@@ -118,11 +118,16 @@ func main() {
 		app.Err.Fatal(err)
 	}
 
+
 	/* If we're using the CLN backend, init
 	 * the checkout runner */
-	err = setupCLNCheckout(&app)
-	if err != nil {
-		app.Err.Fatal(err)
+	 if app.Env.UseCLN {
+		err = setupCLNCheckout(&app)
+		if err != nil {
+			app.Err.Printf("Warning: CLN checkout setup failed: %v", err)
+			app.Env.UseCLN = false
+			app.Err.Printf("CLN checkout disabled, Falling back to OpenNode")
+		}
 	}
 
 	srv := &http.Server{
