@@ -48,6 +48,7 @@ type (
 		HasSatellites bool
 		Color         string
 		Tickets       []*ConfTicket
+		TixSold       uint
 	}
 
 	ConfTicket struct {
