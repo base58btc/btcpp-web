@@ -3,7 +3,6 @@ package config
 import (
 	"html/template"
 	"log"
-	"time"
 
 	"github.com/alexedwards/scs/v2"
 	"github.com/base58btc/btcpp-web/internal/types"
@@ -20,6 +19,4 @@ type AppContext struct {
 	Session       *scs.SessionManager
 	TemplateCache map[string]*template.Template
 	Confs         []*types.Conf
-	Speakers      []*types.Speaker
-	LastSpeakerFetch time.Time
 }

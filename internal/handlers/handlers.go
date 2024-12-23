@@ -380,6 +380,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	app.TemplateCache = make(map[string]*template.Template)
 	err = loadTemplates(app)
+	if err != nil {
+		return r, err
+	}
+
+	getters.GetSpeakers(app)
+	getters.GetTalks(app)
+	getters.GetDiscounts(app)
 
 	return r, err
 }
@@ -494,12 +501,12 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 
 	ctx.Confs = confs
 	
-	/* Also try reloading Speakers */
-	_, err = FetchSpeakers(ctx)
-	if err != nil {
-		http.Error(w, "Unable to load speakers, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/conf-reload speaker load failed ! %s", err.Error())
-		return
+	/* Also reload cached data */
+	getters.GetSpeakers(ctx)
+	getters.GetTalks(ctx)
+	getters.GetDiscounts(ctx)
+	for _, conf := range(confs) {
+		getters.UpdateSoldTix(ctx, conf)
 	}
 
 	/* We redirect to home on success */
@@ -535,25 +542,6 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 }
 
-/* Implement a 5m refresh for the speakers 'cache' */
-func FetchSpeakers(ctx *config.AppContext) ([]*types.Speaker, error) {
-	/* FIXME: use a cache for notion fetches? */
-	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if ctx.Speakers == nil || ctx.LastSpeakerFetch.Before(deadline) {
-		var err error
-		ctx.Speakers, err = getters.ListSpeakers(ctx.Notion)
-		/* Set last fetch to now even if there's errors */
-		ctx.LastSpeakerFetch = time.Now()
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return ctx.Speakers, nil
-}
-
 func filterSpeakers(talks []*types.Talk) types.Speakers {
 	var speakers types.Speakers	
 	already := make(map[string]int)
@@ -579,15 +567,8 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return
 	}
 
-	speakers, err := FetchSpeakers(ctx)
-	if err != nil {
-		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to fetch speakers from Notion!! %s", err.Error())
-		return
-	}
-
 	var talks talkTime
-	talks, err = getters.GetTalksFor(ctx.Notion, conf.Tag, speakers)
+	talks, err = getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
@@ -639,14 +620,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
-	var talks talkTime
-	speakers, err := FetchSpeakers(ctx)
-	if err != nil {
-		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to fetch speakers from Notion!! %s", err.Error())
-		return
-	}
-	talks, err = getters.GetTalksFor(ctx.Notion, conf.Tag, speakers)
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
@@ -657,12 +631,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	evSpeakers = filterSpeakers(talks)
 	sort.Sort(evSpeakers)
 
-	soldCount, err := getters.SoldTixCount(ctx.Notion, conf.Ref)
-	if err != nil {
-		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to fetch ticket count from Notion!! %s", err.Error())
-		return
-	}
+	soldCount := getters.SoldTixCached(ctx, conf)
 
 	buckets, err := bucketTalks(conf, talks)
 	if err != nil {
@@ -1163,7 +1132,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	/* Calculate the discount */
 	var discountRef string
-	discountPrice, discount, err := getters.CalcDiscount(ctx.Notion, conf.Ref, discountCode, tixPrice)
+	discountPrice, discount, err := getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice)
 	if discount != nil {
 		discountRef = discount.Ref
 	}
@@ -1227,7 +1196,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		var discountRef string
 		if discountCode != "" {
 			var discount *types.DiscountCode
-			discountPrice, discount, err = getters.CalcDiscount(ctx.Notion, conf.Ref, discountCode, tixPrice)
+			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice)
 			if err != nil {
 				ctx.Err.Printf("/tix/%s/apply-discount discount not available: %s", tixSlug, err)
 				/* We don't bail though.. just continue */

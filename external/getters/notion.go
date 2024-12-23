@@ -13,6 +13,14 @@ import (
 	"time"
 )
 
+var cacheSpeakers []*types.Speaker
+var lastSpeakerFetch time.Time
+var talks []*types.Talk
+var lastTalksFetch time.Time
+var discounts []*types.DiscountCode
+var lastDiscountFetch time.Time
+
+
 func parseRichText(key string, props map[string]notion.PropertyValue) string {
 	val, ok := props[key]
 	if !ok {
@@ -248,8 +256,27 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func ListTalks(n *types.Notion, speakers []*types.Speaker) ([]*types.Talk, error) {
+func GetTalks(ctx *config.AppContext) {
+	var err error
+	talks, err = ListTalks(ctx)
+	/* Set last fetch to now even if there's errors */
+	lastTalksFetch = time.Now()
+
+	if err != nil {
+		ctx.Err.Printf("error fetching talks %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d talks!", len(talks))
+	}
+}
+
+func ListTalks(ctx *config.AppContext) ([]*types.Talk, error) {
 	var talks []*types.Talk
+	n := ctx.Notion
+
+	speakers, err := FetchSpeakersCached(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	hasMore := true
 	nextCursor := ""
@@ -272,6 +299,31 @@ func ListTalks(n *types.Notion, speakers []*types.Speaker) ([]*types.Talk, error
 	}
 
 	return talks, nil
+}
+
+
+/* This may return nil */
+func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
+		go GetSpeakers(ctx)
+	}
+
+	return cacheSpeakers, nil
+}
+
+func GetSpeakers(ctx *config.AppContext) {
+	var err error
+	cacheSpeakers, err = ListSpeakers(ctx.Notion)
+	/* Set last fetch to now even if there's errors */
+	lastSpeakerFetch = time.Now()
+
+	if err != nil {
+		ctx.Err.Printf("error fetching speakers %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
+	}
 }
 
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
@@ -300,8 +352,19 @@ func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
 	return speakers, nil
 }
 
-func GetTalksFor(n *types.Notion, event string, speakers []*types.Speaker) ([]*types.Talk, error) {
-	talks, err := ListTalks(n, speakers)
+/* This may return nil */
+func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if talks == nil || lastTalksFetch.Before(deadline) {
+		go GetTalks(ctx)
+	}
+
+	return talks, nil
+}
+
+func GetTalksFor(ctx *config.AppContext, event string) ([]*types.Talk, error) {
+	talks, err := FetchTalksCached(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -340,8 +403,32 @@ func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	return discounts, nil
 }
 
-func FindDiscount(n *types.Notion, code string) (*types.DiscountCode, error) {
-	discounts, err := ListDiscounts(n)
+/* This may return nil */
+func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if discounts == nil || lastDiscountFetch.Before(deadline) {
+		go GetDiscounts(ctx)
+	}
+
+	return discounts, nil
+}
+
+func GetDiscounts(ctx *config.AppContext) {
+	var err error
+	discounts, err = ListDiscounts(ctx.Notion)
+	/* Set last fetch to now even if there's errors */
+	lastDiscountFetch = time.Now()
+
+	if err != nil {
+		ctx.Err.Printf("error fetching discounts %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d discounts!", len(discounts))
+	}
+}
+
+func FindDiscount(ctx *config.AppContext, code string) (*types.DiscountCode, error) {
+	discounts, err := FetchDiscountsCached(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -355,8 +442,8 @@ func FindDiscount(n *types.Notion, code string) (*types.DiscountCode, error) {
 	return nil, nil
 }
 
-func CalcDiscount(n *types.Notion, confRef string, code string, tixPrice uint) (uint, *types.DiscountCode, error) {
-	discount, err := FindDiscount(n, code)
+func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice uint) (uint, *types.DiscountCode, error) {
+	discount, err := FindDiscount(ctx, code)
 
 	if err != nil {
 		return tixPrice, nil, err
@@ -433,6 +520,23 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 		regis.ConfRef = props["conf"].Relation[0].ID
 	}
 	return regis
+}
+
+func SoldTixCached(ctx *config.AppContext, conf *types.Conf) (uint) {
+	/* update the sold tix cache every time */
+	go UpdateSoldTix(ctx, conf)
+
+	return conf.TixSold
+}
+
+func UpdateSoldTix(ctx *config.AppContext, conf *types.Conf) {
+	soldTixCount, err := SoldTixCount(ctx.Notion, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("error fetching sold tix %s %s", conf.Ref, err)
+	} else {
+		ctx.Infos.Printf("Loaded sold tix count %s %d!", conf.Ref, soldTixCount)
+		conf.TixSold = soldTixCount
+	}
 }
 
 func SoldTixCount(n *types.Notion, confRef string) (uint, error) {
