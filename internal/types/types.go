@@ -75,7 +75,7 @@ type (
 		Ref        string
 		CodeName   string
 		PercentOff uint
-		ConfRef	   string
+		ConfRef	   []string
 	}
 
 	Speaker struct {

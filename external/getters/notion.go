@@ -55,8 +55,8 @@ func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.
 		PercentOff:     uint(props["PercentOff"].Number),
 	}
 
-	if len(props["Conference"].Relation) > 0 {
-		discount.ConfRef = props["Conference"].Relation[0].ID
+	for _, confRef := range props["Conference"].Relation {
+		discount.ConfRef = append(discount.ConfRef, confRef.ID)
 	}
 
 	return discount
@@ -454,8 +454,13 @@ func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice 
 		return tixPrice, nil, fmt.Errorf("Discount code \"%s\" not found", code)
 	}
 
-	if discount.ConfRef != confRef {
-		return tixPrice, nil, fmt.Errorf("%s not a valid code for conference (%s != %s)", code, discount.ConfRef, confRef)
+	found := false
+	for _, discountConfRef := range discount.ConfRef {
+		found = found || discountConfRef == confRef
+	}
+
+	if !found {
+		return tixPrice, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
 	}
 
 	discountTix := float64(100 - discount.PercentOff) * float64(tixPrice) / float64(100)
