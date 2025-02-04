@@ -401,10 +401,19 @@
     <div class="mx-auto max-w-2xl">
       <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Get Your Hackathon Pass</h2>
       {{ if .Tix }}
-        <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="text-buenos">{{ .Tix.Expires.DateDesc }}</span>
-        {{ if lt .TixLeft 40 }}
-        or after 
-        <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> more tickets are sold!</p>
+        {{ if eq .Tix.Local .MaxTix.Local  }}
+           <!-- max ticket reached -->
+           {{ if lt .TixLeft 40 }}
+              <p class="mt-6 text-xl leading-8 text-gray-600">Only <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> tickets are left!</p>
+           {{ end }}
+        {{ else }}
+          <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="text-buenos">{{ .Tix.Expires.DateDesc }}</span>
+          {{ if lt .TixLeft 40 }}
+          or after 
+            <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> more tickets are sold!</p>
+          {{ else }}
+            </p>
+          {{ end }}
         {{ end }}
       {{ else }}
       <p class="mt-6 text-lg leading-8 text-gray-600">This event is sold out! 🙈</p>
