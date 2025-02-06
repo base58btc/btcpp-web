@@ -134,6 +134,7 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	err := ctx.TemplateCache["email-html-"+conf.Tag].Execute(io.Writer(&htmlBody), &EmailTmpl{
 		URI: ctx.Env.GetURI(),
 		CSS: MiniCss(),
+		ConfTag: conf.Tag,
 	})
 	if err != nil {
 		return err
@@ -146,6 +147,7 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	var textBody bytes.Buffer
 	err = ctx.TemplateCache["email-text-"+conf.Tag].Execute(io.Writer(&textBody), &EmailTmpl{
 		URI: ctx.Env.GetURI(),
+		ConfTag: conf.Tag,
 	})
 	if err != nil {
 		return err

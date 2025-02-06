@@ -40,7 +40,6 @@ type (
 		Desc          string
 		DateDesc      string
 		Venue         string
-		Template      string
 		ShowAgenda    bool
 		ShowTalks     bool
 		HasSatellites bool

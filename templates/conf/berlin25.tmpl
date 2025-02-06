@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>lightning++ berlin | programmable payments</title>
+    <link rel="stylesheet" href="/static/css/mini.css" />
+    <script src="/static/js/script.js" type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+	<!-- facebook open graph tags -->
+	<meta property="og:type" content="website" />
+	<meta property="og:url" content="https://btcpp.dev/conf/berlin25" />
+	<meta property="og:title" content="lightning++ || 2+3+4 Oct 2025" />
+	<meta property="og:description" content="Join us in Berlin, October 2+3+4 2025 for the first ever lightning++" />
+	<meta property="og:image" content="https://btcpp.dev/static/img/berlin25_promo.png" />
+
+	<!-- twitter card tags additive with the og: tags -->
+	<meta name="twitter:card" content="summary_large_image">
+	<meta name="twitter:site" content="@btcplusplus">
+	<meta name="twitter:domain" content="btcpp.dev" />
+	<meta name="twitter:url" content="https://btcpp.dev/conf/berlin25" />
+	<meta name="twitter:title" content="lightning++ || 2+3+4 Oct 2024" />
+	<meta name="twitter:description" content="Join us in Berlin, October 2+3+4 2024 for the first ever lightning++" />
+	<meta name="twitter:image" content="https://btcpp.dev/static/img/berlin25_promo.png" />
+
+	<!-- meta tags -->
+	<meta name="description" content="Join us in Berlin, October 2+3+4 2024 for the first ever lightning++" />
+	<meta name="author" content="bitcoin++"/>
+  </head>
+<body>
+{{ block "conf_nav" .Conf }} {{ end }}
+<section id="intro">
+ <div class="relative">
+    <div class="mx-auto max-w-7xl">
+      <div class="relative z-10 pt-14 lg:w-full lg:max-w-2xl">
+        <svg class="absolute inset-y-0 right-8 hidden h-full w-80 translate-x-1/2 transform fill-white lg:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polygon points="0,0 90,0 50,100 0,100" />
+        </svg>
+
+        <div class="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
+          <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
+            <div class="hidden sm:mb-10 sm:flex">
+              <div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
+                Get involved in the future of lightning. <a href="https://www.cognitoforms.com/Btcplusplus/SponsorshipInquiry" target="_blank" class="whitespace-nowrap font-semibold text-yellow-800"><span class="absolute inset-0" aria-hidden="true"></span>Become a Sponsor<span aria-hidden="true">&rarr;</span></a>
+              </div>
+            </div>
+            <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl"><span class="font-bitcoin">lightning++</span> is programming payments</h1>
+            <p class="mt-6 text-lg leading-8 text-gray-600">Join us in Berlin to learn about lightning and programmable payments</p>
+            <p class="text-lg leading-8 text-gray-600">Berlin, Germany | web3 hub | October 2+3+4, 2025</p>
+            <div class="mt-10 flex items-center gap-x-6">
+              <a href="#tickets" class="rounded-md bg-yellow-800 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-200">Get Your All Conf Pass</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
+      <img class="aspect-[3/2] object-cover lg:aspect-auto lg:h-full lg:w-full" src="/static/img/berlin/leading.png" alt="">
+    </div>
+  </div>
+</section>
+<section id="about" class="mx-auto max-w-2xl lg:max-w-4xl">
+<div class="bg-white py-10 sm:py-10">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <h2 class="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl">Why lightning + bitcoin</h2>
+    <p class="mt-6 text-lg leading-8 text-gray-600">The lightning network is lighting up the private payments world. Can bitcoin defeat its haters and prove to the world it's a Medium of Exchange? Join us in Berlin this October 2+3+4 to explore the exploding ecosystem of programmable payments, anonymous infrastructure that's being added to the Bitcoin sovereign stack.</p>
+    <div class="mx-auto grid max-w-2xl grid-cols-1 gap-8 overflow-hidden lg:mx-0 lg:max-w-none lg:grid-cols-4 mt-12">
+      <div>
+        <time datetime="2021-08" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+	        Anonymous
+      </div>
+      <div>
+        <time datetime="2021-12" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          Fast
+      </div>
+      <div>
+        <time datetime="2022-02" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          Lightning++
+      </div>
+      <div>
+        <time datetime="2022-12" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+         Open Source 
+      </div>
+    </div>
+  </div>
+  </div>
+</section>
+<section id="venue">
+<div class="overflow-hidden bg-white pt-32 pb-8">
+  <div class="mx-auto max-w-7xl px-6 lg:flex lg:px-8">
+    <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-12 gap-y-16 lg:mx-0 lg:min-w-full lg:max-w-none lg:flex-none lg:gap-y-8">
+      <div class="lg:col-end-1 lg:w-full lg:max-w-lg lg:pb-8">
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Conference Venue</h2>
+        <p class="mt-6 text-xl leading-8 text-gray-600">Explore Berlin, get zapped</p>
+        <p class="mt-6 text-base leading-7 text-gray-600"><span class="font-bitcoin">lightning++</span> is happening at web3.hub in Berlin, Germany.</p>
+        <div class="mt-10 flex">
+        </div>
+      </div>
+      <div class="flex flex-wrap items-start justify-end gap-6 sm:gap-8 lg:contents">
+        <div class="w-0 flex-auto lg:ml-auto lg:w-auto lg:flex-none lg:self-end">
+          <img src="/static/img/web3_one.png" alt="" class="aspect-[7/5] w-[37rem] max-w-none rounded-2xl bg-gray-50 object-cover">
+        </div>
+        <div class="contents lg:col-span-2 lg:col-end-2 lg:ml-auto lg:flex lg:w-[37rem] lg:items-start lg:justify-end lg:gap-x-8">
+          <div class="order-first flex w-64 flex-none justify-end self-end lg:w-auto">
+            <img src="/static/img/web3_two.avif" alt="" class="aspect-[4/3] w-[24rem] max-w-none flex-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+          <div class="flex w-96 flex-auto justify-end lg:w-auto lg:flex-none">
+            <img src="/static/img/web3_three.avif" alt="" class="aspect-[7/5] w-[37rem] max-w-none flex-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+          <div class="hidden sm:block sm:w-0 sm:flex-auto lg:w-auto lg:flex-none">
+            <img src="/static/img/web3_four.png" alt="" class="aspect-[4/3] w-[24rem] max-w-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <iframe title="web3.hub" aria-lable="web3 hub" 
+    class="mt-12"
+	  width="100%"
+	  height="500px"
+	  frameborder="0" style="border:0"
+	  referrerpolicy="no-referrer-when-downgrade"
+	  src="https://www.google.com/maps/embed/v1/place?key=AIzaSyBs_ErgLEfaa9HBJfMzdm45JPhQgdPAMwc&amp;q=web3%20hub%20berlin&amp;zoom=16"
+	  allowfullscreen>
+      </iframe>
+    </div>
+  </div>
+</div>
+<div class="bg-white py-10 sm:py-10">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <h3 class="mt-2 text-xl tracking-tight text-gray-900 sm:text-xl">Where to Stay</h3>
+      <p class="mt-6 text-lg leading-8 text-gray-600">The conference is at the web3 coworking space at Möckernstraße 120, 10963 Berlin, Germany. Here’s some suggestions for places to stay that are really close by! We don’t have an official hotel this year, but hope you can find a great accommodation within walking distance of the venue!</p>
+    <div class="mx-auto grid max-w-2xl grid-cols-1 gap-8 overflow-hidden lg:mx-0 lg:max-w-none lg:grid-cols-4 mt-12">
+      <div>
+        <time datetime="2021-08" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
+            <circle cx="2" cy="2" r="2" fill="currentColor" />
+          </svg>
+	   'Mid-Range' Chain
+          <div class="absolute -ml-2 h-px w-screen -translate-x-full bg-gray-900/10 sm:-ml-4 lg:static lg:ml-8 lg:-mr-6 lg:w-auto lg:flex-auto lg:translate-x-0" aria-hidden="true"></div>
+        </time>
+	<a href="https://www.leonardo-hotels.com/booking?hotel=hotel-berlin-potsdamer-platz-by-leonardo-hotels&from=2025-10-01T00:00:00&to=2025-10-05T00:00:00&stay=leisure&redeemPoints=false&paxesConfig=adults,2,children,0,infants,0" target="_blank">
+	<img src="/static/img/berlin_crowneplaza.jpg" height="350" width="100%" class="mt-12 w-full max-h-xl rounded-xl" />
+        <p class="mt-6 text-lg font-semibold leading-8 tracking-tight text-gray-900">Hotel Berlin Potsdamer Platz, Leonardo Hotels</p>
+        <p class="mt-1 text-base leading-7 text-gray-600">From 205€ a night, walking distance to venue.</p>
+	</a>
+      </div>
+
+      <div>
+        <time datetime="2021-12" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
+            <circle cx="2" cy="2" r="2" fill="currentColor" />
+          </svg>
+           More Upscale 
+          <div class="absolute -ml-2 h-px w-screen -translate-x-full bg-gray-900/10 sm:-ml-4 lg:static lg:ml-8 lg:-mr-6 lg:w-auto lg:flex-auto lg:translate-x-0" aria-hidden="true"></div>
+        </time>
+	<a href="https://onepagebooking.com/grimmspot?bookingcode=grimms5&adults=1&children=0&rooms=1&arrival=01.10.2025&departure=05.10.2025&lang=de" target="_blank">
+	<img src="/static/img/berlin/grimm.png" height="350" width="100%" class="mt-12 w-full max-h-xl rounded-xl" />
+        <p class="mt-6 text-lg font-semibold leading-8 tracking-tight text-gray-900">Grimm's Hotel</p>
+        <p class="mt-1 text-base leading-7 text-gray-600">Sophisticated hotel with a restaurant. From 150€ a night.</p>
+	</a>
+      </div>
+
+      <div>
+        <time datetime="2022-02" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
+            <circle cx="2" cy="2" r="2" fill="currentColor" />
+          </svg>
+          Modern Budget
+          <div class="absolute -ml-2 h-px w-screen -translate-x-full bg-gray-900/10 sm:-ml-4 lg:static lg:ml-8 lg:-mr-6 lg:w-auto lg:flex-auto lg:translate-x-0" aria-hidden="true"></div>
+        </time>
+	<a href="https://onepagebooking.com/fjord?id=fjord&module=public&ratetype=wbe&arrival=01.10.2025&departure=05.10.2025&adults=2&children=0&rooms=1" target="_blank">
+	<img src="/static/img/berlin_fjordhotel.jpg" height="350" width="100%"class="mt-12 w-full max-h-xl rounded-xl" />
+        <p class="mt-6 text-lg font-semibold leading-8 tracking-tight text-gray-900">fjord hotel berlin</p>
+        <p class="mt-1 text-base leading-7 text-gray-600">Nice hotel closer to the river. 11m walk from venue. From 112€ a night. NOTE: sends phishing spam to your email!</p>
+	</a>
+      </div>
+
+      <div>
+        <time datetime="2022-12" class="flex items-center text-sm font-semibold leading-6 text-yellow-800">
+          <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
+            <circle cx="2" cy="2" r="2" fill="currentColor" />
+          </svg>
+          Contemporary
+          <div class="absolute -ml-2 h-px w-screen -translate-x-full bg-gray-900/10 sm:-ml-4 lg:static lg:ml-8 lg:-mr-6 lg:w-auto lg:flex-auto lg:translate-x-0" aria-hidden="true"></div>
+        </time>
+	<a href="https://onepagebooking.com/aletto-potsdamer-platz?arrival=2025.10.01&departure=2025.10.05&lang=en&filter=true" target="_blank">
+	<img src="/static/img/berlin_aletto.jpg" height="350" width="100%" class="mt-12 w-full max-h-xl rounded-xl aspect[16/9] sm:aspect[2/1] lg:aspect-[3/2]" />
+        <p class="mt-6 text-lg font-semibold leading-8 tracking-tight text-gray-900">aletto Potsdamer Platz</p>
+        <p class="mt-1 text-base leading-7 text-gray-600">3-minute walk from Gleisdreieck U-Bahn station, 6-min walk to the venue. From 160€ a night.</p>
+	</a>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+<section id="hackathon">
+  <div class="bg-white py-32">
+    <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+      <div class="mx-auto max-w-4xl text-left">
+        <h2 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl" id="hackathon">Hackathon</h2>
+        <p class="mt-6 text-lg leading-8 text-gray-600">bitcoin++ historically has been the launchpad for many great projects and new ideas in the bitcoin space. At this lightning++, we're proud to offer our biggest prize pool yet, with over 10M sats and counting to win across three different bonus challenges and prize tiers.</p>
+        <p class="mt-6 mb-20 text-lg leading-8 text-gray-600">Here's our sponsors contributing to the prize pool for this conference's hackathon</p>
+        <a href="https://bitcoin.devpost.com/" target="_blank" class="rounded-md bg-yellow-800 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-200">Current prizes + entries</a>
+        <div class="mt-20 mx-auto grid w-full max-w-xl grid-cols-2 items-center gap-y-12 sm:gap-y-14 lg:mx-0 lg:max-w-none lg:pl-8">
+          <a href="https://base58.school" target="_blank" class="p-4 sm:p-12">
+            <img class="max-h-24 w-full object-contain object-center" src="/static/img/base58.svg" alt="Base58" width="150" height="auto">
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="speakers">
+<div class="bg-white py-32">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Who's Coming</h2>
+      <p class="mt-4 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span>'s third ever Berlin conference has an all-star lineup of lightning and payment experts.</p>
+    </div>
+    <ul role="list" class="mx-auto mt-20 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ range .EventSpeakers }}
+        {{ block "speaker" . }} {{ end }}
+      {{ end }}
+    </ul>
+  </div>
+</div>
+</section>
+{{ if .Conf.ShowAgenda }}
+<section id="agenda">
+<div class="bg-white py-32">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Conference Agenda</h2>
+    </div>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Thurs, Oct 2nd</h3>
+	  <div class="mt-6 relative">
+	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+	      <div class="w-full border-t border-gray-300"></div>
+	    </div>
+	    <div class="relative flex justify-start">
+	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:00 am </span>
+	    </div>
+	  </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1A") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1B") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1C") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1D") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:00 pm - 12:45 pm</span>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1E") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1F") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:15 pm - 3:00 pm</span>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1G") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "1H") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Fri, Oct 3rd</h3>
+    <div class="mt-6 relative">
+	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+	      <div class="w-full border-t border-gray-300"></div>
+	    </div>
+	    <div class="relative flex justify-start">
+	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:00 am </span>
+	    </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2A") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2B") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2C") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:00 pm - 12:45 pm</span>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2D") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2E") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2F") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2G") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2H") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "2I") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Saturday, Oct 5th</h3>
+    <div class="mt-6 relative">
+	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+	      <div class="w-full border-t border-gray-300"></div>
+	    </div>
+	    <div class="relative flex justify-start">
+	      <span class="bg-white px-2 text-sm text-gray-500">Opens + Breakfast, 9:00 am </span>
+	    </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "3A") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 11:45 pm - 12:30 pm</span>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "3B") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "3C") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ with (index .Buckets "3D") }}
+        {{ range . }}
+          {{ block "session" . }} {{ end }}
+        {{ end }}
+      {{ end }}
+    </div>
+  </div>
+</div>
+</section>
+{{ end }}
+<section id="tickets">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Get Your All Conference Pass</h2>
+      {{ if .Tix }}
+        {{ if eq .Tix.USD .MaxTix.USD }}
+           <!-- max ticket reached -->
+           {{ if lt .TixLeft 40 }}
+              <p class="mt-6 text-xl leading-8 text-gray-600">Only <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> tickets are left!</p>
+           {{ end }}
+        {{ else }}
+          <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="text-buenos">{{ .Tix.Expires.DateDesc }}</span>
+          {{ if lt .TixLeft 40 }}
+          or after 
+            <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> more tickets are sold!</p>
+          {{ else }}
+            </p>
+          {{ end }}
+        {{ end }}
+      {{ else }}
+      <p class="mt-6 text-lg leading-8 text-gray-600">This event is sold out! 🙈</p>
+      {{ end }}
+    </div>
+  </div>
+  {{ if .Tix }}
+  <div class="relative isolate bg-white pb-24 px-6 sm:pb-32 lg:px-16">
+    <div class="absolute inset-x-0 -top-3 -z-10 transform-gpu overflow-hidden px-36 blur-3xl" aria-hidden="true">
+      <svg class="mx-auto w-[72.1875rem]" viewBox="0 0 1155 678">
+        <path fill="url(#083c110e-60c8-42bb-a9db-29bba74cc569)" fill-opacity=".3" d="M317.219 518.975L203.852 678 0 438.341l317.219 80.634 204.172-286.402c1.307 132.337 45.083 346.658 209.733 145.248C936.936 126.058 882.053-94.234 1031.02 41.331c119.18 108.451 130.68 295.337 121.53 375.223L855 299l21.173 362.054-558.954-142.079z" />
+        <defs>
+          <linearGradient id="083c110e-60c8-42bb-a9db-29bba74cc569" x1="1155.49" x2="-78.208" y1=".177" y2="474.645" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#9089FC" />
+            <stop offset="1" stop-color="#FF80B5" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="mx-auto max-w-4xl lg:max-w-7xl">
+    <div class="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2">
+    <div class="flex flex-col justify-between rounded-3xl bg-white p-8 ring-1 ring-gray-200 xl:p-10 lg:z-10 lg:rounded-b-none">
+      <div>
+        <h3 id="tier-bitcoin" class="text-base font-semibold leading-7 text-bitcoin">Pay with Bitcoin</h3>
+        <p class="mt-4 flex items-baseline gap-x-2">
+          {{ if ne .MaxTix.BTC .Tix.BTC }}
+          <span class="line-through text-3xl font-bold tracking-tight text-gray-300">€{{ .MaxTix.BTC }} {{ .Tix.Currency }}</span>
+          {{ end }}
+          <span class="text-3xl font-bold tracking-tight text-orange">€{{ .Tix.BTC }} {{ .Tix.Currency }}</span>
+          <span class="text-base text-gray-500">/ticket</span>
+        </p>
+        <p class="mt-6 text-base leading-7 text-gray-600">Spend bitcoin, save money.</p>
+        <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            All conference pass
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Unlimited access to workshops
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Ticket includes lunch + refreshments 
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="bitcoin" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Discounted rate for paying in bitcoin
+          </li>
+
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+             Swag bag with t-shirts and other goodies
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Compete for hackathon prizes
+          </li>
+        </ul>
+      </div>
+      <a href="/tix/{{ .Tix.ID }}+default+btc" aria-describedby="tier-bitcoin" class="mt-8 block rounded-md py-2.5 px-3.5 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-800 sm:mt-10 bg-bitcoin" style="background: #FF8A00">{{ block "btcbutton" . }} {{ end }}</a>
+    </div>
+
+    <div class="flex flex-col justify-between rounded-3xl bg-white p-8 ring-1 ring-gray-200 xl:p-10 lg:mt-8 lg:rounded-l-none">
+      <div>
+          <h3 id="tier-fiat" class="text-base font-semibold leading-7 text-yellow-800">Pay with Fiat</h3>
+          <p class="mt-4 flex items-baseline gap-x-2">
+            {{ if ne .MaxTix.USD .Tix.USD}}
+              <span class="line-through text-3xl font-bold tracking-tight text-gray-300">€{{ .MaxTix.USD }} {{ .Tix.Currency }}</span>
+            {{ end }}
+            <span class="text-3xl font-bold tracking-tight text-gray-900">€{{ .Tix.USD}} {{ .Tix.Currency }}</span>
+            <span class="text-base text-gray-500">/ticket</span>
+          </p>
+          <p class="mt-6 text-base leading-7 text-gray-600">Get your <span class="font-bitcoin">bitcoin++</span> ticket using Stripe checkout</p>
+        <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            All conference pass
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Unlimited access to workshops
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Ticket includes lunch + refreshments 
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Normal rate for paying with fiat
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Swag bag with t-shirts and other goodies
+          </li>
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none text-yellow-800" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+          Compete for hackathon prizes
+          </li>
+        </ul>
+        </div>
+        <a href="/tix/{{ .Tix.ID }}+default+fiat" aria-describedby="tier-fiat" class="mt-8 block rounded-md py-2.5 px-3.5 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-200 sm:mt-10 text-yellow-800 ring-1 ring-inset ring-yellow-200 hover:ring-yellow-200">Checkout</a>
+      </div>
+    {{ end }}
+    </div>
+</section>
+<!--
+<section id="satellites">
+  <div class="bg-white py-32">
+    <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+      <div class="mx-auto max-w-2xl">
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Satellite Events</h2>
+      </div>
+      <p class="mt-2 text-lg leading-8 text-gray-600">Other bitcoin events happening in Berlin. Additional ticket/registration may be necessary!</p>
+      <div class="mt-16 space-y-20 lg:mt-20 lg:space-y-20">
+        <article class="relative isolate flex flex-col gap-8 lg:flex-row">
+          <div class="relative aspect-[16/9] sm:aspect-[2/1] lg:aspect-square lg:w-64 lg:shrink-0">
+            <img src="/static/img/berlin_hack_day.png" alt="" class="absolute inset-0 h-full w-full rounded-2xl bg-gray-50 object-cover">
+            <div class="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10"></div>
+          </div>
+          <div>
+            <div class="flex items-center gap-x-4 text-xs">
+              <time datetime="2020-03-16" class="text-gray-500">Oct 9, 2024 @ 10am</time>
+              <span class="relative z-10 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600 hover:bg-gray-100">Hackathon</span>
+            </div>
+            <div class="group relative max-w-xl">
+              <h3 class="mt-3 text-lg font-semibold leading-6 text-start text-gray-900 group-hover:text-gray-600">
+                <a href="https://chgoodchild.github.io/nostrhackday.github.io/" target="_blank">
+                  <span class="absolute inset-0"></span>
+                  Nostr Hackday
+                </a>
+              </h3>
+              <p class="mt-5 text-sm leading-6 text-gray-600"></p>
+            </div>
+            <div class="mt-6 flex border-t border-gray-900/5 pt-6">
+              <div class="relative flex items-center gap-x-4">
+                <img src="/static/img/berlin_nostr_hack.jpg" alt="" class="h-10 w-10 rounded-full bg-gray-50">
+                <div class="text-sm leading-6">
+                  <p class="font-semibold text-gray-900">
+                    <a href="https://primal.net/p/npub1w8lxsgc67y5jmvgfhjqrxtkj0gnxtrcsvrtzh97kpd66pw35e5gstn94qr" target="_blank">
+                      <span class="absolute inset-0"></span>
+		      Nostr Hack Day
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </div>
+</section>
+-->
+<section id="sponsors">
+<div class="bg-white py-24 sm:py-32">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+    <div class="grid grid-cols-1 items-top gap-x-8 gap-y-16 lg:grid-cols-2">
+      <div class="mx-auto w-full max-w-xl lg:mx-0">
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900"><span class="font-bitcoin">bitcoin++</span> is made possible by the support of the bitcoin community</h2>
+        <p class="mt-6 mb-6 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span> is proud to be supported by a wide range of companies from across the bitcoin ecosystem. Check out what they're up to, both here online as well as at the conference.</p>
+        <a href="https://www.cognitoforms.com/Btcplusplus/SponsorshipInquiry" target="_blank" class="mt-6 rounded-md bg-yellow-800 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-yellow-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-yellow-200">Become a Sponsor</a>
+      </div>
+      <div class="mx-auto grid w-full max-w-xl grid-cols-2 items-center gap-y-12 sm:gap-y-14 lg:mx-0 lg:max-w-none lg:pl-8">
+        <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
+          <h3 class="text-xl font-bold tracking-tight text-gray-900">🔶Satoshi Level Sponsors🔶</h3>
+        </div>
+        <!--
+        <a href="https://hrf.org/" target="_blank" class="p-4 sm:p-12"
+        style="grid-column: span 2">
+        <img class="max-h-32 w-full object-contain object-center" src="/static/img/hrf.svg" alt="HRF" width="300" height="300">
+        </a>
+        <a href="https://wolfnyc.com/" target="_blank" class="p-4" style="grid-column: span 2">
+        <img class="w-full object-contain object-center" src="/static/img/wolf_color.svg" alt="StoneRidge Group" width="150" height="auto">
+        </a>
+        -->
+        <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
+          <h3 class="text-lg font-bold tracking-tight text-gray-900">💎Diamond Level Sponsors💎</h3>
+        </div>
+        <a href="https://fulmo.org/" target="_blank" class="p-4 sm:p-12" style="background-color: #000720">
+        <img class="max-h-24 w-full object-contain object-center" src="/static/img/fulmo.png" alt="Fulmo" width="300" height="300">
+        </a>
+        <a href="https://base58.school" target="_blank" class="p-4 sm:p-12">
+        <img class="max-h-24 w-full object-contain object-center" src="/static/img/base58.svg" alt="Base58" width="150" height="auto">
+        </a>
+        <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
+          <h3 class="text-lg font-bold tracking-tight text-gray-900">🪙Gold Level Sponsors🪙</h3>
+        </div>
+        <!--
+        <a href="https://opencash.dev/" target="_blank" class="p-4 sm:p-12">
+        <img class="max-h-24 w-full object-contain object-center" src="/static/img/opencash.svg" alt="OpenCash Association" width="150" height="auto">
+        </a>
+        -->
+        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center">
+          <h3 class="text-lg font-bold tracking-tight text-gray-900">📡 Media Partners 📺</h3>
+        </div>
+        <a href="https://www.blocktrainer.de/" target="_blank" class="p-4 sm:p-12">
+        <img class="max-h-12 w-full object-contain object-center" src="/static/img/blocktrainer.svg" alt="Blocktrainer" width="300" height="300">
+        </a>
+        <a href="https://nodesignal.space/" target="_blank" class="p-4 sm:p-12">
+        <img class="max-h-20 w-full object-contain object-center" src="/static/img/nodesignal.jpg" alt="Nodesignal Podcast" width="300" height="300">
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+  </body>
+</html>

@@ -52,18 +52,6 @@ func loadTemplates(app *config.AppContext) error {
 	}
 	app.TemplateCache["success.tmpl"] = success
 
-	berlin, err := template.ParseFiles("templates/berlin.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["berlin.tmpl"] = berlin
-
-	berlin24, err := template.ParseFiles("templates/berlin24.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["berlin24.tmpl"] = berlin24
-
 	talks, err := template.ParseFiles("templates/sched.tmpl",
 		"templates/sched_desc.tmpl",
 		"templates/conf_nav.tmpl")
@@ -72,35 +60,6 @@ func loadTemplates(app *config.AppContext) error {
 	}
 	app.TemplateCache["talks.tmpl"] = talks
 
-	buenos, err := template.ParseFiles("templates/buenos.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/multi_session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["buenos.tmpl"] = buenos
-
-	floripa, err := template.ParseFiles("templates/floripa.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/multi_session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["floripa.tmpl"] = floripa
-
-	atx, err := template.ParseFiles("templates/atx.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["atx.tmpl"] = atx
-
-	atx25, err := template.ParseFiles("templates/atx25.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["atx25.tmpl"] = atx25
-
-	atx24, err := template.ParseFiles("templates/atx24.tmpl", "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["atx24.tmpl"] = atx24
 
 	ticket, err := template.New("ticket.tmpl").Funcs(template.FuncMap{
 		"safesrc": func(s string) template.HTMLAttr {
@@ -116,13 +75,21 @@ func loadTemplates(app *config.AppContext) error {
 	app.TemplateCache["ticket.tmpl"] = ticket
 
 	for _, conf := range app.Confs {
+		/* Load every conf's template */
+		tmplstr := fmt.Sprintf("%s.tmpl", conf.Tag)
+		files, err := template.ParseFiles("templates/conf/" + tmplstr, "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl", "templates/section/speaker.tmpl")
+		if err != nil {
+			return err
+		}
+		app.TemplateCache[tmplstr] = files
+
+		/* Only load email templates for active conferences */
 		if !conf.Active {
 			continue
 		}
 
 		htmlEmailTmpl := fmt.Sprintf("templates/emails/%s.tmpl", conf.Tag)
 		textEmailTmpl := fmt.Sprintf("templates/emails/text-%s.tmpl", conf.Tag)
-
 		htmlEmail, err := template.ParseFiles(htmlEmailTmpl)
 		if err != nil {
 			return err
@@ -649,8 +616,9 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	} else {
 		tixLeft = currTix.Max - soldCount
 	}
-	tmpl := ctx.TemplateCache[conf.Template]
-	err = tmpl.ExecuteTemplate(w, conf.Template, &ConfPage{
+	tmplTag := fmt.Sprintf("%s.tmpl", conf.Tag)
+	tmpl := ctx.TemplateCache[tmplTag]
+	err = tmpl.ExecuteTemplate(w, tmplTag, &ConfPage{
 		Conf:    conf,
 		Tix:     currTix,
 		MaxTix:  maxTix,
@@ -767,6 +735,7 @@ func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, erro
 type EmailTmpl struct {
 	URI string
 	CSS string
+	ConfTag string
 }
 
 type TicketTmpl struct {
