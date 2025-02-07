@@ -37,16 +37,21 @@ func MiniCss() string {
 	return string(css)
 }
 
+var pages []string = []string { "index", "about", "sponsor", "contact", "talk", "press" }
+
 /* https://www.calhoun.io/intro-to-templates-p3-functions/ */
 func loadTemplates(app *config.AppContext) error {
 
-	index, err := template.ParseFiles("templates/index.tmpl", "templates/main_nav.tmpl", "templates/section/about.tmpl")
-	if err != nil {
-		return err
+	for _, page := range pages {
+		templName := fmt.Sprintf("%s.tmpl", page)
+		pageTmpl, err := template.ParseFiles("templates/" + templName, "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
+		if err != nil {
+			return err
+		}
+		app.TemplateCache[templName] = pageTmpl
 	}
-	app.TemplateCache["index.tmpl"] = index
 
-	success, err := template.ParseFiles("templates/success.tmpl", "templates/main_nav.tmpl", "templates/section/about.tmpl")
+	success, err := template.ParseFiles("templates/success.tmpl", "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
 	if err != nil {
 		return err
 	}
@@ -54,7 +59,8 @@ func loadTemplates(app *config.AppContext) error {
 
 	talks, err := template.ParseFiles("templates/sched.tmpl",
 		"templates/sched_desc.tmpl",
-		"templates/conf_nav.tmpl")
+		"templates/conf_nav.tmpl",
+		"templates/section/footer.tmpl")
 	if err != nil {
 		return err
 	}
@@ -77,7 +83,7 @@ func loadTemplates(app *config.AppContext) error {
 	for _, conf := range app.Confs {
 		/* Load every conf's template */
 		tmplstr := fmt.Sprintf("%s.tmpl", conf.Tag)
-		files, err := template.ParseFiles("templates/conf/" + tmplstr, "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl", "templates/section/speaker.tmpl")
+		files, err := template.ParseFiles("templates/conf/" + tmplstr, "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl", "templates/section/speaker.tmpl", "templates/section/footer.tmpl")
 		if err != nil {
 			return err
 		}
@@ -103,7 +109,7 @@ func loadTemplates(app *config.AppContext) error {
 		app.TemplateCache["email-text-"+conf.Tag] = textEmail
 	}
 
-	checkin, err := template.ParseFiles("templates/checkin.tmpl", "templates/main_nav.tmpl")
+	checkin, err := template.ParseFiles("templates/checkin.tmpl", "templates/main_nav.tmpl", "templates/section/footer.tmpl")
 	if err != nil {
 		return err
 	}
@@ -115,7 +121,7 @@ func loadTemplates(app *config.AppContext) error {
 	}
 	app.TemplateCache["collect-email.tmpl"] = collect
 
-	emailincludes, err := template.ParseFiles("templates/tix_details.tmpl")
+	emailincludes, err := template.ParseFiles("templates/tix_details.tmpl", "templates/section/footer.tmpl")
 	if err != nil {
 		return err
 	}
@@ -258,8 +264,19 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	// Set up the routes, we'll have one page per course
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		maybeReload(app)
-		Home(w, r, app)
+		RenderPage(w, r, app, "index")
 	}).Methods("GET")
+
+	/* List of 'normie' pages */
+	for _, page := range pages {
+		/* Normie Pages */
+		renderPage := page
+		r.HandleFunc("/" + renderPage, func(w http.ResponseWriter, r *http.Request) {
+			maybeReload(app)
+			RenderPage(w, r, app, renderPage)
+		}).Methods("GET")
+	}
+
 	/* Legacy redirects! */
 	r.HandleFunc("/berlin23", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/berlin23", http.StatusSeeOther)
@@ -387,7 +404,9 @@ func getSessionKey(p string, r *http.Request) (string, bool) {
 	return key, ok
 }
 
-type HomePage struct{}
+type HomePage struct{
+	Year uint
+}
 
 type ConfPage struct {
 	Conf    *types.Conf
@@ -398,10 +417,12 @@ type ConfPage struct {
 	Talks   []*types.Talk
 	EventSpeakers []*types.Speaker
 	Buckets map[string]sessionTime
+	Year    uint
 }
 
 type SuccessPage struct {
 	Conf *types.Conf
+	Year uint
 }
 
 type TixFormPage struct {
@@ -415,6 +436,7 @@ type TixFormPage struct {
 	DiscountRef string
 	HMAC	  string
 	Err       string
+	Year uint
 }
 
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
@@ -439,6 +461,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		w.WriteHeader(http.StatusBadRequest)
 		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
+			Year:     currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -451,6 +474,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		w.WriteHeader(http.StatusUnauthorized)
 		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg: "Wrong registration PIN",
+			Year: currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -493,6 +517,7 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			err := ctx.TemplateCache["checkin.tmpl"].ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
+				Year:      currentYear(),
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -552,6 +577,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		Talks: talks,
 		EventSpeakers: evSpeakers,
 		Conf:  conf,
+		Year:  currentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -571,6 +597,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	tmpl := ctx.TemplateCache["success.tmpl"]
 	err = tmpl.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
 		Conf: conf,
+		Year: currentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -627,6 +654,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		Talks:   talks,
 		EventSpeakers: evSpeakers,
 		Buckets: buckets,
+		Year: currentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -635,15 +663,23 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 }
 
-func Home(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+func currentYear() uint {
+	year, _, _ := time.Now().Date()
+	return uint(year)
+}
 
+func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, page string) {
+
+	template := fmt.Sprintf("%s.tmpl", page)
 	// Define the data to be rendered in the template
-	tmpl := ctx.TemplateCache["index.tmpl"]
+	tmpl := ctx.TemplateCache[template]
 
-	err := tmpl.ExecuteTemplate(w, "index.tmpl", &HomePage{})
+	err := tmpl.ExecuteTemplate(w, template, &HomePage{
+		Year: currentYear(),
+	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/ ExecuteTemplate failed ! %s", err.Error())
+		ctx.Err.Printf("/%s ExecuteTemplate failed ! %s", page, err.Error())
 		return
 	}
 }
@@ -849,6 +885,7 @@ type CheckInPage struct {
 	NeedsPin   bool
 	TicketType string
 	Msg        string
+	Year       uint
 }
 
 func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -864,6 +901,7 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			err := ctx.TemplateCache["checkin.tmpl"].ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
+				Year:     currentYear(),
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -890,6 +928,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		w.WriteHeader(http.StatusBadRequest)
 		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
+			Year:     currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -902,6 +941,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		w.WriteHeader(http.StatusUnauthorized)
 		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg: "Wrong registration PIN",
+			Year: currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -928,6 +968,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	err = tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 		TicketType: tix_type,
 		Msg:        msg,
+		Year:       currentYear(),
 	})
 
 	if err != nil {
@@ -1125,6 +1166,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		Err:      errStr,
 		HMAC:     calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
 		Count:    uint(1),
+		Year:     currentYear(),
 	})
 
 	if err != nil {
@@ -1188,6 +1230,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			Err:      errStr,
 			HMAC:     calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
 			Count:    uint(1),
+			Year:     currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
