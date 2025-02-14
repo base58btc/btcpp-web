@@ -37,7 +37,7 @@ func MiniCss() string {
 	return string(css)
 }
 
-var pages []string = []string { "index", "about", "sponsor", "contact", "talk", "press" }
+var pages []string = []string { "index", "about", "sponsor", "contact", "talk", "press", "volunteer" }
 
 /* https://www.calhoun.io/intro-to-templates-p3-functions/ */
 func loadTemplates(app *config.AppContext) error {
