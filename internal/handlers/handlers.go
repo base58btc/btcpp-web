@@ -44,7 +44,7 @@ func loadTemplates(app *config.AppContext) error {
 
 	for _, page := range pages {
 		templName := fmt.Sprintf("%s.tmpl", page)
-		pageTmpl, err := template.ParseFiles("templates/" + templName, "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
+		pageTmpl, err := template.ParseFiles("templates/embeds/" + templName, "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
 		if err != nil {
 			return err
 		}
