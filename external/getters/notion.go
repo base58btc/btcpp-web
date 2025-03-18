@@ -172,6 +172,7 @@ func parseConfTicket(pageID string, props map[string]notion.PropertyValue) *type
 		USD:   uint(props["USD"].Number),
 		Max:   uint(props["Max"].Number),
 		Currency: parseRichText("Currency", props),
+		Symbol: parseRichText("Symbol", props),
 	}
 
 	if len(props["Conf"].Relation) > 0 {
