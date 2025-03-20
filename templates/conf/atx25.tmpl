@@ -220,7 +220,7 @@
     <div class="mx-auto max-w-2xl">
       <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Conference Agenda</h2>
     </div>
-    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Wed, May 1st</h3>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Wed, May 7th</h3>
 	  <div class="mt-6 relative">
 	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
 	      <div class="w-full border-t border-gray-300"></div>
@@ -252,6 +252,9 @@
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
       </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12 pm - 1 pm</span>
+      </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "1C") }}
@@ -264,9 +267,6 @@
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
       </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:30 pm - 1:30 pm</span>
-      </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "1D") }}
@@ -278,6 +278,9 @@
     <div class="mt-6 relative">
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
       </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -303,9 +306,6 @@
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
       </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 3:30 pm - 4:00 pm</span>
-      </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "1G") }}
@@ -314,19 +314,7 @@
         {{ end }}
       {{ end }}
     </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "1H") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Thurs, May 2nd</h3>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Thurs, May 8th</h3>
     <div class="mt-6 relative">
 	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
 	      <div class="w-full border-t border-gray-300"></div>
@@ -358,6 +346,9 @@
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
       </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12 pm - 1 pm</span>
+      </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "2C") }}
@@ -370,9 +361,6 @@
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
       </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:30 pm - 1:30 pm</span>
-      </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "2D") }}
@@ -384,6 +372,9 @@
     <div class="mt-6 relative">
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
       </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -405,46 +396,7 @@
         {{ end }}
       {{ end }}
     </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 3:30 pm - 4:00 pm</span>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "2G") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "2H") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "2I") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Fri, May 3rd</h3>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Fri, May 9th</h3>
     <div class="mt-6 relative">
 	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
 	      <div class="w-full border-t border-gray-300"></div>
@@ -465,7 +417,7 @@
         <div class="w-full border-t border-gray-300"></div>
       </div>
       <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:30 pm - 1:30 pm</span>
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12 pm - 1 pm</span>
       </div>
     </div>
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
@@ -475,6 +427,7 @@
         {{ end }}
       {{ end }}
     </div>
+    <!--
     <div class="mt-6 relative">
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
         <div class="w-full border-t border-gray-300"></div>
@@ -483,54 +436,9 @@
         <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 3:30 pm - 4:00 pm</span>
       </div>
     </div>
+    -->
     <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
       {{ with (index .Buckets "3C") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Sat, May 4th</h3>
-    <div class="mt-6 relative">
-	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
-	      <div class="w-full border-t border-gray-300"></div>
-	    </div>
-	    <div class="relative flex justify-start">
-	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:30 am </span>
-	    </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "4A") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12:30 pm - 1:30 pm</span>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "4B") }}
-        {{ range . }}
-          {{ block "session" . }} {{ end }}
-        {{ end }}
-      {{ end }}
-    </div>
-    <div class="mt-6 relative">
-      <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="w-full border-t border-gray-300"></div>
-      </div>
-      <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 4:00 pm - 4:30 pm</span>
-      </div>
-    </div>
-    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
-      {{ with (index .Buckets "4C") }}
         {{ range . }}
           {{ block "session" . }} {{ end }}
         {{ end }}
