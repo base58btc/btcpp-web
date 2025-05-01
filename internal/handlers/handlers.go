@@ -290,6 +290,21 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/atx24", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/atx24", http.StatusSeeOther)
 	}).Methods("GET")
+	r.HandleFunc("/riga", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/riga", http.StatusSeeOther)
+	}).Methods("GET")
+	r.HandleFunc("/privacy", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/riga", http.StatusSeeOther)
+	}).Methods("GET")
+	r.HandleFunc("/istanbul", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/istanbul", http.StatusSeeOther)
+	}).Methods("GET")
+	r.HandleFunc("/taipei", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/taipei", http.StatusSeeOther)
+	}).Methods("GET")
+	r.HandleFunc("/lightning", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/berlin25", http.StatusSeeOther)
+	}).Methods("GET")
 	r.HandleFunc("/ba24", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/ba24", http.StatusSeeOther)
 	}).Methods("GET")
