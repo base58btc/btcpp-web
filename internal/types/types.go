@@ -42,6 +42,7 @@ type (
 		Venue         string
 		ShowAgenda    bool
 		ShowTalks     bool
+		ShowHackathon bool
 		HasSatellites bool
 		Color         string
 		Tickets       []*ConfTicket

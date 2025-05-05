@@ -11,6 +11,9 @@
       <div class="hidden lg:flex lg:gap-x-12">
         <a href="/conf/{{ .Tag }}#about" class="text-sm font-semibold leading-6 text-gray-900">about</a>
 	      <a href="/conf/{{ .Tag }}#venue" class="text-sm font-semibold leading-6 text-gray-900">venue</a>
+        {{ if .ShowHackathon }}
+	      <a href="/conf/{{ .Tag }}#hackathon" class="text-sm font-semibold leading-6 text-gray-900">hackathon</a>
+        {{ end }}
         {{ if .ShowAgenda }}
 	      <a href="/conf/{{ .Tag }}#agenda" class="text-sm font-semibold leading-6 text-gray-900">agenda</a>
         {{ end }}
@@ -43,6 +46,7 @@
               <div class="">
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#about" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">about</a>
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#venue" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">venue</a>
+		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#hackathon" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">hackathon</a>
                 {{ if .ShowAgenda }}
 	              <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#agenda" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">agenda</a>
                 {{ end }}
