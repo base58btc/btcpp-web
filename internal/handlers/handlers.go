@@ -116,6 +116,12 @@ func loadTemplates(app *config.AppContext) error {
 	}
 	app.TemplateCache["checkin.tmpl"] = checkin
 
+	sendcal, err := template.ParseFiles("templates/sendcal.tmpl", "templates/main_nav.tmpl", "templates/section/footer.tmpl")
+	if err != nil {
+		return err
+	}
+	app.TemplateCache["sendcal.tmpl"] = sendcal
+
 	collect, err := template.ParseGlob("templates/*.tmpl")
 	if err != nil {
 		return err
@@ -928,6 +934,29 @@ func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Infos.Printf("/welcome-email ExecuteTemplate failed ! %s", err.Error())
 	}
+}
+
+type SendCalPage struct {
+	NeedsPin   bool
+	ConfTag    string
+	Year       uint
+}
+
+func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	tmpl := ctx.TemplateCache["sendcal.tmpl"]
+	err := tmpl.ExecuteTemplate(w, "sendcal.tmpl", &SendCalPage{
+		NeedsPin: false,
+		ConfTag: "atx25",
+		Year:    currentYear(),
+	})
+
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("sendcal.tmpl ExecuteTemplate failed ! %s", err.Error())
+	}
+
+	// INIT SEND CAL
+	google.RunCalendarInvites()
 }
 
 type CheckInPage struct {
