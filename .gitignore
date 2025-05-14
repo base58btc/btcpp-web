@@ -6,5 +6,7 @@ todo
 *.log
 .env
 .DS_Store
+<<<<<<< HEAD
 
 /media/*/
+credentials.json
