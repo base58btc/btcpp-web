@@ -830,6 +830,28 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 }
 
+type SendCalPage struct {
+	NeedsPin   bool
+	ConfTag    string
+	Year       uint
+}
+
+func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	err := ctx.TemplateCache.ExecuteTemplate(w, "sendcal.tmpl", &SendCalPage{
+		NeedsPin: false,
+		ConfTag: "atx25",
+		Year:    helpers.CurrentYear(),
+	})
+
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("sendcal.tmpl ExecuteTemplate failed ! %s", err.Error())
+	}
+
+	// INIT SEND CAL
+	google.RunCalendarInvites()
+}
+
 type CheckInPage struct {
 	NeedsPin   bool
 	TicketType string

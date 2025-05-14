@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>bitcoin++</title>
+  <link rel="stylesheet" href="/static/css/mini.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/static/js/script.js" type="text/javascript"></script>
+  <!-- FIXME: Show emoji that maps to the conf you're checking in for? -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+</head>
+<body class="h-full bg-green-300">
+{{ if eq .ConfTag "" }}
+  {{ if .NeedsPin }}
+    <body class="h-full">
+  {{ end }}
+    <body class="h-full bg-red-500">
+{{ end }}
+{{ block "mainnav" . }} {{ end }}
+<!-- can i get tailwind to pick up these colors? -->
+  <section id="sendcal">
+    <div class="flex flex-col" >
+    <div class="pt-20 sm:pt-20 grow-0">
+      <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <div class="max-w-2xl text-start">
+         {{ if .NeedsPin }}
+	  <form method="POST">
+	    <input id="pin" type="input" name="pin" placeholder="Passcode" required class="py-3 px-4 border-gray border-2 rounded-sm" />
+	    <button class="mt-4 bg-black text-white hover:text-white-400 px-4 py-2 rounded-md" type="submit" >Enter</button>
+	  </form> 
+         {{ else }}
+         <h2 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-4xl">{{ .ConfTag }} emails sending!!</h2>
+          {{ end }}
+         </div>
+         </div>
+       </div>
+    </div>
+  </section>
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>
