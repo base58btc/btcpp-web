@@ -22,6 +22,7 @@ import (
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/external/google"
 	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
 
@@ -297,6 +298,32 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/check-in/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
+
+	r.HandleFunc("/auth-login", func(w http.ResponseWriter, r *http.Request) {
+		google.HandleLogin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/gcal-callback", func(w http.ResponseWriter, r *http.Request) {
+		ok := google.HandleLoginCallback(w, r, app)
+		// FIXME: redirect to any? internal page
+		if ok {
+			http.Redirect(w, r, "/internal/sendcal", http.StatusFound)
+		}
+	}).Methods("GET")
+
+	r.HandleFunc("/internal/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		if !google.IsLoggedIn() {
+			http.Redirect(w, r, "/auth-login", http.StatusFound)
+			return
+		}
+		err := google.RunCalendarInvites()
+		if err != nil {
+			app.Err.Printf("Unable to send cal invites! %s", err)
+		} else {
+			app.Infos.Printf("Sent calendar invites!")
+		}
+	}).Methods("GET", "POST")
+
 	r.HandleFunc("/ticket/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		Ticket(w, r, app)
 	}).Methods("GET")
@@ -334,6 +361,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	if err != nil {
 		return r, err
 	}
+
+	// FIXME: Put in main?
+	google.InitOauth()
 
 	return r, err
 }
