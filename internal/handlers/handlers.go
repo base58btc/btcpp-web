@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/base58btc/btcpp-web/external/getters"
+	"github.com/base58btc/btcpp-web/external/google"
 	"github.com/base58btc/btcpp-web/internal/config"
 	"github.com/base58btc/btcpp-web/internal/types"
 	"github.com/gorilla/mux"
@@ -346,6 +347,35 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		maybeReload(app)
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
+
+	r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		maybeReload(app)
+		google.HandleLogin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/gcal-callback", func(w http.ResponseWriter, r *http.Request) {
+		maybeReload(app)
+		ok := google.HandleLoginCallback(w, r, app)
+		// FIXME: redirect to any? internal page
+		if ok {
+			http.Redirect(w, r, "/internal/sendcal", http.StatusFound)
+		}
+	}).Methods("GET")
+
+	r.HandleFunc("/internal/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		maybeReload(app)
+		if !google.IsLoggedIn() {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		err := google.RunCalendarInvites()
+		if err != nil {
+			app.Err.Printf("Unable to send cal invites! %s", err)
+		} else {
+			app.Infos.Printf("Sent calendar invites!")
+		}
+	}).Methods("GET", "POST")
+
 	r.HandleFunc("/welcome-email", func(w http.ResponseWriter, r *http.Request) {
 		maybeReload(app)
 		TicketCheck(w, r, app)
@@ -368,6 +398,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
 
+
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
@@ -386,6 +417,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	getters.GetSpeakers(app)
 	getters.GetTalks(app)
 	getters.GetDiscounts(app)
+
+	// FIXME: Put in main?
+	google.InitOauth()
 
 	return r, err
 }
