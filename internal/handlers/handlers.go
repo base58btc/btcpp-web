@@ -300,19 +300,25 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET", "POST")
 
 	r.HandleFunc("/auth-login", func(w http.ResponseWriter, r *http.Request) {
-		google.HandleLogin(w, r, app)
+		redirectTo := app.Session.GetString(r.Context(), "r")
+		app.Infos.Printf("login called, redirect to %s", redirectTo)
+		google.HandleLogin(w, r, app, redirectTo)
 	}).Methods("GET")
 
 	r.HandleFunc("/gcal-callback", func(w http.ResponseWriter, r *http.Request) {
+		redirectTo := app.Session.GetString(r.Context(), "r")
+		app.Infos.Printf("gcal-callback called, redirect to %s", redirectTo)
+
 		ok := google.HandleLoginCallback(w, r, app)
-		// FIXME: redirect to any? internal page
 		if ok {
-			http.Redirect(w, r, "/internal/sendcal", http.StatusFound)
+			http.Redirect(w, r, redirectTo, http.StatusFound)
 		}
+		// FIXME: what if not ok to login?
 	}).Methods("GET")
 
 	r.HandleFunc("/internal/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if !google.IsLoggedIn() {
+			app.Session.Put(r.Context(), "r", "/internal/sendcal")
 			http.Redirect(w, r, "/auth-login", http.StatusFound)
 			return
 		}

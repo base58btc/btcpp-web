@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -104,7 +105,6 @@ func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-
 func getSpeakers(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting speakers...")
@@ -180,6 +180,64 @@ func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error)
 	return discounts, nil
 }
 
+
+func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
+	var tokens types.AuthTokens
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.TokenDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			token := &types.AuthToken {
+				Token: parseRichText("Token", page.Properties),
+				CreatedAt: page.Properties["CreatedAt"].CreatedTime,
+			}
+			tokens = append(tokens, token)
+		}
+	}
+
+	return tokens, nil
+}
+
+func MostRecentToken(n *types.Notion) (*types.AuthToken, error) {
+	tokens, err := FetchTokens(n)
+	if err != nil {
+		return nil, err 
+	}
+	if len(tokens) == 0 {
+		return nil, nil
+	}
+
+	sort.Sort(tokens)
+	return tokens[0], nil
+}
+
+func SaveAuthToken(n *types.Notion, token string) error {
+	parent := notion.NewDatabaseParent(n.Config.TokenDb)
+
+	vals := map[string]*notion.PropertyValue{
+		"Token": notion.NewTitlePropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: token}},
+			}...),
+	}
+
+	_, err := n.Client.CreatePage(context.Background(), parent, vals)
+	return err
+}
 
 func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 	var confTix []*types.ConfTicket

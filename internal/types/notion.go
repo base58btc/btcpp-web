@@ -14,9 +14,9 @@ type (
 		ConfsDb     string
 		ConfsTixDb  string
 		DiscountsDb string
-
 		NewsletterDb string
 		MissivesDb   string
+		TokenDb     string
 	}
 
 	Notion struct {

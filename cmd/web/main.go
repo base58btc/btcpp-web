@@ -58,15 +58,16 @@ func loadConfig() *types.EnvConfig {
 		config.StripeEndpointSec = os.Getenv("STRIPE_END_SECRET")
 		config.RegistryPin = os.Getenv("REGISTRY_PIN")
 		config.Notion = types.NotionConfig{
-			Token:       os.Getenv("NOTION_TOKEN"),
-			PurchasesDb: os.Getenv("NOTION_PURCHASES_DB"),
-			TalksDb:     os.Getenv("NOTION_TALKS_DB"),
-			SpeakersDb:  os.Getenv("NOTION_SPEAKERS_DB"),
-			ConfsDb:     os.Getenv("NOTION_CONFS_DB"),
-			ConfsTixDb:  os.Getenv("NOTION_CONFSTIX_DB"),
-			DiscountsDb: os.Getenv("NOTION_DISCOUNT_DB"),
+			Token:        os.Getenv("NOTION_TOKEN"),
+			PurchasesDb:  os.Getenv("NOTION_PURCHASES_DB"),
+			TalksDb:      os.Getenv("NOTION_TALKS_DB"),
+			SpeakersDb:   os.Getenv("NOTION_SPEAKERS_DB"),
+			ConfsDb:      os.Getenv("NOTION_CONFS_DB"),
+			ConfsTixDb:   os.Getenv("NOTION_CONFSTIX_DB"),
+			DiscountsDb:  os.Getenv("NOTION_DISCOUNT_DB"),
 			NewsletterDb: os.Getenv("NOTION_NEWSLETTER_DB"),
 			MissivesDb:   os.Getenv("NOTION_MISSIVES_DB"),
+			TokenDb:      os.Getenv("NOTION_TOKEN_DB"),
 		}
 		config.Google = types.GoogleConfig{Key: os.Getenv("GOOGLE_KEY")}
 
