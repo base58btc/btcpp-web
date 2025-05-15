@@ -145,6 +145,12 @@ type (
 	}
 
 	ShirtSize string
+
+	AuthToken struct {
+		CreatedAt *time.Time
+		Token     string
+	}
+	AuthTokens []*AuthToken
 )
 
 func (env *EnvConfig) GetDomain() string {
@@ -280,6 +286,31 @@ func (s ConfTickets) Less(i, j int) bool {
 	return s[i].Expires.Start.Before(s[j].Expires.Start)
 }
 
+/* Functions to sort AuthTokens */
+func (at AuthTokens) Len() int {
+	return len(at)
+}
+
+func (at AuthTokens) Swap(i, j int) {
+	at[i], at[j] = at[j], at[i]
+}
+
+/* I want most recent first */
+func (at AuthTokens) Less(i, j int) bool {
+	/* Sort by time */
+	if at[j].CreatedAt == nil && at[j].CreatedAt == nil {
+		return false
+	} else if at[j].CreatedAt == nil {
+		return true
+	} else if at[i].CreatedAt == nil {
+		return false
+	}
+
+	return (*at[j].CreatedAt).Before(*at[i].CreatedAt)
+}
+
+
+/* Functions to sort Speakers */
 func (s Speakers) Len() int {
 	return len(s)
 }

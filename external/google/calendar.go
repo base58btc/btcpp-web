@@ -2,6 +2,8 @@ package google
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +13,7 @@ import (
 	"google.golang.org/api/option"
 	calendar "google.golang.org/api/calendar/v3"
 
+	"github.com/base58btc/btcpp-web/external/getters"
 	"github.com/base58btc/btcpp-web/internal/config"
 )
 
@@ -33,8 +36,40 @@ func InitOauth() {
 	oauthConfig.RedirectURL = redirectURL
 }
 
-func HandleLogin(w http.ResponseWriter, r *http.Request, app *config.AppContext) {
-	url := oauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+func tryCachedToken(app *config.AppContext) (*calendar.Service, error) {
+	authToken, err := getters.MostRecentToken(app.Notion)
+	if err != nil {
+		return nil, err
+	}
+	if authToken == nil {
+		return nil, fmt.Errorf("No token saved to database")
+	}
+
+	var token oauth2.Token
+	err = json.Unmarshal([]byte(authToken.Token), &token)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to unmarshal json")
+	}
+
+	ctx := context.Background()
+	calService, err := createCalService(ctx, &token)
+	return calService, err
+}
+
+func HandleLogin(w http.ResponseWriter, r *http.Request, app *config.AppContext, redirectTo string) {
+	cals, err := tryCachedToken(app)
+
+	if err != nil {
+		app.Infos.Printf("Cached token failed. %s", err)
+	}
+	var url string
+	if cals != nil {
+		calService = cals
+		url = redirectTo
+	} else {
+		url = oauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	}
+	app.Infos.Printf("Redirecting to ... %s", url)
 	http.Redirect(w, r, url, http.StatusFound)
 }
 
@@ -48,15 +83,32 @@ func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.App
 		return false
 	}
 
+	tokenJson, err := json.Marshal(token)
+	if err != nil {
+		http.Error(w, "Could not marshal auth token! "+ err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	err = getters.SaveAuthToken(app.Notion, string(tokenJson))
+	if err != nil {
+		http.Error(w, "Could not save auth token! "+ err.Error(), http.StatusInternalServerError)
+		return false
+	}
+
 	// Create authenticated calendar service
-	client := oauthConfig.Client(ctx, token)
-	calService, err = calendar.NewService(ctx, option.WithHTTPClient(client))
+	calService, err = createCalService(ctx, token)
 	if err != nil {
 		http.Error(w, "Failed to create cal service: "+err.Error(), http.StatusInternalServerError)
 		return false
 	}
 
 	return true
+}
+
+func createCalService(ctx context.Context, token *oauth2.Token) (*calendar.Service, error) {
+	// Create authenticated calendar service
+	client := oauthConfig.Client(ctx, token)
+	cals, err := calendar.NewService(ctx, option.WithHTTPClient(client))
+	return cals, err
 }
 
 func IsLoggedIn() bool {
