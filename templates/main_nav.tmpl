@@ -300,7 +300,7 @@
             </div>
             <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
               <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/palm.svg" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
+                <img src="/static/img/palm.svg" class="h-6 w-6 grayscale text-gray-600 group-hover:text-bitcoin" />
               </div>
               <a href="/conf/floripa" class="mt-6 block font-semibold text-gray-900">
                 Floripa, Brasil | Feb 2025
@@ -310,7 +310,7 @@
             </div>
             <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
               <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/pool.svg" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
+                <img src="/static/img/pool.svg" class="h-6 w-6 grayscale text-gray-600 group-hover:text-bitcoin" />
               </div>
               <a href="/conf/atx25" class="mt-6 block font-semibold text-gray-900">
                 Austin | May 2025
@@ -423,12 +423,10 @@
               </button>
               <!-- 'Product' sub-menu, show/hide based on menu state. -->
               <div class="mt-2 space-y-2" role="mobile-flyout-current">
-                <a onclick="toggleMenu(this)" href="/conf/taipei" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-red-800 hover:bg-gray-50">Taipei | Dec 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/berlin25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-yellow-300 hover:bg-gray-50">Berlin | Oct 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/istanbul" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-lime-500 hover:bg-gray-50">Istanbul | Sept 2025</a>
                 <a onclick="toggleMenu(this)" href="/conf/riga" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-amber-500 hover:bg-gray-50">Riga | Aug 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/atx25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-sky-500 hover:bg-gray-50">Austin | April 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/floripa" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-teal-400 hover:bg-gray-50">Floripa, Brasil | Feb 2025</a>
+                <a onclick="toggleMenu(this)" href="/conf/istanbul" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-lime-500 hover:bg-gray-50">Istanbul | Sept 2025</a>
+                <a onclick="toggleMenu(this)" href="/conf/berlin25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-yellow-300 hover:bg-gray-50">Berlin | Oct 2025</a>
+                <a onclick="toggleMenu(this)" href="/conf/taipei" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-red-800 hover:bg-gray-50">Taipei | Dec 2025</a>
 	      </div>
               <button type="button" onclick="toggleMobileFlyout(this, 'past')" class="flex w-full items-center justify-between rounded-lg py-2 pl-3 pr-3.5 text-base leading-7 text-gray-900 hover:bg-gray-50" aria-controls="disclosure-1" aria-expanded="false">
                 Past Events
@@ -442,6 +440,8 @@
                 </svg>
               </button>
               <div class="mt-2 space-y-2" role="mobile-flyout-past">
+                <a onclick="toggleMenu(this)" href="/conf/atx25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | April 2025</a>
+                <a onclick="toggleMenu(this)" href="/conf/floripa" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Floripa, Brasil | Feb 2025</a>
                 <a onclick="toggleMenu(this)" href="/conf/berlin24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Berlin | Oct 2024</a>
                 <a onclick="toggleMenu(this)" href="/conf/atx24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | May 2024</a>
                 <a onclick="toggleMenu(this)" href="/conf/ba24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Buenos Aires | Feb 2024</a>
