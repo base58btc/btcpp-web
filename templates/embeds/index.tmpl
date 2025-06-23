@@ -10,6 +10,7 @@
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
+    <!-- no top banner
     <section id="top_banner">
       <div class="bg-orange-300">
         <div class="mx-auto max-w-7xl mt-8 px-6 py-8 lg:flex lg:items-center lg:justify-between lg:px-8">
@@ -20,6 +21,7 @@
         </div>
       </div>
     </section>
+    -->
     <section id="confs">
       <div class="bg-white py-8 sm:py-16">
         <div class="mx-auto max-w-7xl px-6 lg:px-0">
@@ -54,17 +56,6 @@
           <!-- ends -->
         </div>
       <div>
-    </section>
-    <section id="banner">
-      <div class="bg-indigo-100">
-        <div class="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:flex lg:items-center lg:justify-between lg:px-8">
-          <h2 class="max-w-2xl text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Want to make a splash? <br>
-            Sponsor <span class="font-bitcoin">bitcoin++</span></h2>
-          <div class="mt-10 flex items-center gap-x-6 lg:mt-0 lg:shrink-0">
-            <a href="/sponsor" class="text-sm/6 font-semibold text-gray-900">Learn more <span aria-hidden="true">→</span></a>
-          </div>
-        </div>
-      </div>
     </section>
     <section id="confs_cont">
       <div class="bg-white py-24 sm:py-32">
@@ -164,6 +155,17 @@
               <span class="hidden md:inline">Join our partner companies to support the bitcoin open source ecosystem.</span>
               <a href="/sponsor" class="font-semibold text-indigo-600"><span class="absolute inset-0" aria-hidden="true"></span> Join them at the frontier of bitcoin<span aria-hidden="true">&rarr;</span></a>
             </p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section id="banner">
+      <div class="bg-indigo-100">
+        <div class="mx-auto max-w-7xl px-6 py-24 sm:py-32 lg:flex lg:items-center lg:justify-between lg:px-8">
+          <h2 class="max-w-2xl text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Want to make a splash? <br>
+            Sponsor <span class="font-bitcoin">bitcoin++</span></h2>
+          <div class="mt-10 flex items-center gap-x-6 lg:mt-0 lg:shrink-0">
+            <a href="/sponsor" class="text-sm/6 font-semibold text-gray-900">Learn more <span aria-hidden="true">→</span></a>
           </div>
         </div>
       </div>
