@@ -17,6 +17,6 @@ type AppContext struct {
 	Err           *log.Logger
 	Infos         *log.Logger
 	Session       *scs.SessionManager
-	TemplateCache map[string]*template.Template
+	TemplateCache *template.Template
 	Confs         []*types.Conf
 }

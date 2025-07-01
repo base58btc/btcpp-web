@@ -10,6 +10,8 @@ import (
 	"html/template"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"strconv"
@@ -39,105 +41,50 @@ func MiniCss() string {
 
 var pages []string = []string { "index", "about", "sponsor", "contact", "talk", "press", "volunteer", "vegas25" }
 
-/* https://www.calhoun.io/intro-to-templates-p3-functions/ */
-func loadTemplates(app *config.AppContext) error {
+/* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
+func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
+    cleanRoot := filepath.Clean(rootDir)
+    pfx := len(cleanRoot)+1
+    root := template.New("")
 
-	for _, page := range pages {
-		templName := fmt.Sprintf("%s.tmpl", page)
-		pageTmpl, err := template.ParseFiles("templates/embeds/" + templName, "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
-		if err != nil {
-			return err
-		}
-		app.TemplateCache[templName] = pageTmpl
-	}
+    err := filepath.Walk(cleanRoot, func(path string, info os.FileInfo, e1 error) error {
+        if !info.IsDir() && strings.HasSuffix(path, ".tmpl") {
+            if e1 != nil {
+                return e1
+            }
 
-	success, err := template.ParseFiles("templates/success.tmpl", "templates/main_nav.tmpl", "templates/section/about.tmpl", "templates/section/footer.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["success.tmpl"] = success
+            b, e2 := ioutil.ReadFile(path)
+            if e2 != nil {
+                return e2
+            }
 
-	talks, err := template.ParseFiles("templates/sched.tmpl",
-		"templates/sched_desc.tmpl",
-		"templates/conf_nav.tmpl",
-		"templates/section/footer.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["talks.tmpl"] = talks
+            name := path[pfx:]
+            t := root.New(name).Funcs(funcMap)
+            _, e2 = t.Parse(string(b))
+            if e2 != nil {
+                return e2
+            }
+        }
 
+        return nil
+    })
 
-	ticket, err := template.New("ticket.tmpl").Funcs(template.FuncMap{
+    return root, err
+}
+
+func loadTemplates(ctx *config.AppContext) error {
+
+	var err error
+	funcMap := template.FuncMap{
 		"safesrc": func(s string) template.HTMLAttr {
 			return template.HTMLAttr(fmt.Sprintf(`src="%s"`, s))
 		},
 		"css": func(s string) template.HTML {
 			return template.HTML(fmt.Sprintf(`<style type="text/css">%s</style>`, s))
 		},
-	}).ParseFiles("templates/emails/ticket.tmpl")
-	if err != nil {
-		return err
 	}
-	app.TemplateCache["ticket.tmpl"] = ticket
-
-	for _, conf := range app.Confs {
-		/* Load every conf's template */
-		tmplstr := fmt.Sprintf("%s.tmpl", conf.Tag)
-		files, err := template.ParseFiles("templates/conf/" + tmplstr, "templates/conf_nav.tmpl", "templates/session.tmpl", "templates/btcbutton.tmpl", "templates/section/speaker.tmpl", "templates/section/footer.tmpl")
-		if err != nil {
-			return err
-		}
-		app.TemplateCache[tmplstr] = files
-
-		/* Only load email templates for active conferences */
-		if !conf.Active {
-			continue
-		}
-
-		htmlEmailTmpl := fmt.Sprintf("templates/emails/%s.tmpl", conf.Tag)
-		textEmailTmpl := fmt.Sprintf("templates/emails/text-%s.tmpl", conf.Tag)
-		htmlEmail, err := template.ParseFiles(htmlEmailTmpl)
-		if err != nil {
-			return err
-		}
-		app.TemplateCache["email-html-"+conf.Tag] = htmlEmail
-
-		textEmail, err := template.ParseFiles(textEmailTmpl)
-		if err != nil {
-			return err
-		}
-		app.TemplateCache["email-text-"+conf.Tag] = textEmail
-	}
-
-	checkin, err := template.ParseFiles("templates/checkin.tmpl", "templates/main_nav.tmpl", "templates/section/footer.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["checkin.tmpl"] = checkin
-
-	collect, err := template.ParseGlob("templates/*.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["collect-email.tmpl"] = collect
-
-	emailincludes, err := template.ParseFiles("templates/tix_details.tmpl", "templates/section/footer.tmpl")
-	if err != nil {
-		return err
-	}
-	app.TemplateCache["email-includes.tmpl"] = emailincludes
-
-
-	return nil
-}
-
-func maybeReload(app *config.AppContext) {
-	if !app.InProduction {
-		err := loadTemplates(app)
-		if err != nil {
-			panic(err)
-		}
-	}
+	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
+	return err
 }
 
 func contains(list []string, item string) bool {
@@ -263,7 +210,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	// Set up the routes, we'll have one page per course
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		RenderPage(w, r, app, "index")
 	}).Methods("GET")
 
@@ -272,7 +218,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		/* Normie Pages */
 		renderPage := page
 		r.HandleFunc("/" + renderPage, func(w http.ResponseWriter, r *http.Request) {
-			maybeReload(app)
 			RenderPage(w, r, app, renderPage)
 		}).Methods("GET")
 	}
@@ -316,46 +261,36 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	r.HandleFunc("/conf/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		RenderConfSuccess(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/conf/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		RenderTalks(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		RenderConf(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		HandleEmail(w, r, app)
 	}).Methods("GET", "POST")
 	r.HandleFunc("/tix/{tix}/apply-discount", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		HandleDiscount(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/tix/{tix}", func(w http.ResponseWriter, r *http.Request) {
 		HandleTixSelection(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/conf-reload", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		ReloadConf(w, r, app)
 	}).Methods("GET", "POST")
 	r.HandleFunc("/check-in/{ticket}", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
 	r.HandleFunc("/welcome-email", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		TicketCheck(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/ticket/{ticket}", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		Ticket(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/trial-email", func(w http.ResponseWriter, r *http.Request) {
-		maybeReload(app)
 		SendMailTest(w, r, app)
 	}).Methods("GET")
 
@@ -377,7 +312,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
-	app.TemplateCache = make(map[string]*template.Template)
 	err = loadTemplates(app)
 	if err != nil {
 		return r, err
@@ -469,12 +403,11 @@ func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discou
 func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for logged in */
 	pin := ctx.Session.GetString(r.Context(), "pin")
-	tmpl := ctx.TemplateCache["checkin.tmpl"]
 
 	if pin == "" {
 		w.Header().Set("x-missing-field", "pin")
 		w.WriteHeader(http.StatusBadRequest)
-		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
 			Year:     currentYear(),
 		})
@@ -487,7 +420,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 
 	if pin != ctx.Env.RegistryPin {
 		w.WriteHeader(http.StatusUnauthorized)
-		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg: "Wrong registration PIN",
 			Year: currentYear(),
 		})
@@ -529,7 +462,7 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		pin := r.Form.Get("pin")
 		if pin != ctx.Env.RegistryPin {
 			w.WriteHeader(http.StatusBadRequest)
-			err := ctx.TemplateCache["checkin.tmpl"].ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
 				Year:      currentYear(),
@@ -565,8 +498,6 @@ func filterSpeakers(talks []*types.Talk) types.Speakers {
 }
 
 func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	tmpl := ctx.TemplateCache["talks.tmpl"]
-
 	conf, err := findConf(r, ctx)
 	if err != nil {
 		http.Error(w, "Unable to find page", 404)
@@ -588,7 +519,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	sort.Sort(talks)
 	sort.Sort(evSpeakers)
 
-	err = tmpl.ExecuteTemplate(w, "sched.tmpl", &ConfPage{
+	err = ctx.TemplateCache.ExecuteTemplate(w, "sched.tmpl", &ConfPage{
 		Talks: talks,
 		EventSpeakers: evSpeakers,
 		Conf:  conf,
@@ -609,8 +540,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	tmpl := ctx.TemplateCache["success.tmpl"]
-	err = tmpl.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
+	err = ctx.TemplateCache.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
 		Conf: conf,
 		Year: currentYear(),
 	})
@@ -658,9 +588,8 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	} else {
 		tixLeft = currTix.Max - soldCount
 	}
-	tmplTag := fmt.Sprintf("%s.tmpl", conf.Tag)
-	tmpl := ctx.TemplateCache[tmplTag]
-	err = tmpl.ExecuteTemplate(w, tmplTag, &ConfPage{
+	tmplTag := fmt.Sprintf("conf/%s.tmpl", conf.Tag)
+	err = ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &ConfPage{
 		Conf:    conf,
 		Tix:     currTix,
 		MaxTix:  maxTix,
@@ -685,11 +614,8 @@ func currentYear() uint {
 
 func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, page string) {
 
-	template := fmt.Sprintf("%s.tmpl", page)
-	// Define the data to be rendered in the template
-	tmpl := ctx.TemplateCache[template]
-
-	err := tmpl.ExecuteTemplate(w, template, &HomePage{
+	template := fmt.Sprintf("embeds/%s.tmpl", page)
+	err := ctx.TemplateCache.ExecuteTemplate(w, template, &HomePage{
 		Year: currentYear(),
 	})
 	if err != nil {
@@ -870,7 +796,7 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		Conf:      conf,
 	}
 
-	err = ctx.TemplateCache["ticket.tmpl"].Execute(w, tix)
+	err = ctx.TemplateCache.ExecuteTemplate(w, "emails/ticket.tmpl", tix)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Infos.Printf("/ticket-pdf ExecuteTemplate failed ! %s", err.Error())
@@ -880,14 +806,8 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	confTag, _ := getSessionKey("tag", r)
 
-	tmplTag := "email-html-" + confTag
-	tmpl, ok := ctx.TemplateCache[tmplTag]
-	if !ok {
-		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Infos.Printf("/welcome-email template %s not found", tmplTag)
-		return
-	}
-	err := tmpl.Execute(w, &EmailTmpl{
+	tmplTag := fmt.Sprintf("emails/email-html-%s", confTag)
+	err := ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &EmailTmpl{
 		URI: ctx.Env.GetURI(),
 	})
 	if err != nil {
@@ -913,7 +833,7 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		pin := r.Form.Get("pin")
 		if pin != ctx.Env.RegistryPin {
 			w.WriteHeader(http.StatusBadRequest)
-			err := ctx.TemplateCache["checkin.tmpl"].ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
 				Year:     currentYear(),
@@ -936,12 +856,11 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for logged in */
 	pin := ctx.Session.GetString(r.Context(), "pin")
-	tmpl := ctx.TemplateCache["checkin.tmpl"]
 
 	if pin == "" {
 		w.Header().Set("x-missing-field", "pin")
 		w.WriteHeader(http.StatusBadRequest)
-		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
 			Year:     currentYear(),
 		})
@@ -954,7 +873,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 
 	if pin != ctx.Env.RegistryPin {
 		w.WriteHeader(http.StatusUnauthorized)
-		err := tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg: "Wrong registration PIN",
 			Year: currentYear(),
 		})
@@ -980,7 +899,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		msg = err.Error()
 		ctx.Infos.Println("check-in problem:", msg)
 	}
-	err = tmpl.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
+	err = ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 		TicketType: tix_type,
 		Msg:        msg,
 		Year:       currentYear(),
@@ -1168,9 +1087,8 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		errStr = err.Error()
 	}
 	
-	tmpl := template.Must(template.ParseFiles("templates/tix_details.tmpl"))
 	w.Header().Set("Content-Type", "text/html")
-	err = tmpl.Execute(w, &TixFormPage{
+	err = ctx.TemplateCache.ExecuteTemplate(w, "tix_details.tmpl", &TixFormPage{
 		Conf:     conf,
 		Tix:      tix,
 		TixSlug:  tixSlug,
@@ -1233,8 +1151,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				discountRef = discount.Ref
 			}
 		}
-		pageTpl := ctx.TemplateCache["collect-email.tmpl"]
-		err = pageTpl.ExecuteTemplate(w, "collect-email.tmpl", &TixFormPage{
+		err = ctx.TemplateCache.ExecuteTemplate(w, "collect-email.tmpl", &TixFormPage{
 			Conf:     conf,
 			Tix:      tix,
 			TixSlug:  tixSlug,
