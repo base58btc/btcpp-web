@@ -131,7 +131,7 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	}
 
 	var htmlBody bytes.Buffer
-	tmpl := fmt.Sprintf("emails/email-html-%s", conf.Tag)
+	tmpl := fmt.Sprintf("emails/%s.tmpl", conf.Tag)
 	err := ctx.TemplateCache.ExecuteTemplate(io.Writer(&htmlBody), tmpl, &EmailTmpl{
 		URI: ctx.Env.GetURI(),
 		CSS: MiniCss(),
@@ -146,7 +146,7 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	}
 
 	var textBody bytes.Buffer
-	tmpl = fmt.Sprintf("emails/email-text-%s", conf.Tag)
+	tmpl = fmt.Sprintf("emails/text-%s.tmpl", conf.Tag)
 	err = ctx.TemplateCache.ExecuteTemplate(io.Writer(&textBody), tmpl, &EmailTmpl{
 		URI: ctx.Env.GetURI(),
 		ConfTag: conf.Tag,

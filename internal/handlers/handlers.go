@@ -806,7 +806,7 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	confTag, _ := getSessionKey("tag", r)
 
-	tmplTag := fmt.Sprintf("emails/email-html-%s", confTag)
+	tmplTag := fmt.Sprintf("emails/%s.tmpl", confTag)
 	err := ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &EmailTmpl{
 		URI: ctx.Env.GetURI(),
 	})
