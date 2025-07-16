@@ -82,6 +82,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"css": func(s string) template.HTML {
 			return template.HTML(fmt.Sprintf(`<style type="text/css">%s</style>`, s))
 		},
+		"isLast": func(index int, count int) bool {
+			return index+1 == count 
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err
@@ -366,6 +369,7 @@ type ConfPage struct {
 	Talks   []*types.Talk
 	EventSpeakers []*types.Speaker
 	Buckets map[string]sessionTime
+	Days    []*Day
 	Year    uint
 }
 
@@ -579,6 +583,13 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
+	days, err := talkDays(ctx, conf, talks)
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("Unable to make days '%s' from talks from Notion!! %s", conf.Tag, err.Error())
+		return
+	}
+
 	currTix := findCurrTix(conf, soldCount)
 	maxTix := findMaxTix(conf)
 
@@ -598,6 +609,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		Talks:   talks,
 		EventSpeakers: evSpeakers,
 		Buckets: buckets,
+		Days:    days,
 		Year: currentYear(),
 	})
 	if err != nil {
@@ -691,6 +703,68 @@ func (p talkTime) Less(i, j int) bool {
 
 func (p talkTime) Swap(i, j int) {
 	p[i], p[j] = p[j], p[i]
+}
+
+type Day struct {
+	Morning []sessionTime
+	Afternoon []sessionTime
+	Evening []sessionTime
+}
+
+func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day, error) {
+	buckets, err := bucketTalks(conf, talks)
+	if err != nil {
+		return nil, err
+	}
+	/* Sort keys alphabetically */
+	days := make([]*Day, 0)
+
+	keys := make([]string, len(buckets))
+	i := 0
+	for k, _ := range buckets {
+	    keys[i] = k
+	    i++
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		v, _ := buckets[k]
+		ctx.Infos.Printf("looking at bucket %s", k)
+		i, err := strconv.Atoi(string(k[0]))
+		if err != nil {
+			return nil, err
+		}
+		/* This could go horribly wrong */
+		if i > 21 {
+			return nil, fmt.Errorf("too many days %d", i)
+		}
+		for i > len(days) {
+			days = append(days, &Day{
+				Morning: make([]sessionTime, 0),
+				Afternoon: make([]sessionTime, 0),
+				Evening: make([]sessionTime, 0),
+			})
+		}
+
+		day := days[i-1]
+		ctx.Infos.Printf("adding sessions %s...", string(k[len(k)-1]))
+		ctx.Infos.Printf("sessions to add?? %v", v)
+		switch string(k[len(k)-1]) {
+		case "+":
+			ctx.Infos.Printf("adding sessions to morning")
+			day.Morning = append(day.Morning, v)
+		case "=":
+			ctx.Infos.Printf("adding sessions to afternoon")
+			day.Afternoon = append(day.Afternoon, v)
+		case "-": 
+			ctx.Infos.Printf("adding sessions to evening")
+			day.Evening = append(day.Evening, v)
+		}
+	}
+
+	for i, day := range days {
+		ctx.Infos.Printf("day %d sessions: %d|%d|%d", i+1, len(day.Morning), len(day.Afternoon), len(day.Evening))
+	}
+	return days, nil
 }
 
 func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, error) {
