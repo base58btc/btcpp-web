@@ -13,8 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/base58btc/btcpp-web/external/getters"
@@ -39,37 +39,37 @@ func MiniCss() string {
 	return string(css)
 }
 
-var pages []string = []string { "index", "about", "sponsor", "contact", "talk", "press", "volunteer", "vegas25" }
+var pages []string = []string{"index", "about", "sponsor", "contact", "talk", "press", "volunteer", "vegas25"}
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
-    cleanRoot := filepath.Clean(rootDir)
-    pfx := len(cleanRoot)+1
-    root := template.New("")
+	cleanRoot := filepath.Clean(rootDir)
+	pfx := len(cleanRoot) + 1
+	root := template.New("")
 
-    err := filepath.Walk(cleanRoot, func(path string, info os.FileInfo, e1 error) error {
-        if !info.IsDir() && strings.HasSuffix(path, ".tmpl") {
-            if e1 != nil {
-                return e1
-            }
+	err := filepath.Walk(cleanRoot, func(path string, info os.FileInfo, e1 error) error {
+		if !info.IsDir() && strings.HasSuffix(path, ".tmpl") {
+			if e1 != nil {
+				return e1
+			}
 
-            b, e2 := ioutil.ReadFile(path)
-            if e2 != nil {
-                return e2
-            }
+			b, e2 := ioutil.ReadFile(path)
+			if e2 != nil {
+				return e2
+			}
 
-            name := path[pfx:]
-            t := root.New(name).Funcs(funcMap)
-            _, e2 = t.Parse(string(b))
-            if e2 != nil {
-                return e2
-            }
-        }
+			name := path[pfx:]
+			t := root.New(name).Funcs(funcMap)
+			_, e2 = t.Parse(string(b))
+			if e2 != nil {
+				return e2
+			}
+		}
 
-        return nil
-    })
+		return nil
+	})
 
-    return root, err
+	return root, err
 }
 
 func loadTemplates(ctx *config.AppContext) error {
@@ -83,7 +83,7 @@ func loadTemplates(ctx *config.AppContext) error {
 			return template.HTML(fmt.Sprintf(`<style type="text/css">%s</style>`, s))
 		},
 		"isLast": func(index int, count int) bool {
-			return index+1 == count 
+			return index+1 == count
 		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
@@ -192,11 +192,11 @@ func findMaxTix(conf *types.Conf) *types.ConfTicket {
 	/* Sort the tickets! */
 	tixs := types.ConfTickets(conf.Tickets)
 	sort.Sort(&tixs)
-	
+
 	if len(tixs) <= 0 {
 		return nil
 	}
-	
+
 	maxTix := tixs[0]
 	for _, tix := range tixs {
 		if tix.USD > maxTix.USD {
@@ -220,7 +220,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	for _, page := range pages {
 		/* Normie Pages */
 		renderPage := page
-		r.HandleFunc("/" + renderPage, func(w http.ResponseWriter, r *http.Request) {
+		r.HandleFunc("/"+renderPage, func(w http.ResponseWriter, r *http.Request) {
 			RenderPage(w, r, app, renderPage)
 		}).Methods("GET")
 	}
@@ -356,21 +356,21 @@ func getSessionKey(p string, r *http.Request) (string, bool) {
 	return key, ok
 }
 
-type HomePage struct{
+type HomePage struct {
 	Year uint
 }
 
 type ConfPage struct {
-	Conf    *types.Conf
-	Tix     *types.ConfTicket
-	MaxTix  *types.ConfTicket
-	Sold    uint
-	TixLeft uint
-	Talks   []*types.Talk
+	Conf          *types.Conf
+	Tix           *types.ConfTicket
+	MaxTix        *types.ConfTicket
+	Sold          uint
+	TixLeft       uint
+	Talks         []*types.Talk
 	EventSpeakers []*types.Speaker
-	Buckets map[string]sessionTime
-	Days    []*Day
-	Year    uint
+	Buckets       map[string]sessionTime
+	Days          []*Day
+	Year          uint
 }
 
 type SuccessPage struct {
@@ -379,17 +379,17 @@ type SuccessPage struct {
 }
 
 type TixFormPage struct {
-	Conf     *types.Conf
-	Tix      *types.ConfTicket
-	TixSlug  string
-	Count    uint
-	TixPrice    uint
-	Discount string
+	Conf          *types.Conf
+	Tix           *types.ConfTicket
+	TixSlug       string
+	Count         uint
+	TixPrice      uint
+	Discount      string
 	DiscountPrice uint
-	DiscountRef string
-	HMAC	  string
-	Err       string
-	Year uint
+	DiscountRef   string
+	HMAC          string
+	Err           string
+	Year          uint
 }
 
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
@@ -425,7 +425,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	if pin != ctx.Env.RegistryPin {
 		w.WriteHeader(http.StatusUnauthorized)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
-			Msg: "Wrong registration PIN",
+			Msg:  "Wrong registration PIN",
 			Year: currentYear(),
 		})
 		if err != nil {
@@ -443,12 +443,12 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 
 	ctx.Confs = confs
-	
+
 	/* Also reload cached data */
 	getters.GetSpeakers(ctx)
 	getters.GetTalks(ctx)
 	getters.GetDiscounts(ctx)
-	for _, conf := range(confs) {
+	for _, conf := range confs {
 		getters.UpdateSoldTix(ctx, conf)
 	}
 
@@ -469,7 +469,7 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
-				Year:      currentYear(),
+				Year:     currentYear(),
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -487,11 +487,11 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 }
 
 func filterSpeakers(talks []*types.Talk) types.Speakers {
-	var speakers types.Speakers	
+	var speakers types.Speakers
 	already := make(map[string]int)
 
 	for _, talk := range talks {
-		for _, speaker:= range talk.Speakers {
+		for _, speaker := range talk.Speakers {
 			if _, ok := already[speaker.ID]; !ok {
 				speakers = append(speakers, speaker)
 				already[speaker.ID] = 1
@@ -524,10 +524,10 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	sort.Sort(evSpeakers)
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "sched.tmpl", &ConfPage{
-		Talks: talks,
+		Talks:         talks,
 		EventSpeakers: evSpeakers,
-		Conf:  conf,
-		Year:  currentYear(),
+		Conf:          conf,
+		Year:          currentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -601,16 +601,16 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 	tmplTag := fmt.Sprintf("conf/%s.tmpl", conf.Tag)
 	err = ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &ConfPage{
-		Conf:    conf,
-		Tix:     currTix,
-		MaxTix:  maxTix,
-		Sold:    soldCount,
-		TixLeft: tixLeft,
-		Talks:   talks,
+		Conf:          conf,
+		Tix:           currTix,
+		MaxTix:        maxTix,
+		Sold:          soldCount,
+		TixLeft:       tixLeft,
+		Talks:         talks,
 		EventSpeakers: evSpeakers,
-		Buckets: buckets,
-		Days:    days,
-		Year: currentYear(),
+		Buckets:       buckets,
+		Days:          days,
+		Year:          currentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -706,9 +706,9 @@ func (p talkTime) Swap(i, j int) {
 }
 
 type Day struct {
-	Morning []sessionTime
+	Morning   []sessionTime
 	Afternoon []sessionTime
-	Evening []sessionTime
+	Evening   []sessionTime
 }
 
 func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day, error) {
@@ -722,8 +722,8 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 	keys := make([]string, len(buckets))
 	i := 0
 	for k, _ := range buckets {
-	    keys[i] = k
-	    i++
+		keys[i] = k
+		i++
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
@@ -738,9 +738,9 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 		}
 		for i > len(days) {
 			days = append(days, &Day{
-				Morning: make([]sessionTime, 0),
+				Morning:   make([]sessionTime, 0),
 				Afternoon: make([]sessionTime, 0),
-				Evening: make([]sessionTime, 0),
+				Evening:   make([]sessionTime, 0),
 			})
 		}
 
@@ -750,7 +750,7 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 			day.Morning = append(day.Morning, v)
 		case "=":
 			day.Afternoon = append(day.Afternoon, v)
-		case "-": 
+		case "-":
 			day.Evening = append(day.Evening, v)
 		}
 	}
@@ -775,8 +775,8 @@ func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, erro
 }
 
 type EmailTmpl struct {
-	URI string
-	CSS string
+	URI     string
+	CSS     string
 	ConfTag string
 }
 
@@ -939,7 +939,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	if pin != ctx.Env.RegistryPin {
 		w.WriteHeader(http.StatusUnauthorized)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
-			Msg: "Wrong registration PIN",
+			Msg:  "Wrong registration PIN",
 			Year: currentYear(),
 		})
 		if err != nil {
@@ -1039,12 +1039,12 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 
 	ctx.Infos.Println("opennode charge!", charge)
 	entry := types.Entry{
-		ID:       charge.ID,
-		ConfRef:  charge.Metadata.ConfRef,
-		Total:    int64(charge.FiatVal * 100),
-		Currency: charge.Metadata.Currency,
-		Created:  charge.CreatedAt,
-		Email:    charge.Metadata.Email,
+		ID:          charge.ID,
+		ConfRef:     charge.Metadata.ConfRef,
+		Total:       int64(charge.FiatVal * 100),
+		Currency:    charge.Metadata.Currency,
+		Created:     charge.CreatedAt,
+		Email:       charge.Metadata.Email,
 		DiscountRef: charge.Metadata.DiscountRef,
 	}
 
@@ -1151,20 +1151,20 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		/* We don't bail though.. just continue */
 		errStr = err.Error()
 	}
-	
+
 	w.Header().Set("Content-Type", "text/html")
 	err = ctx.TemplateCache.ExecuteTemplate(w, "tix_details.tmpl", &TixFormPage{
-		Conf:     conf,
-		Tix:      tix,
-		TixSlug:  tixSlug,
-		TixPrice: tixPrice,
-		Discount: discountCode,
+		Conf:          conf,
+		Tix:           tix,
+		TixSlug:       tixSlug,
+		TixPrice:      tixPrice,
+		Discount:      discountCode,
 		DiscountPrice: discountPrice,
-		DiscountRef:  discountRef,
-		Err:      errStr,
-		HMAC:     calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
-		Count:    uint(1),
-		Year:     currentYear(),
+		DiscountRef:   discountRef,
+		Err:           errStr,
+		HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
+		Count:         uint(1),
+		Year:          currentYear(),
 	})
 
 	if err != nil {
@@ -1217,17 +1217,17 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			}
 		}
 		err = ctx.TemplateCache.ExecuteTemplate(w, "collect-email.tmpl", &TixFormPage{
-			Conf:     conf,
-			Tix:      tix,
-			TixSlug:  tixSlug,
-			TixPrice:    tixPrice,
-			Discount: discountCode,
+			Conf:          conf,
+			Tix:           tix,
+			TixSlug:       tixSlug,
+			TixPrice:      tixPrice,
+			Discount:      discountCode,
 			DiscountPrice: discountPrice,
-			DiscountRef: discountRef,
-			Err:      errStr,
-			HMAC:     calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
-			Count:    uint(1),
-			Year:     currentYear(),
+			DiscountRef:   discountRef,
+			Err:           errStr,
+			HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
+			Count:         uint(1),
+			Year:          currentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -1258,7 +1258,6 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-
 
 		/* The goal is that we hit opennode init, with an email! */
 		isLocal := tixPrice == tix.Local

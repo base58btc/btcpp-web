@@ -22,10 +22,10 @@ type (
 	}
 
 	OpenNodeMetadata struct {
-		Email    string  `json:"email"`
-		Quantity float64 `json:"quantity"`
-		ConfRef  string  `json:"conf-ref"`
-		TixLocal bool    `json:"tix-local"`
+		Email       string  `json:"email"`
+		Quantity    float64 `json:"quantity"`
+		ConfRef     string  `json:"conf-ref"`
+		TixLocal    bool    `json:"tix-local"`
 		DiscountRef string  `json:"discount,omitempty"`
 		Currency    string  `json:"currency"`
 	}

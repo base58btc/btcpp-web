@@ -16,10 +16,10 @@ const CHARGES_ENDPOINT string = "/charges"
 func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string) (*types.OpenNodePayment, error) {
 
 	metadata := &types.OpenNodeMetadata{
-		Email:    email,
-		Quantity: float64(count),
-		ConfRef:  conf.Ref,
-		TixLocal: isLocal,
+		Email:       email,
+		Quantity:    float64(count),
+		ConfRef:     conf.Ref,
+		TixLocal:    isLocal,
 		DiscountRef: discountRef,
 		/* We have to save it b/c OpenNode doesnt */
 		Currency: tix.Currency,

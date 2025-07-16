@@ -58,7 +58,7 @@ func CheckForNewMails(ctx *config.AppContext) {
 			fails++
 		}
 	}
-	if (success+fails+resent > 0) {
+	if success+fails+resent > 0 {
 		ctx.Infos.Printf("Of %d, sent %d mails, %d failed, %d retries", success+fails+resent, success, fails, resent)
 	}
 }
@@ -133,8 +133,8 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	var htmlBody bytes.Buffer
 	tmpl := fmt.Sprintf("emails/%s.tmpl", conf.Tag)
 	err := ctx.TemplateCache.ExecuteTemplate(io.Writer(&htmlBody), tmpl, &EmailTmpl{
-		URI: ctx.Env.GetURI(),
-		CSS: MiniCss(),
+		URI:     ctx.Env.GetURI(),
+		CSS:     MiniCss(),
 		ConfTag: conf.Tag,
 	})
 	if err != nil {
@@ -148,7 +148,7 @@ func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email
 	var textBody bytes.Buffer
 	tmpl = fmt.Sprintf("emails/text-%s.tmpl", conf.Tag)
 	err = ctx.TemplateCache.ExecuteTemplate(io.Writer(&textBody), tmpl, &EmailTmpl{
-		URI: ctx.Env.GetURI(),
+		URI:     ctx.Env.GetURI(),
 		ConfTag: conf.Tag,
 	})
 	if err != nil {

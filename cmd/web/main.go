@@ -61,7 +61,7 @@ func loadConfig() *types.EnvConfig {
 			SpeakersDb:  os.Getenv("NOTION_SPEAKERS_DB"),
 			ConfsDb:     os.Getenv("NOTION_CONFS_DB"),
 			ConfsTixDb:  os.Getenv("NOTION_CONFSTIX_DB"),
-			DiscountsDb:  os.Getenv("NOTION_DISCOUNT_DB"),
+			DiscountsDb: os.Getenv("NOTION_DISCOUNT_DB"),
 		}
 		config.Google = types.GoogleConfig{Key: os.Getenv("GOOGLE_KEY")}
 

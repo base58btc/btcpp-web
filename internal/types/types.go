@@ -50,45 +50,45 @@ type (
 	}
 
 	ConfTicket struct {
-		ID      string
-		ConfRef string
-		Tier    string
-		Local   uint
-		BTC     uint
-		USD     uint
-		Expires *Times
-		Max     uint
+		ID       string
+		ConfRef  string
+		Tier     string
+		Local    uint
+		BTC      uint
+		USD      uint
+		Expires  *Times
+		Max      uint
 		Currency string
 		Symbol   string
 	}
 	ConfTickets []*ConfTicket
 
 	TixForm struct {
-		Email    string
-		Count    uint
+		Email         string
+		Count         uint
 		DiscountPrice uint
-		Discount string
-		DiscountRef string
-		HMAC     string
+		Discount      string
+		DiscountRef   string
+		HMAC          string
 	}
-	
+
 	DiscountCode struct {
 		Ref        string
 		CodeName   string
 		PercentOff uint
-		ConfRef	   []string
+		ConfRef    []string
 	}
 
 	Speaker struct {
-		ID          string
-		Name        string
-		Photo       string
-		Twitter     string
-		Github      string
-		Website     string
-		Nostr       string
-		Company     string
-		OrgPhoto    string
+		ID       string
+		Name     string
+		Photo    string
+		Twitter  string
+		Github   string
+		Website  string
+		Nostr    string
+		Company  string
+		OrgPhoto string
 	}
 	Speakers []*Speaker
 
@@ -134,13 +134,13 @@ type (
 	}
 
 	Entry struct {
-		ID       string
-		ConfRef  string
-		Total    int64
-		Currency string
-		Created  time.Time
-		Email    string
-		Items    []Item
+		ID          string
+		ConfRef     string
+		Total       int64
+		Currency    string
+		Created     time.Time
+		Email       string
+		Items       []Item
 		DiscountRef string
 	}
 

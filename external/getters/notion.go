@@ -20,7 +20,6 @@ var lastTalksFetch time.Time
 var discounts []*types.DiscountCode
 var lastDiscountFetch time.Time
 
-
 func parseRichText(key string, props map[string]notion.PropertyValue) string {
 	val, ok := props[key]
 	if !ok {
@@ -50,9 +49,9 @@ func fileGetURL(file *notion.File) string {
 
 func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.DiscountCode {
 	discount := &types.DiscountCode{
-		Ref:            pageID,
-		CodeName:	parseRichText("CodeName", props),
-		PercentOff:     uint(props["PercentOff"].Number),
+		Ref:        pageID,
+		CodeName:   parseRichText("CodeName", props),
+		PercentOff: uint(props["PercentOff"].Number),
 	}
 
 	for _, confRef := range props["Conference"].Relation {
@@ -72,15 +71,15 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 	}
 
 	speaker := &types.Speaker{
-		ID:          pageID,
-		Name:        parseRichText("Name", props),
-		Photo:       parseRichText("NormPhoto", props),
-		OrgPhoto:    parseRichText("OrgPhoto", props),
-		Website:     props["Website"].URL,
-		Github:      props["Github"].URL,
-		Twitter:     twitter,
-		Nostr:       parseRichText("npub", props),
-		Company:     parseRichText("Company", props),
+		ID:       pageID,
+		Name:     parseRichText("Name", props),
+		Photo:    parseRichText("NormPhoto", props),
+		OrgPhoto: parseRichText("OrgPhoto", props),
+		Website:  props["Website"].URL,
+		Github:   props["Github"].URL,
+		Twitter:  twitter,
+		Nostr:    parseRichText("npub", props),
+		Company:  parseRichText("Company", props),
 	}
 
 	return speaker
@@ -152,7 +151,7 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		DateDesc:      parseRichText("DateDesc", props),
 		Venue:         parseRichText("Venue", props),
 		ShowAgenda:    props["Show Agenda"].Checkbox,
-		ShowHackathon:    props["Show Hacks"].Checkbox,
+		ShowHackathon: props["Show Hacks"].Checkbox,
 		ShowTalks:     props["Show Talks"].Checkbox,
 		HasSatellites: props["Has Satellites"].Checkbox,
 	}
@@ -166,14 +165,14 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 
 func parseConfTicket(pageID string, props map[string]notion.PropertyValue) *types.ConfTicket {
 	ticket := &types.ConfTicket{
-		ID:    pageID,
-		Tier:  parseRichText("Tier", props),
-		Local: uint(props["Local"].Number),
-		BTC:   uint(props["BTC"].Number),
-		USD:   uint(props["USD"].Number),
-		Max:   uint(props["Max"].Number),
+		ID:       pageID,
+		Tier:     parseRichText("Tier", props),
+		Local:    uint(props["Local"].Number),
+		BTC:      uint(props["BTC"].Number),
+		USD:      uint(props["USD"].Number),
+		Max:      uint(props["Max"].Number),
 		Currency: parseRichText("Currency", props),
-		Symbol: parseRichText("Symbol", props),
+		Symbol:   parseRichText("Symbol", props),
 	}
 
 	if len(props["Conf"].Relation) > 0 {
@@ -301,7 +300,6 @@ func ListTalks(ctx *config.AppContext) ([]*types.Talk, error) {
 
 	return talks, nil
 }
-
 
 /* This may return nil */
 func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
@@ -464,12 +462,12 @@ func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice 
 		return tixPrice, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
 	}
 
-	discountTix := float64(100 - discount.PercentOff) * float64(tixPrice) / float64(100)
-	
+	discountTix := float64(100-discount.PercentOff) * float64(tixPrice) / float64(100)
+
 	tix := uint(discountTix)
 	/* Overflows are a thing */
 	if tix == 0 || tix > tixPrice {
-		tix = 1	
+		tix = 1
 	}
 	return tix, discount, nil
 }
@@ -528,7 +526,7 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 	return regis
 }
 
-func SoldTixCached(ctx *config.AppContext, conf *types.Conf) (uint) {
+func SoldTixCached(ctx *config.AppContext, conf *types.Conf) uint {
 	/* update the sold tix cache every time */
 	go UpdateSoldTix(ctx, conf)
 
