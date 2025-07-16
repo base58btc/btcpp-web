@@ -728,7 +728,6 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 	sort.Strings(keys)
 	for _, k := range keys {
 		v, _ := buckets[k]
-		ctx.Infos.Printf("looking at bucket %s", k)
 		i, err := strconv.Atoi(string(k[0]))
 		if err != nil {
 			return nil, err
@@ -746,24 +745,16 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 		}
 
 		day := days[i-1]
-		ctx.Infos.Printf("adding sessions %s...", string(k[len(k)-1]))
-		ctx.Infos.Printf("sessions to add?? %v", v)
 		switch string(k[len(k)-1]) {
 		case "+":
-			ctx.Infos.Printf("adding sessions to morning")
 			day.Morning = append(day.Morning, v)
 		case "=":
-			ctx.Infos.Printf("adding sessions to afternoon")
 			day.Afternoon = append(day.Afternoon, v)
 		case "-": 
-			ctx.Infos.Printf("adding sessions to evening")
 			day.Evening = append(day.Evening, v)
 		}
 	}
 
-	for i, day := range days {
-		ctx.Infos.Printf("day %d sessions: %d|%d|%d", i+1, len(day.Morning), len(day.Afternoon), len(day.Evening))
-	}
 	return days, nil
 }
 
