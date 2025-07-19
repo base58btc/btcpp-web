@@ -376,6 +376,19 @@ func GetTalksFor(ctx *config.AppContext, event string) ([]*types.Talk, error) {
 	return filtered, nil
 }
 
+func GetTalk(ctx *config.AppContext, talkID string) (*types.Talk, error) { 
+	talks, err := FetchTalksCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, talk := range talks {
+		if talk.ID == talkID {
+			return talk, nil
+		}
+	}
+	return nil, fmt.Errorf("Talk %s not found", talkID)
+}
+
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	var discounts []*types.DiscountCode
 

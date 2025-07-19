@@ -291,3 +291,15 @@ func (s Speakers) Swap(i, j int) {
 func (s Speakers) Less(i, j int) bool {
 	return strings.ToUpper(s[i].Name) < strings.ToUpper(s[j].Name)
 }
+
+func (s *Speaker) TwitterHandle() string {
+	indx := strings.LastIndex(s.Twitter, "/")
+	if indx == -1 {
+		return ""
+	}
+	handle := s.Twitter[indx+1:]
+	if strings.HasPrefix(handle, "@") {
+		return handle[1:]
+	}
+	return handle
+}

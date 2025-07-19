@@ -6,3 +6,5 @@ todo
 *.log
 .env
 .DS_Store
+
+/media/*/

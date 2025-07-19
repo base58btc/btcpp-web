@@ -11,6 +11,7 @@
       {
         devShells.default = pkgs.mkShell {
           packages = with pkgs; [
+	    poppler-utils
             bashInteractive
             jq
             go

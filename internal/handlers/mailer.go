@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -14,14 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/base58btc/btcpp-web/external/getters"
 	"github.com/base58btc/btcpp-web/internal/config"
+	"github.com/base58btc/btcpp-web/external/getters"
+	"github.com/base58btc/btcpp-web/internal/helpers"
 	"github.com/base58btc/btcpp-web/internal/types"
 	mailer "github.com/base58btc/mailer/mail"
-
-	"github.com/chromedp/cdproto/emulation"
-	"github.com/chromedp/cdproto/page"
-	"github.com/chromedp/chromedp"
 )
 
 var rezziesSent map[string]*types.Registration
@@ -63,48 +59,14 @@ func CheckForNewMails(ctx *config.AppContext) {
 	}
 }
 
-func pdfGrabber(url string, res *[]byte) chromedp.Tasks {
-	return chromedp.Tasks{
-		emulation.SetUserAgentOverride("WebScraper 1.0"),
-		chromedp.Navigate(url),
-		chromedp.WaitVisible(`body`, chromedp.ByQuery),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			buf, _, err := page.PrintToPDF().WithPrintBackground(true).WithPreferCSSPageSize(true).WithPaperWidth(3.8).WithPaperHeight(12.0).Do(ctx)
-			if err != nil {
-				return err
-			}
-			*res = buf
-			return nil
-		}),
-	}
-}
-
-func buildChromePdf(ctx *config.AppContext, fromURL string) ([]byte, error) {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.Flag("allow-insecure-localhost", true),
-		chromedp.Flag("ignore-certificate-errors", true),
-		chromedp.Flag("accept-insecure-certs", true),
-	)
-
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
-
-	taskCtx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(ctx.Infos.Printf),
-	)
-	defer cancel()
-	var pdfBuffer []byte
-	if err := chromedp.Run(taskCtx, pdfGrabber(fromURL, &pdfBuffer)); err != nil {
-		return pdfBuffer, err
-	}
-
-	return pdfBuffer, nil
-}
 
 func MakeTicketPDF(ctx *config.AppContext, rez *types.Registration) ([]byte, error) {
-	ticketPage := fmt.Sprintf("http://localhost:%s/ticket/%s?type=%s&conf=%s", ctx.Env.Port, rez.RefID, rez.Type, rez.ConfRef)
-	return buildChromePdf(ctx, ticketPage)
+	pdf := &helpers.PDFPage{
+		URL: fmt.Sprintf("http://localhost:%s/ticket/%s?type=%s&conf=%s", ctx.Env.Port, rez.RefID, rez.Type, rez.ConfRef),
+		Height: float64(12.0),
+		Width: float64(3.8),
+	}
+	return helpers.BuildChromePdf(ctx, pdf)
 }
 
 func SendMail(ctx *config.AppContext, rez *types.Registration) error {

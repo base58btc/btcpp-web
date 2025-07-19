@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/base58btc/btcpp-web/external/getters"
+	"github.com/base58btc/btcpp-web/internal/helpers"
 	"github.com/base58btc/btcpp-web/internal/config"
 	"github.com/base58btc/btcpp-web/internal/types"
 	"github.com/gorilla/mux"
@@ -305,6 +306,15 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/callback/opennode", func(w http.ResponseWriter, r *http.Request) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
+
+
+	r.HandleFunc("/media/imgs/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		GenSpeakerCards(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/media/imgs/{conf}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
+		MakeSpeakerCard(w, r, app)
+	}).Methods("GET")
 
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
@@ -820,6 +830,106 @@ func sendMail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, re
 	if err != nil {
 		http.Error(w, "Unable to send ticket, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/send test mail failed to send! %s", err.Error())
+		return
+	}
+}
+
+type SpeakerCard struct {
+	ConfTag   string
+	Name      string
+	TalkTitle string
+	TalkImg   string
+	Twitter   string
+}
+
+func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ctx.Env.Prod {
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
+	path := fmt.Sprintf("media/%s", confTag)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		err := os.MkdirAll(path, os.ModePerm)
+		if err != nil {
+			ctx.Err.Printf("can't make conf directory: %s", err)
+			return
+		}
+	}
+
+	talks, _ := getters.GetTalksFor(ctx, confTag)
+	/* Get talks for this conf */
+	for _, talk := range talks {
+		if talk.Type == "hackathon" {
+			continue
+		}
+		for _, speaker := range talk.Speakers {
+			img, err := helpers.MakeSpeakerImage(ctx, confTag, speaker.ID, talk.ID)
+			if err != nil {
+				ctx.Err.Printf("oh no can't make speaker image %s: %s", speaker.Name, err)
+				return
+			}
+			
+			ctx.Infos.Printf("made image for %s", speaker.Name)
+
+			imgName := strings.Split(speaker.Photo, ".")[0]
+			fileName := fmt.Sprintf("media/%s/%s.pdf", confTag, imgName)
+			err = os.WriteFile(fileName, img, 0644)
+			if err != nil {
+				ctx.Err.Printf("oh no can't write speaker image %s: %s", speaker.Name, err)
+				return
+			}
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ctx.Env.Prod {
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	talkID := params["talk"]
+	sID := params["speaker"]
+
+	/* Find talk! */
+	talk, err := getters.GetTalk(ctx, talkID)
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
+		return
+	}
+
+	/* Find speaker! */
+	var speaker *types.Speaker
+	for _, sp := range talk.Speakers {
+		if sp.ID == sID {
+			speaker = sp
+			break
+		}
+	}
+	
+	if speaker == nil {
+		ctx.Err.Printf("unable to find speaker %s for talk %s", sID, talk.Name)
+		return
+	}
+
+	template := "media/speaker_social.tmpl"
+	err = ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
+		ConfTag: confTag,
+		Name: speaker.Name,
+		TalkTitle: talk.Name,
+		TalkImg: talk.Clipart,
+		Twitter: speaker.TwitterHandle(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("exec speaker_social failed")
 		return
 	}
 }
