@@ -67,7 +67,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 	if strings.Contains(parseTwitter, "http") {
 		twitter = parseTwitter
 	} else if parseTwitter != "" {
-		twitter = fmt.Sprintf("https://twitter.com/%s", parseTwitter)
+		twitter = fmt.Sprintf("https://x.com/%s", parseTwitter)
 	}
 
 	speaker := &types.Speaker{

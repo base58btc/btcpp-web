@@ -1,4 +1,4 @@
-This is the code for the bitcoin++ website. (Conference [Twitter](https://twitter.com/btcplusplus))
+This is the code for the [bitcoin++ website](https://btcpp.dev). (Conference [X Account](https://x.com/btcplusplus))
 
 All of the configuration values live in a `config.toml` file, which is missing from this repo on purpose.
 
