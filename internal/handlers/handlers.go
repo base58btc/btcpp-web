@@ -740,6 +740,10 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
+		if k == "" {
+			ctx.Err.Printf("empty key in set?")
+			continue
+		}
 		v, _ := buckets[k]
 		i, err := strconv.Atoi(string(k[0]))
 		if err != nil {
