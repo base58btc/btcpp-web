@@ -307,12 +307,15 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
 
+	r.HandleFunc("/media/preview/{conf}/{card}", func(w http.ResponseWriter, r *http.Request) {
+		PreviewSpeakerCard(w, r, app)
+	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		GenSpeakerCards(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/media/imgs/{conf}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/media/imgs/{conf}/{card}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
 		MakeSpeakerCard(w, r, app)
 	}).Methods("GET")
 
@@ -850,13 +853,12 @@ func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	params := mux.Vars(r)
 	confTag := params["conf"]
 
+	/* Make sure the directory exists */
 	path := fmt.Sprintf("media/%s", confTag)
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		err := os.MkdirAll(path, os.ModePerm)
-		if err != nil {
-			ctx.Err.Printf("can't make conf directory: %s", err)
-			return
-		}
+	err := helpers.MakeDir(path)
+	if err != nil {
+		ctx.Err.Printf("can't make dir %s: %s", path, err)
+		return
 	}
 
 	talks, _ := getters.GetTalksFor(ctx, confTag)
@@ -866,25 +868,51 @@ func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 			continue
 		}
 		for _, speaker := range talk.Speakers {
-			img, err := helpers.MakeSpeakerImage(ctx, confTag, speaker.ID, talk.ID)
-			if err != nil {
-				ctx.Err.Printf("oh no can't make speaker image %s: %s", speaker.Name, err)
-				return
-			}
-			
-			ctx.Infos.Printf("made image for %s", speaker.Name)
+			for _, card := range types.MediaCards {
+				img, err := helpers.MakeSpeakerImage(ctx, confTag, card, speaker.ID, talk.ID)
+				if err != nil {
+					ctx.Err.Printf("oh no can't make speaker image %s: %s", speaker.Name, err)
+					return
+				}
+				
+				ctx.Infos.Printf("made image for (%s) %s", card, speaker.Name)
 
-			imgName := strings.Split(speaker.Photo, ".")[0]
-			fileName := fmt.Sprintf("media/%s/%s.pdf", confTag, imgName)
-			err = os.WriteFile(fileName, img, 0644)
-			if err != nil {
-				ctx.Err.Printf("oh no can't write speaker image %s: %s", speaker.Name, err)
-				return
+				imgName := strings.Split(speaker.Photo, ".")[0]
+				fileName := fmt.Sprintf("media/%s/%s-%s.pdf", confTag, imgName, card)
+				err = os.WriteFile(fileName, img, 0644)
+				if err != nil {
+					ctx.Err.Printf("oh no can't write speaker image %s: %s", speaker.Name, err)
+					return
+				}
 			}
 		}
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func PreviewSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ctx.Env.Prod {
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+
+	template := fmt.Sprintf("media/speaker_%s.tmpl", card)
+	err := ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
+		ConfTag: confTag,
+		Name: "Speaker's Name",
+		TalkTitle: "This is a very long talk Name: one that goes way too far",
+		TalkImg: "riga_clock.png",
+		Twitter: "niftynei",
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("exec speaker_social failed")
+		return
+	}
 }
 
 func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -894,6 +922,7 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 
 	params := mux.Vars(r)
 	confTag := params["conf"]
+	card := params["card"]
 	talkID := params["talk"]
 	sID := params["speaker"]
 
@@ -919,7 +948,7 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	template := "media/speaker_social.tmpl"
+	template := fmt.Sprintf("media/speaker_%s.tmpl", card)
 	err = ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
 		ConfTag: confTag,
 		Name: speaker.Name,

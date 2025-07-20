@@ -23,8 +23,8 @@ body {
 }
 
 .bounding {
-  height: 314px;
-  width: 600px;
+  height: 1080px;
+  width:  1920px;
 }
 
 .img {
@@ -38,30 +38,52 @@ body {
 }
 
 .logo {
-  width: 110px;
+  width: 353px;
   height: 100%;
-  position: absolute;
   object-fit: contain;
+  position: absolute;
   right: 0;
   bottom: 0;
 
-  background-image: url(/static/img/{{ .ConfTag }}/logo.png);
+  background-image: url(/static/img/{{ .ConfTag }}/logo_1080p.png);
   background-size: cover;
   background-position: center;
+}
+
+.captionbox {
+  position: absolute;
+  bottom: 64px;
+  left: 64px;
+  right: 64px;
+}
+
+.speaker {
+  font-size: 10rem;
+  line-height: 10rem;
+}
+
+.talk {
+  font-size: 4rem;
+  line-height: 4rem;
+  margin-right: 360px;
+}
+
+.social {
+  font-size: 2rem;
 }
 </style>
   <!-- option 1 -->
 <section class="bounding relative">
     <div class="relative overflow-hidden bg-gray-900 shadow-xl bounding img"></div>
-    <div style="position: absolute; bottom: 20px; left: 40px; right: 40px;">
+    <div class="captionbox">
         <figure>
-          <blockquote class="text-lg font-semibold text-white sm:text-xl/8" style="font-size: 5rem; line-height: 4rem;">
+          <blockquote class="speaker text-lg font-semibold text-white sm:text-xl/8 mb-4">
             <p>{{ .Name }}</p>
           </blockquote>
-          <figcaption class="mt-4 text-base text-white"> 
-            <div class="font-semibold" style="font-size: 1.5rem; line-height: 1.25rem; margin-right: 112px;">{{ .TalkTitle }}</div>
+          <figcaption class="text-base text-white"> 
+            <div class="talk font-semibold">{{ .TalkTitle }}</div>
 	    {{ if .Twitter }}
-            <div class="mt-1">@{{ .Twitter }}</div>
+            <div class="social mt-8">@{{ .Twitter }}</div>
 	    {{ end }}
           </figcaption>
         </figure>

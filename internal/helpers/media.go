@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/base58btc/btcpp-web/internal/config"
+	"github.com/base58btc/btcpp-web/internal/types"
 
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
@@ -58,12 +59,17 @@ func BuildChromePdf(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 	return pdfBuffer, nil
 }
 
-func MakeSpeakerImage(ctx *config.AppContext, confTag, speakerID, talkID string) ([]byte, error) {
+func MakeSpeakerImage(ctx *config.AppContext, confTag, card, speakerID, talkID string) ([]byte, error) {
+
+	dimens, ok := types.MediaDimens[card]
+	if !ok {
+		return nil, fmt.Errorf("can't find card %s", card)
+	}
 
 	pdf := &PDFPage{
-		URL: fmt.Sprintf("http://localhost:%s/media/imgs/%s/%s/%s", ctx.Env.Port, confTag, talkID, speakerID),
-		Height: float64(3.27),
-		Width: float64(6.25),
+		URL: fmt.Sprintf("http://localhost:%s/media/imgs/%s/%s/%s/%s", ctx.Env.Port, confTag, card, talkID, speakerID),
+		Height: dimens.Height,
+		Width: dimens.Width,
 	}
 
 	ctx.Infos.Printf("URL: %s", pdf.URL)
