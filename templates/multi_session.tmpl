@@ -23,17 +23,17 @@
           {{ end }}
         {{ if eq .Venue "one" }}
         <p class="text-left text-sm text-gray-500">
-          Venue: <span class="font-medium text-purple-600">Plenarium</span>
+          Venue: <span class="font-medium text-purple-600">Main Stage</span>
         </p>
         {{ end }}
         {{ if eq .Venue "two" }}
         <p class="text-left text-sm text-gray-500">
-          Venue: <span class="font-medium text-blue-600">Auditorium</span>
+          Venue: <span class="font-medium text-blue-600">Talks Stage</span>
         </p>
         {{ end }}
         {{ if eq .Venue "three" }}
         <p class="text-left text-sm text-gray-500">
-          Venue: <span class="font-medium text-indigo-600">Workshop</span>
+          Venue: <span class="font-medium text-indigo-600">Workshops</span>
         </p>
         {{ end }}
     </a>
@@ -55,6 +55,9 @@
     {{ end }}
     {{ if eq .Type "keynote" }}
     <span class="grow0 relative z-10 rounded-full bg-pink-50 py-1.5 px-3 font-medium text-pink-600">{{ .Type }}</span>
+    {{ end }}
+    {{ if eq .Type "panel" }}
+    <span class="grow0 relative z-10 rounded-full bg-indigo-50 py-1.5 px-3 font-medium text-indigo-600">{{ .Type }}</span>
     {{ end }}
 
   </div>

@@ -19,6 +19,9 @@
     {{ if eq .Type "talk" }}
     <span class="relative z-10 rounded-full bg-orange-50 py-1.5 px-3 font-medium text-orange-600 hover:bg-orange-100">Talk</span>
     {{ end }}
+    {{ if eq .Type "panel" }}
+    <span class="relative z-10 rounded-full bg-indigo-50 py-1.5 px-3 font-medium text-indigo-600 hover:bg-indigo-100">Panel</span>
+    {{ end }}
     </div>
     <div class="group relative max-w-xl">
       <h3 class="mt-3 text-lg font-semibold leading-6 text-gray-900">
@@ -29,17 +32,17 @@
     </div>
     {{ if eq .Venue "one" }}
     <p class="text-left text-sm text-gray-500">
-      Venue: <span class="font-medium text-purple-600">Plenarium</span>
+      Venue: <span class="font-medium text-purple-600">Main Stage</span>
     </p>
     {{ end }}
     {{ if eq .Venue "two" }}
     <p class="text-left text-sm text-gray-500">
-      Venue: <span class="font-medium text-blue-600">Workshop</span>
+      Venue: <span class="font-medium text-blue-600">Talks Stage</span>
     </p>
     {{ end }}
     {{ if eq .Venue "three" }}
     <p class="text-left text-sm text-gray-500">
-      Venue: <span class="font-medium text-indigo-600">Hang n' Hack</span>
+      Venue: <span class="font-medium text-indigo-600">Workshops</span>
     </p>
     {{ end }}
     {{ if .Speakers }}
