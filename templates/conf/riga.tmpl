@@ -55,7 +55,19 @@
       </div>
     </div>
     <div class="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
-      <img class="aspect-[3/2] object-cover lg:aspect-auto lg:h-full lg:w-full" src="/static/img/riga/leading.png" alt="">
+      <picture>
+        <source srcset="/static/img/riga/leading.avif" type="image/avif"/>
+        <img 
+          class="aspect-[3/2] object-cover lg:aspect-auto lg:h-full w-full" 
+          src="/static/img/riga/leading-200.png" 
+          loading="lazy"
+          srcset="
+          /static/img/riga/leading-200.png 320w,
+          /static/img/riga/leading-400.png 800w,
+          /static/img/riga/leading-800.png 1200w
+          "
+      alt="">
+      </picture>
     </div>
   </div>
 </section>
@@ -231,7 +243,7 @@
   </div>
 </div>
 <div class="mx-auto max-w-7xl sm:px-6 sm:pt-24 lg:px-8">
-    <div class="relative isolate overflow-hidden bg-orange-500 px-6 py-24 text-center shadow-2xl sm:rounded-3xl sm:px-16 bg-[url(/static/img/riga/bnw.png)] bg-center">
+    <div class="relative isolate overflow-hidden bg-orange-500 px-6 py-24 text-center shadow-2xl sm:rounded-3xl sm:px-16 bg-[url(/static/img/riga/bnw.avif)] bg-center">
       <h2 class="text-balance text-4xl font-semibold tracking-tight text-white sm:text-5xl">Compete. Present. Win.</h2>
       <p class="mx-auto mt-6 max-w-xl text-pretty text-lg/8 text-gray-50">Find more details about our judges, prize categories, and winning criteria on Devpost</p>
       <div class="mt-10 flex items-center justify-center gap-x-6">
