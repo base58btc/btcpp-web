@@ -12,6 +12,10 @@ build:
 css-build:
 	tailwindcss -i templates/css/input.css -o static/css/mini.css --minify
 
+.PHONY: pdf-gen
+pdf-conv:
+	cd media && ./convert.sh $(conf) && cd ..
+
 .PHONY: build-all
 build-all: build css-build
 
