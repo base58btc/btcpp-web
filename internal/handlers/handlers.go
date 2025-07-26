@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -17,28 +18,22 @@ import (
 	"strings"
 	"time"
 
-	"github.com/base58btc/btcpp-web/external/getters"
-	"github.com/base58btc/btcpp-web/internal/helpers"
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/internal/config"
+	"btcpp-web/external/getters"
+	"btcpp-web/internal/emails"
+	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/missives"
+	"btcpp-web/internal/types"
+
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
 
-	"encoding/base64"
 	qrcode "github.com/skip2/go-qrcode"
 
 	stripe "github.com/stripe/stripe-go/v76"
 	"github.com/stripe/stripe-go/v76/checkout/session"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
-
-func MiniCss() string {
-	css, err := ioutil.ReadFile("static/css/mini.css")
-	if err != nil {
-		panic(err)
-	}
-	return string(css)
-}
 
 var pages []string = []string{"index", "about", "sponsor", "contact", "talk", "press", "volunteer", "vegas25"}
 
@@ -86,6 +81,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"isLast": func(index int, count int) bool {
 			return index+1 == count
 		},
+		"ishtml": func(s string) template.HTML {
+			return template.HTML(s)
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err
@@ -111,15 +109,6 @@ func findConf(r *http.Request, app *config.AppContext) (*types.Conf, error) {
 	}
 
 	return nil, fmt.Errorf("'%s' not found (url: %s)", confTag, r.URL.String())
-}
-
-func findConfByRef(app *config.AppContext, confRef string) *types.Conf {
-	for _, conf := range app.Confs {
-		if conf.Ref == confRef {
-			return conf
-		}
-	}
-	return nil
 }
 
 func findTicket(app *config.AppContext, tixID string) (*types.ConfTicket, *types.Conf) {
@@ -288,15 +277,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/check-in/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
-	r.HandleFunc("/welcome-email", func(w http.ResponseWriter, r *http.Request) {
-		TicketCheck(w, r, app)
-	}).Methods("GET")
 	r.HandleFunc("/ticket/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		Ticket(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/trial-email", func(w http.ResponseWriter, r *http.Request) {
-		SendMailTest(w, r, app)
-	}).Methods("GET")
+
+	/* Register routes for newsletters */
+	missives.RegisterNewsletterHandlers(r, app)
+	emails.RegisterEndpoints(r, app)
 
 	/* Setup stripe! */
 	stripe.Key = app.Env.StripeKey
@@ -363,12 +350,6 @@ func addFaviconRoutes(r *mux.Router) error {
 	return nil
 }
 
-func getSessionKey(p string, r *http.Request) (string, bool) {
-	ok := r.URL.Query().Has(p)
-	key := r.URL.Query().Get(p)
-	return key, ok
-}
-
 type HomePage struct {
 	Year uint
 }
@@ -426,7 +407,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		w.WriteHeader(http.StatusBadRequest)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
-			Year:     currentYear(),
+			Year:     helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -439,7 +420,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		w.WriteHeader(http.StatusUnauthorized)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg:  "Wrong registration PIN",
-			Year: currentYear(),
+			Year: helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -482,7 +463,7 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
-				Year:     currentYear(),
+				Year:     helpers.CurrentYear(),
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -540,7 +521,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		Talks:         talks,
 		EventSpeakers: evSpeakers,
 		Conf:          conf,
-		Year:          currentYear(),
+		Year:          helpers.CurrentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -559,7 +540,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
 		Conf: conf,
-		Year: currentYear(),
+		Year: helpers.CurrentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -623,7 +604,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		EventSpeakers: evSpeakers,
 		Buckets:       buckets,
 		Days:          days,
-		Year:          currentYear(),
+		Year:          helpers.CurrentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -632,16 +613,11 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 }
 
-func currentYear() uint {
-	year, _, _ := time.Now().Date()
-	return uint(year)
-}
-
 func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, page string) {
 
 	template := fmt.Sprintf("embeds/%s.tmpl", page)
 	err := ctx.TemplateCache.ExecuteTemplate(w, template, &HomePage{
-		Year: currentYear(),
+		Year: helpers.CurrentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -791,54 +767,12 @@ func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, erro
 	return sessions, nil
 }
 
-type EmailTmpl struct {
-	URI     string
-	CSS     string
-	ConfTag string
-}
-
 type TicketTmpl struct {
 	QRCodeURI string
 	Domain    string
 	CSS       string
 	Type      string
 	Conf      *types.Conf
-}
-
-func SendMailTest(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	reg := &types.Registration{
-		RefID:      "testticket",
-		Type:       "volunteer",
-		Email:      "niftynei@gmail.com",
-		ItemBought: "bitcoin++",
-	}
-
-	sendMail(w, r, ctx, reg)
-}
-
-func sendMail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, reg *types.Registration) {
-	pdf, err := MakeTicketPDF(ctx, reg)
-
-	if err != nil {
-		http.Error(w, "Unable to make ticket, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/send test mail failed ! %s", err.Error())
-		return
-	}
-
-	tickets := make([]*types.Ticket, 1)
-	tickets[0] = &types.Ticket{
-		Pdf: pdf,
-		ID:  reg.RefID,
-	}
-
-	err = SendTickets(ctx, tickets, reg.ConfRef, reg.Email, time.Now())
-
-	/* Return the error */
-	if err != nil {
-		http.Error(w, "Unable to send ticket, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/send test mail failed to send! %s", err.Error())
-		return
-	}
 }
 
 type SpeakerCard struct {
@@ -971,15 +905,15 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	params := mux.Vars(r)
 	ticket := params["ticket"]
 
-	tixType, _ := getSessionKey("type", r)
-	confRef, _ := getSessionKey("conf", r)
+	tixType, _ := helpers.GetSessionKey("type", r)
+	confRef, _ := helpers.GetSessionKey("conf", r)
 
 	/* make it pretty */
 	if tixType == "genpop" {
 		tixType = "general"
 	}
 
-	conf := findConfByRef(ctx, confRef)
+	conf := helpers.FindConfByRef(ctx, confRef)
 	if conf == nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/ticket-pdf unable to find conf! %s", confRef)
@@ -998,7 +932,7 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 
 	tix := &TicketTmpl{
 		QRCodeURI: dataURI,
-		CSS:       MiniCss(),
+		CSS:       helpers.MiniCss(),
 		Domain:    ctx.Env.GetDomain(),
 		Type:      tixType,
 		Conf:      conf,
@@ -1008,19 +942,6 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Infos.Printf("/ticket-pdf ExecuteTemplate failed ! %s", err.Error())
-	}
-}
-
-func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	confTag, _ := getSessionKey("tag", r)
-
-	tmplTag := fmt.Sprintf("emails/%s.tmpl", confTag)
-	err := ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &EmailTmpl{
-		URI: ctx.Env.GetURI(),
-	})
-	if err != nil {
-		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Infos.Printf("/welcome-email ExecuteTemplate failed ! %s", err.Error())
 	}
 }
 
@@ -1044,7 +965,7 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 				NeedsPin: true,
 				Msg:      "Wrong pin",
-				Year:     currentYear(),
+				Year:     helpers.CurrentYear(),
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -1070,7 +991,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		w.WriteHeader(http.StatusBadRequest)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			NeedsPin: true,
-			Year:     currentYear(),
+			Year:     helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -1083,7 +1004,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		w.WriteHeader(http.StatusUnauthorized)
 		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 			Msg:  "Wrong registration PIN",
-			Year: currentYear(),
+			Year: helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -1110,7 +1031,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
 		TicketType: tix_type,
 		Msg:        msg,
-		Year:       currentYear(),
+		Year:       helpers.CurrentYear(),
 	})
 
 	if err != nil {
@@ -1223,6 +1144,18 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+
+	/* Add to mailing list + schedule mails */
+	conf := helpers.FindConfByRef(ctx, entry.ConfRef)
+	err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType)
+
+	if err != nil {
+		ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+
 	ctx.Infos.Println("Added ticket!", entry.ID)
 	w.WriteHeader(http.StatusOK)
 }
@@ -1307,7 +1240,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		Err:           errStr,
 		HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
 		Count:         uint(1),
-		Year:          currentYear(),
+		Year:          helpers.CurrentYear(),
 	})
 
 	if err != nil {
@@ -1341,7 +1274,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	switch r.Method {
 	case http.MethodGet:
 
-		discountCode, _ := getSessionKey("q", r)
+		discountCode, _ := helpers.GetSessionKey("q", r)
 
 		discountPrice := tixPrice
 		var errStr string
@@ -1370,7 +1303,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			Err:           errStr,
 			HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
 			Count:         uint(1),
-			Year:          currentYear(),
+			Year:          helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -1504,7 +1437,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			w.WriteHeader(http.StatusOK)
 			return
 		}
-		conf := findConfByRef(ctx, confRef)
+		conf := helpers.FindConfByRef(ctx, confRef)
 		if conf == nil {
 			ctx.Err.Println("Couldn't find conf %s", confRef)
 			w.WriteHeader(http.StatusOK)
@@ -1565,6 +1498,16 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			return
 		}
 		ctx.Infos.Printf("Added %d tickets!!", len(entry.Items))
+
+		/* Add to mailing list + send mails */
+		err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType)
+
+		if err != nil {
+			ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
 	default:
 		ctx.Infos.Printf("Unhandled event type: %s", event.Type)
 	}

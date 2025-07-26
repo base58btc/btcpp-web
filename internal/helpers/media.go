@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/types"
 
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"

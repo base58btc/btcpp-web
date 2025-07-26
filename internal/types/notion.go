@@ -1,7 +1,7 @@
 package types
 
 import (
-	"github.com/sorcererxw/go-notion"
+	"github.com/niftynei/go-notion"
 )
 
 type (
@@ -14,6 +14,9 @@ type (
 		ConfsDb     string
 		ConfsTixDb  string
 		DiscountsDb string
+
+		NewsletterDb string
+		MissivesDb   string
 	}
 
 	Notion struct {
@@ -23,6 +26,8 @@ type (
 )
 
 func (n *Notion) Setup(token string) {
-	client := notion.NewClient(notion.Settings{Token: token})
+	client := notion.NewClient(notion.Settings{
+		Token: token,
+	})
 	n.Client = client
 }

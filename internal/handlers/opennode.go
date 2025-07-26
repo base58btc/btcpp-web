@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/types"
 	"io/ioutil"
 	"net/http"
 	"time"

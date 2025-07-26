@@ -15,6 +15,7 @@ type (
 		MailerSecret      string
 		MailerJob         int
 		MailOff           bool
+		MailEndpoint      string
 		StripeKey         string
 		StripeEndpointSec string
 		RegistryPin       string

@@ -5,7 +5,7 @@ import (
 	"log"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/internal/types"
 )
 
 /* application configuration settings */
@@ -18,5 +18,6 @@ type AppContext struct {
 	Infos         *log.Logger
 	Session       *scs.SessionManager
 	TemplateCache *template.Template
+	EmailCache    map[string]*template.Template
 	Confs         []*types.Conf
 }

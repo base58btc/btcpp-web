@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"fmt"
+	"html/template"
 	"log"
 	"net/http"
 	"os"
@@ -11,10 +12,11 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/alexedwards/scs/v2"
-	"github.com/base58btc/btcpp-web/external/getters"
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/handlers"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/external/getters"
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/handlers"
+	"btcpp-web/internal/emails"
+	"btcpp-web/internal/types"
 )
 
 const configFile = "config.toml"
@@ -39,6 +41,7 @@ func loadConfig() *types.EnvConfig {
 
 		config.Host = os.Getenv("HOST")
 		config.MailerSecret = os.Getenv("MAILER_SECRET")
+		config.MailEndpoint = os.Getenv("MAILER_ENDPOINT")
 		config.MailOff = false
 
 		mailSec, err := strconv.ParseInt(os.Getenv("MAILER_JOB_SEC"), 10, 32)
@@ -62,6 +65,8 @@ func loadConfig() *types.EnvConfig {
 			ConfsDb:     os.Getenv("NOTION_CONFS_DB"),
 			ConfsTixDb:  os.Getenv("NOTION_CONFSTIX_DB"),
 			DiscountsDb: os.Getenv("NOTION_DISCOUNT_DB"),
+			NewsletterDb: os.Getenv("NOTION_NEWSLETTER_DB"),
+			MissivesDb:   os.Getenv("NOTION_MISSIVES_DB"),
 		}
 		config.Google = types.GoogleConfig{Key: os.Getenv("GOOGLE_KEY")}
 
@@ -78,7 +83,7 @@ func RunNewMails(ctx *config.AppContext) {
 	time.Sleep(4 * time.Second)
 	ctx.Infos.Println("Starting up mailer job...")
 	for true {
-		handlers.CheckForNewMails(ctx)
+		emails.CheckForNewMails(ctx)
 		time.Sleep(time.Duration(ctx.Env.MailerJob) * time.Second)
 	}
 }
@@ -142,6 +147,7 @@ func run(env *types.EnvConfig) error {
 
 	// Initialize the application configuration
 	app.InProduction = env.Prod
+	app.EmailCache = make(map[string]*template.Template)
 
 	app.Infos.Println("\n\n\n")
 	app.Infos.Println("~~~~app restarted, here we go~~~~~")

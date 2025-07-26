@@ -6,9 +6,9 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/types"
-	"github.com/sorcererxw/go-notion"
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/types"
+	"github.com/niftynei/go-notion"
 	"strings"
 	"time"
 )
@@ -19,174 +19,6 @@ var talks []*types.Talk
 var lastTalksFetch time.Time
 var discounts []*types.DiscountCode
 var lastDiscountFetch time.Time
-
-func parseRichText(key string, props map[string]notion.PropertyValue) string {
-	val, ok := props[key]
-	if !ok {
-		/* FIXME: log err? */
-		return ""
-	}
-	if len(val.RichText) == 0 {
-		if len(val.Title) != 0 {
-			return val.Title[0].Text.Content
-		}
-		/* FIXME: log err? */
-		return ""
-	}
-
-	return val.RichText[0].Text.Content
-}
-
-func fileGetURL(file *notion.File) string {
-	if file.Internal != nil {
-		return file.Internal.URL
-	}
-	if file.External != nil {
-		return file.External.URL
-	}
-	return ""
-}
-
-func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.DiscountCode {
-	discount := &types.DiscountCode{
-		Ref:        pageID,
-		CodeName:   parseRichText("CodeName", props),
-		PercentOff: uint(props["PercentOff"].Number),
-	}
-
-	for _, confRef := range props["Conference"].Relation {
-		discount.ConfRef = append(discount.ConfRef, confRef.ID)
-	}
-
-	return discount
-}
-
-func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.Speaker {
-	var twitter string
-	parseTwitter := parseRichText("Twitter", props)
-	if strings.Contains(parseTwitter, "http") {
-		twitter = parseTwitter
-	} else if parseTwitter != "" {
-		twitter = fmt.Sprintf("https://x.com/%s", parseTwitter)
-	}
-
-	speaker := &types.Speaker{
-		ID:       pageID,
-		Name:     parseRichText("Name", props),
-		Photo:    parseRichText("NormPhoto", props),
-		OrgPhoto: parseRichText("OrgPhoto", props),
-		Website:  props["Website"].URL,
-		Github:   props["Github"].URL,
-		Twitter:  twitter,
-		Nostr:    parseRichText("npub", props),
-		Company:  parseRichText("Company", props),
-	}
-
-	return speaker
-}
-
-func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []*types.Speaker) *types.Talk {
-
-	var sched *types.Times
-	talktimes := props["Talk Time"].Date
-	if talktimes != nil {
-		sched = &types.Times{
-			Start: talktimes.Start,
-			End:   talktimes.End,
-		}
-	}
-
-	talk := &types.Talk{
-		ID:          pageID,
-		Name:        parseRichText("Talk Name", props),
-		Clipart:     parseRichText("Clipart", props),
-		Description: parseRichText("Description", props),
-		Sched:       sched,
-	}
-
-	/* Find all speakers for this talk */
-	if speakers != nil {
-		for _, speakerRel := range props["speakers"].Relation {
-			for _, speaker := range speakers {
-				if speakerRel.ID == speaker.ID {
-					talk.Speakers = append(talk.Speakers, speaker)
-				}
-			}
-		}
-	}
-
-	if len(talk.Clipart) > 4 {
-		talk.AnchorTag = talk.Clipart[:len(talk.Clipart)-4]
-	}
-
-	if props["Venue"].Select != nil {
-		talk.Venue = props["Venue"].Select.Name
-	}
-
-	if props["Event"].Select != nil {
-		talk.Event = props["Event"].Select.Name
-	}
-
-	if sched != nil {
-		talk.TimeDesc = sched.Desc()
-		talk.DayTag = sched.Day()
-	}
-	if props["Talk Type"].Select != nil {
-		talk.Type = props["Talk Type"].Select.Name
-	}
-
-	if props["Section"].Select != nil {
-		talk.Section = props["Section"].Select.Name
-	}
-
-	return talk
-}
-
-func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf {
-	conf := &types.Conf{
-		Ref:           pageID,
-		Tag:           parseRichText("Name", props),
-		Active:        props["Active"].Checkbox,
-		Desc:          parseRichText("Desc", props),
-		DateDesc:      parseRichText("DateDesc", props),
-		Venue:         parseRichText("Venue", props),
-		ShowAgenda:    props["Show Agenda"].Checkbox,
-		ShowHackathon: props["Show Hacks"].Checkbox,
-		ShowTalks:     props["Show Talks"].Checkbox,
-		HasSatellites: props["Has Satellites"].Checkbox,
-	}
-
-	if props["Color"].Select != nil {
-		conf.Color = props["Color"].Select.Name
-	}
-
-	return conf
-}
-
-func parseConfTicket(pageID string, props map[string]notion.PropertyValue) *types.ConfTicket {
-	ticket := &types.ConfTicket{
-		ID:       pageID,
-		Tier:     parseRichText("Tier", props),
-		Local:    uint(props["Local"].Number),
-		BTC:      uint(props["BTC"].Number),
-		USD:      uint(props["USD"].Number),
-		Max:      uint(props["Max"].Number),
-		Currency: parseRichText("Currency", props),
-		Symbol:   parseRichText("Symbol", props),
-	}
-
-	if len(props["Conf"].Relation) > 0 {
-		ticket.ConfRef = props["Conf"].Relation[0].ID
-	}
-
-	if props["Expires"].Date != nil {
-		ticket.Expires = &types.Times{
-			Start: props["Expires"].Date.Start,
-		}
-	}
-
-	return ticket
-}
 
 func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 	var confTix []*types.ConfTicket
@@ -524,19 +356,6 @@ func CheckIn(n *types.Notion, ticket string) (string, bool, error) {
 	}
 
 	return "", true, fmt.Errorf("Already checked in")
-}
-
-func parseRegistration(props map[string]notion.PropertyValue) *types.Registration {
-	regis := &types.Registration{
-		RefID:      parseRichText("RefID", props),
-		Type:       props["Type"].Select.Name,
-		Email:      props["Email"].Email,
-		ItemBought: parseRichText("Item Bought", props),
-	}
-	if len(props["conf"].Relation) > 0 {
-		regis.ConfRef = props["conf"].Relation[0].ID
-	}
-	return regis
 }
 
 func SoldTixCached(ctx *config.AppContext, conf *types.Conf) uint {

@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/base58btc/btcpp-web/internal/config"
-	"github.com/base58btc/btcpp-web/internal/types"
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/types"
 )
 
 const CHARGES_ENDPOINT string = "/charges"
