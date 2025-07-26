@@ -17,6 +17,7 @@
             go
             tailwindcss
             air 
+	    git
           ];
           # Automatically run ??? when entering the shell.
           #shellHook = "???";
