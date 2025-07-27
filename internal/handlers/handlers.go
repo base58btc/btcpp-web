@@ -201,6 +201,11 @@ func findMaxTix(conf *types.Conf) *types.ConfTicket {
 func Routes(app *config.AppContext) (http.Handler, error) {
 	r := mux.NewRouter()
 
+	/* Handle 404s */
+	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handle404(w, r, app)
+	})
+
 	// Set up the routes, we'll have one page per course
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		RenderPage(w, r, app, "index")
@@ -348,6 +353,35 @@ func addFaviconRoutes(r *mux.Router) error {
 	}
 
 	return nil
+}
+
+func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	w.WriteHeader(http.StatusNotFound)
+	ctx.Err.Printf("404 err: %s", r.URL.Path)
+
+	confs, err := getters.ListConferences(ctx.Notion)
+	if err != nil {
+		// FIXME add an internal error page
+		http.Error(w, "Unable to load confereneces, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/conf-reload conf load failed ! %s", err.Error())
+		return
+	}
+
+	page := struct {
+		Confs   []*types.Conf
+		Year    uint
+	}{
+		Confs: confs,
+		Year: helpers.CurrentYear(),
+	}
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "404.tmpl", &page)
+	if err != nil {
+		// FIXME add an internal error page
+		http.Error(w, "error encountered loading 404 page", http.StatusInternalServerError)
+		ctx.Err.Printf("/404 page render failed ! %s", err.Error())
+		return
+	}
 }
 
 type HomePage struct {
