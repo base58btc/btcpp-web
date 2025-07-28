@@ -49,6 +49,7 @@ type (
 
 var sublists []string = []string{ 
 	"newsletter",
+	"test-news",
 	"insider",
 	"volunteer",
 	"sponsor",
