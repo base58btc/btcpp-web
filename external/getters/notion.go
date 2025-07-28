@@ -6,11 +6,12 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"strings"
+	"time"
+
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 	"github.com/niftynei/go-notion"
-	"strings"
-	"time"
 )
 
 var cacheSpeakers []*types.Speaker
@@ -21,6 +22,164 @@ var talks []*types.Talk
 var lastTalksFetch time.Time
 var discounts []*types.DiscountCode
 var lastDiscountFetch time.Time
+
+type (
+	JobType int
+
+)
+
+const (
+	JobSpeakers JobType = iota + 1
+	JobConfs
+	JobTalks
+	JobDiscounts
+)
+
+var taskChan chan JobType = make(chan JobType)
+
+func StartWorkPool(ctx *config.AppContext) {
+	// FIXME: I don't think go-notion is threadsafe lmao
+	numWorkers := 1
+
+	// Start the worker pool
+	for i := 0; i < numWorkers; i++ {
+		go workers(ctx, i, taskChan)
+	}
+
+	fmt.Println("Work Pool Initialized")	
+}
+
+func CloseWorkPool() {
+	close(taskChan)
+}
+
+func WaitFetch(ctx *config.AppContext) {
+	runJob(ctx, JobConfs)
+	runJob(ctx, JobSpeakers)
+	runJob(ctx, JobTalks)
+	runJob(ctx, JobDiscounts)
+}
+
+func runJob(ctx *config.AppContext, job JobType) {
+	switch job {
+	case JobConfs:
+		getConfs(ctx)
+	case JobSpeakers:
+		getSpeakers(ctx)
+	case JobTalks:
+		getTalks(ctx)
+	case JobDiscounts:
+		getDiscounts(ctx)
+	}
+}
+
+func workers(ctx *config.AppContext, id int, c chan JobType) {
+	for job := range c {
+		ctx.Infos.Printf("%d starting job type %d", id, job) 
+		runJob(ctx, job)
+		ctx.Infos.Printf("%d finished job type %d", id, job)
+	}
+}
+
+func getConfs(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting confs...")
+	confs, err = ListConferences(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching confs %s", err)
+	} else {
+		lastConfsFetch = time.Now()
+		ctx.Infos.Printf("Loaded %d confs!", len(confs))
+	}
+}
+
+func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if confs == nil || lastConfsFetch.Before(deadline) {
+		taskChan <- JobSpeakers
+	}
+
+	return confs, nil
+}
+
+
+func getSpeakers(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting speakers...")
+	cacheSpeakers, err = ListSpeakers(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching speakers %s", err)
+	} else {
+		/* Set last fetch to now even if there's errors */
+		lastSpeakerFetch = time.Now()
+		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
+	}
+}
+
+/* This may return nil */
+func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
+		taskChan <- JobSpeakers
+	}
+
+	return cacheSpeakers, nil
+}
+
+func getTalks(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting talks...")
+	talks, err = ListTalks(ctx)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching talks %s", err)
+	} else {
+		/* Set last fetch to now even if there's errors */
+		lastTalksFetch = time.Now()
+		ctx.Infos.Printf("Loaded %d talks!", len(talks))
+	}
+}
+
+/* This may return nil */
+func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if talks == nil || lastTalksFetch.Before(deadline) {
+		taskChan <- JobTalks
+	}
+
+	return talks, nil
+}
+
+func getDiscounts(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting discounts...")
+	discounts, err = ListDiscounts(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching discounts %s", err)
+	} else {
+		/* Set last fetch to now even if there's errors */
+		lastDiscountFetch = time.Now()
+		ctx.Infos.Printf("Loaded %d discounts!", len(discounts))
+	}
+}
+
+/* This may return nil */
+func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if discounts == nil || lastDiscountFetch.Before(deadline) {
+		taskChan <- JobDiscounts
+	}
+
+	return discounts, nil
+}
+
 
 func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 	var confTix []*types.ConfTicket
@@ -46,36 +205,6 @@ func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 	}
 
 	return confTix, nil
-}
-
-func GetConfs(ctx *config.AppContext) {
-	var err error
-	confs, err = ListConferences(ctx.Notion)
-	/* Set last fetch to now even if there's errors */
-	lastConfsFetch = time.Now()
-
-	if err != nil {
-		ctx.Err.Printf("error fetching confs %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d confs!", len(confs))
-	}
-}
-
-func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
-	now := time.Now()
-	if confs == nil {
-		var err error
-		confs, err = ListConferences(ctx.Notion)
-		return confs, err
-
-	}
-
-	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if lastConfsFetch.Before(deadline) {
-		go GetConfs(ctx)
-	}
-
-	return confs, nil
 }
 
 /* Grabs the conferences + their tickets buckets */
@@ -120,19 +249,6 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func GetTalks(ctx *config.AppContext) {
-	var err error
-	talks, err = ListTalks(ctx)
-	/* Set last fetch to now even if there's errors */
-	lastTalksFetch = time.Now()
-
-	if err != nil {
-		ctx.Err.Printf("error fetching talks %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d talks!", len(talks))
-	}
-}
-
 func ListTalks(ctx *config.AppContext) ([]*types.Talk, error) {
 	var talks []*types.Talk
 	n := ctx.Notion
@@ -165,30 +281,6 @@ func ListTalks(ctx *config.AppContext) ([]*types.Talk, error) {
 	return talks, nil
 }
 
-/* This may return nil */
-func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
-	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
-		go GetSpeakers(ctx)
-	}
-
-	return cacheSpeakers, nil
-}
-
-func GetSpeakers(ctx *config.AppContext) {
-	var err error
-	cacheSpeakers, err = ListSpeakers(ctx.Notion)
-	/* Set last fetch to now even if there's errors */
-	lastSpeakerFetch = time.Now()
-
-	if err != nil {
-		ctx.Err.Printf("error fetching speakers %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
-	}
-}
-
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
 	var speakers []*types.Speaker
 
@@ -213,17 +305,6 @@ func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
 	}
 
 	return speakers, nil
-}
-
-/* This may return nil */
-func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
-	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if talks == nil || lastTalksFetch.Before(deadline) {
-		go GetTalks(ctx)
-	}
-
-	return talks, nil
 }
 
 func GetTalksFor(ctx *config.AppContext, event string) ([]*types.Talk, error) {
@@ -277,30 +358,6 @@ func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	}
 
 	return discounts, nil
-}
-
-/* This may return nil */
-func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error) {
-	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if discounts == nil || lastDiscountFetch.Before(deadline) {
-		go GetDiscounts(ctx)
-	}
-
-	return discounts, nil
-}
-
-func GetDiscounts(ctx *config.AppContext) {
-	var err error
-	discounts, err = ListDiscounts(ctx.Notion)
-	/* Set last fetch to now even if there's errors */
-	lastDiscountFetch = time.Now()
-
-	if err != nil {
-		ctx.Err.Printf("error fetching discounts %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d discounts!", len(discounts))
-	}
 }
 
 func FindDiscount(ctx *config.AppContext, code string) (*types.DiscountCode, error) {

@@ -97,10 +97,8 @@ func main() {
 	}
 
 	/* Load cached data */
-	getters.GetConfs(&app)
-	getters.GetSpeakers(&app)
-	getters.GetTalks(&app)
-	getters.GetDiscounts(&app)
+	getters.WaitFetch(&app)
+	getters.StartWorkPool(&app)
 
 	/* Set up Routes + Templates */
 	routes, err := handlers.Routes(&app)

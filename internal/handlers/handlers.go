@@ -458,7 +458,7 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 
 	/* Refresh the confs */
-	getters.GetConfs(ctx)
+	getters.WaitFetch(ctx)	
 	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load confereneces, please try again later", http.StatusInternalServerError)
