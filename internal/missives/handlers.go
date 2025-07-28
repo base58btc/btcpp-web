@@ -65,8 +65,13 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 		return
 	}
 
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		ctx.Err.Println(err)
+		return
+	}
 	for _, rez := range rezzies {
-		conf := helpers.FindConfByRef(ctx, rez.ConfRef)
+		conf := helpers.FindConfByRef(confs, rez.ConfRef)
 
 		newsletters := make([]string, 1)
 

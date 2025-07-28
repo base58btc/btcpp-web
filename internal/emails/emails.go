@@ -149,14 +149,18 @@ func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 /* Send a request to our mailer to send a ticket at time */
 func SendTickets(ctx *config.AppContext, tickets []*types.Ticket, confRef, email string, sendAt time.Time) error {
 	/* Send the ticket email! */
-	conf := helpers.FindConfByRef(ctx, confRef)
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		return err
+	}
+	conf := helpers.FindConfByRef(confs, confRef)
 	if conf == nil {
 		return fmt.Errorf("No conference found for ref %s", confRef)
 	}
 
 	var htmlBody bytes.Buffer
 	tmpl := fmt.Sprintf("emails/%s.tmpl", conf.Tag)
-	err := ctx.TemplateCache.ExecuteTemplate(io.Writer(&htmlBody), tmpl, &EmailTmpl{
+	err = ctx.TemplateCache.ExecuteTemplate(io.Writer(&htmlBody), tmpl, &EmailTmpl{
 		URI:     ctx.Env.GetURI(),
 		CSS:     helpers.MiniCss(),
 		ConfTag: conf.Tag,

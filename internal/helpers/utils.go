@@ -10,7 +10,6 @@ import (
 	"os"
 	"time"
 
-	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 )
 
@@ -28,8 +27,8 @@ func MakeDir(dirpath string) error {
 	return nil
 }
 
-func FindConfByRef(app *config.AppContext, confRef string) *types.Conf {
-	for _, conf := range app.Confs {
+func FindConfByRef(confs []*types.Conf, confRef string) *types.Conf {
+	for _, conf := range confs {
 		if conf.Ref == confRef {
 			return conf
 		}

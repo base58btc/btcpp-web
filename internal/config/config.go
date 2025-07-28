@@ -19,5 +19,4 @@ type AppContext struct {
 	Session       *scs.SessionManager
 	TemplateCache *template.Template
 	EmailCache    map[string]*template.Template
-	Confs         []*types.Conf
 }

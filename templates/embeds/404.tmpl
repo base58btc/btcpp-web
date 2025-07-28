@@ -11,7 +11,7 @@
 <body>
 <div class="bg-white">
   <main class="mx-auto w-full max-w-7xl px-6 pt-10 pb-16 sm:pb-24 lg:px-8">
-    <img src="/static/img/logo_blk.svg" alt="bitcoin++" class="mx-auto h-10 w-auto sm:h-12" />
+    <a href="/" class="mx-auto h-10 w-auto sm:h-12"><span class="sr-only">bitcoin++</span> <img class="h-8 w-auto" src="/static/img/logo_blk.svg" alt="bitcoin++"></a>
 
     <div class="mx-auto max-w-2xl text-center" style="margin-top: 10rem; margin-bottom: 8rem;">
       <p class="text-base/8 font-semibold text-amber-600">404</p>
@@ -22,11 +22,13 @@
       <h2 class="sr-only">Popular pages</h2>
       <ul role="list" class="-mt-6 divide-y divide-gray-900/5 border-b border-gray-900/5">
       {{ range .Confs }}
-        {{ block "404_conf" . }} {{ end }}
+  	{{ if .Active }}
+          {{ block "404_conf" . }} {{ end }}
+	{{ end }}
       {{ end }}
       </ul>
       <div class="mt-10 flex justify-center">
-        <a href="#" class="text-sm/6 font-semibold text-amber-600"><span aria-hidden="true">&larr;</span> Back to home</a>
+        <a href="/" class="text-sm/6 font-semibold text-amber-600"><span aria-hidden="true">&larr;</span> Back to home</a>
       </div>
     </div>
   </main>

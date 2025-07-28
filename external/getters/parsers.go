@@ -25,6 +25,14 @@ func parseCheckbox(checkbox *bool) bool {
 	return *checkbox
 }
 
+func parseUniqueID(field string, props map[string]notion.PropertyValue) uint64 {
+	uniqID := props[field].UniqueID
+	if uniqID == nil {
+		return uint64(0)
+	}
+	return uint64(uniqID.Number)
+}
+
 func parseRichText(key string, props map[string]notion.PropertyValue) string {
 	val, ok := props[key]
 	if !ok {
@@ -141,9 +149,12 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 	conf := &types.Conf{
 		Ref:           pageID,
 		Tag:           parseRichText("Name", props),
+		UID:           parseUniqueID("ID", props),
 		Active:        parseCheckbox(props["Active"].Checkbox),
 		Desc:          parseRichText("Desc", props),
+		Tagline:       parseRichText("Tagline", props),
 		DateDesc:      parseRichText("DateDesc", props),
+		Location:      parseRichText("Location", props),
 		Venue:         parseRichText("Venue", props),
 		ShowAgenda:    parseCheckbox(props["Show Agenda"].Checkbox),
 		ShowHackathon: parseCheckbox(props["Show Hacks"].Checkbox),

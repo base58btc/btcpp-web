@@ -96,11 +96,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	/* Load up conference info */
-	app.Confs, err = getters.ListConferences(app.Notion)
-	if err != nil {
-		app.Err.Fatal(err)
-	}
+	/* Load cached data */
+	getters.GetConfs(&app)
+	getters.GetSpeakers(&app)
+	getters.GetTalks(&app)
+	getters.GetDiscounts(&app)
 
 	/* Set up Routes + Templates */
 	routes, err := handlers.Routes(&app)

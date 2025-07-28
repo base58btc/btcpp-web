@@ -41,14 +41,6 @@ func parseOptsToList(field string, props map[string]notion.PropertyValue) []stri
 	return list
 }
 
-func parseUniqueID(field string, props map[string]notion.PropertyValue) uint64 {
-	uniqID := props[field].UniqueID
-	if uniqID == nil {
-		return uint64(0)
-	}
-	return uint64(uniqID.Number)
-}
-
 func parseLetter(pageID string, props map[string]notion.PropertyValue) *mtypes.Letter {
 	letter := &mtypes.Letter{
 		PageID:     pageID,

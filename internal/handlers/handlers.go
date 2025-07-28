@@ -102,7 +102,11 @@ func findConf(r *http.Request, app *config.AppContext) (*types.Conf, error) {
 	params := mux.Vars(r)
 	confTag := params["conf"]
 
-	for _, conf := range app.Confs {
+	confs, err := getters.FetchConfsCached(app)
+	if err != nil {
+		return nil, err
+	}
+	for _, conf := range confs {
 		if conf.Tag == confTag {
 			return conf, nil
 		}
@@ -112,7 +116,13 @@ func findConf(r *http.Request, app *config.AppContext) (*types.Conf, error) {
 }
 
 func findTicket(app *config.AppContext, tixID string) (*types.ConfTicket, *types.Conf) {
-	for _, conf := range app.Confs {
+	confs, err := getters.FetchConfsCached(app)
+	if err != nil {
+		app.Err.Println("unable to find ticket?? %s", err)
+		return nil, nil
+	}
+
+	for _, conf := range confs {
 		for _, tix := range conf.Tickets {
 			if tix.ID == tixID {
 				return tix, conf
@@ -325,10 +335,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
-	getters.GetSpeakers(app)
-	getters.GetTalks(app)
-	getters.GetDiscounts(app)
-
 	return r, err
 }
 
@@ -355,37 +361,25 @@ func addFaviconRoutes(r *mux.Router) error {
 	return nil
 }
 
-func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	w.WriteHeader(http.StatusNotFound)
-	ctx.Err.Printf("404 err: %s", r.URL.Path)
-
-	confs, err := getters.ListConferences(ctx.Notion)
+func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
+	var confs confList
+	var err error
+	confs, err = getters.FetchConfsCached(ctx)
 	if err != nil {
 		// FIXME add an internal error page
 		http.Error(w, "Unable to load confereneces, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/conf-reload conf load failed ! %s", err.Error())
-		return
+		return nil
 	}
 
-	page := struct {
-		Confs   []*types.Conf
-		Year    uint
-	}{
-		Confs: confs,
-		Year: helpers.CurrentYear(),
-	}
-
-	err = ctx.TemplateCache.ExecuteTemplate(w, "404.tmpl", &page)
-	if err != nil {
-		// FIXME add an internal error page
-		http.Error(w, "error encountered loading 404 page", http.StatusInternalServerError)
-		ctx.Err.Printf("/404 page render failed ! %s", err.Error())
-		return
-	}
+	sort.Sort(&confs)
+	return confs
 }
 
-type HomePage struct {
-	Year uint
+func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	w.WriteHeader(http.StatusNotFound)
+	
+	RenderPage(w, r, ctx, "404")
 }
 
 type ConfPage struct {
@@ -463,22 +457,22 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
-	confs, err := getters.ListConferences(ctx.Notion)
+	/* Refresh the confs */
+	getters.GetConfs(ctx)
+	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load confereneces, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/conf-reload conf load failed ! %s", err.Error())
 		return
 	}
-
-	ctx.Confs = confs
+	for _, conf := range confs {
+		getters.UpdateSoldTix(ctx, conf)
+	}
 
 	/* Also reload cached data */
 	getters.GetSpeakers(ctx)
 	getters.GetTalks(ctx)
 	getters.GetDiscounts(ctx)
-	for _, conf := range confs {
-		getters.UpdateSoldTix(ctx, conf)
-	}
 
 	/* We redirect to home on success */
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -649,14 +643,25 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 
 func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, page string) {
 
-	template := fmt.Sprintf("embeds/%s.tmpl", page)
-	err := ctx.TemplateCache.ExecuteTemplate(w, template, &HomePage{
+	confList := listConfs(w, ctx)
+	if confList == nil {
+		return
+	}
+
+	data := struct { 
+		Confs []*types.Conf
+		Year uint
+	}{
+		Confs: confList,
 		Year: helpers.CurrentYear(),
-	})
+	}
+
+	template := fmt.Sprintf("embeds/%s.tmpl", page)
+	err := ctx.TemplateCache.ExecuteTemplate(w, template, &data)
+
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/%s ExecuteTemplate failed ! %s", page, err.Error())
-		return
 	}
 }
 
@@ -700,105 +705,10 @@ type SchedulePage struct {
 	Sessions []talkTime
 }
 
-type talkTime []*types.Talk
-type sessionTime []*Session
-
-func (p talkTime) Len() int {
-	return len(p)
-}
-
-func (p talkTime) Less(i, j int) bool {
-	if p[i].Sched == nil {
-		return true
-	}
-	if p[j].Sched == nil {
-		return false
-	}
-
-	/* Sort by time first */
-	if p[i].Sched.Start != p[j].Sched.Start {
-		return p[i].Sched.Start.Before(p[j].Sched.Start)
-	}
-
-	/* Then we sort by room */
-	return p[i].VenueValue() < p[j].VenueValue()
-}
-
-func (p talkTime) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
 type Day struct {
 	Morning   []sessionTime
 	Afternoon []sessionTime
 	Evening   []sessionTime
-}
-
-func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day, error) {
-	buckets, err := bucketTalks(conf, talks)
-	if err != nil {
-		return nil, err
-	}
-	/* Sort keys alphabetically */
-	days := make([]*Day, 0)
-
-	keys := make([]string, len(buckets))
-	i := 0
-	for k, _ := range buckets {
-		keys[i] = k
-		i++
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		if k == "" {
-			ctx.Err.Printf("empty key in set?")
-			continue
-		}
-		v, _ := buckets[k]
-		i, err := strconv.Atoi(string(k[0]))
-		if err != nil {
-			return nil, err
-		}
-		/* This could go horribly wrong */
-		if i > 21 {
-			return nil, fmt.Errorf("too many days %d", i)
-		}
-		for i > len(days) {
-			days = append(days, &Day{
-				Morning:   make([]sessionTime, 0),
-				Afternoon: make([]sessionTime, 0),
-				Evening:   make([]sessionTime, 0),
-			})
-		}
-
-		day := days[i-1]
-		switch string(k[len(k)-1]) {
-		case "+":
-			day.Morning = append(day.Morning, v)
-		case "=":
-			day.Afternoon = append(day.Afternoon, v)
-		case "-":
-			day.Evening = append(day.Evening, v)
-		}
-	}
-
-	return days, nil
-}
-
-func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, error) {
-	sort.Sort(talks)
-
-	sessions := make(map[string]sessionTime)
-	for _, talk := range talks {
-		session := TalkToSession(talk, conf)
-		section, ok := sessions[talk.Section]
-		if !ok {
-			section = make(sessionTime, 0)
-		}
-		section = append(section, session)
-		sessions[talk.Section] = section
-	}
-	return sessions, nil
 }
 
 type TicketTmpl struct {
@@ -947,7 +857,14 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		tixType = "general"
 	}
 
-	conf := helpers.FindConfByRef(ctx, confRef)
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/ticket-pdf unable to load confs! %s", err)
+		return
+	}
+
+	conf := helpers.FindConfByRef(confs, confRef)
 	if conf == nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/ticket-pdf unable to find conf! %s", confRef)
@@ -1180,7 +1097,14 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 
 	/* Add to mailing list + schedule mails */
-	conf := helpers.FindConfByRef(ctx, entry.ConfRef)
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("opennode callback: unable to load confs! %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	conf := helpers.FindConfByRef(confs, entry.ConfRef)
 	err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType)
 
 	if err != nil {
@@ -1468,13 +1392,20 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		confRef, ok := checkout.Metadata["conf-ref"]
 		if !ok {
 			ctx.Infos.Println("No conf-ref present")
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		conf := helpers.FindConfByRef(ctx, confRef)
+
+		confs, err := getters.FetchConfsCached(ctx)
+		if err != nil {
+			ctx.Err.Printf("Stripe callback: unable to load confs! %s", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		conf := helpers.FindConfByRef(confs, confRef)
 		if conf == nil {
 			ctx.Err.Println("Couldn't find conf %s", confRef)
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 

@@ -1,0 +1,33 @@
+{{ define "front_page_conf" }}
+  <div class="relative mx-auto max-w-2xl lg:mx-0 lg:max-w-none lg:px-8">
+    <div class="relative lg:static rounded-2xl mt-16 sm:mt-20 lg:mx-0 lg:max-w-none">
+      <div class="relative z-20 pt-14 lg:w-full lg:max-w-lg lg:pl-8">
+	<svg class="absolute inset-y-0 -right-24 hidden h-full w-80 translate-x-1/5 transform fill-white lg:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+	  <polygon points="0,0 90,0 50,100 0,100" />
+	</svg>
+
+	<div class="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
+	  <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
+	    <h1 class="text-4xl font-bold tracking-tight text-white lg:text-gray-900">
+	    <span class="font-bitcoin">
+	    {{ if eq .Tag "berlin25" }}lightning++{{ else }}bitcoin++{{ end }}
+	    </span> {{ .Tagline }}</h1>
+	    <p class="mt-6 text-lg leading-8 text-gray-200 lg:text-gray-600">{{ .Location }} | {{ .DateDesc }}</p>
+	    <div class="mt-10 flex flex-col justify-start gap-y-4">
+	      <a href="/conf/{{ .Tag }}" class="rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 w-max {{ .Tag }}">Attend</a>
+	      <div class="sm:mb-10 sm:flex">
+		<div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 lg:ring-1 lg:ring-gray-900/10 hover:ring-gray-900/20">
+		  <a href="/volunteer" target="_blank" class="whitespace-nowrap font-semibold text-white {{ .Tag }}-text"><span class="absolute inset-0" aria-hidden="true"></span>Apply to Volunteer<span aria-hidden="true">&rarr;</span></a>
+		</div>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+      </div>
+    </div>
+    <div class="rounded-2xl absolute inset-0 z-10 bg-gradient-to-t from-gray-900 via-gray-900/40 lg:hidden"></div>
+    <div class="bg-gray-50 absolute inset-0 lg:z-10 lg:inset-y-0 lg:left-auto lg:right-0 lg:w-2/3">
+      <img class="aspect-[3/2] object-cover lg:aspect-auto h-full w-full rounded-2xl lg:rounded-r-2xl" src="/static/img/{{ .Tag }}/leading.png" alt="">
+    </div>
+  </div>
+{{ end }}

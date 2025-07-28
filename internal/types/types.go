@@ -36,10 +36,13 @@ type (
 
 	Conf struct {
 		Ref           string
+		UID           uint64
 		Tag           string
 		Active        bool
 		Desc          string
+		Tagline       string
 		DateDesc      string
+		Location      string
 		Venue         string
 		ShowAgenda    bool
 		ShowTalks     bool
@@ -258,13 +261,6 @@ var mapEnumShirtSize = func() map[string]ShirtSize {
 func ParseShirtSize(str string) (ShirtSize, bool) {
 	ss, ok := mapEnumShirtSize[strings.ToLower(str)]
 	return ss, ok
-}
-
-func (c *Conf) GetColor() string {
-	if c.Color == "" {
-		return "indigo-600"
-	}
-	return c.Color
 }
 
 /* Functions to sort conference tickets */

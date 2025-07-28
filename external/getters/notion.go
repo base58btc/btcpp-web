@@ -15,6 +15,8 @@ import (
 
 var cacheSpeakers []*types.Speaker
 var lastSpeakerFetch time.Time
+var confs []*types.Conf
+var lastConfsFetch time.Time
 var talks []*types.Talk
 var lastTalksFetch time.Time
 var discounts []*types.DiscountCode
@@ -44,6 +46,36 @@ func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 	}
 
 	return confTix, nil
+}
+
+func GetConfs(ctx *config.AppContext) {
+	var err error
+	confs, err = ListConferences(ctx.Notion)
+	/* Set last fetch to now even if there's errors */
+	lastConfsFetch = time.Now()
+
+	if err != nil {
+		ctx.Err.Printf("error fetching confs %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d confs!", len(confs))
+	}
+}
+
+func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
+	now := time.Now()
+	if confs == nil {
+		var err error
+		confs, err = ListConferences(ctx.Notion)
+		return confs, err
+
+	}
+
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if lastConfsFetch.Before(deadline) {
+		go GetConfs(ctx)
+	}
+
+	return confs, nil
 }
 
 /* Grabs the conferences + their tickets buckets */
@@ -441,7 +473,13 @@ func ticketMatch(tickets []string, rez *types.Registration) bool {
 }
 
 func checkActive(ctx *config.AppContext, confRef string) bool {
-	for _, conf := range ctx.Confs {
+	confs, err := FetchConfsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("couldn't fetch confs?? %s", err)
+		return false
+	}
+
+	for _, conf := range confs {
 		if confRef == conf.Ref {
 			return conf.Active
 		}
