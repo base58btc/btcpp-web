@@ -378,6 +378,7 @@ func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
 
 func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.WriteHeader(http.StatusNotFound)
+	ctx.Err.Printf("404'd: %s", r.URL.Path)
 	
 	RenderPage(w, r, ctx, "404")
 }
@@ -467,8 +468,7 @@ func filterSpeakers(talks []*types.Talk) types.Speakers {
 func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := findConf(r, ctx)
 	if err != nil {
-		http.Error(w, "Unable to find page", 404)
-		ctx.Err.Printf("Unable to find conf %s: %s", err.Error())
+		handle404(w, r, ctx)
 		return
 	}
 
@@ -502,8 +502,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := findConf(r, ctx)
 	if err != nil {
-		http.Error(w, "Unable to find page", 404)
-		ctx.Err.Printf("Unable to find conf %s: %s", err.Error())
+		handle404(w, r, ctx)
 		return
 	}
 
@@ -521,8 +520,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := findConf(r, ctx)
 	if err != nil {
-		http.Error(w, "Unable to find page", 404)
-		ctx.Err.Printf("Unable to find conf %s: %s", err.Error())
+		handle404(w, r, ctx)
 		return
 	}
 
