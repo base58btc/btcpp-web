@@ -113,6 +113,20 @@ type (
 		Speakers    []*Speaker
 	}
 
+	Session struct {
+		Name      string
+		Speakers  []*Speaker
+		TalkPhoto string
+		Sched     *Times
+		StartTime string
+		Len       string
+		DayTag    string
+		Type      string
+		Venue     string
+		AnchorTag string
+		ConfTag   string
+	}
+
 	Ticket struct {
 		ID  string
 		Pdf []byte

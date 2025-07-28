@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/mail"
+	"sort"
 	"strconv"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/mtypes"
+	"btcpp-web/internal/types"
 
 	"github.com/gorilla/mux"
 )
@@ -153,9 +155,9 @@ func SubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 type SubscribePage struct {
 	Year       uint
+	Confs      []*types.Conf
 	Email      string
 	Text       string
-	ActionText string
 	Newsletter string
 }
 
@@ -167,7 +169,7 @@ func ConfirmEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	if token == "" {
 		ctx.Infos.Printf("No token found for newsletter confirmation request")
 		/* Return the homepage page */
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Redirect(w, r, "/#newsletter?b=sub_fail", http.StatusSeeOther)
 		return
 	}
 
@@ -222,25 +224,19 @@ func ConfirmEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 
 	if err != nil {
-		ctx.Infos.Printf("Subscribe failed for newsletter confirmation request %s: %s", subToken.Email, err)
-		/* FIXME: show an error banner or something */
+		ctx.Err.Printf("Subscribe failed for newsletter confirmation request %s: %s", subToken.Email, err)
 		/* Return the homepage page */
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
 
-	var title, actionText string
-	if subToken.Newsletter == "newsletter" {
-		title = "Subscribed Success"
-		actionText = "subscribed to"
-	} else {
-		title = "You're on the Waitlist"
-		actionText = "added to"
-	}
-	// Render the template with the data
-	err = ctx.TemplateCache.ExecuteTemplate(w, "emails/subscribe.tmpl", &SubscribePage{
-		Text:       title,
-		ActionText: actionText,
+	var confs types.ConfList
+	confs, _ = getters.FetchConfsCached(ctx)
+	sort.Sort(confs)
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "emails/subscribe_ok.tmpl", &SubscribePage{
+		Confs:      confs,
+		Text:       "Subscribed Success",
 		Email:      subToken.Email,
 		Newsletter: subToken.Newsletter,
 	})
@@ -298,11 +294,15 @@ func UnsubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 
 	// Render the template with the data
-	err = ctx.TemplateCache.ExecuteTemplate(w, "emails/subscribe.tmpl", &SubscribePage{
+	var confs types.ConfList
+	confs, _ = getters.FetchConfsCached(ctx)
+	sort.Sort(confs)
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "emails/unsubscribe_ok.tmpl", &SubscribePage{
 		Year:       helpers.CurrentYear(),
+		Confs:      confs,
 		Email:      subscriber.Email,
 		Text:       "Sorry to see you go",
-		ActionText: "unsubscribed from",
 		Newsletter: subToken.Newsletter,
 	})
 

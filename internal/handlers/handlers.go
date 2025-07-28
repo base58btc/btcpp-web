@@ -362,7 +362,7 @@ func addFaviconRoutes(r *mux.Router) error {
 }
 
 func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
-	var confs confList
+	var confs types.ConfList
 	var err error
 	confs, err = getters.FetchConfsCached(ctx)
 	if err != nil {
@@ -390,7 +390,7 @@ type ConfPage struct {
 	TixLeft       uint
 	Talks         []*types.Talk
 	EventSpeakers []*types.Speaker
-	Buckets       map[string]sessionTime
+	Buckets       map[string]types.SessionTime
 	Days          []*Day
 	Year          uint
 }
@@ -531,7 +531,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return
 	}
 
-	var talks talkTime
+	var talks types.TalkTime
 	talks, err = getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -665,50 +665,15 @@ func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 	}
 }
 
-type Session struct {
-	Name      string
-	Speakers  []*types.Speaker
-	TalkPhoto string
-	Sched     *types.Times
-	StartTime string
-	Len       string
-	DayTag    string
-	Type      string
-	Venue     string
-	AnchorTag string
-	ConfTag   string
-}
-
-func TalkToSession(talk *types.Talk, conf *types.Conf) *Session {
-	sesh := &Session{
-		Name:      talk.Name,
-		Speakers:  talk.Speakers,
-		TalkPhoto: talk.Clipart,
-		Sched:     talk.Sched,
-		Type:      talk.Type,
-		Venue:     talk.Venue,
-		AnchorTag: talk.AnchorTag,
-		ConfTag:   conf.Tag,
-	}
-
-	if talk.Sched != nil {
-		sesh.Len = talk.Sched.LenStr()
-		sesh.StartTime = talk.Sched.StartTime()
-		sesh.DayTag = talk.Sched.Day()
-	}
-
-	return sesh
-}
-
 type SchedulePage struct {
 	Talks    []*types.Talk
-	Sessions []talkTime
+	s []types.TalkTime
 }
 
 type Day struct {
-	Morning   []sessionTime
-	Afternoon []sessionTime
-	Evening   []sessionTime
+	Morning   []types.SessionTime
+	Afternoon []types.SessionTime
+	Evening   []types.SessionTime
 }
 
 type TicketTmpl struct {

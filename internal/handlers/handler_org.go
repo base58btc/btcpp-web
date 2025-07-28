@@ -9,52 +9,7 @@ import (
 	"btcpp-web/internal/types"
 )
 
-type (
-	talkTime []*types.Talk
-	sessionTime []*Session
-	confList []*types.Conf
-)
-
-func (p talkTime) Len() int {
-	return len(p)
-}
-
-func (p talkTime) Less(i, j int) bool {
-	if p[i].Sched == nil {
-		return true
-	}
-	if p[j].Sched == nil {
-		return false
-	}
-
-	/* Sort by time first */
-	if p[i].Sched.Start != p[j].Sched.Start {
-		return p[i].Sched.Start.Before(p[j].Sched.Start)
-	}
-
-	/* Then we sort by room */
-	return p[i].VenueValue() < p[j].VenueValue()
-}
-
-func (p talkTime) Swap(i, j int) {
-	p[i], p[j] = p[j], p[i]
-}
-
-/* Sort confs */
-func (c confList) Len() int {
-	return len(c)
-}
-
-func (c confList) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c confList) Less(i, j int) bool {
-	/* Sort by UID ?? */
-	return c[i].UID < c[j].UID
-}
-
-func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day, error) {
+func talkDays(ctx *config.AppContext, conf *types.Conf, talks types.TalkTime) ([]*Day, error) {
 	buckets, err := bucketTalks(conf, talks)
 	if err != nil {
 		return nil, err
@@ -85,9 +40,9 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 		}
 		for i > len(days) {
 			days = append(days, &Day{
-				Morning:   make([]sessionTime, 0),
-				Afternoon: make([]sessionTime, 0),
-				Evening:   make([]sessionTime, 0),
+				Morning:   make([]types.SessionTime, 0),
+				Afternoon: make([]types.SessionTime, 0),
+				Evening:   make([]types.SessionTime, 0),
 			})
 		}
 
@@ -105,15 +60,37 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks talkTime) ([]*Day,
 	return days, nil
 }
 
-func bucketTalks(conf *types.Conf, talks talkTime) (map[string]sessionTime, error) {
+func talkToSession(talk *types.Talk, conf *types.Conf) *types.Session {
+	sesh := &types.Session{
+		Name:      talk.Name,
+		Speakers:  talk.Speakers,
+		TalkPhoto: talk.Clipart,
+		Sched:     talk.Sched,
+		Type:      talk.Type,
+		Venue:     talk.Venue,
+		AnchorTag: talk.AnchorTag,
+		ConfTag:   conf.Tag,
+	}
+
+	if talk.Sched != nil {
+		sesh.Len = talk.Sched.LenStr()
+		sesh.StartTime = talk.Sched.StartTime()
+		sesh.DayTag = talk.Sched.Day()
+	}
+
+	return sesh
+}
+
+
+func bucketTalks(conf *types.Conf, talks types.TalkTime) (map[string]types.SessionTime, error) {
 	sort.Sort(talks)
 
-	sessions := make(map[string]sessionTime)
+	sessions := make(map[string]types.SessionTime)
 	for _, talk := range talks {
-		session := TalkToSession(talk, conf)
+		session := talkToSession(talk, conf)
 		section, ok := sessions[talk.Section]
 		if !ok {
-			section = make(sessionTime, 0)
+			section = make(types.SessionTime, 0)
 		}
 		section = append(section, session)
 		sessions[talk.Section] = section
