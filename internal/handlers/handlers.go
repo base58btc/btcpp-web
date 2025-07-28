@@ -378,7 +378,7 @@ func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
 
 func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.WriteHeader(http.StatusNotFound)
-	ctx.Err.Printf("404'd: %s", r.URL.Path)
+	ctx.Infos.Printf("404'd: %s", r.URL.Path)
 	
 	RenderPage(w, r, ctx, "404")
 }
