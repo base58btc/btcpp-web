@@ -244,7 +244,7 @@ func ComposeAndSendMail(ctx *config.AppContext, mail *Mail) error {
 		Subscription: mail.Sub,
 		Missive:      mail.Missive,
 		ToAddr:       mail.Email,
-		FromAddr:     "hello@base58.dev",
+		FromAddr:     "hello@btcpp.dev",
 		FromName:     "bitcoin++ ✨",
 		ReplyTo:      mail.ReplyTo,
 		Title:        mail.Title,
