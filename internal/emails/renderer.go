@@ -24,6 +24,7 @@ type SubConfirmEmail struct {
 	Email      string
 	ConfirmURL string
 	Newsletter string
+	URI        string
 }
 
 /* Blogpost on how to write renderers https://blog.kowalczyk.info/article/cxn3/advanced-markdown-processing-in-go.html */

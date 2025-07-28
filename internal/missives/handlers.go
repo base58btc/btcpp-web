@@ -98,21 +98,29 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 	w.Write([]byte("ok!"))
 }
 
+type TextData struct {
+	Text string
+}
+
 func SubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	params := mux.Vars(r)
 	newsletter := params["newsletter"]
 
 	r.ParseForm()
 	email := r.Form.Get("newsletter-email")
+
+	/* We're returning html */
+	w.Header().Set("Content-Type", "text/html")
+
 	/* Validate email */
 	if _, err := mail.ParseAddress(email); err != nil {
-		w.Write([]byte(fmt.Sprintf(`
-        	<div class="form_message-error-wrapper w-form-fail" style="display:block;">
-                <div class="form_message-error-2">
-                <div>"%s" not a valid email. Please try again.</div>
-                </div>
-                </div>
-		`, email)))
+		msg := fmt.Sprintf("\"%s\" not a valid email. Try again.", email)
+		err = ctx.TemplateCache.ExecuteTemplate(w, "section/err.tmpl", &TextData{
+			Text: msg,
+		})
+		if err != nil {
+			ctx.Err.Printf("nope. %s", err)
+		}
 		return
 	}
 
@@ -122,23 +130,25 @@ func SubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	ctx.Infos.Printf("%s subscribe token is %s. sending confirmation email", email, token)
 	_, err := emails.SendNewsletterSubEmail(ctx, email, token, newsletter)
 	if err != nil {
-		w.Write([]byte(fmt.Sprintf(`
-        	<div class="form_message-error-wrapper w-form-fail" style="display:block;">
-                <div class="form_message-error-2">
-                <div>Unable to subscribe %s. Please try again.</div>
-                </div>
-                </div>
-		`, email)))
 		ctx.Infos.Printf("Unable to send mail to %s: %s", email, err)
+		msg := fmt.Sprintf("Unable to subscribe \"%s\". Try again.", email)
+		err = ctx.TemplateCache.ExecuteTemplate(w, "section/err.tmpl", &TextData{
+			Text: msg,
+		})
+		if err != nil {
+			ctx.Err.Printf("nope. %s", err)
+		}
 		return
 	}
-	w.Write([]byte(fmt.Sprintf(`
-        	<div class="form_message-error-wrapper w-form-done" style="display:block;">
-                <div class="form_message-success-4">
-                <div>Confirmation email sent to %s. Check your inbox.</div>
-                </div>
-                </div>
-	`, email)))
+
+	msg := fmt.Sprintf("Subscription confirmation sent to %s.", email)
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "section/ok.tmpl", &TextData{
+		Text: msg,
+	})
+	if err != nil {
+		ctx.Err.Printf("nope. %s", err)
+	}
 }
 
 type SubscribePage struct {

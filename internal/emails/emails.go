@@ -421,19 +421,14 @@ func buildConfirmURL(ctx *config.AppContext, token string) string {
 func SendNewsletterSubEmail(ctx *config.AppContext, email, token, newsletter string) ([]byte, error) {
 
 	var title, template string
-	if newsletter == "newsletter" {
-		title = "Newsletter Subscription"
-		template = "emails/confirm-sub.tmpl"
-	} else {
-		title = fmt.Sprintf("%s Course Waitlist", newsletter)
-		template = "emails/confirm-waitlist.tmpl"
-	}
+	title = "Mailing List Subscription"
+	template = "emails/confirm-sub.tmpl"
 	jobkey := "subscribe-" + token
 	mail := &Mail{
 		JobKey: jobkey,
 		Sub:    makeSubKey(email, newsletter),
 		Email:  email,
-		Title:  fmt.Sprintf("[Action Required] Confirm Base58 %s", title),
+		Title:  fmt.Sprintf("[Action Required] Confirm bitcoin++ %s", title),
 		SendAt: time.Now(),
 	}
 
@@ -445,6 +440,7 @@ func SendNewsletterSubEmail(ctx *config.AppContext, email, token, newsletter str
 		Email:      email,
 		ConfirmURL: buildConfirmURL(ctx, token),
 		Newsletter: newsletter,
+		URI:        ctx.Env.GetURI(),
 	})
 
 	if err != nil {
