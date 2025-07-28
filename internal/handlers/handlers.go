@@ -211,6 +211,11 @@ func findMaxTix(conf *types.Conf) *types.ConfTicket {
 func Routes(app *config.AppContext) (http.Handler, error) {
 	r := mux.NewRouter()
 
+	err := loadTemplates(app)
+	if err != nil {
+		return r, err
+	}
+
 	/* Handle 404s */
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handle404(w, r, app)
@@ -324,13 +329,8 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
-	err := addFaviconRoutes(r)
+	err = addFaviconRoutes(r)
 
-	if err != nil {
-		return r, err
-	}
-
-	err = loadTemplates(app)
 	if err != nil {
 		return r, err
 	}
