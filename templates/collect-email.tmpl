@@ -20,15 +20,15 @@
                 <p class="text-3xl font-bold tracking-tight text-white sm:text-4xl">Let's get you registered</p>
                 <h2 class="mt-2 text-gray-300 font-semibold leading-7">{{ .Conf.Desc }}</h2>
                 <p class="mt-6 text-base leading-7 text-gray-300">We just need your email before collecting your payment</p>
-	              <form method="POST" class="grid grid-cols-1 gap-x-8 text-base w-full sm:w-2xl">
-                  <label class="text-gray-300 mt-4 mb-2">
-                    Email (required)
-                  </label>
-                  <input class="rounded-md" type="email" name="Email" placeholder="hello@example.com" required>
-                  <label class="text-gray-300 mt-4 mb-2">
-                    Discount Code (optional)
-                  </label>
-                  <input class="rounded-md" name="Discount" type="search" 
+	          <form method="POST" class="grid grid-cols-1 gap-y-2 gap-x-8 text-base w-full sm:w-2xl">
+                    <label for="Email" class="text-gray-300 mt-4 mb-2">
+                      Email (required)
+                    </label>
+                    <input class="rounded-md mt-2" type="email" id="Email" name="Email" placeholder="hello@example.com" required>
+                    <label for="Discount" class="text-gray-300 mt-4 mb-2">
+                      Discount Code (optional)
+                    </label>
+                    <input class="rounded-md" name="Discount" id="Discount" type="search" 
                     autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                     hx-post="/tix/{{ .TixSlug }}/apply-discount"
                     hx-trigger="input changed delay:500ms, search"
@@ -40,6 +40,18 @@
                       value="{{ .Discount }}"
                     {{ end }} 
                     />
+		    <div class="flex my-4 sm:col-span-2">
+                      <div class="flex h-6 items-center mr-4">
+		        <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+			<span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+
+                          <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
+                        </div>
+                      </div>
+                      <label for="sub-newsletter" class="text-sm/6 text-gray-300">
+                        Join the <span class="font-bitcoin">bitcoin++</span> mailing list!
+                      </label>
+                    </div>
                   {{ template "tix_details.tmpl" . }}
                   <div class="mt-8">
                     <button type="submit" class="inline-flex rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Pay Now</button>

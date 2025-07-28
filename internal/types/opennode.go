@@ -28,6 +28,7 @@ type (
 		TixLocal    bool    `json:"tix-local"`
 		DiscountRef string  `json:"discount,omitempty"`
 		Currency    string  `json:"currency"`
+		Subscribe   bool    `json:"subscribe,omitempty"`
 	}
 
 	OpenNodeChainInvoice struct {

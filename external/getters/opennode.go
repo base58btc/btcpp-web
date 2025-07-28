@@ -13,7 +13,7 @@ import (
 
 const CHARGES_ENDPOINT string = "/charges"
 
-func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string) (*types.OpenNodePayment, error) {
+func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string, subNewsletter bool) (*types.OpenNodePayment, error) {
 
 	metadata := &types.OpenNodeMetadata{
 		Email:       email,
@@ -23,6 +23,7 @@ func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.Conf
 		DiscountRef: discountRef,
 		/* We have to save it b/c OpenNode doesnt */
 		Currency: tix.Currency,
+		Subscribe:    subNewsletter,
 	}
 
 	domain := ctx.Env.GetURI()

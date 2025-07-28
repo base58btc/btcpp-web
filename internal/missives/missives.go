@@ -158,12 +158,15 @@ func NewSubscriberMissives(ctx *config.AppContext, subscriber *mtypes.Subscriber
 	return nil
 }
 
-func NewTicketSub(ctx *config.AppContext, email, conf, tixtype string) error {
+func NewTicketSub(ctx *config.AppContext, email, conf, tixtype string, gensub bool) error {
 	/* Add to subscriber list */
 	newsletters := make([]string, 3)
 	newsletters[0] = conf
 	newsletters[1] = tixtype
 	newsletters[2] = conf + "-" + tixtype
+	if gensub {
+		newsletters = append(newsletters, "newsletter")
+	}
 
 	sub, err := getters.SubscribeEmailList(ctx.Notion, email, newsletters)
 	if err != nil {

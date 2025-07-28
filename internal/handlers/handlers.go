@@ -1070,7 +1070,7 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 
 	conf := helpers.FindConfByRef(confs, entry.ConfRef)
-	err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType)
+	err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType, charge.Metadata.Subscribe)
 
 	if err != nil {
 		ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)
@@ -1269,7 +1269,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 }
 
 func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice uint, tixForm *types.TixForm, isLocal bool) {
-	payment, err := getters.InitOpenNodeCheckout(ctx, tixPrice, tix, conf, isLocal, tixForm.Count, tixForm.Email, tixForm.DiscountRef)
+	payment, err := getters.InitOpenNodeCheckout(ctx, tixPrice, tix, conf, isLocal, tixForm.Count, tixForm.Email, tixForm.DiscountRef, tixForm.Subscribe)
 
 	if err != nil {
 		http.Error(w, "unable to init btc payment", http.StatusInternalServerError)
@@ -1430,7 +1430,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		ctx.Infos.Printf("Added %d tickets!!", len(entry.Items))
 
 		/* Add to mailing list + send mails */
-		err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType)
+		err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType, false)
 
 		if err != nil {
 			ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)

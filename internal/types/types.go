@@ -69,6 +69,7 @@ type (
 
 	TixForm struct {
 		Email         string
+		Subscribe     bool
 		Count         uint
 		DiscountPrice uint
 		Discount      string
