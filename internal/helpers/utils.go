@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 )
 
@@ -80,4 +81,27 @@ func MakeJobHash(email string, uid uint64, title string) string {
 	h.Write(b)
 	h.Write([]byte(title))
 	return hex.EncodeToString(h.Sum(nil))
+}
+
+func Render401(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	err := ctx.TemplateCache.ExecuteTemplate(w, "401.tmpl", &LoginPage{
+		Year:        CurrentYear(),
+		Destination: r.URL.Path,
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/401.tmpl exec template failed %s\n", err.Error())
+		return
+	}
+}
+
+func CheckPin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) bool {
+	pin := ctx.Session.GetString(r.Context(), "pin")
+	if pin == "" {
+		w.Header().Set("x-missing-field", "pin")
+		w.WriteHeader(http.StatusUnauthorized)
+		ctx.Infos.Printf("401 login failed: %s", r.URL.Path)
+		return false
+	}
+	return pin == ctx.Env.RegistryPin
 }

@@ -313,11 +313,6 @@ func UnsubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 }
 
-type LoginPage struct {
-	Year        uint
-	Destination string
-}
-
 /* Set the pin cookie and redirect to destination */
 func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	r.ParseForm()
@@ -340,22 +335,10 @@ func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.Header().Set("HX-Redirect", destpath)
 }
 
-func Render401(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	err := ctx.TemplateCache.ExecuteTemplate(w, "401.tmpl", &LoginPage{
-		Year:        helpers.CurrentYear(),
-		Destination: r.URL.Path,
-	})
-	if err != nil {
-		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/401.tmpl exec template failed %s\n", err.Error())
-		return
-	}
-}
-
 func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for verified */
-	if ok := checkPin(w, r, ctx); !ok {
-		Render401(w, r, ctx)
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
 		return
 	}
 
@@ -412,8 +395,8 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for verified */
-	if ok := checkPin(w, r, ctx); !ok {
-		Render401(w, r, ctx)
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
 		return
 	}
 
@@ -458,8 +441,8 @@ func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.App
 
 func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for verified */
-	if ok := checkPin(w, r, ctx); !ok {
-		Render401(w, r, ctx)
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
 		return
 	}
 
@@ -496,8 +479,8 @@ func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 
 func UnscheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for verified */
-	if ok := checkPin(w, r, ctx); !ok {
-		Render401(w, r, ctx)
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
 		return
 	}
 

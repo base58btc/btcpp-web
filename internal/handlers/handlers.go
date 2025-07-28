@@ -293,7 +293,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 	r.HandleFunc("/conf-reload", func(w http.ResponseWriter, r *http.Request) {
 		ReloadConf(w, r, app)
-	}).Methods("GET", "POST")
+	}).Methods("GET")
 	r.HandleFunc("/check-in/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
@@ -426,34 +426,10 @@ func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discou
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for logged in */
-	pin := ctx.Session.GetString(r.Context(), "pin")
-
-	if pin == "" {
-		w.Header().Set("x-missing-field", "pin")
-		w.WriteHeader(http.StatusBadRequest)
-		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
-			NeedsPin: true,
-			Year:     helpers.CurrentYear(),
-		})
-		if err != nil {
-			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/conf/check-in ExecuteTemplate failed ! %s", err.Error())
-		}
-		return
-	}
-
-	if pin != ctx.Env.RegistryPin {
-		w.WriteHeader(http.StatusUnauthorized)
-		err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
-			Msg:  "Wrong registration PIN",
-			Year: helpers.CurrentYear(),
-		})
-		if err != nil {
-			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/conf-reload ExecuteTemplate failed ! %s", err.Error())
-		}
+func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	/* Check for verified */
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
 		return
 	}
 
@@ -469,43 +445,8 @@ func GetReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		getters.UpdateSoldTix(ctx, conf)
 	}
 
-	/* Also reload cached data */
-	getters.GetSpeakers(ctx)
-	getters.GetTalks(ctx)
-	getters.GetDiscounts(ctx)
-
 	/* We redirect to home on success */
 	http.Redirect(w, r, "/", http.StatusSeeOther)
-}
-
-func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	switch r.Method {
-	case http.MethodGet:
-		GetReloadConf(w, r, ctx)
-		return
-	case http.MethodPost:
-		r.ParseForm()
-		pin := r.Form.Get("pin")
-		if pin != ctx.Env.RegistryPin {
-			w.WriteHeader(http.StatusBadRequest)
-			err := ctx.TemplateCache.ExecuteTemplate(w, "checkin.tmpl", &CheckInPage{
-				NeedsPin: true,
-				Msg:      "Wrong pin",
-				Year:     helpers.CurrentYear(),
-			})
-			if err != nil {
-				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-				ctx.Err.Printf("/conf-reload ExecuteTemplate failed ! %s", err.Error())
-				return
-			}
-			ctx.Err.Printf("/conf-reload wrong pin submitted! %s", pin)
-			return
-		}
-
-		/* Set pin?? */
-		ctx.Session.Put(r.Context(), "pin", pin)
-		GetReloadConf(w, r, ctx)
-	}
 }
 
 func filterSpeakers(talks []*types.Talk) types.Speakers {
