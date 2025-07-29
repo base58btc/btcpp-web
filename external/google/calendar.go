@@ -115,7 +115,7 @@ func IsLoggedIn() bool {
 	return calService != nil
 }
 
-func RunCalendarInvites() error {
+func RunCalendarInvites(confTag string) error {
 	
 	// Define the event
 	event := &calendar.Event{
@@ -131,11 +131,11 @@ func RunCalendarInvites() error {
 			TimeZone: "America/Chicago",
 		},
 		Attendees: []*calendar.EventAttendee{
-			{Email: "nifty@example.com"},
+			{Email: "hello@btcpp.dev"},
 		},
 	}
 
 	// Insert the event into the primary calendar
-	_, err := calService.Events.Insert("primary", event).Do()
+	_, err := calService.Events.Insert(confTag, event).Do()
 	return err
 }
