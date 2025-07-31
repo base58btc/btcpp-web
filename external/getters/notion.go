@@ -97,7 +97,7 @@ func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
 	now := time.Now()
 	deadline := now.Add(time.Duration(-5) * time.Minute)
 	if confs == nil || lastConfsFetch.Before(deadline) {
-		taskChan <- JobSpeakers
+		taskChan <- JobConfs
 	}
 
 	return confs, nil
@@ -131,7 +131,8 @@ func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
 func getTalks(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting talks...")
-	talks, err = ListTalks(ctx)
+	speakers, _ := FetchSpeakersCached(ctx)
+	talks, err = ListTalks(ctx, speakers)
 
 	if err != nil {
 		ctx.Err.Printf("error fetching talks %s", err)
@@ -305,14 +306,9 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func ListTalks(ctx *config.AppContext) ([]*types.Talk, error) {
+func ListTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk, error) {
 	var talks []*types.Talk
 	n := ctx.Notion
-
-	speakers, err := FetchSpeakersCached(ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	hasMore := true
 	nextCursor := ""
