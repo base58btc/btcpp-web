@@ -46,8 +46,6 @@ func StartWorkPool(ctx *config.AppContext) {
 	for i := 0; i < numWorkers; i++ {
 		go workers(ctx, i, taskChan)
 	}
-
-	fmt.Println("Work Pool Initialized")	
 }
 
 func CloseWorkPool() {
