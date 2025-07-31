@@ -13,6 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/alexedwards/scs/v2"
 	"btcpp-web/external/getters"
+	"btcpp-web/external/google"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/handlers"
 	"btcpp-web/internal/emails"
@@ -69,7 +70,10 @@ func loadConfig() *types.EnvConfig {
 			MissivesDb:   os.Getenv("NOTION_MISSIVES_DB"),
 			TokenDb:      os.Getenv("NOTION_TOKEN_DB"),
 		}
-		config.Google = types.GoogleConfig{Key: os.Getenv("GOOGLE_KEY")}
+		config.Google = types.GoogleConfig{
+			Key: os.Getenv("GOOGLE_KEY"),
+			Config: os.Getenv("GOOGLE_CONFIG"),
+		}
 
 		secretHex := os.Getenv("HMAC_SECRET")
 		config.HMACKey = sha256.Sum256([]byte(secretHex))
@@ -100,6 +104,9 @@ func main() {
 	/* Load cached data */
 	getters.WaitFetch(&app)
 	getters.StartWorkPool(&app)
+
+	/* Start up Google stuffs */
+	google.InitOauth(&app)
 
 	/* Set up Routes + Templates */
 	routes, err := handlers.Routes(&app)

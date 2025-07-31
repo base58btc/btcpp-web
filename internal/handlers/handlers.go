@@ -360,9 +360,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
-	// FIXME: Put in main?
-	google.InitOauth()
-
 	return r, err
 }
 

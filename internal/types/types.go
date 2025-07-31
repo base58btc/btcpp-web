@@ -32,6 +32,7 @@ type (
 
 	GoogleConfig struct {
 		Key string
+		Config string
 	}
 
 	Conf struct {

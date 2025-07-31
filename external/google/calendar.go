@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -23,14 +22,11 @@ var oauthConfig *oauth2.Config
 var calService *calendar.Service 
 
 
-func InitOauth() {
-	b, err := os.ReadFile("credentials.json")
-	if err != nil {
-		log.Fatalf("Unable to read client secret file: %v", err)
-	}
+func InitOauth(ctx *config.AppContext) {
+	creds := []byte(ctx.Env.Google.Config)
 
 	// Request access to calendar events
-	oauthConfig, err = google.ConfigFromJSON(b, calendar.CalendarEventsScope)
+	oauthConfig, err := google.ConfigFromJSON(creds, calendar.CalendarEventsScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
