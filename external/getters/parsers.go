@@ -80,6 +80,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 		OrgPhoto: parseRichText("OrgPhoto", props),
 		Website:  props["Website"].URL,
 		Github:   props["Github"].URL,
+		Email:    props["Email"].Email,
 		Twitter:  twitter,
 		Nostr:    parseRichText("npub", props),
 		Company:  parseRichText("Company", props),
@@ -104,6 +105,7 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []
 		Name:        parseRichText("Talk Name", props),
 		Clipart:     parseRichText("Clipart", props),
 		Description: parseRichText("Description", props),
+		CalNotif:    parseRichText("CalNotif", props),
 		Sched:       sched,
 	}
 

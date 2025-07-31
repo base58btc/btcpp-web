@@ -316,18 +316,20 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		// FIXME: what if not ok to login?
 	}).Methods("GET")
 
-	r.HandleFunc("/internal/sendcal", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/i/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		/* Check for verified */
+		if ok := helpers.CheckPin(w, r, app); !ok {
+			helpers.Render401(w, r, app)
+			return
+		}
+
 		if !google.IsLoggedIn() {
-			app.Session.Put(r.Context(), "r", "/internal/sendcal")
+			app.Session.Put(r.Context(), "r", r.URL.Path)
 			http.Redirect(w, r, "/auth-login", http.StatusFound)
 			return
 		}
-		err := google.RunCalendarInvites()
-		if err != nil {
-			app.Err.Printf("Unable to send cal invites! %s", err)
-		} else {
-			app.Infos.Printf("Sent calendar invites!")
-		}
+
+		SendCals(w, r, app)
 	}).Methods("GET", "POST")
 
 	r.HandleFunc("/ticket/{ticket}", func(w http.ResponseWriter, r *http.Request) {
@@ -836,26 +838,59 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 }
 
-type SendCalPage struct {
-	NeedsPin   bool
-	ConfTag    string
-	Year       uint
-}
-
 func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	err := ctx.TemplateCache.ExecuteTemplate(w, "sendcal.tmpl", &SendCalPage{
-		NeedsPin: false,
-		ConfTag: "atx25",
-		Year:    helpers.CurrentYear(),
-	})
-
+	
+	conf, err := findConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	
+	var talks types.TalkTime
+	talks, err = getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("sendcal.tmpl ExecuteTemplate failed ! %s", err.Error())
+		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
+		return
 	}
 
-	// INIT SEND CAL
-	google.RunCalendarInvites()
+	/* Send a cal invite to every speaker of a talk! */
+	for _, talk := range talks {
+		if talk.Sched.End == nil {
+			ctx.Err.Printf("Can't send cals for %s talk: no end time??", talk.Name)
+			continue
+		}
+
+		emails := make([]string, len(talk.Speakers))
+		for i, speaker := range talk.Speakers {
+			emails[i] = speaker.Email
+		}
+
+		ctx.Infos.Printf("Sending cal invite for %s (%d)", talk.Name, len(emails))
+		/* Send cal invites!! */
+		calInvite := &google.CalInvite{
+			ConfTag:   conf.Tag,
+			EventName: "btc++:" + talk.Name,
+			Location:  talk.VenueName(),
+			Invitees:  emails,
+			StartTime: talk.Sched.Start,
+			EndTime:   *talk.Sched.End,
+		}
+		ident, err := google.RunCalendarInvites(talk.CalNotif, calInvite)
+
+		if err != nil {
+			ctx.Err.Printf("Failure sending cal invite for talk %s: %s", talk.Name, err)
+			continue
+		}
+
+		err = getters.TalkUpdateCalNotif(ctx.Notion, talk.ID, ident)
+		if err != nil {
+			ctx.Err.Printf("Failure updating calnotif data!!! %s", err)
+			continue
+		}
+
+		ctx.Infos.Printf("Cal invite sent to %d people!", len(emails))
+	}
 }
 
 type CheckInPage struct {

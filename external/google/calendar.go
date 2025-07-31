@@ -7,14 +7,15 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	calendar "google.golang.org/api/calendar/v3"
 
-	"btcpp-web/internal/config"
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/config"
 )
 
 var redirectURL = "http://localhost:8888/gcal-callback"
@@ -115,27 +116,54 @@ func IsLoggedIn() bool {
 	return calService != nil
 }
 
-func RunCalendarInvites(confTag string) error {
-	
+type CalInvite struct {
+	TalkID    string
+	ConfTag   string
+	EventName string
+	Location  string
+	Invitees []string
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+func (c *CalInvite) StartFmt() string {
+	return c.StartTime.Format("2006-01-02T15:04:05-07:00")
+}
+
+func (c *CalInvite) EndFmt() string {
+	return c.EndTime.Format("2006-01-02T15:04:05-07:00")
+}
+
+func RunCalendarInvites(calNotif string, invite *CalInvite) (string, error) {
 	// Define the event
-	event := &calendar.Event{
-		Summary:     "Automated Go Event",
-		Location:    "bitcoin++ Riga, Latvia",
-		Description: "Your talk is happening now!",
-		Start: &calendar.EventDateTime{
-			DateTime: "2025-05-20T10:00:00-07:00",
-			TimeZone: "America/Chicago",
-		},
-		End: &calendar.EventDateTime{
-			DateTime: "2025-05-20T11:00:00-07:00",
-			TimeZone: "America/Chicago",
-		},
-		Attendees: []*calendar.EventAttendee{
-			{Email: "hello@btcpp.dev"},
-		},
+	attendees := make([]*calendar.EventAttendee, len(invite.Invitees))
+	for i := range invite.Invitees {
+		attendees[i] = &calendar.EventAttendee {
+			Email: invite.Invitees[i],
+		}
 	}
 
-	// Insert the event into the primary calendar
-	_, err := calService.Events.Insert(confTag, event).Do()
-	return err
+	event := &calendar.Event{
+		Summary:     invite.EventName,
+		Location:    invite.Location,
+		Description: "Your talk is happening now!",
+		Start: &calendar.EventDateTime{
+			DateTime: invite.StartFmt(),
+		},
+		End: &calendar.EventDateTime{
+			DateTime: invite.EndFmt(),
+		},
+		Attendees: attendees,
+	}
+
+	// Insert the event into the "conf" calendar
+	var ee *calendar.Event
+	var err error
+	if calNotif == "" {
+		ee, err = calService.Events.Insert("primary", event).Do()
+	} else {
+		ee, err = calService.Events.Update("primary", calNotif, event).SendUpdates("all").Do()
+	}
+
+	return ee.Id, err
 }

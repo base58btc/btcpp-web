@@ -87,6 +87,7 @@ type (
 	Speaker struct {
 		ID       string
 		Name     string
+		Email    string
 		Photo    string
 		Twitter  string
 		Github   string
@@ -112,6 +113,7 @@ type (
 		AnchorTag   string
 		Section     string
 		Speakers    []*Speaker
+		CalNotif    string
 	}
 
 	Session struct {
@@ -216,6 +218,31 @@ func (t *Talk) VenueValue() int {
 	}
 
 	return 5
+}
+
+func (t *Talk) VenueName() string {
+	switch t.Venue {
+	case "p2pkh":
+		return "Main Stage"
+	case "p2wsh":
+		return "Talking Stage"
+	case "multisig":
+		return "Workshops"
+	case "p2tr":
+		return "Workshops 2"
+	case "p2sh-p2wpkh":
+		return "Talking two"
+	case "one":
+		return "Main Stage"
+	case "two":
+		return "Talks Stage"
+	case "three":
+		return "Workshops Stage"
+	case "four":
+		return "Lounge Stage"
+	}
+
+	return "Not Listed Yet"
 }
 
 func (t *Times) Desc() string {
