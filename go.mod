@@ -7,7 +7,6 @@ toolchain go1.24.4
 require (
 	github.com/BurntSushi/toml v1.2.1
 	github.com/alexedwards/scs/v2 v2.5.1
-	github.com/base58btc/btcpp-web v0.0.0-20240904215537-105871839671
 	github.com/base58btc/mailer v0.0.0-20250703225241-27f47714b725
 	github.com/chromedp/cdproto v0.0.0-20230329100754-6125fc8d7142
 	github.com/chromedp/chromedp v0.9.1
@@ -48,7 +47,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/sendgrid/sendgrid-go v3.16.1+incompatible // indirect
-	github.com/sorcererxw/go-notion v0.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.36.0 // indirect
