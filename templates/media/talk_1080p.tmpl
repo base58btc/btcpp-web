@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="/static/css/mini.css" />
+    <script src="/static/js/script.js" type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body class="bounding">
+
+
+<style>
+* {
+  box-sizing: border-box;
+}
+html {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  background: #8f7a66;
+  min-height: 100%;
+}
+
+.bounding {
+  height: 1080px;
+  width:  1920px;
+}
+
+.img {
+  padding: 1rem;
+
+  background-image: url(/static/img/talks/{{ .Talk.Clipart }});
+  background-size: cover;
+  background-position: center;
+
+  mask-image: linear-gradient(to top, transparent 10%, black);
+}
+
+.logo {
+  width: 353px;
+  height: 100%;
+  object-fit: contain;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+
+  background-image: url(/static/img/{{ .ConfTag }}/logo_1080p.png);
+  background-size: contain;
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+
+.captionbox {
+  position: absolute;
+  bottom: 64px;
+  left: 64px;
+  right: 64px;
+}
+
+.speaker {
+  font-size: 10rem;
+  line-height: 10rem;
+}
+
+.talk {
+  font-size: 4rem;
+  line-height: 4rem;
+  margin-right: 360px;
+}
+
+.social {
+  font-size: 2rem;
+}
+</style>
+  <!-- option 1 -->
+  <section class="bounding relative">
+    <div class="relative overflow-hidden bg-gray-900 shadow-xl bounding img"></div>
+    <div class="captionbox flex">
+      <figure class="flex-1">
+        <blockquote class="speaker text-lg font-semibold text-white sm:text-xl/8 mb-4">
+          <p>{{ .Talk.Name }}</p>
+        </blockquote>
+        <div class="flex items-center gap-x-4">
+	  {{ $first := index .Talk.Speakers 0 }}
+	  {{ $solo := eq (len .Talk.Speakers) 1 }}
+	  {{ range .Talk.Speakers }}
+	    {{ if eq $first . }}
+	  <img src="/static/img/speakers/{{ .Photo }}" alt="" class="size-64 rounded-full bg-gray-100" />
+	      {{ if $solo }} 
+          <div class="text-sm/6">
+            <p class="font-semibold text-white talk">
+               <span class="absolute inset-0"></span>
+                 {{ .Name }}
+            </p>
+	        {{ if .Company }}
+            <p class="text-white mt-4 text-4xl">{{ .Company }}</p>
+	        {{ end }}
+	        {{ if .TwitterHandle }}
+            <p class="text-white mt-4 text-4xl">@{{ .TwitterHandle }}</p>
+	        {{ end }}
+	      {{ end }}
+	    {{ else }}
+	      <img src="/static/img/speakers/{{ .Photo }}" alt="" style="margin-left: -4rem;" class="size-64 rounded-full bg-gray-100" />
+	    {{ end }}
+	  {{ end }}
+          </div>
+        </div>
+      </figure>
+      <div class="flex flex-col flex-initial justify-end">
+	<div class="flex-1"></div>
+	<div class="flex-initial logo"></div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

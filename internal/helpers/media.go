@@ -59,7 +59,17 @@ func BuildChromePdf(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 	return pdfBuffer, nil
 }
 
-func MakeSpeakerImage(ctx *config.AppContext, confTag, card, speakerID, talkID string) ([]byte, error) {
+func MakeSpeakerImg(ctx *config.AppContext, confTag, card, speakerID, talkID string) ([]byte, error) {
+	path := fmt.Sprintf("/media/imgs/%s/speaker/%s/%s/%s", confTag, card, talkID, speakerID)
+	return MakeMediaImg(ctx, card, path)
+}
+
+func MakeTalkImg(ctx *config.AppContext, confTag, card, talkID string) ([]byte, error) {
+	path := fmt.Sprintf("/media/imgs/%s/talk/%s/%s", confTag, card, talkID)
+	return MakeMediaImg(ctx, card, path)
+}
+
+func MakeMediaImg(ctx *config.AppContext, card, path string) ([]byte, error) {
 
 	dimens, ok := types.MediaDimens[card]
 	if !ok {
@@ -67,7 +77,7 @@ func MakeSpeakerImage(ctx *config.AppContext, confTag, card, speakerID, talkID s
 	}
 
 	pdf := &PDFPage{
-		URL: fmt.Sprintf("http://localhost:%s/media/imgs/%s/%s/%s/%s", ctx.Env.Port, confTag, card, talkID, speakerID),
+		URL: ctx.Env.GetURI() + path,
 		Height: dimens.Height,
 		Width: dimens.Width,
 	}
