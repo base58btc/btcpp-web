@@ -349,7 +349,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
 
-	r.HandleFunc("/media/preview/{conf}/{card}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/media/preview/{conf}/{view}/{card}", func(w http.ResponseWriter, r *http.Request) {
 		PreviewSpeakerCard(w, r, app)
 	}).Methods("GET")
 
@@ -722,9 +722,10 @@ func PreviewSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	params := mux.Vars(r)
 	confTag := params["conf"]
+	view := params["view"]
 	card := params["card"]
 
-	template := fmt.Sprintf("media/speaker_%s.tmpl", card)
+	template := fmt.Sprintf("media/%s_%s.tmpl", view, card)
 	err := ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
 		ConfTag: confTag,
 		Name: "Speaker's Name",
@@ -839,15 +840,12 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	
-	conf, err := findConf(r, ctx)
-	if err != nil {
-		handle404(w, r, ctx)
-		return
-	}
-	
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
 	var talks types.TalkTime
-	talks, err = getters.GetTalksFor(ctx, conf.Tag)
+	talks, err := getters.GetTalksFor(ctx, confTag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
@@ -869,7 +867,7 @@ func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		ctx.Infos.Printf("Sending cal invite for %s (%d)", talk.Name, len(emails))
 		/* Send cal invites!! */
 		calInvite := &google.CalInvite{
-			ConfTag:   conf.Tag,
+			ConfTag:   confTag,
 			EventName: "btc++:" + talk.Name,
 			Location:  talk.VenueName(),
 			Invitees:  emails,
