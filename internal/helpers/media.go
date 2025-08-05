@@ -69,6 +69,12 @@ func MakeTalkImg(ctx *config.AppContext, confTag, card, talkID string) ([]byte, 
 	return MakeMediaImg(ctx, card, path)
 }
 
+func MakeAgendaImg(ctx *config.AppContext, confTag, dayref, venue string) ([]byte, error) {
+	path := fmt.Sprintf("/media/imgs/%s/agenda/%s/%s", confTag, dayref, venue)
+	card := "agenda"
+	return MakeMediaImg(ctx, card, path)
+}
+
 func MakeMediaImg(ctx *config.AppContext, card, path string) ([]byte, error) {
 
 	dimens, ok := types.MediaDimens[card]

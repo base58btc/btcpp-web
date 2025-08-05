@@ -173,7 +173,35 @@ type (
 		Token     string
 	}
 	AuthTokens []*AuthToken
+
+	DayTime int
 )
+
+const (
+	Morning DayTime = iota
+	Afternoon
+	Evening
+)
+
+var daytimenames = map[DayTime]string {
+	Morning: "morning",
+	Afternoon: "afternoon",
+	Evening: "evening",
+}
+
+func (dt DayTime) String() string {
+	return daytimenames[dt]
+}
+
+var DayTimeChars = map[string]DayTime {
+	"+": Morning,
+	"=": Afternoon,
+	"-": Evening,
+}
+
+func (s *Session) BeginsAt() string {
+	return s.Sched.Start.Format("15:04")
+}
 
 func (env *EnvConfig) GetDomain() string {
 	if env.Port != "" && !env.Prod {
@@ -221,8 +249,8 @@ func (t *Talk) VenueValue() int {
 	return 5
 }
 
-func (t *Talk) VenueName() string {
-	switch t.Venue {
+func NameVenue(v string) string {
+	switch v {
 	case "p2pkh":
 		return "Main Stage"
 	case "p2wsh":
@@ -244,6 +272,10 @@ func (t *Talk) VenueName() string {
 	}
 
 	return "Not Listed Yet"
+}
+
+func (t *Talk) VenueName() string {
+	return NameVenue(t.Venue)
 }
 
 func (t *Times) Desc() string {

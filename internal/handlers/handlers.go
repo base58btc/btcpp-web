@@ -638,6 +638,32 @@ type Day struct {
 	Morning   []types.SessionTime
 	Afternoon []types.SessionTime
 	Evening   []types.SessionTime
+
+	Idx       int
+}
+
+func (d *Day) Venues() []string {
+	venhash := make(map[string]string)
+
+	all := make([]types.SessionTime, 0)
+	all = append(all, d.Morning...)
+	all = append(all, d.Afternoon...)
+	all = append(all, d.Evening...)
+
+	for _, list := range all {
+		for _, sesh := range list {
+			venhash[sesh.Venue] = ""
+		}
+	}
+
+	venues := make([]string, len(venhash))
+	i := 0
+	for k, _ := range venhash {
+		venues[i] = k
+		i++
+	}
+
+	return venues
 }
 
 type TicketTmpl struct {

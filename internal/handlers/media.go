@@ -16,19 +16,37 @@ import (
 )
 
 func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
-	r.HandleFunc("/media/preview/{conf}/speaker/{card}", func(w http.ResponseWriter, r *http.Request) {
-		PreviewSpeakerCard(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/media/preview/{conf}/talk/{card}", func(w http.ResponseWriter, r *http.Request) {
-		PreviewTalkCard(w, r, app)
+	r.HandleFunc("/media/preview/{conf}/{type}/{card}", func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		cardtype := params["type"]
+		switch cardtype {
+		case "speaker":
+			PreviewSpeakerCard(w, r, app)
+		case "talk":
+			PreviewTalkCard(w, r, app)
+		case "agenda":
+			confTag := params["conf"]
+			ref := params["card"]
+			/* Main stage preview! */
+			MakeAgendaCard(w, r, app, confTag, ref, "one")
+		default:
+			handle404(w, r, app)
+		}
 	}).Methods("GET")
 
-	r.HandleFunc("/media/imgs/{conf}/speakers", func(w http.ResponseWriter, r *http.Request) {
-		GenSpeakerCards(w, r, app)
-	}).Methods("GET")
-
-	r.HandleFunc("/media/imgs/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
-		GenTalkCards(w, r, app)
+	r.HandleFunc("/media/imgs/{conf}/{type}", func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		cardtype := params["type"]
+		switch cardtype {
+		case "speakers":
+			GenSpeakerCards(w, r, app)
+		case "talks":
+			GenTalkCards(w, r, app)
+		case "agenda":
+			GenAgendaCards(w, r, app)
+		default:
+			handle404(w, r, app)
+		}
 	}).Methods("GET")
 
 	/* Gen both talk + speaker cards */
@@ -44,6 +62,14 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 	r.HandleFunc("/media/imgs/{conf}/talk/{card}/{talk}", func(w http.ResponseWriter, r *http.Request) {
 		MakeTalkCard(w, r, app)
 	}).Methods("GET")
+
+	r.HandleFunc("/media/imgs/{conf}/agenda/{ref}/{venue}", func(w http.ResponseWriter, r *http.Request) {
+		params := mux.Vars(r)
+		confTag := params["conf"]
+		ref := params["ref"]
+		venue := params["venue"]
+		MakeAgendaCard(w, r, app, confTag, ref, venue)
+	}).Methods("GET")
 }
 
 type TalkCard struct {
@@ -57,6 +83,12 @@ type SpeakerCard struct {
 	TalkImg   string
 	Name      string
 	Twitter   string
+}
+
+type SessionCard struct {
+	ConfTag   string
+	Venue     string
+	Sessions  []*types.Session
 }
 
 func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -122,7 +154,7 @@ func GenTalkCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 
 	talks, _ := getters.GetTalksFor(ctx, confTag)
-	// FIXME: do all sizes for talks 
+	// FIXME: do all sizes for talks ?
 	card := "1080p"
 	for _, talk := range talks {
 		img, err := helpers.MakeTalkImg(ctx, confTag, card, talk.ID)
@@ -144,6 +176,66 @@ func GenTalkCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 
 	w.WriteHeader(http.StatusOK)
 }
+
+func GenAgendaCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ctx.Env.Prod {
+		return
+	}
+
+	conf, err := findConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	/* Make sure the directory exists */
+	path := fmt.Sprintf("media/%s/agendas", conf.Tag)
+	err = helpers.MakeDir(path)
+	if err != nil {
+		ctx.Err.Printf("can't make dir %s: %s", path, err)
+		return
+	}
+
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
+	if err != nil {
+		ctx.Err.Printf("error getting talks %s", err)
+		return
+	}
+
+	days, err := talkDays(ctx, conf, talks)
+	if err != nil {
+		ctx.Err.Printf("error bucketing talks %s", err)
+		return
+	}
+
+	/* Get talks for this conf */
+	for _, day := range days {
+		venues := day.Venues()
+		for _, venue := range venues {
+			for char, daytime := range types.DayTimeChars {
+				dayref := fmt.Sprintf("%d%s", day.Idx, char)
+				img, err := helpers.MakeAgendaImg(ctx, conf.Tag, dayref, venue)
+				if err != nil {
+					ctx.Err.Printf("oh no can't make agenda image %s (%s): %s", dayref, venue, err)
+					return
+				}
+				
+				ctx.Infos.Printf("made image for %s-%s", dayref, venue)
+
+				fileName := fmt.Sprintf("%s/%d-%s-%s.pdf", path, day.Idx, venue, daytime)
+				err = os.WriteFile(fileName, img, 0644)
+				if err != nil {
+					ctx.Err.Printf("oh no can't write agenda image %s (%s): %s", dayref, venue, err)
+					return
+				}
+			}
+
+		}
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 
 func PreviewTalkCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if ctx.Env.Prod {
@@ -192,7 +284,6 @@ func MakeTalkCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		return
 	}
 
-	/* Find speaker! */
 	template := fmt.Sprintf("media/talk_%s.tmpl", card)
 	err = ctx.TemplateCache.ExecuteTemplate(w, template, &TalkCard{
 		ConfTag: confTag,
@@ -270,6 +361,50 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		TalkImg: talk.Clipart,
 		Twitter: speaker.TwitterHandle(),
 	})
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("exec speaker_social failed")
+		return
+	}
+}
+
+func MakeAgendaCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, confTag, dayref, venue string) {
+	conf, err := findConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	/* Find talk! */
+	talks, err := getters.GetTalksFor(ctx, confTag)
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
+		return
+	}
+
+	days, err := talkDays(ctx, conf, talks)
+	if err !=  nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("unable to bucket talk days %s", err)
+		return
+	}
+
+	/* Filter for only in particular venue */
+	sessions, err := filterSessions(days, dayref, venue)
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("unable to pick sessions %s: %s", dayref, err)
+		return
+	}
+
+	template := "media/agenda_1080p.tmpl"
+	err = ctx.TemplateCache.ExecuteTemplate(w, template, &SessionCard{
+		ConfTag:  confTag,
+		Venue:    types.NameVenue(venue),
+		Sessions: sessions,
+	})
+
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("exec speaker_social failed")

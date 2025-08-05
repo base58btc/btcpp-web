@@ -24,6 +24,11 @@ var MediaDimens = map[string]CardDimens{
 		Height: float64(11.25),
 		Width:  float64(20),
 	},
+	/* 1920x1080px */
+	"agenda": CardDimens{
+		Height:  float64(20),
+		Width:   float64(11.25),
+	},
 	/* 1080x1080px */
 	"insta": CardDimens{
 		Height: float64(11.25),

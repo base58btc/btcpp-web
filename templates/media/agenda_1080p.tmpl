@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="/static/css/mini.css" />
+    <script src="/static/js/script.js" type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+<style>
+* {
+  box-sizing: border-box;
+}
+html {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  background: #fff;
+  min-height: 100%;
+}
+
+.bounding {
+  width: 1080px;
+  height:  1920px;
+}
+
+.logo {
+  width: 353px;
+  height: 120px;
+  max-height: 120px;
+  object-fit: contain;
+
+  background-image: url(/static/img/{{ .ConfTag }}/logo_blk.svg);
+  background-size: contain;
+  background-position: bottom;
+  background-repeat: no-repeat;
+}
+
+.venue {
+  font-size: 4rem;
+  line-height: 4rem;
+}
+
+.talk {
+  font-size: 3.25rem;
+  line-height: 3.25rem;
+}
+
+.speaker {
+  font-size: 2rem;
+  line-height: 2rem;
+  margin-right: 360px;
+}
+
+.social {
+  font-size: 2rem;
+}
+
+.session {
+  max-height: 350px;
+  height: 100%;
+  width: 100%
+}
+
+.img {
+  padding: 1rem;
+
+  background-size: cover;
+  background-position: center;
+
+  mask-image: linear-gradient(to top, transparent 4%, black);
+}
+
+.info {
+  bottom: 0;
+}
+</style>
+  <body class="bounding p-12">
+  <!-- option 1 -->
+    <div class="flex flex-col w-full h-full items-center gap-8">
+      <header class="flex-initial venue text-lg font-semibold text-gray-800 sm:text-xl/8 mb-4">
+        <p>{{ .Venue }}</p>
+      </header>
+      {{ range .Sessions }}
+      <article class="session relative">
+        <div class="rounded-[30px] session relative overflow-hidden bg-gray-900 shadow-xl img opacity-[.65]"
+	style="background-image: url(/static/img/talks/{{ .TalkPhoto }});"></div>
+        <div class="info absolute flex p-[30px] w-full" >
+          <figure class="flex-1 w-full">
+            <h1 class="talk text-gray-900 text-md mb-4">{{ .Name }}</h1>
+
+	{{ $first := index .Speakers 0 }}
+	{{ $solo := eq (len .Speakers) 1 }}
+            <div class="speakers flex items-center gap-x-4">
+	{{ if eq .Type "hackathon" }}
+	<!-- no speakers for 'hackathons' -->
+	{{ else }}
+        {{ range .Speakers}}
+              <img src="/static/img/speakers/{{ .Photo }}" alt="" class="size-24 rounded-full bg-gray-100" 
+	      {{ if ne $first .}}
+	      style="margin-left: -2rem;"
+	      {{ end }}
+	      />
+	    {{ if $solo }} 
+              <div class="text-sm/6">
+               <p class="font-semibold text-gray-700 speaker">
+                <span class="absolute inset-0"></span>
+                {{ .Name }}
+               </p>
+	      {{ if .Company }}
+               <p class="text-gray-700 text-xl">{{ .Company }}</p>
+	      {{ end }}
+	      {{ if .TwitterHandle }}
+               <p class="text-gray-700 text-xl">@{{ .TwitterHandle }}</p>
+	      {{ end }}
+	     </div>
+	    {{ end }}
+	  {{ end }}
+	{{ end }}
+	    <div class="flex-1"></div>
+	    <div class="flex-1">
+	      <p class="text-gray-800 text-[3.25rem] text-end">{{ .BeginsAt }} </p>
+	    </div>
+	  </div>
+	</figure>
+	</div>
+      </article>
+      {{ end }}
+      <div class="flex-1"></div>
+      <div class="flex-none logo"></div>
+    </div>
+  </body>
+</html>
