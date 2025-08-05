@@ -72,17 +72,19 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks types.TalkTime) ([
 		return nil, err
 	}
 	/* Sort keys alphabetically */
-	keys := make([]string, len(buckets))
-	i := 0
+	keys := make([]string, 0)
 	for k, _ := range buckets {
 		if k == "" {
 			continue
 		}
-		keys[i] = k
-		i++
+		keys = append(keys, k)
 	}
 	// FIXME: double digit days?
 	sort.Strings(keys)
+
+	if len(keys) == 0 {
+		return nil, nil
+	}
 
 	/* populate days */
 	lastKey := keys[len(keys) - 1]
