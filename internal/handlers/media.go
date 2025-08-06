@@ -222,7 +222,8 @@ func GenAgendaCards(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 				
 				ctx.Infos.Printf("made image for %s-%s", dayref, venue)
 
-				fileName := fmt.Sprintf("%s/%d-%s-%s.pdf", path, day.Idx, venue, daytime)
+				venueName := strings.Split(types.NameVenue(venue), " ")[0]
+				fileName := fmt.Sprintf("%s/day%d-%s-%s.pdf", path, day.Idx, venueName, daytime)
 				err = os.WriteFile(fileName, img, 0644)
 				if err != nil {
 					ctx.Err.Printf("oh no can't write agenda image %s (%s): %s", dayref, venue, err)
