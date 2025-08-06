@@ -67,8 +67,6 @@ body {
 
   background-size: cover;
   background-position: center;
-
-  mask-image: linear-gradient(to top, transparent 4%, black);
 }
 
 .info {
@@ -78,16 +76,21 @@ body {
   <body class="bounding p-12">
   <!-- option 1 -->
     <div class="flex flex-col w-full h-full items-center gap-8">
-      <header class="flex-initial venue text-lg font-semibold text-gray-800 sm:text-xl/8 mb-4">
+      <header class="flex-initial venue text-lg font-semibold text-gray-800 sm:text-xl/8 my-20">
         <p>{{ .Venue }}</p>
       </header>
       {{ range .Sessions }}
       <article class="session relative">
         <div class="rounded-[30px] session relative overflow-hidden bg-gray-900 shadow-xl img opacity-[.65]"
 	style="background-image: url(/static/img/talks/{{ .TalkPhoto }});"></div>
+	<div class="rounded-[30px] inset-0 session relative overflow-hidden bg-gray-900 shadow-xl bg-gradient-to-t from-gray-900 via-gray-900/40 " style="
+	    position: absolute;
+	    top: 0;
+	    opacity: .5;
+	"></div>
         <div class="info absolute flex p-[30px] w-full" >
           <figure class="flex-1 w-full">
-            <h1 class="talk text-gray-900 text-md mb-4">{{ .Name }}</h1>
+            <h1 class="talk text-white text-md mb-4">{{ .Name }}</h1>
 
 	{{ $first := index .Speakers 0 }}
 	{{ $solo := eq (len .Speakers) 1 }}
@@ -103,15 +106,15 @@ body {
 	      />
 	    {{ if $solo }} 
               <div class="text-sm/6">
-               <p class="font-semibold text-gray-700 speaker">
+               <p class="font-semibold text-white speaker">
                 <span class="absolute inset-0"></span>
                 {{ .Name }}
                </p>
 	      {{ if .Company }}
-               <p class="text-gray-700 text-xl">{{ .Company }}</p>
+               <p class="text-gray-200 text-xl">{{ .Company }}</p>
 	      {{ end }}
 	      {{ if .TwitterHandle }}
-               <p class="text-gray-700 text-xl">@{{ .TwitterHandle }}</p>
+               <p class="text-gray-200 text-xl">@{{ .TwitterHandle }}</p>
 	      {{ end }}
 	     </div>
 	    {{ end }}
@@ -119,7 +122,7 @@ body {
 	{{ end }}
 	    <div class="flex-1"></div>
 	    <div class="flex-1">
-	      <p class="text-gray-800 text-[3.25rem] text-end">{{ .BeginsAt }} </p>
+	      <p class="text-white text-[3.25rem] text-end">{{ .BeginsAt }} </p>
 	    </div>
 	  </div>
 	</figure>
