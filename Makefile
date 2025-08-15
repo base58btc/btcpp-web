@@ -14,7 +14,7 @@ css-build:
 
 .PHONY: png-conv
 png-conv:
-	cd media && ./convert.sh $(conf) $(subdir) && rm $(conf)/$(subdir)/*.pdf cd ..
+	cd media && ./convert.sh $(conf) $(subdir) && rm $(conf)/$(subdir)/*.pdf && cd ..
 
 .PHONY: build-all
 build-all: build css-build
