@@ -53,6 +53,7 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 	r.HandleFunc("/media/imgs/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		GenSpeakerCards(w, r, app)
 		GenTalkCards(w, r, app)
+		GenAgendaCards(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/speaker/{card}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
