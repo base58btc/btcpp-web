@@ -1,0 +1,9 @@
+for file in *.png; do
+  name=${file%%.*}
+  ffmpeg -i $file -preset ultrafast -vf "transpose=1" right/$name.jpeg
+done
+
+for file in *.png; do
+  name=${file%%.*}
+  ffmpeg -i $file -preset ultrafast -vf "transpose=2" left/$name.jpeg
+done
