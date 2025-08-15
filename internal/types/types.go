@@ -184,9 +184,9 @@ const (
 )
 
 var daytimenames = map[DayTime]string {
-	Morning: "morning",
-	Afternoon: "afternoon",
-	Evening: "evening",
+	Morning: "01morning",
+	Afternoon: "02afternoon",
+	Evening: "03evening",
 }
 
 func (dt DayTime) String() string {
