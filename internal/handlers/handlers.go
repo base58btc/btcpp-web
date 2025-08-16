@@ -99,23 +99,6 @@ func contains(list []string, item string) bool {
 	return false
 }
 
-func findConf(r *http.Request, app *config.AppContext) (*types.Conf, error) {
-	params := mux.Vars(r)
-	confTag := params["conf"]
-
-	confs, err := getters.FetchConfsCached(app)
-	if err != nil {
-		return nil, err
-	}
-	for _, conf := range confs {
-		if conf.Tag == confTag {
-			return conf, nil
-		}
-	}
-
-	return nil, fmt.Errorf("'%s' not found (url: %s)", confTag, r.URL.String())
-}
-
 func findTicket(app *config.AppContext, tixID string) (*types.ConfTicket, *types.Conf) {
 	confs, err := getters.FetchConfsCached(app)
 	if err != nil {
@@ -491,7 +474,7 @@ func filterSpeakers(talks []*types.Talk) types.Speakers {
 }
 
 func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, err := findConf(r, ctx)
+	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
 		handle404(w, r, ctx)
 		return
@@ -525,7 +508,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 }
 
 func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, err := findConf(r, ctx)
+	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
 		handle404(w, r, ctx)
 		return
@@ -543,7 +526,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 }
 
 func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, err := findConf(r, ctx)
+	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
 		handle404(w, r, ctx)
 		return

@@ -183,7 +183,7 @@ func GenAgendaCards(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
 	}
 
-	conf, err := findConf(r, ctx)
+	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
 		handle404(w, r, ctx)
 		return
@@ -371,7 +371,7 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 }
 
 func MakeAgendaCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, confTag, dayref, venue string) {
-	conf, err := findConf(r, ctx)
+	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
 		handle404(w, r, ctx)
 		return

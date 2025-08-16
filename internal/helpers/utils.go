@@ -10,8 +10,11 @@ import (
 	"os"
 	"time"
 
+	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
+
+	"github.com/gorilla/mux"
 )
 
 
@@ -35,6 +38,23 @@ func FindConfByRef(confs []*types.Conf, confRef string) *types.Conf {
 		}
 	}
 	return nil
+}
+
+func FindConf(r *http.Request, app *config.AppContext) (*types.Conf, error) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
+	confs, err := getters.FetchConfsCached(app)
+	if err != nil {
+		return nil, err
+	}
+	for _, conf := range confs {
+		if conf.Tag == confTag {
+			return conf, nil
+		}
+	}
+
+	return nil, fmt.Errorf("'%s' not found (url: %s)", confTag, r.URL.String())
 }
 
 func MiniCss() string {
