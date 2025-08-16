@@ -51,7 +51,7 @@ func RegisterNewsletterHandlers(r *mux.Router, ctx *config.AppContext) {
 		PreviewMissive(w, r, ctx)
 	}).Methods("GET")
 
-	r.HandleFunc("/missives/port", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/missives/port/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		PortRegistrationsToNewsletters(w, r, ctx)
 	}).Methods("GET")
 }
@@ -61,27 +61,23 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 		w.Write([]byte("no way! in prod"))
 		return
 	}
-	rezzies, err := getters.FetchBtcppRegistrations(ctx, false)
+
+	conf, err := helpers.FindConf(r, ctx)
+        if err != nil {
+		w.Write([]byte(fmt.Sprintf("conf not found! %s", err)))
+		return
+        }
+
+	rezzies, err := getters.FetchRegistrationsConf(ctx, conf.Ref)
 	if err != nil {
 		ctx.Err.Println(err)
 		return
 	}
 
-	confs, err := getters.FetchConfsCached(ctx)
-	if err != nil {
-		ctx.Err.Println(err)
-		return
-	}
 	for _, rez := range rezzies {
-		conf := helpers.FindConfByRef(confs, rez.ConfRef)
-
 		newsletters := make([]string, 1)
+		newsletters[0] = conf.Tag
 
-		if conf == nil {
-			newsletters[0] = "other"
-		} else {
-			newsletters[0] = conf.Tag
-		}
 		/* Also add their type + conf-type! */
 		newsletters = append(newsletters, rez.Type)
 		newsletters = append(newsletters, newsletters[0] + "-" + rez.Type)
