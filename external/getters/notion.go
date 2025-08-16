@@ -571,18 +571,28 @@ func SoldTixCount(n *types.Notion, confRef string) (uint, error) {
 	return regisCount, nil
 }
 
-func fetchRegistrations(ctx *config.AppContext) ([]*types.Registration, error) {
+func fetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
 	var regis []*types.Registration
-
 	hasMore := true
 	nextCursor := ""
 	n := ctx.Notion
 	db := ctx.Env.Notion.PurchasesDb
+
+        var filter *notion.Filter
+        if confRef != "" {
+                filter = &notion.Filter{
+                        Property: "conf",
+                        Relation: &notion.RelationFilterCondition{
+                                Contains: confRef,
+                        },
+                }
+        }
 	for hasMore {
 		var err error
 		var pages []*notion.Page
 		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
 			StartCursor: nextCursor,
+                        Filter: filter,
 		})
 		if err != nil {
 			return nil, err
@@ -623,9 +633,13 @@ func checkActive(ctx *config.AppContext, confRef string) bool {
 	return false
 }
 
+func FetchRegistrationsConf(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
+	return fetchRegistrations(ctx, confRef)
+}
+
 func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.Registration, error) {
 	var btcppres []*types.Registration
-	rezzies, err := fetchRegistrations(ctx)
+	rezzies, err := fetchRegistrations(ctx, "")
 
 	if err != nil {
 		return nil, err
