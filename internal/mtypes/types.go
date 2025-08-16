@@ -43,6 +43,7 @@ type (
 		Content     string
 		ImgRef      string
 		URI         string
+                SubNewsURL  string
 		Unsubscribe string
 	}
 )

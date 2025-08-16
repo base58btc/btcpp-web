@@ -98,12 +98,12 @@ func scheduleMissive(ctx *config.AppContext, subscribers []*mtypes.Subscriber, l
 	subssent := 0
 	var htmlBody []byte
 	for _, sub := range subscribers {
-		if !sub.IsSubscribed(letter) {
+		if !sub.IsSubscribed(letter) && !isPreview {
 			continue
 		}
 
 		var err error
-		htmlBody, err = emails.SendNewsletterMissive(ctx, sub, letter, sendAt)
+		htmlBody, err = emails.SendNewsletterMissive(ctx, sub, letter, sendAt, isPreview)
 		if err != nil {
 			/* FIXME: do something less hacky for collisions
 			(like returning a specific error code)
@@ -146,7 +146,7 @@ func NewSubscriberMissives(ctx *config.AppContext, subscriber *mtypes.Subscriber
 			return err
 		}
 
-		_, err = emails.SendNewsletterMissive(ctx, subscriber, letter, sendAt)
+		_, err = emails.SendNewsletterMissive(ctx, subscriber, letter, sendAt, false)
 		if err != nil {
 			/* FIXME: do something less hacky for collisions */
 			if !strings.Contains(err.Error(), "scheduled.idem_key") {

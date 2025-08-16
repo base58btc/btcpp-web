@@ -365,15 +365,21 @@ func SendMailRequest(ctx *config.AppContext, mail *mailer.MailRequest) error {
 	return nil
 }
 
-func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, letter *mtypes.Letter, sendAt time.Time) ([]byte, error) {
+func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, letter *mtypes.Letter, sendAt time.Time, preview bool) ([]byte, error) {
 
 	jobhash := helpers.MakeJobHash(sub.Email, letter.UID, letter.Title)
 	jobkey := fmt.Sprintf("%s-%s", letter.Missive(), jobhash)
+
+        timestamp := uint64(time.Now().UTC().UnixNano())
+        _, newsToken := helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, "newsletter", timestamp)
+
 
 	var buf bytes.Buffer
 	err := missiveTemplate(ctx, letter).Execute(&buf, &mtypes.EmailContent{
 		ImgRef: letter.ImgRef(),
 		URI: ctx.Env.GetURI(),
+                /* Always include the newsletter subscribe token?? */
+                SubNewsURL: buildConfirmURL(ctx, newsToken),
 	})
 	if err != nil {
 		return nil, err
@@ -383,16 +389,20 @@ func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, lette
 	 * for this email/user on this Newsletter */
 	subList := letter.SubList(sub)
 	if len(subList) == 0 {
-		return nil, fmt.Errorf("subscriber not sub'ed to this missive?? %s ! %s", letter.Title, sub.Email)
+                if preview {
+                        subList = []string{ "newsletter" }
+                } else {
+		        return nil, fmt.Errorf("subscriber not sub'ed to this missive?? %s ! %s", letter.Title, sub.Email)
+                }
 	}
 
-	subToken := ""
-	subkey := makeSubKey(sub.Email, subList[0])
+        var subkey, subToken string
 	if unsub := letter.Unsub(sub); unsub != "" {
-		timestamp := uint64(time.Now().UTC().UnixNano())
-		_, subToken = helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, unsub, timestamp)
 		subkey = makeSubKey(sub.Email, unsub)
-	}
+                _, subToken = helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, unsub, timestamp)
+	} else {
+	        subkey = makeSubKey(sub.Email, subList[0])
+        }
 
 	htmlBody, err := BuildHTMLEmailUnsub(ctx, letter.ImgRef(), buf.Bytes(), subToken)
 	if err != nil {
