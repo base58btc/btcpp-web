@@ -3,7 +3,10 @@
   <div class="flex">
     <div class="mb-4 flex-shrink-0 sm:mb-0 sm:mr-4">
      <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" target="_blank">
-     <img class="inline-block h-28 w-28 rounded-md" src="/static/img/talks/{{ .TalkPhoto }}" alt="" />
+     <picture>
+       <source srcset="/static/img/talks/{{ .TalkAvif }}" type="image/avif"/>
+       <img src="/static/img/talks/{{ .TalkPhoto }}" alt="" class="inline-block h-28 w-28 rounded-md"/>
+     </picture>
      </a>
     </div>
    <div class="ml-3">

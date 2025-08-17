@@ -17,6 +17,7 @@
             go
             tailwindcss
             air 
+            ffmpeg
 	    git
           ];
           # Automatically run ??? when entering the shell.

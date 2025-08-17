@@ -1,7 +1,10 @@
 {{ define "details" }}
 <article class="relative isolate flex flex-col gap-8 lg:flex-row" id="{{ .AnchorTag }}">
 <div class="relative aspect-[2/1] lg:aspect-square lg:w-64 lg:shrink-0">
-    <img src="/static/img/talks/{{ .Clipart }}" alt="" class="absolute inset-0 h-full w-full rounded-2xl bg-gray-50 object-cover">
+    <picture>
+      <source srcset="/static/img/talks/{{ .ClipartAvif }}" type="image/avif"/>
+      <img src="/static/img/talks/{{ .Clipart }}" alt="" class="absolute inset-0 h-full w-full rounded-2xl bg-gray-50 object-cover"/>
+    </picture>
     <div class="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10"></div>
   </div>
   <div>

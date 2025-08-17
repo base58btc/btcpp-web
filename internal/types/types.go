@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+        "path/filepath"
 	"strings"
 	"time"
 )
@@ -197,6 +198,16 @@ var DayTimeChars = map[string]DayTime {
 	"+": Morning,
 	"=": Afternoon,
 	"-": Evening,
+}
+
+func (t *Talk) ClipartAvif() string {
+        name := strings.TrimSuffix(t.Clipart, filepath.Ext(t.Clipart))
+        return name + ".avif"
+}
+
+func (s *Session) TalkAvif() string {
+        name := strings.TrimSuffix(s.TalkPhoto, filepath.Ext(s.TalkPhoto))
+        return name + ".avif"
 }
 
 func (s *Session) BeginsAt() string {
