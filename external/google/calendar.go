@@ -17,20 +17,26 @@ import (
 	"btcpp-web/internal/config"
 )
 
-var redirectURL = "http://localhost:8888/gcal-callback"
+var redirectPath = "/gcal-callback"
 var oauthConfig *oauth2.Config
 var calService *calendar.Service 
 
 
-func InitOauth(ctx *config.AppContext) {
+func InitOauth(ctx *config.AppContext) *oauth2.Config {
+        if oauthConfig != nil {
+               return oauthConfig 
+        }
+
 	creds := []byte(ctx.Env.Google.Config)
 
 	// Request access to calendar events
-	oauthConfig, err := google.ConfigFromJSON(creds, calendar.CalendarEventsScope)
+        var err error
+	oauthConfig, err = google.ConfigFromJSON(creds, calendar.CalendarEventsScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-	oauthConfig.RedirectURL = redirectURL
+	oauthConfig.RedirectURL = ctx.Env.GetURI() + redirectPath
+        return oauthConfig
 }
 
 func tryCachedToken(app *config.AppContext) (*calendar.Service, error) {
@@ -49,7 +55,8 @@ func tryCachedToken(app *config.AppContext) (*calendar.Service, error) {
 	}
 
 	ctx := context.Background()
-	calService, err := createCalService(ctx, &token)
+        config := InitOauth(app)
+	calService, err := createCalService(config, ctx, &token)
 	return calService, err
 }
 
@@ -59,12 +66,15 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, app *config.AppContext,
 	if err != nil {
 		app.Infos.Printf("Cached token failed. %s", err)
 	}
+
+        config := InitOauth(app)
+
 	var url string
 	if cals != nil {
 		calService = cals
 		url = redirectTo
 	} else {
-		url = oauthConfig.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+		url = config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
 	}
 	app.Infos.Printf("Redirecting to ... %s", url)
 	http.Redirect(w, r, url, http.StatusFound)
@@ -73,7 +83,9 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, app *config.AppContext,
 func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.AppContext) bool {
 	ctx := context.Background()
 	code := r.URL.Query().Get("code")
-	token, err := oauthConfig.Exchange(ctx, code)
+
+        config := InitOauth(app)
+	token, err := config.Exchange(ctx, code)
 
 	if err != nil {
 		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
@@ -92,7 +104,7 @@ func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.App
 	}
 
 	// Create authenticated calendar service
-	calService, err = createCalService(ctx, token)
+	calService, err = createCalService(config, ctx, token)
 	if err != nil {
 		http.Error(w, "Failed to create cal service: "+err.Error(), http.StatusInternalServerError)
 		return false
@@ -101,9 +113,9 @@ func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.App
 	return true
 }
 
-func createCalService(ctx context.Context, token *oauth2.Token) (*calendar.Service, error) {
+func createCalService(config *oauth2.Config, ctx context.Context, token *oauth2.Token) (*calendar.Service, error) {
 	// Create authenticated calendar service
-	client := oauthConfig.Client(ctx, token)
+	client := config.Client(ctx, token)
 	cals, err := calendar.NewService(ctx, option.WithHTTPClient(client))
 	return cals, err
 }
@@ -158,8 +170,13 @@ func RunCalendarInvites(calNotif string, invite *CalInvite) (string, error) {
 	if calNotif == "" {
 		ee, err = calService.Events.Insert("primary", event).Do()
 	} else {
-		ee, err = calService.Events.Update("primary", calNotif, event).SendUpdates("all").Do()
+                return "", fmt.Errorf("Already sent cal invite")
+		//ee, err = calService.Events.Update("primary", calNotif, event).SendUpdates("all").Do()
 	}
+
+        if err != nil {
+                return "", err
+        }
 
 	return ee.Id, err
 }
