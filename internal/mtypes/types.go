@@ -8,6 +8,7 @@ import (
 )
 
 type SendStatus int
+
 const (
 	ErrO     SendStatus = -1
 	SubOnly  SendStatus = 0
@@ -15,17 +16,16 @@ const (
 	Sendable SendStatus = 2
 )
 
-
 type (
 	Letter struct {
-		PageID     string
-		UID        uint64
-		Title      string
+		PageID      string
+		UID         uint64
+		Title       string
 		Newsletters []string
-		Markdown   string
-		SendAt     string
-		SentAt     *time.Time
-		Expiry     *time.Time
+		Markdown    string
+		SendAt      string
+		SentAt      *time.Time
+		Expiry      *time.Time
 	}
 
 	Subscriber struct {
@@ -43,12 +43,12 @@ type (
 		Content     string
 		ImgRef      string
 		URI         string
-                SubNewsURL  string
+		SubNewsURL  string
 		Unsubscribe string
 	}
 )
 
-var sublists []string = []string{ 
+var sublists []string = []string{
 	"newsletter",
 	"test-news",
 	"insider",
@@ -82,7 +82,7 @@ func (l *Letter) ImgRef() string {
 }
 
 func findSubset(subs, letters []string) []string {
-	set := make([]string, 0)	
+	set := make([]string, 0)
 	hash := make(map[string]string)
 
 	for _, v := range subs {
@@ -99,7 +99,7 @@ func findSubset(subs, letters []string) []string {
 }
 
 func excludeSubs(subs, letters []string) []string {
-	set := make([]string, 0)	
+	set := make([]string, 0)
 	hash := make(map[string]string)
 
 	for _, v := range subs {
@@ -119,7 +119,7 @@ func uniqConfsList(subs []string) []string {
 	hash := make(map[string]string)
 
 	for _, v := range subs {
-		key := strings.Split(v,"-")[0]
+		key := strings.Split(v, "-")[0]
 		if key == "" {
 			continue
 		}
@@ -151,7 +151,7 @@ func (l *Letter) Unsub(sub *Subscriber) string {
 }
 
 func (l *Letter) SubList(sub *Subscriber) []string {
-	return findSubset(sub.SubNames(), l.InNewsletters())	
+	return findSubset(sub.SubNames(), l.InNewsletters())
 }
 
 /*
@@ -308,7 +308,7 @@ func (s *Subscriber) RmSubscription(name string) bool {
 }
 
 func (s *Subscriber) IsSubscribed(letter *Letter) bool {
-	list := findSubset(s.SubNames(), letter.InNewsletters())	
+	list := findSubset(s.SubNames(), letter.InNewsletters())
 	return len(list) > 0
 }
 

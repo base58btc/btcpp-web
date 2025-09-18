@@ -18,7 +18,6 @@ type PDFPage struct {
 	Width  float64
 }
 
-
 func pdfGrabber(pdf *PDFPage, res *[]byte) chromedp.Tasks {
 	return chromedp.Tasks{
 		emulation.SetUserAgentOverride("WebScraper 1.0"),
@@ -83,9 +82,9 @@ func MakeMediaImg(ctx *config.AppContext, card, path string) ([]byte, error) {
 	}
 
 	pdf := &PDFPage{
-		URL: ctx.Env.GetURI() + path,
+		URL:    ctx.Env.GetURI() + path,
 		Height: dimens.Height,
-		Width: dimens.Width,
+		Width:  dimens.Width,
 	}
 
 	ctx.Infos.Printf("URL: %s", pdf.URL)

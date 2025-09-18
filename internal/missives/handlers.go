@@ -63,10 +63,10 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 	}
 
 	conf, err := helpers.FindConf(r, ctx)
-        if err != nil {
+	if err != nil {
 		w.Write([]byte(fmt.Sprintf("conf not found! %s", err)))
 		return
-        }
+	}
 
 	rezzies, err := getters.FetchRegistrationsConf(ctx, conf.Ref)
 	if err != nil {
@@ -80,10 +80,10 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 
 		/* Also add their type + conf-type! */
 		newsletters = append(newsletters, rez.Type)
-		newsletters = append(newsletters, newsletters[0] + "-" + rez.Type)
+		newsletters = append(newsletters, newsletters[0]+"-"+rez.Type)
 		if rez.Type == "local" {
 			newsletters = append(newsletters, "genpop")
-			newsletters = append(newsletters, newsletters[0] + "-genpop")
+			newsletters = append(newsletters, newsletters[0]+"-genpop")
 		}
 
 		_, err := getters.SubscribeEmailList(ctx.Notion, rez.Email, newsletters)
@@ -361,7 +361,7 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		&mtypes.Subscriber{
 			Email: "hello@btcpp.dev",
 			Subs: []*mtypes.Subscription{
-				&mtypes.Subscription {
+				&mtypes.Subscription{
 					Name: missive.Newsletters[0],
 				},
 			},
@@ -369,7 +369,7 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		&mtypes.Subscriber{
 			Email: "niftynei@gmail.com",
 			Subs: []*mtypes.Subscription{
-				&mtypes.Subscription {
+				&mtypes.Subscription{
 					Name: missive.Newsletters[0],
 				},
 			},
@@ -387,7 +387,6 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	ctx.Infos.Printf("Scheduled preview emails for %s", missive.Title)
 	w.Write(body)
 }
-
 
 func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	/* Check for verified */
@@ -422,7 +421,7 @@ func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.App
 		return
 	}
 
-	letters := []*mtypes.Letter { missive }
+	letters := []*mtypes.Letter{missive}
 	err = scheduleMissives(ctx, subscribers, letters)
 	if err != nil {
 		ctx.Infos.Printf("Unable to send missives: %s", err)
@@ -509,4 +508,3 @@ func UnscheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
-

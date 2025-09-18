@@ -18,11 +18,11 @@ import (
 	"strings"
 	"time"
 
-	"btcpp-web/internal/config"
 	"btcpp-web/external/getters"
+	"btcpp-web/external/google"
+	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
-	"btcpp-web/external/google"
 	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
 
@@ -390,12 +390,13 @@ func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
 func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.WriteHeader(http.StatusNotFound)
 	ctx.Infos.Printf("404'd: %s", r.URL.Path)
-	
+
 	RenderPage(w, r, ctx, "404")
 }
 
 type ConfPage struct {
 	Conf          *types.Conf
+	Hotels        []*types.Hotel
 	Tix           *types.ConfTicket
 	MaxTix        *types.ConfTicket
 	Sold          uint
@@ -446,7 +447,7 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 
 	/* Refresh the confs */
-	getters.WaitFetch(ctx)	
+	getters.WaitFetch(ctx)
 	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load confereneces, please try again later", http.StatusInternalServerError)
@@ -562,6 +563,8 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
+	confHotels := helpers.HotelsForConf(ctx, conf)
+
 	currTix := findCurrTix(conf, soldCount)
 	maxTix := findMaxTix(conf)
 
@@ -574,6 +577,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	tmplTag := fmt.Sprintf("conf/%s.tmpl", conf.Tag)
 	err = ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &ConfPage{
 		Conf:          conf,
+		Hotels:        confHotels,
 		Tix:           currTix,
 		MaxTix:        maxTix,
 		Sold:          soldCount,
@@ -598,12 +602,12 @@ func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 		return
 	}
 
-	data := struct { 
+	data := struct {
 		Confs []*types.Conf
-		Year uint
+		Year  uint
 	}{
 		Confs: confList,
-		Year: helpers.CurrentYear(),
+		Year:  helpers.CurrentYear(),
 	}
 
 	template := fmt.Sprintf("embeds/%s.tmpl", page)
@@ -616,8 +620,8 @@ func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 }
 
 type SchedulePage struct {
-	Talks    []*types.Talk
-	s []types.TalkTime
+	Talks []*types.Talk
+	s     []types.TalkTime
 }
 
 type Day struct {
@@ -625,7 +629,7 @@ type Day struct {
 	Afternoon []types.SessionTime
 	Evening   []types.SessionTime
 
-	Idx       int
+	Idx int
 }
 
 func (d *Day) Venues() []string {
@@ -979,7 +983,6 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
 
 	ctx.Infos.Println("Added ticket!", entry.ID)
 	w.WriteHeader(http.StatusOK)

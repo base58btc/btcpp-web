@@ -17,7 +17,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-
 func CurrentYear() uint {
 	year, _, _ := time.Now().Date()
 	return uint(year)

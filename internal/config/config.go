@@ -4,8 +4,8 @@ import (
 	"html/template"
 	"log"
 
-	"github.com/alexedwards/scs/v2"
 	"btcpp-web/internal/types"
+	"github.com/alexedwards/scs/v2"
 )
 
 /* application configuration settings */

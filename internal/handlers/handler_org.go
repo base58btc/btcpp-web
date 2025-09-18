@@ -11,9 +11,9 @@ import (
 )
 
 func sessionDay(key string) (int, error) {
-	/* Some keys are "3H" others are "2A+" 
+	/* Some keys are "3H" others are "2A+"
 	 * We want to preserve the ability to do just '10E'
-	*/
+	 */
 	var index string
 	for _, c := range key {
 		if !unicode.IsDigit(c) {
@@ -54,17 +54,16 @@ func pickSessions(days []*Day, dayref string) ([]types.SessionTime, error) {
 
 	day := days[i-1]
 	switch string(dayref[len(dayref)-1]) {
-		case "+":
-			return day.Morning, nil
-		case "=":
-			return day.Afternoon, nil
-		case "-":
-			return day.Evening, nil
+	case "+":
+		return day.Morning, nil
+	case "=":
+		return day.Afternoon, nil
+	case "-":
+		return day.Evening, nil
 	}
 
 	return nil, fmt.Errorf("Unknown day time marker %s", dayref)
 }
-
 
 func talkDays(ctx *config.AppContext, conf *types.Conf, talks types.TalkTime) ([]*Day, error) {
 	buckets, err := bucketTalks(conf, talks)
@@ -87,7 +86,7 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks types.TalkTime) ([
 	}
 
 	/* populate days */
-	lastKey := keys[len(keys) - 1]
+	lastKey := keys[len(keys)-1]
 	maxDays, err := sessionDay(lastKey)
 	if err != nil {
 		return nil, err
@@ -99,7 +98,7 @@ func talkDays(ctx *config.AppContext, conf *types.Conf, talks types.TalkTime) ([
 			Morning:   make([]types.SessionTime, 0),
 			Afternoon: make([]types.SessionTime, 0),
 			Evening:   make([]types.SessionTime, 0),
-			Idx: i + 1,
+			Idx:       i + 1,
 		}
 	}
 
@@ -145,7 +144,6 @@ func talkToSession(talk *types.Talk, conf *types.Conf) *types.Session {
 
 	return sesh
 }
-
 
 func bucketTalks(conf *types.Conf, talks types.TalkTime) (map[string]types.SessionTime, error) {
 	sort.Sort(talks)

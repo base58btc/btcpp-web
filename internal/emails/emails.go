@@ -14,12 +14,11 @@ import (
 	"strings"
 	"time"
 
-
-	"btcpp-web/internal/config"
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
-	"btcpp-web/internal/types"
 	"btcpp-web/internal/mtypes"
+	"btcpp-web/internal/types"
 	mailer "github.com/base58btc/mailer/mail"
 	"github.com/gorilla/mux"
 )
@@ -31,7 +30,6 @@ type EmailTmpl struct {
 	CSS     string
 	ConfTag string
 }
-
 
 type Mail struct {
 	JobKey   string
@@ -50,7 +48,6 @@ type EmailFile struct {
 	PDF  []byte
 	Name string
 }
-
 
 func RegisterEndpoints(r *mux.Router, ctx *config.AppContext) {
 	r.HandleFunc("/welcome-email", func(w http.ResponseWriter, r *http.Request) {
@@ -108,12 +105,11 @@ func CheckForNewMails(ctx *config.AppContext) {
 	}
 }
 
-
 func MakeTicketPDF(ctx *config.AppContext, rez *types.Registration) ([]byte, error) {
 	pdf := &helpers.PDFPage{
-		URL: fmt.Sprintf("http://localhost:%s/ticket/%s?type=%s&conf=%s", ctx.Env.Port, rez.RefID, rez.Type, rez.ConfRef),
+		URL:    fmt.Sprintf("http://localhost:%s/ticket/%s?type=%s&conf=%s", ctx.Env.Port, rez.RefID, rez.Type, rez.ConfRef),
 		Height: float64(12.0),
-		Width: float64(3.8),
+		Width:  float64(3.8),
 	}
 	return helpers.BuildChromePdf(ctx, pdf)
 }
@@ -257,7 +253,6 @@ func ComposeAndSendMail(ctx *config.AppContext, mail *Mail) error {
 	return SendMailRequest(ctx, mailReq)
 }
 
-
 func makeAuthStamp(secret string, timestamp string, r *http.Request) string {
 	h := sha256.New()
 	h.Write([]byte(secret))
@@ -324,7 +319,7 @@ func SendSubDeleteRequest(ctx *config.AppContext, email, sub string) error {
 
 	err = sendMailerReq(ctx, "/sub", http.MethodDelete, payload)
 	if err != nil {
-		return fmt.Errorf("Sub delete request failed. %s, %s : %s", sub,  email, err)
+		return fmt.Errorf("Sub delete request failed. %s, %s : %s", sub, email, err)
 	}
 	ctx.Infos.Printf("Rm'd subscription %s", subkey)
 	return nil
@@ -370,16 +365,15 @@ func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, lette
 	jobhash := helpers.MakeJobHash(sub.Email, letter.UID, letter.Title)
 	jobkey := fmt.Sprintf("%s-%s", letter.Missive(), jobhash)
 
-        timestamp := uint64(time.Now().UTC().UnixNano())
-        _, newsToken := helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, "newsletter", timestamp)
-
+	timestamp := uint64(time.Now().UTC().UnixNano())
+	_, newsToken := helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, "newsletter", timestamp)
 
 	var buf bytes.Buffer
 	err := missiveTemplate(ctx, letter).Execute(&buf, &mtypes.EmailContent{
 		ImgRef: letter.ImgRef(),
-		URI: ctx.Env.GetURI(),
-                /* Always include the newsletter subscribe token?? */
-                SubNewsURL: buildConfirmURL(ctx, newsToken),
+		URI:    ctx.Env.GetURI(),
+		/* Always include the newsletter subscribe token?? */
+		SubNewsURL: buildConfirmURL(ctx, newsToken),
 	})
 	if err != nil {
 		return nil, err
@@ -389,20 +383,20 @@ func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, lette
 	 * for this email/user on this Newsletter */
 	subList := letter.SubList(sub)
 	if len(subList) == 0 {
-                if preview {
-                        subList = []string{ "newsletter" }
-                } else {
-		        return nil, fmt.Errorf("subscriber not sub'ed to this missive?? %s ! %s", letter.Title, sub.Email)
-                }
+		if preview {
+			subList = []string{"newsletter"}
+		} else {
+			return nil, fmt.Errorf("subscriber not sub'ed to this missive?? %s ! %s", letter.Title, sub.Email)
+		}
 	}
 
-        var subkey, subToken string
+	var subkey, subToken string
 	if unsub := letter.Unsub(sub); unsub != "" {
 		subkey = makeSubKey(sub.Email, unsub)
-                _, subToken = helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, unsub, timestamp)
+		_, subToken = helpers.GetSubscribeToken(ctx.Env.HMACKey[:], sub.Email, unsub, timestamp)
 	} else {
-	        subkey = makeSubKey(sub.Email, subList[0])
-        }
+		subkey = makeSubKey(sub.Email, subList[0])
+	}
 
 	htmlBody, err := BuildHTMLEmailUnsub(ctx, letter.ImgRef(), buf.Bytes(), subToken)
 	if err != nil {
@@ -502,4 +496,3 @@ func sendMail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, re
 		return
 	}
 }
-

@@ -10,8 +10,8 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
 	calendar "google.golang.org/api/calendar/v3"
+	"google.golang.org/api/option"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
@@ -19,24 +19,23 @@ import (
 
 var redirectPath = "/gcal-callback"
 var oauthConfig *oauth2.Config
-var calService *calendar.Service 
-
+var calService *calendar.Service
 
 func InitOauth(ctx *config.AppContext) *oauth2.Config {
-        if oauthConfig != nil {
-               return oauthConfig 
-        }
+	if oauthConfig != nil {
+		return oauthConfig
+	}
 
 	creds := []byte(ctx.Env.Google.Config)
 
 	// Request access to calendar events
-        var err error
+	var err error
 	oauthConfig, err = google.ConfigFromJSON(creds, calendar.CalendarEventsScope)
 	if err != nil {
 		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
 	oauthConfig.RedirectURL = ctx.Env.GetURI() + redirectPath
-        return oauthConfig
+	return oauthConfig
 }
 
 func tryCachedToken(app *config.AppContext) (*calendar.Service, error) {
@@ -55,7 +54,7 @@ func tryCachedToken(app *config.AppContext) (*calendar.Service, error) {
 	}
 
 	ctx := context.Background()
-        config := InitOauth(app)
+	config := InitOauth(app)
 	calService, err := createCalService(config, ctx, &token)
 	return calService, err
 }
@@ -67,7 +66,7 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, app *config.AppContext,
 		app.Infos.Printf("Cached token failed. %s", err)
 	}
 
-        config := InitOauth(app)
+	config := InitOauth(app)
 
 	var url string
 	if cals != nil {
@@ -84,7 +83,7 @@ func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.App
 	ctx := context.Background()
 	code := r.URL.Query().Get("code")
 
-        config := InitOauth(app)
+	config := InitOauth(app)
 	token, err := config.Exchange(ctx, code)
 
 	if err != nil {
@@ -94,12 +93,12 @@ func HandleLoginCallback(w http.ResponseWriter, r *http.Request, app *config.App
 
 	tokenJson, err := json.Marshal(token)
 	if err != nil {
-		http.Error(w, "Could not marshal auth token! "+ err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Could not marshal auth token! "+err.Error(), http.StatusInternalServerError)
 		return false
 	}
 	err = getters.SaveAuthToken(app.Notion, string(tokenJson))
 	if err != nil {
-		http.Error(w, "Could not save auth token! "+ err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Could not save auth token! "+err.Error(), http.StatusInternalServerError)
 		return false
 	}
 
@@ -129,7 +128,7 @@ type CalInvite struct {
 	ConfTag   string
 	EventName string
 	Location  string
-	Invitees []string
+	Invitees  []string
 	StartTime time.Time
 	EndTime   time.Time
 }
@@ -146,7 +145,7 @@ func RunCalendarInvites(calNotif string, invite *CalInvite) (string, error) {
 	// Define the event
 	attendees := make([]*calendar.EventAttendee, len(invite.Invitees))
 	for i := range invite.Invitees {
-		attendees[i] = &calendar.EventAttendee {
+		attendees[i] = &calendar.EventAttendee{
 			Email: invite.Invitees[i],
 		}
 	}
@@ -170,13 +169,13 @@ func RunCalendarInvites(calNotif string, invite *CalInvite) (string, error) {
 	if calNotif == "" {
 		ee, err = calService.Events.Insert("primary", event).Do()
 	} else {
-                return "", fmt.Errorf("Already sent cal invite")
+		return "", fmt.Errorf("Already sent cal invite")
 		//ee, err = calService.Events.Update("primary", calNotif, event).SendUpdates("all").Do()
 	}
 
-        if err != nil {
-                return "", err
-        }
+	if err != nil {
+		return "", err
+	}
 
 	return ee.Id, err
 }

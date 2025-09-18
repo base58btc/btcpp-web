@@ -208,4 +208,3 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 	}
 	return regis
 }
-

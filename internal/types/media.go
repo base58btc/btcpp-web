@@ -1,15 +1,13 @@
 package types
 
-
 type (
-
 	CardDimens struct {
 		Height float64
 		Width  float64
 	}
 )
 
-var MediaCards = []string{ "social", "1080p", "insta" }
+var MediaCards = []string{"social", "1080p", "insta"}
 
 /* Heights of the media images, in inches */
 /* Use this to convert https://www.unitconverters.net/typography/pixel-x-to-inch.htm */
@@ -26,8 +24,8 @@ var MediaDimens = map[string]CardDimens{
 	},
 	/* 1920x1080px */
 	"agenda": CardDimens{
-		Height:  float64(20),
-		Width:   float64(11.25),
+		Height: float64(20),
+		Width:  float64(11.25),
 	},
 	/* 1080x1080px */
 	"insta": CardDimens{
@@ -35,4 +33,3 @@ var MediaDimens = map[string]CardDimens{
 		Width:  float64(11.25),
 	},
 }
-

@@ -19,7 +19,6 @@ import (
 	"github.com/gomarkdown/markdown/parser"
 )
 
-
 type SubConfirmEmail struct {
 	Email      string
 	ConfirmURL string
@@ -165,7 +164,7 @@ func mdToHTML(md []byte) []byte {
 	return markdown.Render(doc, renderer)
 }
 
-func missiveTemplate(ctx *config.AppContext, letter *mtypes.Letter) (*template.Template) {
+func missiveTemplate(ctx *config.AppContext, letter *mtypes.Letter) *template.Template {
 
 	/* Hash the data for a key. We use the ID + body
 	 * so if they change, a new template will get generated */

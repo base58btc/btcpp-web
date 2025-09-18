@@ -1,9 +1,9 @@
 package types
 
 type (
-	TalkTime []*Talk
+	TalkTime    []*Talk
 	SessionTime []*Session
-	ConfList []*Conf
+	ConfList    []*Conf
 )
 
 func (p TalkTime) Len() int {
@@ -44,4 +44,3 @@ func (c ConfList) Less(i, j int) bool {
 	/* Sort by UID ?? */
 	return c[i].UID < c[j].UID
 }
-

@@ -2,7 +2,7 @@ package types
 
 import (
 	"fmt"
-        "path/filepath"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -32,7 +32,7 @@ type (
 	}
 
 	GoogleConfig struct {
-		Key string
+		Key    string
 		Config string
 	}
 
@@ -53,6 +53,8 @@ type (
 		Color         string
 		Tickets       []*ConfTicket
 		TixSold       uint
+		OGFlavor      string
+		Emoji         string
 	}
 
 	ConfTicket struct {
@@ -184,30 +186,30 @@ const (
 	Evening
 )
 
-var daytimenames = map[DayTime]string {
-	Morning: "01morning",
+var daytimenames = map[DayTime]string{
+	Morning:   "01morning",
 	Afternoon: "02afternoon",
-	Evening: "03evening",
+	Evening:   "03evening",
 }
 
 func (dt DayTime) String() string {
 	return daytimenames[dt]
 }
 
-var DayTimeChars = map[string]DayTime {
+var DayTimeChars = map[string]DayTime{
 	"+": Morning,
 	"=": Afternoon,
 	"-": Evening,
 }
 
 func (t *Talk) ClipartAvif() string {
-        name := strings.TrimSuffix(t.Clipart, filepath.Ext(t.Clipart))
-        return name + ".avif"
+	name := strings.TrimSuffix(t.Clipart, filepath.Ext(t.Clipart))
+	return name + ".avif"
 }
 
 func (s *Session) TalkAvif() string {
-        name := strings.TrimSuffix(s.TalkPhoto, filepath.Ext(s.TalkPhoto))
-        return name + ".avif"
+	name := strings.TrimSuffix(s.TalkPhoto, filepath.Ext(s.TalkPhoto))
+	return name + ".avif"
 }
 
 func (s *Session) BeginsAt() string {
@@ -391,7 +393,6 @@ func (at AuthTokens) Less(i, j int) bool {
 
 	return (*at[j].CreatedAt).Before(*at[i].CreatedAt)
 }
-
 
 /* Functions to sort Speakers */
 func (s Speakers) Len() int {

@@ -1,12 +1,12 @@
 package getters
 
 import (
+	"btcpp-web/internal/mtypes"
+	"btcpp-web/internal/types"
 	"context"
 	"fmt"
-	"strings"
-	"btcpp-web/internal/types"
-	"btcpp-web/internal/mtypes"
 	"github.com/niftynei/go-notion"
+	"strings"
 	"time"
 )
 
@@ -43,12 +43,12 @@ func parseOptsToList(field string, props map[string]notion.PropertyValue) []stri
 
 func parseLetter(pageID string, props map[string]notion.PropertyValue) *mtypes.Letter {
 	letter := &mtypes.Letter{
-		PageID:     pageID,
-		UID:        parseUniqueID("ID", props),
-		Title:      parseRichText("Title", props),
+		PageID:      pageID,
+		UID:         parseUniqueID("ID", props),
+		Title:       parseRichText("Title", props),
 		Newsletters: parseOptsToList("Newsletter", props),
-		Markdown:   parseRichText("Markdown", props),
-		SendAt:     parseRichText("SendAt", props),
+		Markdown:    parseRichText("Markdown", props),
+		SendAt:      parseRichText("SendAt", props),
 	}
 
 	expiry := props["Expiry"].Date
@@ -103,20 +103,20 @@ func ListSubscribersFor(n *types.Notion, newsletters []string) ([]*mtypes.Subscr
 	for _, nl := range newsletters {
 		if strings.HasPrefix(nl, "!") {
 			filter := &notion.Filter{
-					Property: "Subs",
-					MultiSelect: &notion.MultiSelectFilterCondition{
-						/* Get rid of ! */
-						DoesNotContain: nl[1:],
-					},
-				}
+				Property: "Subs",
+				MultiSelect: &notion.MultiSelectFilterCondition{
+					/* Get rid of ! */
+					DoesNotContain: nl[1:],
+				},
+			}
 			andfilters = append(andfilters, filter)
 		} else {
 			filter = &notion.Filter{
-					Property: "Subs",
-					MultiSelect: &notion.MultiSelectFilterCondition{
-						Contains: nl,
-					},
-				}
+				Property: "Subs",
+				MultiSelect: &notion.MultiSelectFilterCondition{
+					Contains: nl,
+				},
+			}
 			orfilters = append(orfilters, filter)
 		}
 	}
@@ -142,9 +142,9 @@ func ListSubscribersFor(n *types.Notion, newsletters []string) ([]*mtypes.Subscr
 		var err error
 		var pages []*notion.Page
 		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.NewsletterDb, notion.QueryDatabaseParam {
+			n.Config.NewsletterDb, notion.QueryDatabaseParam{
 				StartCursor: nextCursor,
-				Filter: filter,
+				Filter:      filter,
 			})
 		if err != nil {
 			return nil, err
@@ -163,12 +163,12 @@ func ListSubscribersFor(n *types.Notion, newsletters []string) ([]*mtypes.Subscr
 }
 
 func ListSubscribers(n *types.Notion, newsletter string) ([]*mtypes.Subscriber, error) {
-	letters := []string { newsletter }
+	letters := []string{newsletter}
 	return ListSubscribersFor(n, letters)
 }
 
 func NewSubscriber(n *types.Notion, email, newsletter string) (*mtypes.Subscriber, error) {
-	nls := []string{ newsletter }
+	nls := []string{newsletter}
 	return NewSubscriberList(n, email, nls)
 }
 
@@ -271,7 +271,7 @@ func GetLetter(n *types.Notion, uniqueID uint64) (*mtypes.Letter, error) {
 	var pages []*notion.Page
 	pages, _, _, err = n.Client.QueryDatabase(context.Background(),
 		n.Config.MissivesDb, notion.QueryDatabaseParam{
-			Filter:      &notion.Filter{
+			Filter: &notion.Filter{
 				Property: "ID",
 				ID: &notion.UniqueIDFilterCondition{
 					Equals: float64(uniqueID),
@@ -337,4 +337,3 @@ func MarkLetterSent(n *types.Notion, letter *mtypes.Letter, sentAt time.Time) er
 		})
 	return err
 }
-

@@ -23,6 +23,8 @@ var talks []*types.Talk
 var lastTalksFetch time.Time
 var discounts []*types.DiscountCode
 var lastDiscountFetch time.Time
+var hotels []*types.Hotel
+var lastHotelFetch time.Time
 
 type (
 	JobType int
@@ -33,6 +35,7 @@ const (
 	JobConfs
 	JobTalks
 	JobDiscounts
+        JobHotels
 )
 
 var taskChan chan JobType = make(chan JobType)
@@ -210,8 +213,8 @@ func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
 		}
 
 		for _, page := range pages {
-			token := &types.AuthToken {
-				Token: parseRichText("Token", page.Properties),
+			token := &types.AuthToken{
+				Token:     parseRichText("Token", page.Properties),
 				CreatedAt: page.Properties["CreatedAt"].CreatedTime,
 			}
 			tokens = append(tokens, token)
@@ -224,7 +227,7 @@ func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
 func MostRecentToken(n *types.Notion) (*types.AuthToken, error) {
 	tokens, err := FetchTokens(n)
 	if err != nil {
-		return nil, err 
+		return nil, err
 	}
 	if len(tokens) == 0 {
 		return nil, nil
@@ -354,9 +357,9 @@ func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
 						Text: &notion.Text{
 							Content: calnotif,
 						}},
-					}...),
+				}...),
 		})
-	return err	
+	return err
 }
 
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
@@ -399,7 +402,7 @@ func GetTalksFor(ctx *config.AppContext, event string) ([]*types.Talk, error) {
 	return filtered, nil
 }
 
-func GetTalk(ctx *config.AppContext, talkID string) (*types.Talk, error) { 
+func GetTalk(ctx *config.AppContext, talkID string) (*types.Talk, error) {
 	talks, err := FetchTalksCached(ctx)
 	if err != nil {
 		return nil, err
@@ -578,21 +581,21 @@ func fetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Regist
 	n := ctx.Notion
 	db := ctx.Env.Notion.PurchasesDb
 
-        var filter *notion.Filter
-        if confRef != "" {
-                filter = &notion.Filter{
-                        Property: "conf",
-                        Relation: &notion.RelationFilterCondition{
-                                Contains: confRef,
-                        },
-                }
-        }
+	var filter *notion.Filter
+	if confRef != "" {
+		filter = &notion.Filter{
+			Property: "conf",
+			Relation: &notion.RelationFilterCondition{
+				Contains: confRef,
+			},
+		}
+	}
 	for hasMore {
 		var err error
 		var pages []*notion.Page
 		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
 			StartCursor: nextCursor,
-                        Filter: filter,
+			Filter:      filter,
 		})
 		if err != nil {
 			return nil, err

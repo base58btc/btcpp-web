@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
+	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"

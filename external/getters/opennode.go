@@ -22,8 +22,8 @@ func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.Conf
 		TixLocal:    isLocal,
 		DiscountRef: discountRef,
 		/* We have to save it b/c OpenNode doesnt */
-		Currency: tix.Currency,
-		Subscribe:    subNewsletter,
+		Currency:  tix.Currency,
+		Subscribe: subNewsletter,
 	}
 
 	domain := ctx.Env.GetURI()

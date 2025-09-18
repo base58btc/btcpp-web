@@ -10,14 +10,14 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/BurntSushi/toml"
-	"github.com/alexedwards/scs/v2"
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
 	"btcpp-web/internal/config"
-	"btcpp-web/internal/handlers"
 	"btcpp-web/internal/emails"
+	"btcpp-web/internal/handlers"
 	"btcpp-web/internal/types"
+	"github.com/BurntSushi/toml"
+	"github.com/alexedwards/scs/v2"
 )
 
 const configFile = "config.toml"
@@ -71,7 +71,7 @@ func loadConfig() *types.EnvConfig {
 			TokenDb:      os.Getenv("NOTION_TOKEN_DB"),
 		}
 		config.Google = types.GoogleConfig{
-			Key: os.Getenv("GOOGLE_KEY"),
+			Key:    os.Getenv("GOOGLE_KEY"),
 			Config: os.Getenv("GOOGLE_CONFIG"),
 		}
 

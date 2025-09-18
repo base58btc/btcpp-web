@@ -6,17 +6,18 @@ import (
 
 type (
 	NotionConfig struct {
-		Token       string
-		EmailDb     string
-		PurchasesDb string
-		TalksDb     string
-		SpeakersDb  string
-		ConfsDb     string
-		ConfsTixDb  string
-		DiscountsDb string
+		Token        string
+		EmailDb      string
+		PurchasesDb  string
+		TalksDb      string
+		SpeakersDb   string
+		ConfsDb      string
+		ConfsTixDb   string
+		DiscountsDb  string
 		NewsletterDb string
 		MissivesDb   string
-		TokenDb     string
+		TokenDb      string
+		HotelsDb     string
 	}
 
 	Notion struct {
