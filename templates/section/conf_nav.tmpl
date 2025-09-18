@@ -11,8 +11,12 @@
       <div class="hidden lg:flex lg:gap-x-12">
         <a href="/conf/{{ .Tag }}#about" class="text-sm font-semibold leading-6 text-gray-900">about</a>
 	      <a href="/conf/{{ .Tag }}#venue" class="text-sm font-semibold leading-6 text-gray-900">venue</a>
+	      <a href="/conf/{{ .Tag }}#speakers" class="text-sm font-semibold leading-6 text-gray-900">speakers</a>
         {{ if .ShowHackathon }}
 	      <a href="/conf/{{ .Tag }}#hackathon" class="text-sm font-semibold leading-6 text-gray-900">hackathon</a>
+        {{ end }}
+        {{ if eq .Tag "durham" }}
+	      <a href="/conf/{{ .Tag }}#schedule" class="text-sm font-semibold leading-6 text-gray-900">schedule</a>
         {{ end }}
         {{ if .ShowAgenda }}
 	      <a href="/conf/{{ .Tag }}#agenda" class="text-sm font-semibold leading-6 text-gray-900">agenda</a>
@@ -46,7 +50,13 @@
               <div class="">
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#about" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">about</a>
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#venue" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">venue</a>
+		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#speakers" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">speakers</a>
+                  {{ if .ShowHackathon }}
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#hackathon" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">hackathon</a>
+                  {{ end }}
+                  {{ if eq .Tag "durham" }}
+		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#schedule" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">schedule</a>
+                  {{ end }}
                 {{ if .ShowAgenda }}
 	              <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#agenda" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">agenda</a>
                 {{ end }}
