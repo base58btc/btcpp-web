@@ -35,7 +35,7 @@ const (
 	JobConfs
 	JobTalks
 	JobDiscounts
-        JobHotels
+	JobHotels
 )
 
 var taskChan chan JobType = make(chan JobType)
@@ -67,6 +67,9 @@ func WaitFetch(ctx *config.AppContext) {
 	runJob(ctx, JobDiscounts)
 	lastDiscountFetch = time.Now()
 
+	runJob(ctx, JobHotels)
+	lastHotelFetch = time.Now()
+
 	ctx.Infos.Printf("wait fetch loaded!")
 	ctx.Infos.Printf("has confs?? %t", confs != nil)
 	ctx.Infos.Printf("has talks?? %t", talks != nil)
@@ -84,12 +87,14 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getTalks(ctx)
 	case JobDiscounts:
 		getDiscounts(ctx)
+	case JobHotels:
+		getHotels(ctx)
 	}
 }
 
 func workers(ctx *config.AppContext, id int, c chan JobType) {
 	for job := range c {
-		ctx.Infos.Printf("%d starting job type %d", id, job) 
+		ctx.Infos.Printf("%d starting job type %d", id, job)
 		runJob(ctx, job)
 		ctx.Infos.Printf("%d finished job type %d", id, job)
 	}
@@ -193,6 +198,29 @@ func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error)
 	return discounts, nil
 }
 
+func getHotels(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting hotels...")
+	hotels, err = ListHotels(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching hotels %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d hotels!", len(hotels))
+	}
+}
+
+/* This may return nil */
+func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if hotels == nil || lastHotelFetch.Before(deadline) {
+		lastHotelFetch = time.Now()
+		taskChan <- JobHotels
+	}
+
+	return hotels, nil
+}
 
 func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
 	var tokens types.AuthTokens
@@ -413,6 +441,32 @@ func GetTalk(ctx *config.AppContext, talkID string) (*types.Talk, error) {
 		}
 	}
 	return nil, fmt.Errorf("Talk %s not found", talkID)
+}
+
+func ListHotels(n *types.Notion) ([]*types.Hotel, error) {
+	var hotels []*types.Hotel
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.HotelsDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+		for _, page := range pages {
+			hotel := parseHotel(page.ID, page.Properties)
+			hotels = append(hotels, hotel)
+		}
+	}
+
+	return hotels, nil
 }
 
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {

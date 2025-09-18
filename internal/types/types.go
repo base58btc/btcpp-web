@@ -178,6 +178,16 @@ type (
 	AuthTokens []*AuthToken
 
 	DayTime int
+
+	Hotel struct {
+		ID       string
+		ConfRef  string
+		Name     string
+		URL      string
+		PhotoURL string
+		Type     string
+		Desc     string
+	}
 )
 
 const (

@@ -8,7 +8,12 @@ import (
 	"github.com/niftynei/go-notion"
 )
 
-func fileGetURL(file *notion.File) string {
+func fileGetURL(files []*notion.File) string {
+	if files == nil {
+		return ""
+	}
+
+	file := files[0]
 	if file.Internal != nil {
 		return file.Internal.URL
 	}
@@ -62,6 +67,27 @@ func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.
 	}
 
 	return discount
+}
+
+func parseConfRef(props map[string]notion.PropertyValue) string {
+	if len(props["conf"].Relation) > 0 {
+		return props["conf"].Relation[0].ID
+	}
+	return ""
+}
+
+func parseHotel(pageID string, props map[string]notion.PropertyValue) *types.Hotel {
+	hotel := &types.Hotel{
+		ID:       pageID,
+		Name:     parseRichText("Name", props),
+		URL:      props["URL"].URL,
+		PhotoURL: fileGetURL(props["PhotoURL"].Files),
+		Type:     parseRichText("Type", props),
+		Desc:     parseRichText("Desc", props),
+	}
+
+	hotel.ConfRef = parseConfRef(props)
+	return hotel
 }
 
 func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.Speaker {
@@ -154,6 +180,8 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		UID:           parseUniqueID("ID", props),
 		Active:        parseCheckbox(props["Active"].Checkbox),
 		Desc:          parseRichText("Desc", props),
+		OGFlavor:      parseRichText("OG_Flavor", props),
+		Emoji:         parseRichText("Emoji", props),
 		Tagline:       parseRichText("Tagline", props),
 		DateDesc:      parseRichText("DateDesc", props),
 		Location:      parseRichText("Location", props),
