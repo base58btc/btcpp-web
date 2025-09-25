@@ -180,6 +180,7 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		UID:           parseUniqueID("ID", props),
 		Active:        parseCheckbox(props["Active"].Checkbox),
 		Desc:          parseRichText("Desc", props),
+		StartDate:     props["StartDate"].Date.Start,
 		OGFlavor:      parseRichText("OG_Flavor", props),
 		Emoji:         parseRichText("Emoji", props),
 		Tagline:       parseRichText("Tagline", props),

@@ -42,5 +42,5 @@ func (c ConfList) Swap(i, j int) {
 
 func (c ConfList) Less(i, j int) bool {
 	/* Sort by UID ?? */
-	return c[i].UID < c[j].UID
+	return c[i].StartDate.Before(c[j].StartDate)
 }

@@ -44,6 +44,7 @@ type (
 		Desc          string
 		Tagline       string
 		DateDesc      string
+		StartDate     time.Time
 		Location      string
 		Venue         string
 		ShowAgenda    bool
@@ -369,7 +370,7 @@ func ParseShirtSize(str string) (ShirtSize, bool) {
 
 /* FIXME: make this nicer?? */
 func (c Conf) HasSchedule() bool {
-        return c.Tag == "durham" || c.Tag == "berlin25"
+	return c.Tag == "durham" || c.Tag == "berlin25"
 }
 
 /* Functions to sort conference tickets */
