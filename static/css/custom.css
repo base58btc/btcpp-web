@@ -88,6 +88,28 @@
 	color: rgb(153 27 27/var(--tw-bg-opacity,1));
 }
 
+.durham {
+	color: #fff;
+	background-color: rgb(31 154 143/var(--tw-bg-opacity,1));
+}
+
+.durham:hover {
+	background-color: rgb(91 222 211/var(--tw-bg-opacity,1));
+}
+
+.durham:focus-visible {
+	outline-color: #28c4c4;
+}
+
+.durham-color {
+	color: rgb(31 154 143/var(--tw-text-opacity,1));
+}
+
+.bitcoin-color {
+        color: #FFA800;
+}
+
+
 @media (min-width: 1024px) {
 	.atx25-text .atx22-text .atx23-text .atx24-text .cdmx22-text .floripa-text .berlin24-text .berlin23-text .ba24-text {
 		color: rgb(245 158 11/var(--tw-bg-opacity,1));
@@ -127,6 +149,14 @@
 
 	.taipei-text:hover {
 		color: rgb(252 165 165/var(--tw-bg-opacity,1));
+	}
+
+	.durham-text {
+	        color: rgb(31 154 143/var(--tw-bg-opacity,1));
+	}
+
+	.durham-text:hover {
+	        color: rgb(91 222 211/var(--tw-bg-opacity,1));
 	}
 }
 

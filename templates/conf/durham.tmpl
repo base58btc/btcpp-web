@@ -19,14 +19,14 @@
           <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
             <div class="hidden sm:mb-10 sm:flex">
               <div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
-                Get involved in the future of bitcoin. <a href="https://www.cognitoforms.com/Btcplusplus/SponsorshipInquiry" target="_blank" class="whitespace-nowrap font-semibold text-pills"><span class="absolute inset-0" aria-hidden="true"></span>Become a Sponsor<span aria-hidden="true">&rarr;</span></a>
+                Get involved in the future of bitcoin. <a href="https://www.cognitoforms.com/Btcplusplus/SponsorshipInquiry" target="_blank" class="whitespace-nowrap font-semibold {{ .Conf.Tag }}-color"><span class="absolute inset-0" aria-hidden="true"></span>Become a Sponsor<span aria-hidden="true">&rarr;</span></a>
               </div>
             </div>
             <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl"><span class="font-bitcoin">bitcoin++</span> comes to Durham, NC</h1>
             <p class="mt-6 text-lg leading-8 text-gray-600">{{ .Conf.OGFlavor }}</p>
             <p class="text-lg leading-8 text-gray-600">{{ .Conf.Location }} | {{ .Conf.Venue }} | {{ .Conf.DateDesc }}</p>
             <div class="mt-10 flex items-center gap-x-6">
-              <a href="#tickets" class="rounded-md bg-pills px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-pills focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pills">Get Your All Conf Pass</a>
+              <a href="#tickets" class="rounded-md {{ .Conf.Tag }} px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Get Your All Conf Pass</a>
             </div>
           </div>
         </div>
@@ -57,7 +57,7 @@
         <p class="mt-6 text-xl leading-8 text-gray-600">Experience Durham, Eat some BBQ, SendRawTransactions</p>
         <p class="mt-6 text-base leading-7 text-gray-600"><span class="font-bitcoin">bitcoin++</span> is excited to be bringing you our very first community edition event in Durham, North Carloina hosted by local hacker <a href="https://x.com/vnprc">@vnrpc</a>.</p>
         <div class="mt-10 flex">
-          <a href="#tickets" class="rounded-md bg-pills px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-pills focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pills">Get Your All Access Pass<span aria-hidden="true">&rarr;</span></a>
+          <a href="#tickets" class="rounded-md {{ .Conf.Tag }} px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Get Your All Access Pass<span aria-hidden="true">&rarr;</span></a>
         </div>
       </div>
       <div class="flex flex-wrap items-start justify-end gap-6 sm:gap-8 lg:contents">
@@ -96,9 +96,10 @@
       <h3 class="mt-2 text-xl tracking-tight text-gray-900 sm:text-xl">Where to Stay</h3>
       <p class="mt-6 text-lg leading-8 text-gray-600">The conference is at the American Underground co-working space in Durham, North Carolina. Here’s some suggestions for places to stay that are nearby</p>
     <div class="mx-auto grid max-w-2xl grid-cols-1 gap-8 overflow-hidden lg:mx-0 lg:max-w-none lg:grid-cols-4 mt-12">
+      {{ $tag := .Conf.Tag }}
       {{ range .Hotels }}
       <div>
-        <time datetime="2021-08" class="flex items-center text-sm font-semibold leading-6 text-pills">
+        <time datetime="2021-08" class="flex items-center text-sm font-semibold leading-6 {{ $tag }}-color">
           <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
             <circle cx="2" cy="2" r="2" fill="currentColor" />
           </svg>
@@ -283,7 +284,7 @@
     <div class="mx-auto max-w-2xl">
       <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Get Your All Conference Pass</h2>
       {{ if .Tix }}
-        <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="text-buenos">{{ .Tix.Expires.DateDesc }}</span>
+        <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="{{ .Conf.Tag }}-color">{{ .Tix.Expires.DateDesc }}</span>
         {{ if lt .TixLeft 21 }}
         or after 
         <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> more tickets are sold!</p>
@@ -321,50 +322,44 @@
         <p class="mt-6 text-base leading-7 text-gray-600">Spend bitcoin, save money.</p>
         <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             All conference pass
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Unlimited access to workshops
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Ticket includes lunch + refreshments 
           </li>
-          <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="bitcoin" aria-hidden="true">
+          <li class="flex gap-x-3 font-bold">
+            <svg class="h-6 w-5 flex-none bitcoin-color" viewBox="0 0 20 20" fill="#ffa800" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Discounted rate for paying in bitcoin
           </li>
 
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
              Swag bag with t-shirts and other goodies
           </li>
-          <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-            </svg>
-            Compete for hackathon prizes
-          </li>
         </ul>
       </div>
-      <a href="/tix/{{ .Tix.ID }}+default+btc" aria-describedby="tier-bitcoin" class="mt-8 block rounded-md py-2.5 px-3.5 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pills sm:mt-10 bg-bitcoin" style="background: #FF8A00">{{ block "btcbutton" . }} {{ end }}</a>
+      <a href="/tix/{{ .Tix.ID }}+default+btc" aria-describedby="tier-bitcoin" class="mt-8 block rounded-md py-2.5 px-3.5 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-10 bg-bitcoin" style="background: #FF8A00">{{ block "btcbutton" . }} {{ end }}</a>
     </div>
 
     <div class="flex flex-col justify-between rounded-3xl bg-white p-8 ring-1 ring-gray-200 xl:p-10 lg:mt-8 lg:rounded-l-none">
       <div>
-          <h3 id="tier-fiat" class="text-base font-semibold leading-7 text-pills">Pay with Fiat</h3>
+          <h3 id="tier-fiat" class="text-base font-semibold leading-7 {{ .Conf.Tag }}-color">Pay with Fiat</h3>
           <p class="mt-4 flex items-baseline gap-x-2">
             {{ if ne .MaxTix.USD .Tix.USD}}
               <span class="line-through text-3xl font-bold tracking-tight text-gray-300">{{ .Tix.Symbol }}{{ .MaxTix.USD }} {{ .Tix.Currency }}</span>
@@ -375,45 +370,38 @@
           <p class="mt-6 text-base leading-7 text-gray-600">Get your <span class="font-bitcoin">bitcoin++</span> ticket using Stripe checkout</p>
         <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             All conference pass
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Unlimited access to workshops
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Ticket includes lunch + refreshments 
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Normal rate for paying with fiat
           </li>
           <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
             </svg>
             Swag bag with t-shirts and other goodies
           </li>
-          </li>
-          <li class="flex gap-x-3">
-            <svg class="h-6 w-5 flex-none text-pills" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-            </svg>
-          Compete for hackathon prizes
-          </li>
         </ul>
         </div>
-        <a href="/tix/{{ .Tix.ID }}+default+fiat" aria-describedby="tier-fiat" class="mt-8 block rounded-md py-2.5 px-3.5 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pills sm:mt-10 text-pills ring-1 ring-inset ring-pills hover:ring-pills">Checkout</a>
+        <a href="/tix/{{ .Tix.ID }}+default+fiat" aria-describedby="tier-fiat" class="mt-8 block rounded-md py-2.5 px-3.5 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-10 {{ .Conf.Tag }}">Checkout</a>
       </div>
     {{ end }}
     </div>
