@@ -367,6 +367,11 @@ func ParseShirtSize(str string) (ShirtSize, bool) {
 	return ss, ok
 }
 
+/* FIXME: make this nicer?? */
+func (c Conf) HasSchedule() bool {
+        return c.Tag == "durham" || c.Tag == "berlin25"
+}
+
 /* Functions to sort conference tickets */
 func (t ConfTickets) Len() int {
 	return len(t)
