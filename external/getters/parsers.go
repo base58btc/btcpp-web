@@ -180,7 +180,6 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		UID:           parseUniqueID("ID", props),
 		Active:        parseCheckbox(props["Active"].Checkbox),
 		Desc:          parseRichText("Desc", props),
-		StartDate:     props["StartDate"].Date.Start,
 		OGFlavor:      parseRichText("OG_Flavor", props),
 		Emoji:         parseRichText("Emoji", props),
 		Tagline:       parseRichText("Tagline", props),
@@ -192,6 +191,10 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		ShowTalks:     parseCheckbox(props["Show Talks"].Checkbox),
 		HasSatellites: parseCheckbox(props["Has Satellites"].Checkbox),
 	}
+
+        if props["StartDate"].Date != nil {
+	        conf.StartDate = props["StartDate"].Date.Start
+        }
 
 	if props["Color"].Select != nil {
 		conf.Color = props["Color"].Select.Name
