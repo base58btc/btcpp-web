@@ -16,6 +16,25 @@
 	color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
+.floripa26 .vegas .vienna .nairobi .toronto .berlin26 .seoul {
+	color: #fff;
+	background-color: rgb(245 158 11/var(--tw-bg-opacity,1));
+}
+
+.floripa26:hover .vegas:hover .vienna:hover .nairobi:hover .toronto:hover .berlin26:hover .seoul:hover {
+	color: rgb(146 64 14/var(--tw-text-opacity,1));
+	background-color: rgb(252 211 77/var(--tw-bg-opacity,1));
+}
+
+.floripa26:focus-visible .vegas:focus-visible .vienna:focus-visible .nairobi:focus-visible .toronto:focus-visible .berlin26:focus-visible .seoul:focus-visible {
+	outline-color: #fcd34d;
+}
+
+.floripa26-color .vegas-color .vienna-color .nairobi-color .toronto-color .berlin26-color .seoul-color {
+	color: rgb(245 158 11/var(--tw-bg-opacity,1));
+}
+
+
 .riga {
 	color: #fff;
 	background-color: rgb(245 158 11/var(--tw-bg-opacity,1));
@@ -116,6 +135,14 @@
 	}
 
 	.atx25-text:hover .atx22-text:hover .atx23-text:hover .atx24-text:hover .cdmx22-text:hover .floripa-text:hover .berlin24-text:hover .berlin23-text:hover .ba24-text:hover {
+		color: rgb(252 211 77/var(--tw-bg-opacity,1));
+	}
+
+        .floripa26-text .vegas-text .vienna-text .nairobi-text .toronto-text .berlin26-text .seoul-text {
+		color: rgb(245 158 11/var(--tw-bg-opacity,1));
+	}
+
+        .floripa26-text:hover .vegas-text:hover .vienna-text:hover .nairobi-text:hover .toronto-text:hover .berlin26-text:hover .seoul-text:hover {
 		color: rgb(252 211 77/var(--tw-bg-opacity,1));
 	}
 
