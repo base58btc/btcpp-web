@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<title>{{ .Conf.Desc }} || {{ .Conf.DateDesc }}</title>
+    {{ block "header" . }} {{ end }}
+    {{ block "og_tags" .Conf }} {{ end }}
+  </head>
+<body>
+{{ block "conf_nav" .Conf }} {{ end }}
+<section id="intro">
+ <div class="relative">
+    <div class="mx-auto max-w-7xl">
+      <div class="relative z-10 pt-14 lg:w-full lg:max-w-2xl">
+        <svg class="absolute inset-y-0 right-8 hidden h-full w-80 translate-x-1/2 transform fill-white lg:block" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <polygon points="0,0 90,0 50,100 0,100" />
+        </svg>
+
+        <div class="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
+          <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
+            <div class="hidden sm:mb-10 sm:flex">
+              <div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
+                Showcase at the frontier of bitcoin <a href="https://www.cognitoforms.com/Btcplusplus/SponsorshipInquiry" target="_blank" class="whitespace-nowrap font-semibold {{ .Conf.Tag }}-color"><span class="absolute inset-0" aria-hidden="true"></span>Become a Sponsor<span aria-hidden="true">&rarr;</span></a>
+              </div>
+            </div>
+            <h1 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-6xl"><span class="font-bitcoin">bitcoin++</span> finds consensus</h1>
+            <p class="mt-6 text-lg leading-8 text-gray-600">{{ .Conf.OGFlavor }}</p>
+            <p class="text-lg leading-8 text-gray-600">{{ .Conf.Location }} | {{ .Conf.Venue }} | {{ .Conf.DateDesc }}</p>
+            <div class="mt-10 flex items-center gap-x-6">
+              <a href="#tickets" class="rounded-md {{ .Conf.Tag }} px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Get Your All Conf Pass</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
+      <img class="aspect-[3/2] object-cover lg:aspect-auto lg:h-full lg:w-full" src="/static/img/{{ .Conf.Tag }}/leading.avif" alt="">
+    </div>
+  </div>
+</section>
+<section id="about">
+  <div class="overflow-hidden bg-white pt-14 pb-8">
+    <div class="mx-auto max-w-7xl px-6 lg:flex lg:px-8">
+      <div class="bg-white py-10 sm:py-10">
+        <h2 class="text-center mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-4xl">Why Consensus?</h2>
+        <p class="mt-6 text-lg leading-8 text-gray-600">Bitcoin stands as one of the greatest decentralized protocols. Encompassing commerce around the globe, and billions of people's economic desires, the protocol itself becomes the frontier of conflict and possibility for the future of the network. In Toronto, we'll be gathering the developers and protocol experts at the edge of bitcoin to reach consensus on some of the most pressing topics of the network.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<section id="venue">
+<div class="overflow-hidden bg-white pt-14 pb-8">
+  <div class="mx-auto max-w-7xl px-6 lg:flex lg:px-8">
+    <div class="mx-auto grid max-w-2xl grid-cols-1 gap-x-12 gap-y-16 lg:mx-0 lg:min-w-full lg:max-w-none lg:flex-none lg:gap-y-8">
+      <div class="lg:col-end-1 lg:w-full lg:max-w-lg lg:pb-8">
+        <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Local Focus: {{ .Conf.Location }}</h2>
+        <p class="mt-6 text-xl leading-8 text-gray-600">Visit Toronto, Explore the Annex irl</p>
+        <p class="mt-6 text-base leading-7 text-gray-600"><span class="font-bitcoin">bitcoin++</span> will be in Toronto for three days of workshops, roundtables, and consensus finding</p>
+        <div class="mt-10 flex">
+          <a href="#tickets" class="rounded-md {{ .Conf.Tag }} px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Get Your All Access Pass<span aria-hidden="true">&rarr;</span></a>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-start justify-end gap-6 sm:gap-8 lg:contents">
+        <div class="w-0 flex-auto lg:ml-auto lg:w-auto lg:flex-none lg:self-end">
+          <img src="/static/img/{{ .Conf.Tag }}/one.jpg" alt="" class="aspect-[7/5] w-[37rem] max-w-none rounded-2xl bg-gray-50 object-cover">
+        </div>
+        <div class="contents lg:col-span-2 lg:col-end-2 lg:ml-auto lg:flex lg:w-[37rem] lg:items-start lg:justify-end lg:gap-x-8">
+          <div class="order-first flex w-64 flex-none justify-end self-end lg:w-auto">
+            <img src="/static/img/{{ .Conf.Tag }}/two.jpg" alt="" class="aspect-[4/3] w-[24rem] max-w-none flex-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+          <div class="flex w-96 flex-auto justify-end lg:w-auto lg:flex-none">
+            <img src="/static/img/{{ .Conf.Tag }}/three.jpg" alt="" class="aspect-[7/5] w-[37rem] max-w-none flex-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+          <div class="hidden sm:block sm:w-0 sm:flex-auto lg:w-auto lg:flex-none">
+            <img src="/static/img/{{ .Conf.Tag }}/four.jpg" alt="" class="aspect-[4/3] w-[24rem] max-w-none rounded-2xl bg-gray-50 object-cover">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <iframe title="{{ .Conf.Venue }}" aria-lable="{{ .Conf.Venue }}" 
+    class="mt-12"
+	  width="100%"
+	  height="500px"
+	  frameborder="0" style="border:0"
+	  referrerpolicy="no-referrer-when-downgrade"
+	  src="https://www.google.com/maps/embed/v1/place?key=AIzaSyBs_ErgLEfaa9HBJfMzdm45JPhQgdPAMwc&amp;q=Great%20Hall%20Toronto&amp;zoom=16"
+	  allowfullscreen>
+      </iframe>
+    </div>
+  </div>
+</div>
+<!-- hotels
+<div class="bg-white py-10 sm:py-10">
+  <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <h3 class="mt-2 text-xl tracking-tight text-gray-900 sm:text-xl">Where to Stay</h3>
+      <p class="mt-6 text-lg leading-8 text-gray-600">The will be held at the Great Hall in Toronto's West End. Here’s some suggestions for places to stay that are nearby</p>
+    <div class="mx-auto grid max-w-2xl grid-cols-1 gap-8 overflow-hidden lg:mx-0 lg:max-w-none lg:grid-cols-4 mt-12">
+      {{ $tag := .Conf.Tag }}
+      {{ range .Hotels }}
+      <div>
+        <time datetime="2021-08" class="flex items-center text-sm font-semibold leading-6 {{ $tag }}-color">
+          <svg viewBox="0 0 4 4" class="mr-4 h-1 w-1 flex-none" aria-hidden="true">
+            <circle cx="2" cy="2" r="2" fill="currentColor" />
+          </svg>
+	      {{ .Type }}
+          <div class="absolute -ml-2 h-px w-screen -translate-x-full bg-gray-900/10 sm:-ml-4 lg:static lg:ml-8 lg:-mr-6 lg:w-auto lg:flex-auto lg:translate-x-0" aria-hidden="true"></div>
+        </time>
+        <a href="{{ .URL }}" target="_blank">
+            <img src="{{ .PhotoURL }}" height="350" width="100%" class="mt-12 w-full max-h-xl rounded-xl" />
+            <p class="mt-6 text-lg font-semibold leading-8 tracking-tight text-gray-900">{{ .Name }}</p>
+            <p class="mt-1 text-base leading-7 text-gray-600">{{ .Desc }}</p>
+        </a>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</div>
+-->
+</section>
+<section id="speakers">
+<div class="bg-white py-32">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Who's Coming</h2>
+      <p class="mt-4 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span>'s first ever consensus edition will have an all-star lineup of open-source contributors, protocol developers, and hackers from around the globe.</p>
+    </div>
+    <ul role="list" class="mx-auto mt-20 grid max-w-2xl grid-cols-1 gap-x-8 gap-y-16 sm:grid-cols-2 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ range .EventSpeakers }}
+        {{ block "speaker" . }} {{ end }}
+      {{ end }}
+    </ul>
+  </div>
+</div>
+</section>
+<section id="schedule">
+    <div class="bg-white py-32">
+        <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+            <div class="mx-auto max-w-2xl">
+                <div>
+                    <div class="px-4 sm:px-0">
+                        <h3 class="text-base/7 font-semibold text-gray-900 dark:text-white">Schedule Overview</h3>
+                        <p class="mt-1 max-w-2xl text-sm/6 text-gray-500 dark:text-gray-400">What to expect on Wednesday, July 22nd</p>
+                    </div>
+                    <div class="mt-6 border-t border-gray-100 dark:border-white/10">
+                        <dl class="divide-y divide-gray-100 dark:divide-white/10">
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:00am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Doors Open</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:30am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Talks + Presentations Begin</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">12:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Catered lunch break (incl in ticket)</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">1:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">More Talks + Presentations</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">5:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Day ends</dd>
+                        </div>
+                        </dl>
+                    </div>
+                    <div class="px-4 sm:px-0">
+                        <p class="mt-1 max-w-2xl text-sm/6 text-gray-500 dark:text-gray-400">What to expect on Thurs, July 23rd</p>
+                    </div>
+                    <div class="mt-6 border-t border-gray-100 dark:border-white/10">
+                        <dl class="divide-y divide-gray-100 dark:divide-white/10">
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:00am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Doors Open</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:30am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Talks + Presentations Begin</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">12:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Catered lunch break (incl in ticket)</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">1:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">More Talks + Presentations</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">5:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Day ends</dd>
+                        </div>
+                        </dl>
+                    </div>
+                    <div class="px-4 sm:px-0">
+                        <p class="mt-1 max-w-2xl text-sm/6 text-gray-500 dark:text-gray-400">What to expect on Fri, July 24th</p>
+                    </div>
+                    <div class="mt-6 border-t border-gray-100 dark:border-white/10">
+                        <dl class="divide-y divide-gray-100 dark:divide-white/10">
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:00am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Doors Open</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:30am</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Talks + Presentations Begin</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">12:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Catered lunch break (incl in ticket)</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">1:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">More Talks + Presentations</dd>
+                        </div>
+                        <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">5:00pm</dt>
+                            <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Day ends</dd>
+                        </div>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{{ if .Conf.ShowAgenda }}
+<section id="agenda">
+<div class="bg-white py-32">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Conference Agenda</h2>
+    </div>
+    <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Sat, Nov 15th</h3>
+	  <div class="mt-6 relative">
+	    <div class="absolute inset-0 flex items-center" aria-hidden="true">
+	      <div class="w-full border-t border-gray-300"></div>
+	    </div>
+	    <div class="relative flex justify-start">
+	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:00 am </span>
+	    </div>
+	  </div>
+
+    {{ with (index .Days 0) }}
+      {{$count := len .Morning }}
+      {{ range $index, $sessions := .Morning }} 
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ range $sessions }}
+        {{ block "session" . }} {{ end }}
+      {{ end }}
+    </div>
+      {{ if not (isLast $index $count) }}
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+      {{ end }}
+      {{ end }}
+    {{ end }}
+
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Lunch, 12 pm - 1 pm</span>
+      </div>
+    </div>
+    {{ with (index .Days 0) }}
+      {{$count := len .Afternoon}}
+      {{ range $index, $sessions := .Afternoon}} 
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ range $sessions }}
+        {{ block "session" . }} {{ end }}
+      {{ end }}
+    </div>
+      {{ if not (isLast $index $count) }}
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+      {{ end }}
+      {{ end }}
+    {{ end }}
+
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+      <div class="relative flex justify-start">
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
+      </div>
+    </div>
+    {{ with (index .Days 0) }}
+      {{$count := len .Evening }}
+      {{ range $index, $sessions := .Evening }} 
+    <div class="mx-auto mt-16 grid max-w-2xl auto-rows-fr grid-cols-1 gap-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+      {{ range $sessions }}
+        {{ block "session" . }} {{ end }}
+      {{ end }}
+    </div>
+      {{ if not (isLast $index $count) }}
+    <div class="mt-6 relative">
+      <div class="absolute inset-0 flex items-center" aria-hidden="true">
+        <div class="w-full border-t border-gray-300"></div>
+      </div>
+    </div>
+      {{ end }}
+      {{ end }}
+    {{ end }}
+  </div>
+</div>
+</section>
+{{ end }}
+<section id="tickets">
+  <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
+    <div class="mx-auto max-w-2xl">
+      <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Get Your All Conference Pass</h2>
+      {{ if .Tix }}
+        <p class="mt-6 text-xl leading-8 text-gray-600">Ticket prices go up on <span class="{{ .Conf.Tag }}-color">{{ .Tix.Expires.DateDesc }}</span>
+        {{ if lt .TixLeft 21 }}
+        or after 
+        <span class="text-zinc-900 font-bold">{{ .TixLeft }}</span> more tickets are sold!</p>
+        {{ end }}
+      {{ else }}
+      <p class="mt-6 text-lg leading-8 text-gray-600">This event is sold out! 🙈</p>
+      {{ end }}
+    </div>
+  </div>
+  {{ if .Tix }}
+  <div class="relative isolate bg-white pb-24 px-6 sm:pb-32 lg:px-16">
+    <div class="absolute inset-x-0 -top-3 -z-10 transform-gpu overflow-hidden px-36 blur-3xl" aria-hidden="true">
+      <svg class="mx-auto w-[72.1875rem]" viewBox="0 0 1155 678">
+        <path fill="url(#083c110e-60c8-42bb-a9db-29bba74cc569)" fill-opacity=".3" d="M317.219 518.975L203.852 678 0 438.341l317.219 80.634 204.172-286.402c1.307 132.337 45.083 346.658 209.733 145.248C936.936 126.058 882.053-94.234 1031.02 41.331c119.18 108.451 130.68 295.337 121.53 375.223L855 299l21.173 362.054-558.954-142.079z" />
+        <defs>
+          <linearGradient id="083c110e-60c8-42bb-a9db-29bba74cc569" x1="1155.49" x2="-78.208" y1=".177" y2="474.645" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#9089FC" />
+            <stop offset="1" stop-color="#FF80B5" />
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="mx-auto max-w-4xl lg:max-w-7xl">
+    <div class="isolate mx-auto mt-16 grid max-w-md grid-cols-1 gap-y-8 sm:mt-20 lg:mx-0 lg:max-w-none lg:grid-cols-2">
+    <div class="flex flex-col justify-between rounded-3xl bg-white p-8 ring-1 ring-gray-200 xl:p-10 lg:z-10 lg:rounded-b-none">
+      <div>
+        <h3 id="tier-bitcoin" class="text-base font-semibold leading-7 text-bitcoin">Pay with Bitcoin</h3>
+        <p class="mt-4 flex items-baseline gap-x-2">
+          {{ if ne .MaxTix.BTC .Tix.BTC }}
+          <span class="line-through text-3xl font-bold tracking-tight text-gray-300">{{ .Tix.Symbol }}{{ .MaxTix.BTC }} {{ .Tix.Currency }}</span>
+          {{ end }}
+          <span class="text-3xl font-bold tracking-tight text-gray-900">{{ .Tix.Symbol }}{{ .Tix.BTC }} {{ .Tix.Currency }}</span>
+          <span class="text-base text-gray-500">/ticket</span>
+        </p>
+        <p class="mt-6 text-base leading-7 text-gray-600">Spend bitcoin, save money.</p>
+        <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            All conference pass
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Unlimited access to workshops
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Ticket includes lunch + refreshments 
+          </li>
+          <li class="flex gap-x-3 font-bold">
+            <svg class="h-6 w-5 flex-none bitcoin-color" viewBox="0 0 20 20" fill="#ffa800" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Discounted rate for paying in bitcoin
+          </li>
+
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+             Swag bag with t-shirts and other goodies
+          </li>
+        </ul>
+      </div>
+      <a href="/tix/{{ .Tix.ID }}+default+btc" aria-describedby="tier-bitcoin" class="mt-8 block rounded-md py-2.5 px-3.5 font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-10 bg-bitcoin" style="background: #FF8A00">{{ block "btcbutton" . }} {{ end }}</a>
+    </div>
+
+    <div class="flex flex-col justify-between rounded-3xl bg-white p-8 ring-1 ring-gray-200 xl:p-10 lg:mt-8 lg:rounded-l-none">
+      <div>
+          <h3 id="tier-fiat" class="text-base font-semibold leading-7 {{ .Conf.Tag }}-color">Pay with Fiat</h3>
+          <p class="mt-4 flex items-baseline gap-x-2">
+            {{ if ne .MaxTix.USD .Tix.USD}}
+              <span class="line-through text-3xl font-bold tracking-tight text-gray-300">{{ .Tix.Symbol }}{{ .MaxTix.USD }} {{ .Tix.Currency }}</span>
+            {{ end }}
+            <span class="text-3xl font-bold tracking-tight text-gray-900">{{ .Tix.Symbol }}{{ .Tix.USD }} {{ .Tix.Currency }}</span>
+            <span class="text-base text-gray-500">/ticket</span>
+          </p>
+          <p class="mt-6 text-base leading-7 text-gray-600">Get your <span class="font-bitcoin">bitcoin++</span> ticket using Stripe checkout</p>
+        <ul role="list" class="mt-8 space-y-3 text-sm leading-6 text-gray-600 sm:mt-10">
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            All conference pass
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Unlimited access to workshops
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Ticket includes lunch + refreshments 
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Normal rate for paying with fiat
+          </li>
+          <li class="flex gap-x-3">
+            <svg class="h-6 w-5 flex-none {{ .Conf.Tag }}-color" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+            </svg>
+            Swag bag with t-shirts and other goodies
+          </li>
+        </ul>
+        </div>
+        <a href="/tix/{{ .Tix.ID }}+default+fiat" aria-describedby="tier-fiat" class="mt-8 block rounded-md py-2.5 px-3.5 text-center text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:mt-10 {{ .Conf.Tag }}">Checkout</a>
+      </div>
+    {{ end }}
+    </div>
+</section>
+<section id="sponsors">
+  <div class="bg-white py-24 sm:py-32">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="grid grid-cols-1 items-top gap-x-8 gap-y-16 lg:grid-cols-2">
+        <div class="mx-auto w-full max-w-xl lg:mx-0">
+          <h2 class="text-3xl font-bold tracking-tight text-gray-900"><span class="font-bitcoin">bitcoin++</span> is made possible by the support of the bitcoin community</h2>
+          <p class="mt-6 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span> is proud to be supported by a wide range of companies from across the bitcoin ecosystem. Check out what they're up to, both here online as well as at the conference.</p>
+        </div>
+        <div class="mx-auto grid w-full max-w-xl grid-cols-2 items-center gap-y-12 sm:gap-y-14 lg:mx-0 lg:max-w-none lg:pl-8">
+          <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
+            <h3 class="text-xl font-bold tracking-tight text-gray-900">🔶Sponsors🔶</h3>
+          </div>
+        <a href="https://base58.school" target="_blank" class="p-4 sm:p-8"
+           style="grid-column: span 2; margin-top: -2rem;">
+            <img class="max-h-20 w-full object-contain object-center" src="/static/img/base58.svg" alt="Base58" width="150" height="auto">
+        </a>
+        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center">
+          <h3 class="text-lg font-bold tracking-tight text-gray-900">📡 Media Partners 📺</h3>
+        </div>
+          <a href="https://insider.btcpp.dev/" target="_blank" class="pt-8">
+            <img class="max-h-32 w-full object-contain object-center" src="/static/img/riga/insider.png" alt="btc++ insider edition" width="200" height="auto">
+          </a>
+        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center pb-8">
+          <h3 class="text-lg font-bold tracking-tight text-gray-900">🏡 Community Partners 🛠️</h3>
+        </div>
+          <a href="https://forms.gle/tw3aSiy3foba3iHF6" target="_blank">
+            <img class="max-h-24 w-full object-contain object-center" src="/static/img/plebprintshop.png" alt="pleb print shop" width="200" height="auto">
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+    {{ block "footer" . }} {{ end }}
+  </body>
+</html>
