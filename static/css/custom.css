@@ -1,36 +1,36 @@
-.atx25 .atx22 .atx23 .atx24 .cdmx22 .floripa .berlin24 .berlin23 .ba24 {
+.atx25, .atx22, .atx23, .atx24, .cdmx22, .floripa, .berlin24, .berlin23, .ba24 {
 	color: #fff;
 	background-color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
-.atx25:hover .atx22:hover .atx23:hover .atx24:hover .cdmx22:hover .floripa:hover .berlin24:hover .berlin23:hover .ba24:hover {
+.atx25:hover, .atx22:hover, .atx23:hover, .atx24:hover, .cdmx22:hover, .floripa:hover, .berlin24:hover, .berlin23:hover, .ba24:hover {
 	color: rgb(146 64 14/var(--tw-text-opacity,1));
 	background-color: rgb(252 211 77/var(--tw-bg-opacity,1));
 }
 
-.atx25:focus-visible .atx22:focus-visible .atx23:focus-visible .atx24:focus-visible .cdmx22:focus-visible .floripa:focus-visible .berlin24:focus-visible .berlin23:focus-visible .ba24:focus-visible {
+.atx25:focus-visible, .atx22:focus-visible, .atx23:focus-visible, .atx24:focus-visible, .cdmx22:focus-visible, .floripa:focus-visible, .berlin24:focus-visible, .berlin23:focus-visible, .ba24:focus-visible {
 	outline-color: #fcd34d;
 }
 
-.atx25-color .atx22-color .atx23-color .atx24-color .cdmx22-color .floripa-color .berlin24-color .berlin23-color .ba24-color {
+.atx25-color, .atx22-color, .atx23-color, .atx24-color, .cdmx22-color, .floripa-color, .berlin24-color, .berlin23-color, .ba24-color {
 	color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
-.floripa26 .vegas .vienna .nairobi .toronto .berlin26 .seoul {
+.floripa26, .vegas, .vienna, .nairobi, .toronto, .berlin26, .seoul {
 	color: #fff;
 	background-color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
-.floripa26:hover .vegas:hover .vienna:hover .nairobi:hover .toronto:hover .berlin26:hover .seoul:hover {
+.floripa26:hover, .vegas:hover, .vienna:hover, .nairobi:hover, .toronto:hover, .berlin26:hover, .seoul:hover {
 	color: rgb(146 64 14/var(--tw-text-opacity,1));
 	background-color: rgb(252 211 77/var(--tw-bg-opacity,1));
 }
 
-.floripa26:focus-visible .vegas:focus-visible .vienna:focus-visible .nairobi:focus-visible .toronto:focus-visible .berlin26:focus-visible .seoul:focus-visible {
+.floripa26:focus-visible, .vegas:focus-visible, .vienna:focus-visible, .nairobi:focus-visible, .toronto:focus-visible, .berlin26:focus-visible, .seoul:focus-visible {
 	outline-color: #fcd34d;
 }
 
-.floripa26-color .vegas-color .vienna-color .nairobi-color .toronto-color .berlin26-color .seoul-color {
+.floripa26-color, .vegas-color, .vienna-color, .nairobi-color, .toronto-color, .berlin26-color, .seoul-color {
 	color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
@@ -130,19 +130,19 @@
 
 
 @media (min-width: 1024px) {
-	.atx25-text .atx22-text .atx23-text .atx24-text .cdmx22-text .floripa-text .berlin24-text .berlin23-text .ba24-text {
+	.atx25-text, .atx22-text, .atx23-text, .atx24-text, .cdmx22-text, .floripa-text, .berlin24-text, .berlin23-text, .ba24-text {
 		color: rgb(245 158 11/var(--tw-bg-opacity,1));
 	}
 
-	.atx25-text:hover .atx22-text:hover .atx23-text:hover .atx24-text:hover .cdmx22-text:hover .floripa-text:hover .berlin24-text:hover .berlin23-text:hover .ba24-text:hover {
+	.atx25-text:hover, .atx22-text:hover, .atx23-text:hover, .atx24-text:hover, .cdmx22-text:hover, .floripa-text:hover, .berlin24-text:hover, .berlin23-text:hover, .ba24-text:hover {
 		color: rgb(252 211 77/var(--tw-bg-opacity,1));
 	}
 
-        .floripa26-text .vegas-text .vienna-text .nairobi-text .toronto-text .berlin26-text .seoul-text {
+        .floripa26-text, .vegas-text, .vienna-text, .nairobi-text, .toronto-text, .berlin26-text, .seoul-text {
 		color: rgb(245 158 11/var(--tw-bg-opacity,1));
 	}
 
-        .floripa26-text:hover .vegas-text:hover .vienna-text:hover .nairobi-text:hover .toronto-text:hover .berlin26-text:hover .seoul-text:hover {
+        .floripa26-text:hover, .vegas-text:hover, .vienna-text:hover, .nairobi-text:hover, .toronto-text:hover, .berlin26-text:hover, .seoul-text:hover {
 		color: rgb(252 211 77/var(--tw-bg-opacity,1));
 	}
 
