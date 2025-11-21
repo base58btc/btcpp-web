@@ -60,6 +60,7 @@ func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.
 		Ref:        pageID,
 		CodeName:   parseRichText("CodeName", props),
 		PercentOff: uint(props["PercentOff"].Number),
+                Discount:   parseRichText("Discount", props),
 	}
 
 	for _, confRef := range props["Conference"].Relation {
@@ -213,6 +214,7 @@ func parseConfTicket(pageID string, props map[string]notion.PropertyValue) *type
 		Max:      uint(props["Max"].Number),
 		Currency: parseRichText("Currency", props),
 		Symbol:   parseRichText("Symbol", props),
+		PostSymbol:   parseRichText("PostSymbol", props),
 	}
 
 	if len(props["Conf"].Relation) > 0 {

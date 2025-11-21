@@ -69,6 +69,7 @@ type (
 		Max      uint
 		Currency string
 		Symbol   string
+		PostSymbol   string
 	}
 	ConfTickets []*ConfTicket
 
@@ -85,6 +86,7 @@ type (
 	DiscountCode struct {
 		Ref        string
 		CodeName   string
+                Discount   string
 		PercentOff uint
 		ConfRef    []string
 	}
