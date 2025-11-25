@@ -16,21 +16,58 @@
 	color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
-.floripa26, .vegas, .vienna, .nairobi, .toronto, .berlin26, .seoul {
+.floripa26 {
+	color: #fff;
+	background-color: #e9714f;
+}
+
+.floripa26:hover {
+	color: rgb(146 64 14/var(--tw-text-opacity,1));
+        background-color: #b35f45;
+}
+
+.floripa26-color {
+	color: #e9714f;
+}
+
+.floripa26:focus-visible {
+	outline-color: #b35f45;
+}
+
+.nairobi {
+	color: #fff;
+	background-color: #e35a03;
+}
+
+.nairobi:hover {
+	color: rgb(146 64 14/var(--tw-text-opacity,1));
+        background-color: #ae5a29;
+}
+
+.nairobi-color {
+	color: #e35a03;
+}
+
+.nairobi:focus-visible {
+	outline-color: #ae5a29;
+}
+
+
+.vegas, .vienna, .toronto, .berlin26, .seoul {
 	color: #fff;
 	background-color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
-.floripa26:hover, .vegas:hover, .vienna:hover, .nairobi:hover, .toronto:hover, .berlin26:hover, .seoul:hover {
+.vegas:hover, .vienna:hover, .toronto:hover, .berlin26:hover, .seoul:hover {
 	color: rgb(146 64 14/var(--tw-text-opacity,1));
 	background-color: rgb(252 211 77/var(--tw-bg-opacity,1));
 }
 
-.floripa26:focus-visible, .vegas:focus-visible, .vienna:focus-visible, .nairobi:focus-visible, .toronto:focus-visible, .berlin26:focus-visible, .seoul:focus-visible {
+.vegas:focus-visible, .vienna:focus-visible, .toronto:focus-visible, .berlin26:focus-visible, .seoul:focus-visible {
 	outline-color: #fcd34d;
 }
 
-.floripa26-color, .vegas-color, .vienna-color, .nairobi-color, .toronto-color, .berlin26-color, .seoul-color {
+.vegas-color, .vienna-color, .toronto-color, .berlin26-color, .seoul-color {
 	color: rgb(245 158 11/var(--tw-bg-opacity,1));
 }
 
@@ -138,12 +175,28 @@
 		color: rgb(252 211 77/var(--tw-bg-opacity,1));
 	}
 
-        .floripa26-text, .vegas-text, .vienna-text, .nairobi-text, .toronto-text, .berlin26-text, .seoul-text {
+        .vegas-text, .vienna-text, .toronto-text, .berlin26-text, .seoul-text {
 		color: rgb(245 158 11/var(--tw-bg-opacity,1));
 	}
 
-        .floripa26-text:hover, .vegas-text:hover, .vienna-text:hover, .nairobi-text:hover, .toronto-text:hover, .berlin26-text:hover, .seoul-text:hover {
+        .vegas-text:hover, .vienna-text:hover, .toronto-text:hover, .berlin26-text:hover, .seoul-text:hover {
 		color: rgb(252 211 77/var(--tw-bg-opacity,1));
+	}
+
+        .floripa26-text {
+	        color: #e9714f;
+	}
+
+        .floripa26-text:hover {
+                color: #b35f45;
+	}
+
+        .nairobi-text {
+	        color: #e35a03;
+	}
+
+        .nairobi-text:hover {
+                color: #ae5a29;
 	}
 
 	.riga-text {
