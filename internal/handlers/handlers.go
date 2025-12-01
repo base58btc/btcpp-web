@@ -247,6 +247,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/taipei", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/taipei", http.StatusSeeOther)
 	}).Methods("GET")
+	r.HandleFunc("/nairobi", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/nairobi", http.StatusSeeOther)
+	}).Methods("GET")
 	r.HandleFunc("/lightning", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/berlin25", http.StatusSeeOther)
 	}).Methods("GET")
