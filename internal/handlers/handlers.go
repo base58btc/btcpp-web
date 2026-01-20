@@ -263,6 +263,18 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}).Methods("GET")
 
+	r.HandleFunc("/exploits", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
+	}).Methods("GET")
+
+	r.HandleFunc("/floripa", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
+	}).Methods("GET")
+
+	r.HandleFunc("/conf/floripa", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
+	}).Methods("GET")
+
 	r.HandleFunc("/conf/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
 		RenderConfSuccess(w, r, app)
 	}).Methods("GET")
