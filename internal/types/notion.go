@@ -18,6 +18,8 @@ type (
 		MissivesDb   string
 		TokenDb      string
 		HotelsDb     string
+		VolunteerDb  string
+		JobTypeDb    string
 	}
 
 	Notion struct {

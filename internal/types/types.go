@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+        "net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -45,13 +46,13 @@ type (
 		Tagline       string
 		DateDesc      string
 		StartDate     time.Time
+		EndDate       time.Time
 		Location      string
 		Venue         string
 		ShowAgenda    bool
 		ShowTalks     bool
 		ShowHackathon bool
 		HasSatellites bool
-		Color         string
 		Tickets       []*ConfTicket
 		TixSold       uint
 		OGFlavor      string
@@ -191,6 +192,38 @@ type (
 		Type     string
 		Desc     string
 	}
+
+        Volunteer struct {
+                Ref           string
+                Name          string
+                Email         string
+                Phone         string
+                Signal        string
+                Availability  []string
+                ContactAt     string
+                Comments      string
+                DiscoveredVia string
+                ScheduleFor   []*Conf
+                OtherEvents   []*Conf
+                WorkYes       []*JobType
+                WorkNo        []*JobType
+                FirstEvent    bool
+                Hometown      string
+                Twitter       string
+                Nostr         string
+                Shirt         string
+                Captcha       int
+                Subscribe     bool
+        }
+
+        JobType struct {
+                Ref      string
+                Tag      string
+                Title    string 
+                Tooltip  string
+                LongDesc string
+                Show     bool
+        }
 )
 
 const (
@@ -340,6 +373,48 @@ func (t *Times) LenStr() string {
 		return fmt.Sprintf("%dh", h)
 	}
 	return fmt.Sprintf("%dh %dm", h, m)
+}
+
+func datesBetween(start, end time.Time) []time.Time {
+        var dates []time.Time
+        for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+                dates = append(dates, d)
+        }
+        return dates
+}
+
+func (c *Conf) InFuture() bool {
+        return c.StartDate.After(time.Now())
+}
+
+func (c *Conf) DaysList(prefix string) []CheckItem {
+        /* Add an setup day before the event starts */
+        start := c.StartDate.AddDate(0, 0, -1)
+
+        dates := datesBetween(start, c.EndDate)
+        items := make([]CheckItem, len(dates))
+
+        for i, d := range dates {
+                items[i] = CheckItem{
+                        ItemID: prefix + d.Format("01/02/2006"),
+                        ItemDesc: d.Format("Mon. Jan 2, 2006"),
+                        Checked: true,
+                }
+        }
+
+        return items
+}
+
+func (vol *Volunteer) ParseAvailability(prefix string, form url.Values) (error) {
+        if vol.Availability == nil {
+                vol.Availability = make([]string, 0)
+        }
+        for k, _ := range form { 
+                if strings.HasPrefix(k, prefix) {
+                        vol.Availability = append(vol.Availability, k[len(prefix):])
+                }
+        }
+        return nil
 }
 
 const (

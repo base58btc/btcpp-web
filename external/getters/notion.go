@@ -26,6 +26,9 @@ var lastDiscountFetch time.Time
 var hotels []*types.Hotel
 var lastHotelFetch time.Time
 
+var jobs []*types.JobType
+var lastJobTypeFetch time.Time
+
 type (
 	JobType int
 )
@@ -36,6 +39,7 @@ const (
 	JobTalks
 	JobDiscounts
 	JobHotels
+	JobJobs
 )
 
 var taskChan chan JobType = make(chan JobType)
@@ -70,11 +74,15 @@ func WaitFetch(ctx *config.AppContext) {
 	runJob(ctx, JobHotels)
 	lastHotelFetch = time.Now()
 
+	runJob(ctx, JobJobs)
+	lastJobTypeFetch = time.Now()
+
 	ctx.Infos.Printf("wait fetch loaded!")
 	ctx.Infos.Printf("has confs?? %t", confs != nil)
 	ctx.Infos.Printf("has talks?? %t", talks != nil)
 	ctx.Infos.Printf("has speakers?? %t", cacheSpeakers != nil)
-	ctx.Infos.Printf("has discounts?? %t", discounts != nil)
+	ctx.Infos.Printf("has hotels?? %t", hotels != nil)
+	ctx.Infos.Printf("has jobs?? %t", jobs != nil)
 }
 
 func runJob(ctx *config.AppContext, job JobType) {
@@ -89,6 +97,8 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getDiscounts(ctx)
 	case JobHotels:
 		getHotels(ctx)
+        case JobJobs:
+		getJobs(ctx)
 	}
 }
 
@@ -220,6 +230,30 @@ func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
 	}
 
 	return hotels, nil
+}
+
+func getJobs(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting jobs...")
+	jobs, err = ListJobs(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching jobs %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d jobs!", len(jobs))
+	}
+}
+
+/* This may return nil */
+func FetchJobsCached(ctx *config.AppContext) ([]*types.JobType, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if jobs == nil || lastHotelFetch.Before(deadline) {
+		lastHotelFetch = time.Now()
+		taskChan <- JobJobs
+	}
+
+	return jobs, nil
 }
 
 func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
@@ -467,6 +501,32 @@ func ListHotels(n *types.Notion) ([]*types.Hotel, error) {
 	}
 
 	return hotels, nil
+}
+
+func ListJobs(n *types.Notion) ([]*types.JobType, error) {
+	var jobs []*types.JobType
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.JobTypeDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+		for _, page := range pages {
+			job := parseJobType(page.ID, page.Properties)
+			jobs = append(jobs, job)
+		}
+	}
+
+	return jobs, nil
 }
 
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
@@ -799,3 +859,133 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 
 	return nil
 }
+
+func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
+	parent := notion.NewDatabaseParent(n.Config.VolunteerDb)
+
+        // multiselect
+        availability := make([]*notion.SelectOption, len(vol.Availability))
+        for i, av := range vol.Availability {
+                availability[i] = &notion.SelectOption{
+                        Name: av,
+                }
+        }
+
+        // relation
+        workYes := make([]*notion.ObjectReference, len(vol.WorkYes))
+        for i, wy := range vol.WorkYes {
+                workYes[i] = &notion.ObjectReference{
+                        Object: notion.ObjectPage,
+                        ID: wy.Ref,
+                }
+        }
+        workNo := make([]*notion.ObjectReference, len(vol.WorkNo))
+        for i, wn := range vol.WorkNo {
+                workNo[i] = &notion.ObjectReference{
+                        Object: notion.ObjectPage,
+                        ID: wn.Ref,
+                }
+        }
+        otherEvents := make([]*notion.ObjectReference, len(vol.OtherEvents))
+        for i, oe := range vol.OtherEvents {
+                otherEvents[i] = &notion.ObjectReference{
+                        Object: notion.ObjectPage,
+                        ID: oe.Ref,
+                }
+        }
+
+        vals := map[string]*notion.PropertyValue{
+                "Name": notion.NewTitlePropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                Text: &notion.Text{Content: vol.Name}},
+                        }...),
+                "Email": notion.NewEmailPropertyValue(vol.Email),
+                "Phone": notion.NewPhoneNumberPropertyValue(vol.Phone),
+                "Availability":  &notion.PropertyValue {
+                        Type: notion.PropertyMultiSelect,
+                        MultiSelect: &availability,
+                },
+                "Signal": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: vol.Signal}},
+                        }...),
+                "ContactAt": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: vol.ContactAt}},
+                        }...),
+                "Comments": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: vol.Comments}},
+                        }...),
+                "DiscoveredVia": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: vol.DiscoveredVia}},
+                        }...),
+                "ScheduleFor": notion.NewRelationPropertyValue(
+                        []*notion.ObjectReference{{ID: vol.ScheduleFor[0].Ref}}...,
+                ),
+                "FirstEvent": {
+                        Type: notion.PropertyCheckbox,
+                        Checkbox: &vol.FirstEvent,
+                },
+                "Hometown": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: vol.Hometown}},
+                        }...),
+                "Shirt": {
+                        Type: notion.PropertySelect,
+                        Select: &notion.SelectOption{
+                                Name: vol.Shirt,
+                        },
+                },
+
+        }
+
+        if len(vol.WorkYes) != 0 {
+                vals["WorkYes"] = &notion.PropertyValue{
+                        Type: notion.PropertyRelation,
+                        Relation: workYes,
+                }
+        }
+
+        if len(vol.WorkNo) != 0 {
+                vals["WorkNo"] = &notion.PropertyValue{
+                        Type: notion.PropertyRelation,
+                        Relation: workNo,
+                }
+        }
+
+        if len(vol.OtherEvents) != 0 {
+                vals["OtherEvents"] = &notion.PropertyValue{
+                        Type: notion.PropertyRelation,
+                        Relation: otherEvents,
+                }
+        }
+
+        if vol.Twitter != "" {
+                vals["Twitter"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: vol.Twitter}},
+                        }...)
+        }
+
+        if vol.Nostr != "" {
+                vals["npub"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: vol.Nostr}},
+                        }...)
+        }
+
+        _, err := n.Client.CreatePage(context.Background(), parent, vals)
+
+	return err
+}
+

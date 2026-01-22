@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 	"github.com/niftynei/go-notion"
 )
@@ -70,11 +71,15 @@ func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.
 	return discount
 }
 
-func parseConfRef(props map[string]notion.PropertyValue) string {
-	if len(props["conf"].Relation) > 0 {
-		return props["conf"].Relation[0].ID
+func parseRef(props map[string]notion.PropertyValue, refname string) string {
+	if len(props[refname].Relation) > 0 {
+		return props[refname].Relation[0].ID
 	}
 	return ""
+}
+
+func parseConfRef(props map[string]notion.PropertyValue) string {
+        return parseRef(props, "conf")
 }
 
 func parseHotel(pageID string, props map[string]notion.PropertyValue) *types.Hotel {
@@ -197,9 +202,9 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 	        conf.StartDate = props["StartDate"].Date.Start
         }
 
-	if props["Color"].Select != nil {
-		conf.Color = props["Color"].Select.Name
-	}
+        if props["EndDate"].Date != nil {
+	        conf.EndDate = props["EndDate"].Date.Start
+        }
 
 	return conf
 }
@@ -241,4 +246,93 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 		regis.ConfRef = props["conf"].Relation[0].ID
 	}
 	return regis
+}
+
+func parseJobType(pageID string, props map[string]notion.PropertyValue) *types.JobType {
+	jobtype := &types.JobType{
+		Ref:    pageID,
+		Tag:    parseRichText("Tag", props),
+		Title: parseRichText("Title", props),
+		Tooltip: parseRichText("Tooltip", props),
+		LongDesc: parseRichText("LongDesc", props),
+		Show:    parseCheckbox(props["Show"].Checkbox),
+        }
+
+        return jobtype
+}
+
+func parseSelectList(field string, props map[string]notion.PropertyValue) []string {
+        var list []string 
+        options := props[field].MultiSelect
+
+        if options == nil {
+                return list
+        }
+
+        for _, opt := range *options {
+                list = append(list, opt.Name)
+        }
+        return list
+}
+
+func parseConfList(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) []*types.Conf {
+        var list []*types.Conf
+        objRefs := props[field].Relation
+
+        confs, _ := FetchConfsCached(ctx)
+        for _, ref := range objRefs {
+                for _, c := range confs {
+                        if c.Ref == ref.ID {
+                                list = append(list, c)
+                                break
+                        }
+                }
+        }
+        return list
+}
+
+func parseJobList(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) []*types.JobType {
+        var list []*types.JobType
+        objRefs := props[field].Relation
+
+        jobs, _ := FetchJobsCached(ctx)
+        for _, ref := range objRefs {
+                for _, j := range jobs {
+                        if j.Ref == ref.ID {
+                                list = append(list, j)
+                                break
+                        }
+                }
+        }
+        return list
+}
+
+func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue) *types.Volunteer {
+	vol := &types.Volunteer{
+		Ref:           pageID,
+		Name:          parseRichText("Name", props),
+		Email:         props["Email"].Email,
+		Phone:         props["Phone"].PhoneNumber,
+		Signal:        parseRichText("Signal", props),
+                Availability:  parseSelectList("Availability", props),
+		ContactAt:     parseRichText("ContactAt", props),
+		Comments:      parseRichText("Comments", props),
+		DiscoveredVia: parseRichText("DiscoveredVia", props),
+
+		ScheduleFor: parseConfList(ctx, "ScheduleFor", props),
+		OtherEvents: parseConfList(ctx, "OtherEvents", props),
+		WorkYes: parseJobList(ctx, "WorkYes", props),
+		WorkNo: parseJobList(ctx, "WorkNo", props),
+
+		FirstEvent:    parseCheckbox(props["FirstEvent"].Checkbox),
+		Hometown: parseRichText("Hometown", props),
+		Twitter: parseRichText("Twitter", props),
+		Nostr: parseRichText("npub", props),
+	}
+
+        if props["Shirt"].Select != nil {
+	        vol.Shirt = props["Shirt"].Select.Name
+        }
+
+	return vol
 }

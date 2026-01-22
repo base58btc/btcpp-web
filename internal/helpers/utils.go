@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+        "net/url"
 	"os"
+        "strings"
 	"time"
 
 	"btcpp-web/external/getters"
@@ -29,6 +31,86 @@ func MakeDir(dirpath string) error {
 
 	return nil
 }
+
+func GetOtherConfs(confs []*types.Conf, conf types.Conf) []types.CheckItem {
+        items := make([]types.CheckItem, 0)
+        for _, c := range confs {
+                if !c.Active || !c.InFuture() {
+                        continue
+                }
+
+                /* Filter out this specific event */
+                if c.Ref == conf.Ref {
+                        continue
+                }
+
+                items = append(items, types.CheckItem{
+                        ItemID: "conf-" + c.Ref,
+                        ItemDesc: c.Desc + " " + c.DateDesc,
+                })
+        }
+
+        return items
+}
+
+func BuildJobs(prefix string, jobs []*types.JobType) ([]types.CheckItem) {
+        joblist := make([]types.CheckItem, 0)
+        for _, j := range jobs {
+                if j.Show {
+                        joblist = append(joblist, types.CheckItem{
+                                ItemID: prefix + j.Tag,
+                                ItemDesc: j.Title,
+                        })
+                }
+        }
+        return joblist
+}
+
+func GetShirtItems() ([]types.CheckItem) {
+        shirts := make([]types.CheckItem, 0)
+
+        opts := []string {
+                "S", "M", "L", "XL", "XXL",
+        }
+        for _, sh := range opts {
+                shirts = append(shirts, types.CheckItem{
+                        ItemID: sh,
+                        ItemDesc: sh,
+                })
+        }
+        return shirts
+}
+
+func ParseFormJobs(prefix string, form url.Values, jobs []*types.JobType) ([]*types.JobType) {
+        joblist := make([]*types.JobType, 0)
+
+        for k, _ := range form { 
+                if strings.HasPrefix(k, prefix) {
+                        for _, j := range jobs {
+                                if j.Tag == k[len(prefix):] {
+                                        joblist = append(joblist, j)
+                                }
+                        }
+                }
+        }
+        return joblist
+}
+
+func ParseFormConfs(prefix string, form url.Values, confs []*types.Conf) ([]*types.Conf) {
+        conflist := make([]*types.Conf, 0)
+
+        for k, _ := range form { 
+                if strings.HasPrefix(k, prefix) {
+                        conf := FindConfByRef(confs, k[len(prefix):])
+                        if conf == nil {
+                                continue
+                        }
+                        conflist = append(conflist, conf)
+                }
+        }
+        return conflist
+}
+
 
 func FindConfByRef(confs []*types.Conf, confRef string) *types.Conf {
 	for _, conf := range confs {

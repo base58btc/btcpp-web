@@ -36,7 +36,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "sponsor", "contact", "talk", "press", "volunteer", "vegas25"}
+var pages []string = []string{"index", "about", "sponsor", "contact", "talk", "press", "vegas25"}
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -284,6 +284,15 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		RenderConf(w, r, app)
 	}).Methods("GET")
+
+        r.HandleFunc("/volunteer", func (w http.ResponseWriter, r *http.Request) {
+                RenderVolunteers(w, r, app)
+        }).Methods("GET")
+
+        r.HandleFunc("/volunteer/{conf}", func (w http.ResponseWriter, r *http.Request) {
+                RenderVolunteerConf(w, r, app)
+        }).Methods("GET", "POST")
+
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
 		HandleEmail(w, r, app)
 	}).Methods("GET", "POST")
@@ -442,6 +451,17 @@ type TixFormPage struct {
 	Year          uint
 }
 
+type VolunteerPage struct {
+        Confs     []*types.Conf
+        Conf      *types.Conf
+        YesJobs   []types.CheckItem
+        NoJobs    []types.CheckItem
+        ConfItems []types.CheckItem
+        ShirtItems []types.CheckItem
+        DaysList  []types.CheckItem
+        Year      uint
+}
+
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
 	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
 	mac.Write([]byte(conf.Ref))
@@ -542,6 +562,97 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		ctx.Err.Printf("/conf/%s/success ExecuteTemplate failed ! %s", conf.Tag, err.Error())
 		return
 	}
+}
+
+func RenderVolunteers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+        confs := listConfs(w, ctx)
+	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer_select.tmpl", &VolunteerPage{
+		Confs: confs,
+		Year: helpers.CurrentYear(),
+	})
+
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/volunteers ExecuteTemplate failed ! %s", err.Error())
+		return
+	}
+}
+
+func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, err := helpers.FindConf(r, ctx)
+        if err != nil {
+                handle404(w, r, ctx)
+                return
+        }
+
+        if !conf.Active {
+                handle404(w, r, ctx)
+                return
+        }
+
+        jobs, _ := getters.FetchJobsCached(ctx)
+        confs := listConfs(w, ctx)
+
+        switch r.Method {
+        case http.MethodGet: 
+                err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
+                        Conf: conf,
+                        Confs: confs,
+                        YesJobs: helpers.BuildJobs("yjob-", jobs),
+                        NoJobs: helpers.BuildJobs("njob-", jobs),
+                        ConfItems: helpers.GetOtherConfs(confs, *conf),
+                        ShirtItems: helpers.GetShirtItems(),
+                        DaysList:  conf.DaysList("days-"),
+                        Year: helpers.CurrentYear(),
+                })
+
+                if err != nil {
+                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+                        ctx.Err.Printf("/volunteer/{conf} ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+                        return
+                }
+                        return
+        case http.MethodPost:
+		r.ParseForm()
+		dec := schema.NewDecoder()
+		dec.IgnoreUnknownKeys(true)
+		var vol types.Volunteer
+		err = dec.Decode(&vol, r.PostForm)
+		if err != nil {
+			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteer/{conf} unable to decode form %s", err)
+			return
+		}
+
+                /* ten divided by two is five */
+                if vol.Captcha != 5 {
+			http.Redirect(w, r, fmt.Sprintf("/volunteer/%s", conf.Tag), http.StatusSeeOther)
+                        return
+                }
+
+                vol.ParseAvailability("days-", r.PostForm)
+                vol.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+                vol.WorkYes = helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
+                vol.WorkNo = helpers.ParseFormJobs("njob-", r.PostForm, jobs)
+        
+                if len(vol.ScheduleFor) == 0 {
+                        vol.ScheduleFor = append(vol.ScheduleFor, conf)
+                }
+
+                err = getters.RegisterVolunteer(ctx.Notion, &vol)
+                if err != nil {
+			http.Error(w, "Unable to register you to volunteer, please try again later or email hello@btcpp.dev", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteer/{conf} unable to register volunteer %s", err)
+			return
+                }
+
+                // todo: send email confirm
+
+                // FIXME: some kind of confirmation notice?
+                http.Redirect(w, r, fmt.Sprintf("/conf/%s", conf.Tag), http.StatusSeeOther)
+                return
+        }
+
 }
 
 func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -1168,6 +1279,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 		if form.Email == "" || form.Count < 1 {
 			http.Redirect(w, r, fmt.Sprintf("/collect-email/%s", tixSlug), http.StatusSeeOther)
+                        return
 		}
 
 		/*  Validate HMAC */
