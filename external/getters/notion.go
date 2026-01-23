@@ -916,11 +916,6 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
                                 {Type: notion.RichTextText,
                                         Text: &notion.Text{Content: vol.ContactAt}},
                         }...),
-                "Comments": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: vol.Comments}},
-                        }...),
                 "DiscoveredVia": notion.NewRichTextPropertyValue(
                         []*notion.RichText{
                                 {Type: notion.RichTextText,
@@ -981,6 +976,14 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
                         []*notion.RichText{
                                 {Type: notion.RichTextText,
                                  Text: &notion.Text{Content: vol.Nostr}},
+                        }...)
+        }
+
+        if vol.Comments != "" {
+                vals["Comments"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: vol.Comments}},
                         }...)
         }
 
