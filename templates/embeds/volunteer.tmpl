@@ -8,202 +8,236 @@
   <body>
     {{ block "mainnav" . }} {{ end }}
     <section id="form">
-      <form method="POST" class="grid grid-cols-1 gap-y-2 gap-x-8 text-base w-full sm:w-2xl">
-        <label for="Name" class="text-gray-300 mt-4 mb-2">
-              Name or Nym *
-        </label>
-        <input class="rounded-md" name="Name" id="Name" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="Your Name"
-            required
-        />
-
-        <label for="Phone" class="text-gray-300 mt-4 mb-2">
-          Phone *
-        </label>
-        <input class="rounded-md mt-2" type="tel" id="Phone" name="Phone" placeholder="+1 555-928-2999" required />
-
-        <label for="Email" class="text-gray-300 mt-4 mb-2">
-          Email *
-        </label>
-        <input class="rounded-md mt-2" type="email" id="Email" name="Email" placeholder="hello@example.com" required />
-
-        <label for="Hometown" class="text-gray-300 mt-4 mb-2">
-          I'll be traveling from... *
-        </label>
-        <input class="rounded-md" name="Hometown" id="Hometown" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="Hometown, USA"
-        required
-        />
-
-        <label for="Signal" class="text-gray-300 mt-4 mb-2">
-          Signal Username or Number *
-        </label>
-        <input class="rounded-md" name="Signal" id="Signal" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="example.99"
-        required
-        />
-
-        <label for="Twitter" class="text-gray-300 mt-4 mb-2">
-          X Account Username
-        </label>
-        <input class="rounded-md" name="Twitter" id="Twitter" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="@btcplusplus"
-        />
-
-        <label for="npub" class="text-gray-300 mt-4 mb-2">
-        Nostr Npub
-        </label>
-        <input class="rounded-md" name="Nostr" id="Nostr" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="npub1dwah..."
-        />
-
-        <label for="ContactAt" class="text-gray-300 mt-4 mb-2">
-        Best Way to Contact You? *
-        </label>
-        <input class="rounded-md" name="ContactAt" id="ContactAt" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="Signal"
-        required
-        />
-
-        <label for="DiscoveredVia" class="text-gray-300 mt-4 mb-2">
-        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
-        </label>
-        <input class="rounded-md" name="DiscoveredVia" id="DiscoveredVia" type="text" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="twitter..."
-        />
-
-        <fieldset >
-            <legend>
-            Things I'd Like to Help With
-            </legend>
-            <div>
-            Select as many as you'd like
+        <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Volunteer Registration</h2>
+                <p class="mt-2 text-lg/8 text-gray-600">Sign up to volunteer at {{ .Conf.Desc }}.</p>
             </div>
-            <div>
-            {{ range .YesJobs }}
-               {{ block "form_list" . }} {{ end }}
-            {{ end }}
-            </div>
-        </fieldset>
-
-        <fieldset>
-            <legend>
-            Things I Don't Want to Help With
-            </legend>
-            <div>
-            Select as many as you'd like
-            </div>
-            <div>
-            {{ range .NoJobs }}
-               {{ block "form_list" . }} {{ end }}
-            {{ end }}
-            </div>
-        </fieldset>
-
-        <fieldset >
-            <legend>
-            Availability
-            </legend>
-            <div>
-            What days are you available to volunteer? Note that you must work at least three 4-hr shifts to receive a free conference ticket.
-            </div>
-            <div>
-            {{ range .DaysList }}
-               {{ block "form_list" . }} {{ end }}
-            {{ end }}
-            </div>
-        </fieldset>
-
-        <div class="flex my-4 sm:col-span-2">
-          <div class="flex h-6 items-center mr-4">
-            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                <input id="FirstEvent" type="checkbox" name="FirstEvent" aria-label="Subscribe to Newsletter" class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
-            </div>
-          </div>
-          <label for="FirstEvent" class="text-sm/6 text-gray-300">
-            This is my first <span class="font-bitcoin">bitcoin++</span> event!
-          </label>
-        </div>
-
-        <fieldset >
-            <legend>
-            Other Events I'm Interested in Volunteering At
-            </legend>
-            <div>
-            {{ range .ConfItems }}
-               {{ block "form_list" . }} {{ end }}
-            {{ end }}
-            </div>
-        </fieldset>
-
-        <fieldset >
-            <legend>
-            Shirt Size
-            </legend>
-            <div>
-            {{ range .ShirtItems }}
-                <div class="flex my-4 sm:col-span-2">
-                  <div class="flex h-6 items-center mr-4">
-                    <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                        <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                        <input id="{{ .ItemID }}" type="radio" name="Shirt" value="{{ .ItemID }}"
-                        {{ if .Checked }}
-                            checked
-                        {{ end }}
-                        class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
+            <form action="#" method="POST" class="mx-auto mt-16 max-w-xl sm:mt-20">
+                <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
+                        <div class="mt-2.5">
+                            <input id="Name" type="text" name="Name" 
+                            autocomplete="given-name" 
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Your Name"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
                     </div>
-                  </div>
-                  <label for="{{ .ItemID }}" class="text-sm/6 text-gray-300">
-                  {{ .ItemDesc }}
-                  </label>
+                    <div class="sm:col-span-2">
+                        <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
+                        <div class="mt-2.5">
+                            <input id="Phone" type="tel" name="Phone" 
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="+1 555-928-1900"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
+                        <div class="mt-2.5">
+                            <input id="Email" type="Email" name="Email" autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Hometown" id="Hometown" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Hometown, USA"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number *</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Signal" id="Signal" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="example.99"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Twitter" class="block text-sm/6 font-semibold text-gray-900">
+                        X Account Username
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Twitter" id="Twitter" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@btcplusplus"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Nostr" class="block text-sm/6 font-semibold text-gray-900">
+                        Nostr Npub
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Nostr" id="Nostr" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="npub1dwah..."
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="ContactAt" class="block text-sm/6 font-semibold text-gray-900">
+                        Best Way to Contact You? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="ContactAt" id="ContactAt" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Signal or email"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <fieldset>
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Things I'd Like to Help With
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .YesJobs }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Things I Don't Want to Help With
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .NoJobs }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Days I'm Available to Help
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .DaysList }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
+                        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="twitter..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Other Events I'm Interested in Volunteering At
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .ConfItems }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="Shirt" class="block text-sm/6 font-semibold text-gray-900">
+                        Shirt Size *
+                        </label>
+                        <div class="mt-2.5">
+                            <select id="Shirt" name="Shirt" 
+                                autocomplete="off" 
+                                aria-label="Shirt Size" 
+                                required
+                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
+                                <option value="S">S</option>
+                                <option value="M" selected>M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                                <option value="XXL">XXL</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Comments" class="block text-sm/6 font-semibold text-gray-900">
+                        Additional Comments
+                        </label>
+                        <div class="mt-2.5">
+                            <textarea 
+                            name="Comments" id="Comments"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Excited about..."
+                            rows="3" 
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="FirstEvent" type="checkbox" name="FirstEvent" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="FirstEvent" class="text-sm/6 text-gray-600">
+                        This is my first <span class="font-bitcoin">bitcoin++</span> event!
+                        </label>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="sub-newsletter" class="text-sm/6 text-gray-600">
+                        Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
+                        </label>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">
+                        What is ten divided by two? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Captcha" id="Captcha" type="number" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="iykyk"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+
                 </div>
-            {{ end }}
-            </div>
-        </fieldset>
-
-        <label for="Comments" class="text-gray-300 mt-4 mb-2">
-        Additional Comments
-        </label>
-        <textarea class="rounded-md" name="Comments" id="Comments"
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="Excited about..."></textarea>
-
-        <div class="flex my-4 sm:col-span-2">
-          <div class="flex h-6 items-center mr-4">
-            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
-            </div>
-          </div>
-          <label for="sub-newsletter" class="text-sm/6 text-gray-300">
-            Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
-          </label>
+                <div class="mt-10">
+                    <button type="submit" class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin">Submit Application</button>
+                </div>
+            </form>
         </div>
-
-        <label for="Captcha" class="text-gray-300 mt-4 mb-2">
-        What is ten divided by two?
-        </label>
-        <input class="rounded-md" name="Captcha" id="Captcha" type="number" 
-        autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-        placeholder="iykyk"
-        />
-
-        <div class="mt-8">
-            <button type="submit" class="inline-flex rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Submit</button>
-        </div>
-
-      </form>
     </section>
     <section id="about">
     {{ block "about" . }} {{ end }}
