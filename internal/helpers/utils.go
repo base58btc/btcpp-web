@@ -53,15 +53,18 @@ func GetOtherConfs(confs []*types.Conf, conf types.Conf) []types.CheckItem {
         return items
 }
 
-func BuildJobs(prefix string, jobs []*types.JobType) ([]types.CheckItem) {
+func BuildJobs(prefix string, jobs []*types.JobType, inclWild bool) ([]types.CheckItem) {
         joblist := make([]types.CheckItem, 0)
         for _, j := range jobs {
-                if j.Show {
-                        joblist = append(joblist, types.CheckItem{
-                                ItemID: prefix + j.Tag,
-                                ItemDesc: j.Title,
-                        })
+                if !j.Show || j.IsWildcard() && !inclWild {
+                                continue
                 }
+
+                joblist = append(joblist, types.CheckItem{
+                        ItemID: prefix + j.Tag,
+                        ItemDesc: j.Title,
+                        Checked: j.IsWildcard(),
+                })
         }
         return joblist
 }

@@ -4,6 +4,7 @@ type (
 	TalkTime    []*Talk
 	SessionTime []*Session
 	ConfList    []*Conf
+        JobsList    []*JobType
 )
 
 func (p TalkTime) Len() int {
@@ -43,4 +44,18 @@ func (c ConfList) Swap(i, j int) {
 func (c ConfList) Less(i, j int) bool {
 	/* Sort by start date */
 	return c[i].StartDate.Before(c[j].StartDate)
+}
+
+/* Sort job types for display */
+func (jl JobsList) Len() int {
+	return len(jl)
+}
+
+func (jl JobsList) Swap(i, j int) {
+	jl[i], jl[j] = jl[j], jl[i]
+}
+
+func (jl JobsList) Less(i, j int) bool {
+	/* Sort by start date */
+	return jl[i].DisplayOrder < jl[j].DisplayOrder
 }

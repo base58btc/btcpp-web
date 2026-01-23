@@ -252,6 +252,7 @@ func parseJobType(pageID string, props map[string]notion.PropertyValue) *types.J
 	jobtype := &types.JobType{
 		Ref:    pageID,
 		Tag:    parseRichText("Tag", props),
+                DisplayOrder: int(props["DisplayOrder"].Number),
 		Title: parseRichText("Title", props),
 		Tooltip: parseRichText("Tooltip", props),
 		LongDesc: parseRichText("LongDesc", props),

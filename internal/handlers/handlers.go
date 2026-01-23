@@ -411,6 +411,21 @@ func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
 	return confs
 }
 
+func listJobs(w http.ResponseWriter, ctx *config.AppContext) []*types.JobType {
+	var jobs types.JobsList
+	var err error
+	jobs, err = getters.FetchJobsCached(ctx)
+	if err != nil {
+		// FIXME add an internal error page
+		http.Error(w, "Unable to load jobs, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("jobs load failed ! %s", err.Error())
+		return nil
+	}
+
+	sort.Sort(&jobs)
+	return jobs
+}
+
 func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.WriteHeader(http.StatusNotFound)
 	ctx.Infos.Printf("404'd: %s", r.URL.Path)
@@ -590,7 +605,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                 return
         }
 
-        jobs, _ := getters.FetchJobsCached(ctx)
+        jobs := listJobs(w, ctx)
         confs := listConfs(w, ctx)
 
         switch r.Method {
@@ -598,8 +613,8 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                 err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
                         Conf: conf,
                         Confs: confs,
-                        YesJobs: helpers.BuildJobs("yjob-", jobs),
-                        NoJobs: helpers.BuildJobs("njob-", jobs),
+                        YesJobs: helpers.BuildJobs("yjob-", jobs, true),
+                        NoJobs: helpers.BuildJobs("njob-", jobs, false),
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
                         ShirtItems: helpers.GetShirtItems(),
                         DaysList:  conf.DaysList("days-"),

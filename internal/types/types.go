@@ -219,6 +219,7 @@ type (
         JobType struct {
                 Ref      string
                 Tag      string
+                DisplayOrder int
                 Title    string 
                 Tooltip  string
                 LongDesc string
@@ -510,4 +511,8 @@ func (s *Speaker) TwitterHandle() string {
 		return handle[1:]
 	}
 	return handle
+}
+
+func (j *JobType) IsWildcard() bool {
+        return j.Tag == "wildcard"
 }
