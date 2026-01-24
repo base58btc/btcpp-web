@@ -158,6 +158,34 @@ func NewSubscriberMissives(ctx *config.AppContext, subscriber *mtypes.Subscriber
 	return nil
 }
 
+func MakeApplicationSublist(conftag, apptype string, gensub bool) []string {
+	/* Add to subscriber list */
+	newsletters := []string { apptype, conftag + "-" + apptype }
+
+	if gensub {
+		newsletters = append(newsletters, "newsletter")
+	}
+
+        return newsletters
+}
+
+func NewSubs(ctx *config.AppContext, email string, newsletters []string) error {
+	sub, err := getters.SubscribeEmailList(ctx.Notion, email, newsletters)
+	if err != nil {
+		return err
+	}
+
+	/* Schedule + send any mails for them */
+	for _, nl := range newsletters {
+		err = NewSubscriberMissives(ctx, sub, nl)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+
+}
+
 func NewTicketSub(ctx *config.AppContext, email, conf, tixtype string, gensub bool) error {
 	/* Add to subscriber list */
 	newsletters := make([]string, 3)

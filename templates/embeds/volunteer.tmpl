@@ -13,7 +13,11 @@
                 <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Volunteer Registration</h2>
                 <p class="mt-2 text-lg/8 text-gray-600">Sign up to volunteer at {{ .Conf.Desc }}.</p>
             </div>
-            <form action="#" method="POST" class="mx-auto mt-16 max-w-xl sm:mt-20">
+            <form action="#" 
+            hx-post="/volunteer/{{ .Conf.Tag }}"
+            class="mx-auto mt-16 max-w-xl sm:mt-20"
+            hx-validate="true"
+            >
                 <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
                     <div class="sm:col-span-2">
                         <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
@@ -234,9 +238,17 @@
 
                 </div>
                 <div class="mt-10">
-                    <button type="submit" class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin">Submit Application</button>
+                    <button type="submit" 
+                    class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin
+                    disabled:opacity-25"
+                    hx-target="#post_result"
+                    hx-swap="innerHTML"
+                    _="on click toggle @disabled until htmx:afterOnLoad"
+                    >Submit Application</button>
                 </div>
             </form>
+            <div id="post_result" name="hidden_stuffs" class="mt-5 mx-auto max-w-xl">
+            </div>
         </div>
     </section>
     <section id="about">

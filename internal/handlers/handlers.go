@@ -634,15 +634,23 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 		var vol types.Volunteer
 		err = dec.Decode(&vol, r.PostForm)
 		if err != nil {
-			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 			ctx.Err.Printf("/volunteer/{conf} unable to decode form %s", err)
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Unable to register you. Try again or email volunteer@btcpp.dev.</div>
+                        </div>
+                        `))
 			return
 		}
 
                 /* ten divided by two is five */
                 if vol.Captcha != 5 {
-			http.Redirect(w, r, fmt.Sprintf("/volunteer/%s", conf.Tag), http.StatusSeeOther)
-                        return
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Incorrect captcha. Try again with 5.</div>
+                        </div>
+                        `))
+			return
                 }
 
                 vol.ParseAvailability("days-", r.PostForm)
@@ -656,16 +664,26 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 
                 err = getters.RegisterVolunteer(ctx.Notion, &vol)
                 if err != nil {
-			http.Error(w, "Unable to register you to volunteer, please try again later or email hello@btcpp.dev", http.StatusInternalServerError)
 			ctx.Err.Printf("/volunteer/{conf} unable to register volunteer %s", err)
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Unable to register you. Try again later or email volunteer@btcpp.dev.</div>
+                        </div>
+                        `))
 			return
                 }
 
-                // todo: send email confirm
+                /* Register to mailing lists :) */
+                /* Note: this also sends pre-saved missives for the vol app list! */
+                newslist := missives.MakeApplicationSublist(conf.Tag, "volapp", vol.Subscribe)
+                err = missives.NewSubs(ctx, vol.Email, newslist)
 
-                // FIXME: some kind of confirmation notice?
-                http.Redirect(w, r, fmt.Sprintf("/conf/%s", conf.Tag), http.StatusSeeOther)
-                return
+                if err != nil {
+                        ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, vol)
+                }
+
+                // FIXME: some kind of confirmation notice on redirect
+                w.Header().Set("HX-Redirect", fmt.Sprintf("/conf/%s", conf.Tag))
         }
 
 }
