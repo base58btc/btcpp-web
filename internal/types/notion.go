@@ -20,6 +20,7 @@ type (
 		HotelsDb     string
 		VolunteerDb  string
 		JobTypeDb    string
+                TalkAppDb    string
 	}
 
 	Notion struct {

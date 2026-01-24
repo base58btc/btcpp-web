@@ -69,19 +69,59 @@ func BuildJobs(prefix string, jobs []*types.JobType, inclWild bool) ([]types.Che
         return joblist
 }
 
-func GetShirtItems() ([]types.CheckItem) {
-        shirts := make([]types.CheckItem, 0)
+func GetPresentationTypes() ([]types.CheckItem) {
+        return []types.CheckItem {
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "lntalk",
+                        ItemDesc: "5min lightning talk",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "20talk",
+                        ItemDesc: "20m talk",
+                        Checked: true,
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "45talk",
+                        ItemDesc: "45m talk",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "45panel",
+                        ItemDesc: "45m panel",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "45workshop",
+                        ItemDesc: "45m workshop",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "60workshop",
+                        ItemDesc: "60m workshop",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "90workshop",
+                        ItemDesc: "90m workshop",
+                },
+                types.CheckItem{
+                        Group: "PresType",
+                        ItemID: "2workshop",
+                        ItemDesc: "2h workshop",
+                },
+        }
+}
 
-        opts := []string {
-                "S", "M", "L", "XL", "XXL",
+func ParsePresentationType(prefix string, form url.Values) string {
+        for k, _ := range form { 
+                if strings.HasPrefix(k, prefix) {
+                        return form.Get(k)
+                }
         }
-        for _, sh := range opts {
-                shirts = append(shirts, types.CheckItem{
-                        ItemID: sh,
-                        ItemDesc: sh,
-                })
-        }
-        return shirts
+        return ""
 }
 
 func ParseFormJobs(prefix string, form url.Values, jobs []*types.JobType) ([]*types.JobType) {

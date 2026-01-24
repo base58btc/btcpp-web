@@ -225,6 +225,44 @@ type (
                 LongDesc string
                 Show     bool
         }
+
+        TalkApp struct {
+                Ref           string
+                Name          string
+                Phone         string
+                Email         string
+                Signal        string
+                Telegram      string
+                ContactAt     string
+                Hometown      string
+                Twitter       string
+                Nostr         string
+                Github        string
+                Website       string
+                Visa          string
+                Pic           string
+                Org           string
+                Sponsor       bool
+                OrgTwitter    string
+                OrgNostr      string
+                OrgSite       string
+                OrgLogo       string
+                TalkTitle     string
+                Description   string
+                PresType      string
+                TalkSetup     bool
+                DinnerRSVP    bool
+                Availability  []string
+                DiscoveredVia string
+                Shirt         string
+                ScheduleFor   []*Conf
+                OtherEvents   []*Conf
+                Comments      string
+                FirstEvent    bool
+                Subscribe     bool
+                Captcha       int
+                
+        }
 )
 
 const (
@@ -388,9 +426,18 @@ func (c *Conf) InFuture() bool {
         return c.StartDate.After(time.Now())
 }
 
-func (c *Conf) DaysList(prefix string) []CheckItem {
+func (c *Conf) DateBeforeStart(daysbefore int) string {
+        start := c.StartDate.AddDate(0, 0, daysbefore * -1)
+        return start.Format("Mon. Jan 2, 2006")
+}
+
+func (c *Conf) DaysList(prefix string, addone bool) []CheckItem {
         /* Add an setup day before the event starts */
-        start := c.StartDate.AddDate(0, 0, -1)
+        delta := 0
+        if addone {
+                delta = -1
+        }
+        start := c.StartDate.AddDate(0, 0, delta)
 
         dates := datesBetween(start, c.EndDate)
         items := make([]CheckItem, len(dates))
@@ -417,6 +464,19 @@ func (vol *Volunteer) ParseAvailability(prefix string, form url.Values) (error) 
         }
         return nil
 }
+
+func (talkapp *TalkApp) ParseAvailability(prefix string, form url.Values) (error) {
+        if talkapp.Availability == nil {
+                talkapp.Availability = make([]string, 0)
+        }
+        for k, _ := range form { 
+                if strings.HasPrefix(k, prefix) {
+                        talkapp.Availability = append(talkapp.Availability, k[len(prefix):])
+                }
+        }
+        return nil
+}
+
 
 const (
 	Small ShirtSize = "small"

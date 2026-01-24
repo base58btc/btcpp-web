@@ -992,3 +992,186 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
 	return err
 }
 
+func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
+	parent := notion.NewDatabaseParent(n.Config.TalkAppDb)
+
+        // multiselect
+        availability := make([]*notion.SelectOption, len(tapp.Availability))
+        for i, av := range tapp.Availability {
+                availability[i] = &notion.SelectOption{
+                        Name: av,
+                }
+        }
+
+        // relation
+        otherEvents := make([]*notion.ObjectReference, len(tapp.OtherEvents))
+        for i, oe := range tapp.OtherEvents {
+                otherEvents[i] = &notion.ObjectReference{
+                        Object: notion.ObjectPage,
+                        ID: oe.Ref,
+                }
+        }
+
+        vals := map[string]*notion.PropertyValue{
+                "Name": notion.NewTitlePropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                Text: &notion.Text{Content: tapp.Name}},
+                        }...),
+                "Phone": notion.NewPhoneNumberPropertyValue(tapp.Phone),
+                "Email": notion.NewEmailPropertyValue(tapp.Email),
+                "Signal": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.Signal}},
+                        }...),
+                "ContactAt": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.ContactAt}},
+                        }...),
+                "Hometown": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.Hometown}},
+                        }...),
+
+                "Github": notion.NewURLPropertyValue(tapp.Github),
+                "Visa": {
+                        Type: notion.PropertySelect,
+                        Select: &notion.SelectOption{
+                                Name: tapp.Visa,
+                        },
+                },
+
+                // Pic
+
+                "Org": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.Org}},
+                        }...),
+                "Sponsor": {
+                        Type: notion.PropertyCheckbox,
+                        Checkbox: &tapp.Sponsor,
+                },
+                "TalkTitle": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.TalkTitle}},
+                        }...),
+                "Description": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.Description}},
+                        }...),
+                "PresType": {
+                        Type: notion.PropertySelect,
+                        Select: &notion.SelectOption{
+                                Name: tapp.PresType,
+                        },
+                },
+                "TalkSetup": {
+                        Type: notion.PropertyCheckbox,
+                        Checkbox: &tapp.TalkSetup,
+                },
+                "DinnerRSVP": {
+                        Type: notion.PropertyCheckbox,
+                        Checkbox: &tapp.DinnerRSVP,
+                },
+                "Availability":  &notion.PropertyValue {
+                        Type: notion.PropertyMultiSelect,
+                        MultiSelect: &availability,
+                },
+
+                "DiscoveredVia": notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                        Text: &notion.Text{Content: tapp.DiscoveredVia}},
+                        }...),
+                "Shirt": {
+                        Type: notion.PropertySelect,
+                        Select: &notion.SelectOption{
+                                Name: tapp.Shirt,
+                        },
+                },
+                "ScheduleFor": notion.NewRelationPropertyValue(
+                        []*notion.ObjectReference{{ID: tapp.ScheduleFor[0].Ref}}...,
+                ),
+
+                "FirstEvent": {
+                        Type: notion.PropertyCheckbox,
+                        Checkbox: &tapp.FirstEvent,
+                },
+
+        }
+
+        if tapp.Telegram != "" {
+                vals["Telegram"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.Telegram}},
+                        }...)
+        }
+
+        if tapp.Twitter != "" {
+                vals["Twitter"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.Twitter}},
+                        }...)
+        }
+
+        if tapp.Nostr != "" {
+                vals["npub"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.Nostr}},
+                        }...)
+        }
+
+        if tapp.Website!= "" {
+                vals["Website"] = notion.NewURLPropertyValue(tapp.Website)
+        }
+
+        if tapp.OrgTwitter != "" {
+                vals["OrgTwitter"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.OrgTwitter}},
+                        }...)
+        }
+
+        if tapp.OrgNostr != "" {
+                vals["OrgNostr"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.OrgNostr}},
+                        }...)
+        }
+
+        if tapp.OrgSite!= "" {
+                vals["OrgSite"] = notion.NewURLPropertyValue(tapp.OrgSite)
+        }
+
+        // OrgLogo
+
+        if len(tapp.OtherEvents) != 0 {
+                vals["OtherEvents"] = &notion.PropertyValue{
+                        Type: notion.PropertyRelation,
+                        Relation: otherEvents,
+                }
+        }
+
+        if tapp.Comments != "" {
+                vals["Comments"] = notion.NewRichTextPropertyValue(
+                        []*notion.RichText{
+                                {Type: notion.RichTextText,
+                                 Text: &notion.Text{Content: tapp.Comments}},
+                        }...)
+        }
+
+        _, err := n.Client.CreatePage(context.Background(), parent, vals)
+
+	return err
+}

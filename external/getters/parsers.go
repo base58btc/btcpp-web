@@ -337,3 +337,54 @@ func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]noti
 
 	return vol
 }
+
+func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue) *types.TalkApp {
+	talk := &types.TalkApp{
+		Ref:           pageID,
+		Name:          parseRichText("Name", props),
+		Phone:         props["Phone"].PhoneNumber,
+		Email:         props["Email"].Email,
+		Signal:        parseRichText("Signal", props),
+		Telegram:      parseRichText("Telegram", props),
+		ContactAt:     parseRichText("ContactAt", props),
+		Hometown:   parseRichText("Hometown", props),
+		Twitter:    parseRichText("Twitter", props),
+		Nostr:      parseRichText("npub", props),
+		Github:     props["Github"].URL,
+		Website:    props["Website"].URL,
+		Pic:        fileGetURL(props["Pic"].Files),
+		Org:        parseRichText("Org", props),
+		Sponsor:    parseCheckbox(props["Sponsor"].Checkbox),
+		OrgTwitter:    parseRichText("OrgTwitter", props),
+		OrgNostr:      parseRichText("OrgNpub", props),
+		OrgSite:       props["OrgSite"].URL,
+		OrgLogo:        fileGetURL(props["OrgLogo"].Files),
+
+		TalkTitle:        parseRichText("TalkTitle", props),
+		Description:        parseRichText("Description", props),
+		TalkSetup:    parseCheckbox(props["TalkSetup"].Checkbox),
+
+		DinnerRSVP:    parseCheckbox(props["DinnerRSVP"].Checkbox),
+                Availability:  parseSelectList("Availability", props),
+		DiscoveredVia: parseRichText("DiscoveredVia", props),
+
+		ScheduleFor: parseConfList(ctx, "ScheduleFor", props),
+		OtherEvents: parseConfList(ctx, "OtherEvents", props),
+		Comments:      parseRichText("Comments", props),
+		FirstEvent:    parseCheckbox(props["FirstEvent"].Checkbox),
+	}
+
+        if props["Visa"].Select != nil {
+	        talk.Visa = props["Visa"].Select.Name
+        }
+
+        if props["PresType"].Select != nil {
+	        talk.PresType = props["PresType"].Select.Name
+        }
+
+        if props["Shirt"].Select != nil {
+	        talk.Shirt = props["Shirt"].Select.Name
+        }
+
+	return talk
+}

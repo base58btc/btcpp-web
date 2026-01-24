@@ -3,14 +3,444 @@
   <head>
     <title>talk at bitcoin++</title>
     {{ block "header" . }} {{ end }}
-    <!-- for the cognito forms section -->
-    <script src="https://www.cognitoforms.com/f/iframe.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
     <section id="form">
-    <iframe src="https://www.cognitoforms.com/f/aDbqSIu5XEqr7KsGaJGtCQ/3" allow="payment" style="border:0;width:100%;" height="2981"></iframe>
+        <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Speaker Application</h2>
+                <p class="mt-2 text-lg/8 text-gray-600">Apply to talk or present at {{ .Conf.Desc }}.</p>
+                <p class="mt-2 text-lg/8 text-gray-600">Applications are due at 12:00 midnight on {{ .DueDate }}</p>
+            </div>
+            <form action="#" 
+            hx-post="/talk/{{ .Conf.Tag }}"
+            class="mx-auto mt-16 max-w-xl sm:mt-20"
+            hx-validate="true"
+            >
+                <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
+                        <div class="mt-2.5">
+                            <input id="Name" type="text" name="Name" 
+                            autocomplete="name" 
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Your Name"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
+                        <div class="mt-2.5">
+                            <input id="Phone" type="tel" name="Phone" 
+                            autoComplete="home tel"
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="+1 555-928-1900"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
+                        <div class="mt-2.5">
+                            <input id="Email" type="Email" name="Email" 
+                            required
+                            autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number *</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Signal" id="Signal" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="example.99"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Telegram" class="block text-sm/6 font-semibold text-gray-900">Telegram Username or Number</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Telegram" id="Telegram" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@niftynei"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="ContactAt" class="block text-sm/6 font-semibold text-gray-900">
+                        Best Way to Contact You? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="ContactAt" id="ContactAt" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Signal or email"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Hometown" id="Hometown" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Hometown, USA"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Visa" class="block text-sm/6 font-semibold text-gray-900">
+                        Will you need a Visa to attend? *
+                        </label>
+                        <div class="mt-2.5">
+                            <select id="Visa" name="Visa" 
+                                autocomplete="off" 
+                                aria-label="Need Visa?" 
+                                required
+                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
+                                <option value="No" selected>No</option>
+                                <option value="Yes">Yes</option>
+                                <option value="IDK">I don't know</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Twitter" class="block text-sm/6 font-semibold text-gray-900">
+                        X Account Username
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Twitter" id="Twitter" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@niftynei"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Nostr" class="block text-sm/6 font-semibold text-gray-900">
+                        Nostr Npub
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Nostr" id="Nostr" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="npub1dwah..."
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Github" class="block text-sm/6 font-semibold text-gray-900">Link to your Github profile *</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Github" id="Github" type="url" 
+                            autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            required
+                            placeholder="https://github.com/niftynei"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Website" class="block text-sm/6 font-semibold text-gray-900">Personal website</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Website" id="Website" type="url" 
+                            autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="https://basicbitch.software"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="PicFile" class="block text-sm/6 font-semibold text-gray-900">
+                        Your pfp (Profile Picture) *
+                        </label>
+                        <div class="block text-sm/6 text-gray-600">
+                        400x400px. Must be less than 20MB.
+                        </div>
+                        <div class="mt-2.5">
+                            <input 
+                            name="PicFile" id="PicFile" type="file" 
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Org" class="block text-sm/6 font-semibold text-gray-900">
+                        Company or Organizational Affiliation *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Org" id="Org" type="text" 
+                            autoComplete="organization" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="bitcoin++"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="Sponsor" type="checkbox" name="Sponsor" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="Sponsor" class="text-sm/6 text-gray-600">
+                        Send me information about sponsoring <span class="font-bitcoin">bitcoin++</span>!
+                        </label>
+                    </div>
+                    
+                    <div class="sm:col-span-2">
+                        <label for="OrgTwitter" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's X Account
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgTwitter" id="OrgTwitter" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@btcplusplus"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgNostr" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's Nostr npub
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgNostr" id="OrgNostr" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="npub1dwah..."
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgSite" class="block text-sm/6 font-semibold text-gray-900">Org's website</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgSite" id="OrgSite" type="url" 
+                            autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="https://btcplusplus.dev"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgLogoFile" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's Logo
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgLogoFile" id="OrgLogoFile" type="file" 
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="TalkTitle" class="block text-sm/6 font-semibold text-gray-900">
+                        Talk/Workshop Title *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="TalkTitle" id="TalkTitle" type="text" 
+                            autoComplete="off" autoCorrect="off" 
+                            autoCapitalize="off" spellCheck="false"
+                            placeholder="Lightning at the edges..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Description" class="block text-sm/6 font-semibold text-gray-900">
+                        Talk/Workshop Description *
+                        </label>
+                        <div class="mt-2.5">
+                            <textarea 
+                            name="Description" id="Description"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="This talk will..."
+                            rows="3" 
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
+                    </div>
+
+                    <fieldset>
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Presentation Length *
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .PresentationType }}
+                           {{ block "form_radiolist" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="TalkSetup" type="checkbox" name="TalkSetup" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="TalkSetup" class="text-sm/6 text-gray-600">
+                        My workshop/talk requires participants to do setup ahead of time
+                        </label>
+                    </div>
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Days I'm Available to Present *
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .DaysList }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="DinnerOpt" class="block text-sm/6 font-semibold text-gray-900">
+                        I'll be able to attend the VIP dinner on {{ .RSVPFor }}, the night before the conference starts.
+                        </label>
+                        <div class="mt-2.5">
+                            <select id="DinnerOpt" name="DinnerOpt" 
+                                autocomplete="off" 
+                                aria-label="Dinner RSVP" 
+                                required
+                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
+                                <option value="Yes" selected>Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                    </div>
+
+
+                    <div class="sm:col-span-2">
+                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
+                        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="twitter..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Shirt" class="block text-sm/6 font-semibold text-gray-900">
+                        Shirt Size *
+                        </label>
+                        <div class="mt-2.5">
+                            <select id="Shirt" name="Shirt" 
+                                autocomplete="off" 
+                                aria-label="Shirt Size" 
+                                required
+                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
+                                <option value="S">S</option>
+                                <option value="M" selected>M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                                <option value="XXL">XXL</option>
+                            </select>
+                        </div>
+                    </div>
+
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Other Events I'm Interested in Presenting At
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .ConfItems }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="Comments" class="block text-sm/6 font-semibold text-gray-900">
+                        Additional Comments
+                        </label>
+                        <div class="mt-2.5">
+                            <textarea 
+                            name="Comments" id="Comments"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Excited about..."
+                            rows="3" 
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="FirstEvent" type="checkbox" name="FirstEvent" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="FirstEvent" class="text-sm/6 text-gray-600">
+                        This is my first <span class="font-bitcoin">bitcoin++</span> event!
+                        </label>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="sub-newsletter" class="text-sm/6 text-gray-600">
+                        Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
+                        </label>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">
+                        What is ten divided by two? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Captcha" id="Captcha" type="number" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="iykyk"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+
+                </div>
+                <div class="mt-10">
+                    <button type="submit" 
+                    class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin
+                    disabled:opacity-25"
+                    hx-target="#post_result"
+                    hx-swap="innerHTML"
+                    _="on click toggle @disabled until htmx:afterOnLoad"
+                    >Submit Application</button>
+                </div>
+            </form>
+            <div id="post_result" name="hidden_stuffs" class="mt-5 mx-auto max-w-xl">
+            </div>
+        </div>
     </section>
     <section id="about">
     {{ block "about" . }} {{ end }}

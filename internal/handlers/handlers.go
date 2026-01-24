@@ -36,7 +36,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "sponsor", "contact", "talk", "press", "vegas25"}
+var pages []string = []string{"index", "about", "sponsor", "contact", "press", "vegas25"}
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -293,6 +293,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
                 RenderVolunteerConf(w, r, app)
         }).Methods("GET", "POST")
 
+        r.HandleFunc("/talk", func (w http.ResponseWriter, r *http.Request) {
+                RenderSpeakers(w, r, app)
+        }).Methods("GET")
+
+        r.HandleFunc("/talk/{conf}", func (w http.ResponseWriter, r *http.Request) {
+                RenderSpeakerConf(w, r, app)
+        }).Methods("GET", "POST")
+
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
 		HandleEmail(w, r, app)
 	}).Methods("GET", "POST")
@@ -472,8 +480,18 @@ type VolunteerPage struct {
         YesJobs   []types.CheckItem
         NoJobs    []types.CheckItem
         ConfItems []types.CheckItem
-        ShirtItems []types.CheckItem
         DaysList  []types.CheckItem
+        Year      uint
+}
+
+type SpeakerPage struct {
+        Confs     []*types.Conf
+        Conf      *types.Conf
+        ConfItems []types.CheckItem
+        DaysList  []types.CheckItem
+        DueDate   string
+        RSVPFor   string
+        PresentationType []types.CheckItem
         Year      uint
 }
 
@@ -579,6 +597,119 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	}
 }
 
+func RenderSpeakers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+        confs := listConfs(w, ctx)
+	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/speaker_select.tmpl", &VolunteerPage{
+		Confs: confs,
+		Year: helpers.CurrentYear(),
+	})
+
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/speakers ExecuteTemplate failed ! %s", err.Error())
+		return
+	}
+}
+
+func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, err := helpers.FindConf(r, ctx)
+        if err != nil {
+                handle404(w, r, ctx)
+                return
+        }
+
+        if !conf.Active {
+                handle404(w, r, ctx)
+                return
+        }
+
+        confs := listConfs(w, ctx)
+
+        switch r.Method {
+        case http.MethodGet: 
+
+                daylist := conf.DaysList("days-", true)
+                err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", &SpeakerPage{
+                        Conf: conf,
+                        Confs: confs,
+                        ConfItems: helpers.GetOtherConfs(confs, *conf),
+                        DueDate: conf.DateBeforeStart(60),
+                        DaysList:  daylist[1:],
+                        RSVPFor: daylist[0].ItemDesc,
+                        PresentationType: helpers.GetPresentationTypes(),
+                        Year: helpers.CurrentYear(),
+                })
+
+                if err != nil {
+                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+                        ctx.Err.Printf("/volunteer/{conf} ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+                        return
+                }
+                        return
+        case http.MethodPost:
+		r.ParseForm()
+		dec := schema.NewDecoder()
+		dec.IgnoreUnknownKeys(true)
+		var talkapp types.TalkApp
+                ctx.Infos.Printf("new talkapp posted %v", r.PostForm)
+		err = dec.Decode(&talkapp, r.PostForm)
+		if err != nil {
+			ctx.Err.Printf("/speaker/{conf} unable to decode form %s", err)
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Unable to register you. Try again or email speak@btcpp.dev.</div>
+                        </div>
+                        `))
+			return
+		}
+
+                /* ten divided by two is five */
+                if talkapp.Captcha != 5 {
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Incorrect captcha. Try again with 5.</div>
+                        </div>
+                        `))
+			return
+                }
+
+                talkapp.ParseAvailability("days-", r.PostForm)
+                dinneropt := r.PostForm.Get("DinnerOpt")
+                talkapp.DinnerRSVP = dinneropt == "Yes"
+                talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+        
+                if len(talkapp.ScheduleFor) == 0 {
+                        talkapp.ScheduleFor = append(talkapp.ScheduleFor, conf)
+                }
+
+                ctx.Infos.Printf("parsed talkapp: %v", talkapp)
+
+                err = getters.RegisterTalkApp(ctx.Notion, &talkapp)
+                if err != nil {
+			ctx.Err.Printf("/talk/{conf} unable to register speaker %s", err)
+                        w.Write([]byte(`
+                        <div class="form_message-error" style="display: block;">
+                          <div class="error-text text-red-700">Unable to register you. Try again later or email speak@btcpp.dev.</div>
+                        </div>
+                        `))
+			return
+                }
+
+                /* Register to mailing lists :) */
+                /* Note: this also sends pre-saved missives for the talkapp list(s)! */
+                newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
+                err = missives.NewSubs(ctx, talkapp.Email, newslist)
+
+                if err != nil {
+                        ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
+                }
+
+                // FIXME: some kind of confirmation notice on redirect
+                w.Header().Set("HX-Redirect", fmt.Sprintf("/conf/%s", conf.Tag))
+        }
+
+}
+
 func RenderVolunteers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
         confs := listConfs(w, ctx)
 	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer_select.tmpl", &VolunteerPage{
@@ -616,8 +747,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                         YesJobs: helpers.BuildJobs("yjob-", jobs, true),
                         NoJobs: helpers.BuildJobs("njob-", jobs, false),
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
-                        ShirtItems: helpers.GetShirtItems(),
-                        DaysList:  conf.DaysList("days-"),
+                        DaysList:  conf.DaysList("days-", true),
                         Year: helpers.CurrentYear(),
                 })
 
