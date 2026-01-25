@@ -646,12 +646,16 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
         switch r.Method {
         case http.MethodGet: 
 
+                talksDue = 45
+                if conf.Tag == "floripa26" {
+                        talksDue = 21
+                }
                 daylist := conf.DaysList("days-", true)
                 err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", &SpeakerPage{
                         Conf: conf,
                         Confs: confs,
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
-                        DueDate: conf.DateBeforeStart(60),
+                        DueDate: conf.DateBeforeStart(talksDue),
                         DaysList:  daylist[1:],
                         RSVPFor: daylist[0].ItemDesc,
                         PresentationType: helpers.GetPresentationTypes(),
