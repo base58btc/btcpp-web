@@ -18,6 +18,7 @@
             hx-post="/talk/{{ .Conf.Tag }}"
             class="mx-auto mt-16 max-w-xl sm:mt-20"
             hx-validate="true"
+            enctype="multipart/form-data"
             >
                 <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
                     <div class="sm:col-span-2">
@@ -164,7 +165,7 @@
                         Your pfp (Profile Picture) *
                         </label>
                         <div class="block text-sm/6 text-gray-600">
-                        400x400px. Must be less than 20MB.
+                        400x400px. Must be less than 10MB.
                         </div>
                         <div class="mt-2.5">
                             <input 
@@ -241,6 +242,9 @@
                         <label for="OrgLogoFile" class="block text-sm/6 font-semibold text-gray-900">
                         Org's Logo
                         </label>
+                        <div class="block text-sm/6 text-gray-600">
+                        Must be less than 10MB.
+                        </div>
                         <div class="mt-2.5">
                             <input 
                             name="OrgLogoFile" id="OrgLogoFile" type="file" 

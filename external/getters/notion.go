@@ -1044,7 +1044,16 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
                         },
                 },
 
-                // Pic
+                "Pic": notion.NewFilesPropertyValue(
+                        []*notion.File{
+                                {
+                                        Name: "speaker",
+                                        Type: "file_upload",
+                                        Upload: &notion.UploadFile{
+                                                ID: tapp.Pic,
+                                        },
+                                },
+                        }...),
 
                 "Org": notion.NewRichTextPropertyValue(
                         []*notion.RichText{
@@ -1154,7 +1163,18 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
                 vals["OrgSite"] = notion.NewURLPropertyValue(tapp.OrgSite)
         }
 
-        // OrgLogo
+        if tapp.OrgLogo != "" {
+                vals["OrgLogo"] = notion.NewFilesPropertyValue(
+                        []*notion.File{
+                                {
+                                        Name: "orglogospeaker",
+                                        Type: "file_upload",
+                                        Upload: &notion.UploadFile{
+                                                ID: tapp.OrgLogo,
+                                        },
+                                },
+                        }...)
+        }
 
         if len(tapp.OtherEvents) != 0 {
                 vals["OtherEvents"] = &notion.PropertyValue{
@@ -1174,4 +1194,22 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
         _, err := n.Client.CreatePage(context.Background(), parent, vals)
 
 	return err
+}
+
+func UploadFile(n *types.Notion, data []byte) (string, error) {
+        upload, err := n.Client.CreateFileUpload(context.Background())
+        if err != nil {
+                return "", err
+        }
+
+        result, err := n.Client.UploadFile(context.Background(), upload, data)
+        if err != nil {
+                return "", err
+        }
+
+        if result.Status != notion.FileStatusUploaded {
+                return "", fmt.Errorf("Unable to upload file. %v", result)
+        }
+
+        return result.ID, nil
 }

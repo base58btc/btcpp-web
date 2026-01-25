@@ -611,6 +611,24 @@ func RenderSpeakers(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 }
 
+/* Turn and uploaded file into a base64 encoded string */
+func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (string, error) {
+        file, _, err := r.FormFile(field) 
+        if err != nil {
+                return "", err
+        }
+
+        defer file.Close()
+
+        // Read the file data
+        fileData, err := ioutil.ReadAll(file)
+        if err != nil {
+                return "", err
+        }
+        
+        return getters.UploadFile(ctx.Notion, fileData)
+}
+
 func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := helpers.FindConf(r, ctx)
         if err != nil {
@@ -647,29 +665,26 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 }
                         return
         case http.MethodPost:
-		r.ParseForm()
+                err = r.ParseMultipartForm(10 << 20) // Limit uploads to 10MB
+                if err != nil {
+			ctx.Err.Printf("/talk/{conf} unable to parse multipart form %s", err)
+                        w.Write([]byte(helpers.ErrTalkApp("Error parsing form.")))
+			return
+                }
+
 		dec := schema.NewDecoder()
 		dec.IgnoreUnknownKeys(true)
 		var talkapp types.TalkApp
-                ctx.Infos.Printf("new talkapp posted %v", r.PostForm)
 		err = dec.Decode(&talkapp, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/speaker/{conf} unable to decode form %s", err)
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Unable to register you. Try again or email speak@btcpp.dev.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrTalkApp("Unable to register you: form parsing error")))
 			return
 		}
 
                 /* ten divided by two is five */
                 if talkapp.Captcha != 5 {
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Incorrect captcha. Try again with 5.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrTalkApp("Incorrect captcha. The answer is 5.")))
 			return
                 }
 
@@ -677,6 +692,22 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 dinneropt := r.PostForm.Get("DinnerOpt")
                 talkapp.DinnerRSVP = dinneropt == "Yes"
                 talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+
+                /* Upload pics */
+                talkapp.Pic, err = processFileUpload(ctx, r, "PicFile")
+                if err != nil {
+			ctx.Err.Printf("/talk/{conf} unable to upload speaker profile pic %s", err)
+                        w.Write([]byte(helpers.ErrTalkApp("Error uploading pfp.")))
+			return
+                }
+
+                talkapp.OrgLogo, err = processFileUpload(ctx, r, "OrgLogoFile")
+                if err != nil && err != http.ErrMissingFile {
+                        ctx.Err.Printf("/talk/{conf} unable to upload org logo %s", err)
+
+                        w.Write([]byte(helpers.ErrTalkApp("Error uploading org logo.")))
+                        return
+                }
         
                 if len(talkapp.ScheduleFor) == 0 {
                         talkapp.ScheduleFor = append(talkapp.ScheduleFor, conf)
@@ -687,11 +718,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 err = getters.RegisterTalkApp(ctx.Notion, &talkapp)
                 if err != nil {
 			ctx.Err.Printf("/talk/{conf} unable to register speaker %s", err)
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Unable to register you. Try again later or email speak@btcpp.dev.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrTalkApp("Unable to register you.")))
 			return
                 }
 
