@@ -249,6 +249,15 @@ func (l *Letter) InNewsletters() []string {
 	return nls
 }
 
+func (l *Letter) HasNewsletter(newsletter string) bool {
+	for _, ln := range l.Newsletters {
+                if ln == newsletter {
+                        return true
+                }
+	}
+	return false
+}
+
 /*
 Job identifier for this letter.
 

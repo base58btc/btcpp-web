@@ -320,6 +320,9 @@ func GetLetters(n *types.Notion, newsletter string) ([]*mtypes.Letter, error) {
 
 		for _, page := range pages {
 			letter := parseLetter(page.ID, page.Properties)
+                        if !letter.HasNewsletter(newsletter) {
+                                continue
+                        }
 			letters = append(letters, letter)
 		}
 	}

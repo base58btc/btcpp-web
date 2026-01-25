@@ -13,7 +13,7 @@ require (
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/schema v1.2.0
-	github.com/niftynei/go-notion v0.2.7
+	github.com/niftynei/go-notion v0.2.8
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stripe/stripe-go/v76 v76.3.0
 	golang.org/x/oauth2 v0.30.0
