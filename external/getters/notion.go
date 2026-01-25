@@ -1088,7 +1088,7 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
                         Type: notion.PropertyCheckbox,
                         Checkbox: &tapp.DinnerRSVP,
                 },
-                "Availability":  &notion.PropertyValue {
+                "Avails":  &notion.PropertyValue {
                         Type: notion.PropertyMultiSelect,
                         MultiSelect: &availability,
                 },
