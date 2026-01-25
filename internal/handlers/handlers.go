@@ -646,7 +646,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
         switch r.Method {
         case http.MethodGet: 
 
-                talksDue = 45
+                talksDue := 45
                 if conf.Tag == "floripa26" {
                         talksDue = 21
                 }
