@@ -87,6 +87,21 @@
                     </div>
 
                     <div class="sm:col-span-2">
+                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
+                        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="twitter..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+
+                    <div class="sm:col-span-2">
                         <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
                         <div class="mt-2.5">
                             <input 
@@ -172,6 +187,25 @@
                             name="PicFile" id="PicFile" type="file" 
                             required
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Shirt" class="block text-sm/6 font-semibold text-gray-900">
+                        Shirt Size *
+                        </label>
+                        <div class="mt-2.5">
+                            <select id="Shirt" name="Shirt" 
+                                autocomplete="off" 
+                                aria-label="Shirt Size" 
+                                required
+                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
+                                <option value="S">S</option>
+                                <option value="M" selected>M</option>
+                                <option value="L">L</option>
+                                <option value="XL">XL</option>
+                                <option value="XXL">XXL</option>
+                            </select>
                         </div>
                     </div>
 
@@ -328,40 +362,6 @@
                                 class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
                                 <option value="Yes" selected>Yes</option>
                                 <option value="No">No</option>
-                            </select>
-                        </div>
-                    </div>
-
-
-                    <div class="sm:col-span-2">
-                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
-                        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
-                        </label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
-                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="twitter..."
-                            required
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="Shirt" class="block text-sm/6 font-semibold text-gray-900">
-                        Shirt Size *
-                        </label>
-                        <div class="mt-2.5">
-                            <select id="Shirt" name="Shirt" 
-                                autocomplete="off" 
-                                aria-label="Shirt Size" 
-                                required
-                                class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
-                                <option value="S">S</option>
-                                <option value="M" selected>M</option>
-                                <option value="L">L</option>
-                                <option value="XL">XL</option>
-                                <option value="XXL">XXL</option>
                             </select>
                         </div>
                     </div>
