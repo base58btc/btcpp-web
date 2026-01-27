@@ -11,9 +11,17 @@ type LoginPage struct {
 
 
 func ErrTalkApp(message string) string {
+        return ErrApp(message, "speak")        
+}
+
+func ErrVolApp(message string) string {
+        return ErrApp(message, "volunteer")
+}
+
+func ErrApp(message, email string) string {
         return fmt.Sprintf(`
         <div class="form_message-error" style="display: block;">
-          <div class="error-text text-red-700">%s. Try again or email us at <a href="mailto:speak@btcpp.dev>speak@btcpp.dev</a>.</div>
+          <div class="error-text text-red-700">%s Try again or email us at <a href="mailto:%s@btcpp.dev">%s@btcpp.dev</a>.</div>
         </div>
-        `, message)
+        `, message, email, email)
 }

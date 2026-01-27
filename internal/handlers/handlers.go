@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"html/template"
 	"io/ioutil"
+        "mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -611,13 +612,20 @@ func RenderSpeakers(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 }
 
-/* Turn and uploaded file into a base64 encoded string */
+func contentTypeFromFilename(filename string) string {
+        ext := filepath.Ext(filename) // e.g., ".png"
+        mimeType := mime.TypeByExtension(ext)
+        if mimeType == "" {
+                return "application/octet-stream" // fallback
+        }
+        return mimeType
+}
+
 func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (string, error) {
-        file, _, err := r.FormFile(field) 
+        file, handler, err := r.FormFile(field) 
         if err != nil {
                 return "", err
         }
-
         defer file.Close()
 
         // Read the file data
@@ -625,8 +633,11 @@ func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (s
         if err != nil {
                 return "", err
         }
+
+        filename := handler.Filename
+        contentType := contentTypeFromFilename(filename)
         
-        return getters.UploadFile(ctx.Notion, fileData)
+        return getters.UploadFile(ctx.Notion, contentType, filename, fileData)
 }
 
 func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -796,21 +807,13 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 		err = dec.Decode(&vol, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to decode form %s", err)
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Unable to register you. Try again or email volunteer@btcpp.dev.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
 		}
 
                 /* ten divided by two is five */
                 if vol.Captcha != 5 {
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Incorrect captcha. Try again with 5.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrVolApp("Incorrect captcha. The answer is 5.")))
 			return
                 }
 
@@ -826,11 +829,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                 err = getters.RegisterVolunteer(ctx.Notion, &vol)
                 if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to register volunteer %s", err)
-                        w.Write([]byte(`
-                        <div class="form_message-error" style="display: block;">
-                          <div class="error-text text-red-700">Unable to register you. Try again later or email volunteer@btcpp.dev.</div>
-                        </div>
-                        `))
+                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
                 }
 
