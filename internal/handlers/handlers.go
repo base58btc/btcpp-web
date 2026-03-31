@@ -37,7 +37,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "sponsor", "contact", "press", "vegas25"}
+var pages []string = []string{"index", "about", "sponsor", "contact", "press", "vegas25" }
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -370,6 +370,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
 
+
+        /* Intrnal pagess */
+	r.HandleFunc("/vols/shift", func(w http.ResponseWriter, r *http.Request) {
+		VolunteerShift(w, r, app)
+	}).Methods("GET", "POST")
+
+
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
@@ -440,60 +447,6 @@ func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	ctx.Infos.Printf("404'd: %s", r.URL.Path)
 
 	RenderPage(w, r, ctx, "404")
-}
-
-type ConfPage struct {
-	Conf          *types.Conf
-	Hotels        []*types.Hotel
-	Tix           *types.ConfTicket
-	MaxTix        *types.ConfTicket
-	Sold          uint
-	TixLeft       uint
-	Talks         []*types.Talk
-	EventSpeakers []*types.Speaker
-	Buckets       map[string]types.SessionTime
-	Days          []*Day
-	Year          uint
-}
-
-type SuccessPage struct {
-	Conf *types.Conf
-	Year uint
-}
-
-type TixFormPage struct {
-	Conf          *types.Conf
-	Tix           *types.ConfTicket
-	TixSlug       string
-	Count         uint
-	TixPrice      uint
-	Discount      string
-	DiscountPrice uint
-	DiscountRef   string
-	HMAC          string
-	Err           string
-	Year          uint
-}
-
-type VolunteerPage struct {
-        Confs     []*types.Conf
-        Conf      *types.Conf
-        YesJobs   []types.CheckItem
-        NoJobs    []types.CheckItem
-        ConfItems []types.CheckItem
-        DaysList  []types.CheckItem
-        Year      uint
-}
-
-type SpeakerPage struct {
-        Confs     []*types.Conf
-        Conf      *types.Conf
-        ConfItems []types.CheckItem
-        DaysList  []types.CheckItem
-        DueDate   string
-        RSVPFor   string
-        PresentationType []types.CheckItem
-        Year      uint
 }
 
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
@@ -938,43 +891,6 @@ func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 	}
 }
 
-type SchedulePage struct {
-	Talks []*types.Talk
-	s     []types.TalkTime
-}
-
-type Day struct {
-	Morning   []types.SessionTime
-	Afternoon []types.SessionTime
-	Evening   []types.SessionTime
-
-	Idx int
-}
-
-func (d *Day) Venues() []string {
-	venhash := make(map[string]string)
-
-	all := make([]types.SessionTime, 0)
-	all = append(all, d.Morning...)
-	all = append(all, d.Afternoon...)
-	all = append(all, d.Evening...)
-
-	for _, list := range all {
-		for _, sesh := range list {
-			venhash[sesh.Venue] = ""
-		}
-	}
-
-	venues := make([]string, len(venhash))
-	i := 0
-	for k, _ := range venhash {
-		venues[i] = k
-		i++
-	}
-
-	return venues
-}
-
 type TicketTmpl struct {
 	QRCodeURI string
 	Domain    string
@@ -1084,13 +1000,6 @@ func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 
 		ctx.Infos.Printf("Cal invite sent to %d people!", len(emails))
 	}
-}
-
-type CheckInPage struct {
-	NeedsPin   bool
-	TicketType string
-	Msg        string
-	Year       uint
 }
 
 func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -1668,4 +1577,124 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+type EmailForm struct {
+        Email string
+}
+
+func RenderFindShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+        switch r.Method {
+        case http.MethodGet: 
+                err := ctx.TemplateCache.ExecuteTemplate(w, "volunteers/findshift.tmpl", &VolShiftPage{
+                        Year: helpers.CurrentYear(),
+                })
+
+                if err != nil {
+                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+                        ctx.Err.Printf("/volunteers/findshift ExecuteTemplate failed ! %s", err.Error())
+                        return
+                }
+        case http.MethodPost:
+		r.ParseForm()
+		dec := schema.NewDecoder()
+		dec.IgnoreUnknownKeys(true)
+		var form EmailForm
+                err := dec.Decode(&form, r.PostForm)
+		if err != nil {
+			ctx.Err.Printf("/vols/shift unable to decode email form %s", err)
+                        w.Write([]byte(helpers.ErrVolApp("Unable to send you email link.")))
+			return
+		}
+
+                _, err = emails.OnlyForVolLogin(ctx, form.Email)
+                if err != nil {
+                        http.Error(w, "Unable to send login link via email", http.StatusInternalServerError)
+                        ctx.Err.Printf("/volunteers/findshift onlyforvollogin failed ! %s", err.Error())
+                        return
+                }
+
+                /* We redirect to home on success */
+                http.Redirect(w, r, "/", http.StatusSeeOther)
+        }
+}
+
+func calcStats(apps []*types.Volunteer) *ApplicationStats {
+        
+        pending, accepted := 0, 0
+        for _, app := range apps {
+                switch app.Status {
+                case "Waitlist":
+                        pending += 1
+                case "Accepted":
+                        accepted += 1
+                }
+        }
+
+        return &ApplicationStats{
+                Applied: len(apps),
+                Pending: pending,
+                Accepted: accepted,
+        }
+}
+
+func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+        /* We put a hash + email in the link */
+	encodedHMAC := r.URL.Query().Get("hr")
+        encodedEmail := r.URL.Query().Get("em")
+
+        if encodedHMAC == "" || encodedEmail == "" {
+                RenderFindShift(w, r, ctx)
+                return
+        }
+
+        emailval, err := base64.RawURLEncoding.DecodeString(encodedEmail)
+        if err != nil {
+                RenderFindShift(w, r, ctx)
+                return
+        }
+
+        hashResult, err := base64.RawURLEncoding.DecodeString(encodedHMAC)
+        if err != nil {
+                RenderFindShift(w, r, ctx)
+                return
+        }
+        email := string(emailval)
+        hmac := string(hashResult)
+
+        if !helpers.VerifyEmailHMAC(ctx, hmac, email) {
+		http.Error(w, "Invalid HMAC for email", http.StatusInternalServerError)
+		handle404(w, r, ctx)
+                return
+        }
+
+        confs := listConfs(w, ctx)
+        /* Find volunteer signups */
+        volapps, err := getters.ListVolunteerApps(ctx, email)
+        if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/vol/shift listvolunteerapps failed ! %s", err.Error())
+		return
+        }
+
+        // fixme: add "sign up to volunteer" state :)
+        if len(volapps) == 0 {
+		handle404(w, r, ctx)
+		return
+        }
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/shift.tmpl", &VolShiftPage{
+                Name:     volapps[0].Name,
+                Hometown: volapps[0].Hometown,
+                Stats:    calcStats(volapps),
+                VolApps:  volapps,
+	        Confs:    confs,	
+		Year:     helpers.CurrentYear(),
+	})
+
+	if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/vol/shift ExecuteTemplate failed ! %s", err.Error())
+		return
+	}
 }

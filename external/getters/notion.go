@@ -992,6 +992,78 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
 	return err
 }
 
+func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
+	var vis []*types.VolInfo
+	hasMore := true
+	nextCursor := ""
+	n := ctx.Notion
+	db := ctx.Env.Notion.VolInfoDb
+
+	var filter *notion.Filter
+	if confRef != "" {
+		filter = &notion.Filter{
+			Property: "conf",
+			Relation: &notion.RelationFilterCondition{
+				Contains: confRef,
+			},
+		}
+	}
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
+			StartCursor: nextCursor,
+			Filter:      filter,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			vi := parseVolInfo(page.ID, page.Properties)
+			vis = append(vis, vi)
+		}
+	}
+
+	return vis, nil
+}
+
+func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer, error) {
+	var vols []*types.Volunteer
+	hasMore := true
+	nextCursor := ""
+	n := ctx.Notion
+	db := ctx.Env.Notion.VolunteerDb
+
+	var filter *notion.Filter
+	if email != "" {
+		filter = &notion.Filter{
+			Property: "Email",
+			Text: &notion.TextFilterCondition{
+				Equals: email,
+			},
+		}
+	}
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
+			StartCursor: nextCursor,
+			Filter:      filter,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			v := parseVolunteer(ctx, page.ID, page.Properties)
+			vols = append(vols, v)
+		}
+	}
+
+	return vols, nil
+}
+
 func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
 	parent := notion.NewDatabaseParent(n.Config.TalkAppDb)
 

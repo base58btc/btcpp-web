@@ -193,6 +193,13 @@ type (
 		Desc     string
 	}
 
+        VolInfo struct {
+                Ref         string
+                ConfRef     string
+                OrientLink  string
+                OrientTimes *time.Time
+        }
+
         Volunteer struct {
                 Ref           string
                 Name          string
@@ -212,8 +219,24 @@ type (
                 Twitter       string
                 Nostr         string
                 Shirt         string
+                WorkShifts    []*WorkShift
                 Captcha       int
                 Subscribe     bool
+                Status        string
+                CreatedAt     *time.Time
+        }
+
+        WorkShift struct {
+                Ref string
+                Name string
+                MaxVols uint
+                // TODO: change to Volunteers?
+                AssigneesRef []string
+                ShiftLeaderRef string
+                Type *JobType
+                Conf *Conf
+                ShiftTime *Times
+                Priority uint
         }
 
         JobType struct {
@@ -395,6 +418,16 @@ func (t *Times) Day() string {
 	return t.Start.Format("Monday")
 }
 
+func (t *Times) FmtRange() string {
+        start := t.Desc() 
+        end := ""
+        if t.End != nil {
+                end = t.End.Format("- 3:04pm")
+        }
+        return start + end
+}
+
+
 func (t *Times) LenStr() string {
 	if t.End == nil {
 		return ""
@@ -575,4 +608,66 @@ func (s *Speaker) TwitterHandle() string {
 
 func (j *JobType) IsWildcard() bool {
         return j.Tag == "wildcard"
+}
+
+func (ws *WorkShift) DayOf() string {
+	return ws.ShiftTime.Start.Format("01/02/2006")
+}
+
+func (v *Volunteer) AvailableOn(ws *WorkShift) bool {
+        shiftDay := ws.DayOf()
+        for _, day := range v.Availability {
+                if day == shiftDay {
+                        return true
+                }
+        }
+        return false
+}
+
+func (v *Volunteer) WillWork(job *JobType) bool {
+        for _, yjob := range v.WorkYes {
+                if yjob.Ref == job.Ref {
+                        return true
+                }
+        }
+        return false
+}
+
+func (v *Volunteer) WillNotWork(job *JobType) bool {
+        for _, njob := range v.WorkNo {
+                if njob.Ref == job.Ref {
+                        return true
+                }
+        }
+        return false
+}
+
+func (ws *WorkShift) Intersects(shifts []*WorkShift) bool {
+        if ws.ShiftTime == nil {
+                return false
+        }
+
+        for _, shift := range shifts {
+                if shift.ShiftTime == nil {
+                        continue
+                }
+                /* this shift starts after other ends, ok */
+                if shift.ShiftTime.End == nil {
+                        continue
+                }
+                if ws.ShiftTime.Start.After(*shift.ShiftTime.End) {
+                        continue
+                }
+                if ws.ShiftTime.End == nil {
+                        continue
+                }
+                /* other shift starts after other ends, ok */
+                if shift.ShiftTime.Start.After(*ws.ShiftTime.End) {
+                        continue
+                }
+
+                return true
+        }
+
+        return false
 }

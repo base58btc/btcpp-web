@@ -21,6 +21,7 @@ type (
 		VolunteerDb  string
 		JobTypeDb    string
                 TalkAppDb    string
+                VolInfoDb    string
 	}
 
 	Notion struct {

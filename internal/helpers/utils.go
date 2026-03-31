@@ -1,7 +1,9 @@
 package helpers
 
 import (
+	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -263,4 +265,35 @@ func CheckPin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) bo
 		return false
 	}
 	return pin == ctx.Env.RegistryPin
+}
+
+func VerifyEmailHMAC(ctx *config.AppContext, hmac, email string) bool {
+        verify := CreateEmailHMAC(ctx, email)
+        return verify == hmac
+}
+
+func CreateEmailHMAC(ctx *config.AppContext, email string) string {
+	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
+	mac.Write([]byte(email))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func VolShiftLink(ctx *config.AppContext, vol *types.Volunteer) string {
+        return EmailLink(ctx, vol.Email, "/vols/shift")
+}
+
+func EmailLink(ctx *config.AppContext, email, path string) string {
+        u, err := url.Parse(ctx.Env.GetURI())
+        if err != nil {
+                return ""
+        }
+        u.Path = path
+        hmac := CreateEmailHMAC(ctx, email)
+        encodedHMAC := base64.RawURLEncoding.EncodeToString([]byte(hmac))
+        encodedEmail := base64.RawURLEncoding.EncodeToString([]byte(email))
+        q := u.Query()
+        q.Set("hr", encodedHMAC)
+        q.Set("em", encodedEmail)
+        u.RawQuery = q.Encode()
+        return u.String()
 }

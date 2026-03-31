@@ -22,6 +22,7 @@ type (
 		UID         uint64
 		Title       string
 		Newsletters []string
+                OnlyFor     string
 		Markdown    string
 		SendAt      string
 		SentAt      *time.Time

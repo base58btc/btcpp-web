@@ -3,6 +3,7 @@ package getters
 import (
 	"fmt"
 	"strings"
+        "time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -30,6 +31,35 @@ func parseCheckbox(checkbox *bool) bool {
 	}
 	return *checkbox
 }
+
+func parseSelect(field string, props map[string]notion.PropertyValue) string {
+        if props[field].Select == nil {
+                return ""
+        }
+
+        return props[field].Select.Name
+}
+
+func parseDate(field string, props map[string]notion.PropertyValue) *time.Time {
+	dd := props[field].Date
+	if dd != nil {
+                return &dd.Start
+	}
+        return nil
+}
+
+func parseTimes(field string, props map[string]notion.PropertyValue) *types.Times {
+	tt := props[field].Date
+	if tt != nil {
+		return &types.Times{
+			Start: tt.Start,
+			End:   tt.End,
+		}
+	}
+
+        return nil
+}
+
 
 func parseUniqueID(field string, props map[string]notion.PropertyValue) uint64 {
 	uniqID := props[field].UniqueID
@@ -123,22 +153,22 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 
 func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []*types.Speaker) *types.Talk {
 
-	var sched *types.Times
-	talktimes := props["Talk Time"].Date
-	if talktimes != nil {
-		sched = &types.Times{
-			Start: talktimes.Start,
-			End:   talktimes.End,
-		}
-	}
-
 	talk := &types.Talk{
 		ID:          pageID,
 		Name:        parseRichText("Talk Name", props),
 		Clipart:     parseRichText("Clipart", props),
 		Description: parseRichText("Description", props),
 		CalNotif:    parseRichText("CalNotif", props),
-		Sched:       sched,
+		Sched:       parseTimes("Talk Time", props),
+                Venue:       parseSelect("Venue", props),
+                Event:       parseSelect("Event", props),
+                Type:        parseSelect("Talk Type", props),
+                Section:     parseSelect("Section", props),
+	}
+
+	if talk.Sched != nil {
+		talk.TimeDesc = talk.Sched.Desc()
+		talk.DayTag = talk.Sched.Day()
 	}
 
 	/* Find all speakers for this talk */
@@ -154,26 +184,6 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []
 
 	if len(talk.Clipart) > 4 {
 		talk.AnchorTag = talk.Clipart[:len(talk.Clipart)-4]
-	}
-
-	if props["Venue"].Select != nil {
-		talk.Venue = props["Venue"].Select.Name
-	}
-
-	if props["Event"].Select != nil {
-		talk.Event = props["Event"].Select.Name
-	}
-
-	if sched != nil {
-		talk.TimeDesc = sched.Desc()
-		talk.DayTag = sched.Day()
-	}
-	if props["Talk Type"].Select != nil {
-		talk.Type = props["Talk Type"].Select.Name
-	}
-
-	if props["Section"].Select != nil {
-		talk.Section = props["Section"].Select.Name
 	}
 
 	return talk
@@ -198,12 +208,13 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		HasSatellites: parseCheckbox(props["Has Satellites"].Checkbox),
 	}
 
-        if props["StartDate"].Date != nil {
-	        conf.StartDate = props["StartDate"].Date.Start
+        stdate := parseDate("StartDate", props)
+        if stdate != nil {
+                conf.StartDate = *stdate        
         }
-
-        if props["EndDate"].Date != nil {
-	        conf.EndDate = props["EndDate"].Date.Start
+        edate := parseDate("EndDate", props)
+        if edate != nil {
+                conf.EndDate = *edate
         }
 
 	return conf
@@ -220,16 +231,11 @@ func parseConfTicket(pageID string, props map[string]notion.PropertyValue) *type
 		Currency: parseRichText("Currency", props),
 		Symbol:   parseRichText("Symbol", props),
 		PostSymbol:   parseRichText("PostSymbol", props),
+                Expires:   parseTimes("Expires", props),
 	}
 
 	if len(props["Conf"].Relation) > 0 {
 		ticket.ConfRef = props["Conf"].Relation[0].ID
-	}
-
-	if props["Expires"].Date != nil {
-		ticket.Expires = &types.Times{
-			Start: props["Expires"].Date.Start,
-		}
 	}
 
 	return ticket
@@ -329,13 +335,23 @@ func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]noti
 		Hometown: parseRichText("Hometown", props),
 		Twitter: parseRichText("Twitter", props),
 		Nostr: parseRichText("npub", props),
+                Shirt: parseSelect("Shirt", props),
+                Status: parseSelect("Status", props),
+                CreatedAt: parseDate("created", props),
 	}
 
-        if props["Shirt"].Select != nil {
-	        vol.Shirt = props["Shirt"].Select.Name
+	return vol
+}
+
+func parseVolInfo(pageID string, props map[string]notion.PropertyValue) *types.VolInfo {
+        vinfo := &types.VolInfo{
+                Ref: pageID,
+                ConfRef: parseConfRef(props),
+                OrientLink: props["OrientLink"].URL,
+                OrientTimes: parseDate("OrientTime", props),
         }
 
-	return vol
+        return vinfo
 }
 
 func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue) *types.TalkApp {
@@ -348,10 +364,12 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 		Telegram:      parseRichText("Telegram", props),
 		ContactAt:     parseRichText("ContactAt", props),
 		Hometown:   parseRichText("Hometown", props),
+                Visa:       parseSelect("Visa", props),
 		Twitter:    parseRichText("Twitter", props),
 		Nostr:      parseRichText("npub", props),
 		Github:     props["Github"].URL,
 		Website:    props["Website"].URL,
+                Shirt:      parseSelect("Shirt", props),
 		Pic:        fileGetURL(props["Pic"].Files),
 		Org:        parseRichText("Org", props),
 		Sponsor:    parseCheckbox(props["Sponsor"].Checkbox),
@@ -362,6 +380,7 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 
 		TalkTitle:        parseRichText("TalkTitle", props),
 		Description:        parseRichText("Description", props),
+                PresType:     parseSelect("PresType", props),
 		TalkSetup:    parseCheckbox(props["TalkSetup"].Checkbox),
 
 		DinnerRSVP:    parseCheckbox(props["DinnerRSVP"].Checkbox),
@@ -374,17 +393,56 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 		FirstEvent:    parseCheckbox(props["FirstEvent"].Checkbox),
 	}
 
-        if props["Visa"].Select != nil {
-	        talk.Visa = props["Visa"].Select.Name
-        }
-
-        if props["PresType"].Select != nil {
-	        talk.PresType = props["PresType"].Select.Name
-        }
-
-        if props["Shirt"].Select != nil {
-	        talk.Shirt = props["Shirt"].Select.Name
-        }
-
 	return talk
+}
+
+func parseJobTypes(field string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) []*types.JobType {
+        jtypes := make([]*types.JobType, 0)
+        
+        for _, jobRel := range props[field].Relation {
+                for _, job := range jobtypes {
+                        if jobRel.ID == job.Ref {
+                                jtypes = append(jtypes, job)
+                        }
+                }
+        }
+
+        return jtypes
+}
+
+func parseWorkShift(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) *types.WorkShift {
+
+        jobs := parseJobTypes("Type", props, jobtypes)
+        var jobtype *types.JobType
+        if len(jobs) > 0 {
+                jobtype = jobs[0]
+        }
+
+        conflist := parseConfList(ctx, "ConfRef", props)
+        var conf *types.Conf
+        if len(conflist) > 0 {
+                conf = conflist[0]
+        }
+
+	shift := &types.WorkShift{
+		Ref:         pageID,
+		Name:        parseRichText("Name", props),
+		MaxVols:     uint(props["MaxVols"].Number),
+                Type:        jobtype,
+                Conf:        conf,
+		ShiftTime:   parseTimes("ShiftTime", props),
+		Priority:    uint(props["Priority"].Number),
+	}
+
+	/* Find all assignees for this shift */
+        shift.AssigneesRef = make([]string, 0)
+        for _, assRel := range props["Assignees"].Relation {
+                shift.AssigneesRef = append(shift.AssigneesRef, assRel.ID)
+        }
+
+        for _, leaderRel := range props["ShiftLeader"].Relation {
+                shift.ShiftLeaderRef = leaderRel.ID
+        }
+
+	return shift
 }

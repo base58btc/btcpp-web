@@ -49,16 +49,11 @@ func parseLetter(pageID string, props map[string]notion.PropertyValue) *mtypes.L
 		Newsletters: parseOptsToList("Newsletter", props),
 		Markdown:    parseRichText("Markdown", props),
 		SendAt:      parseRichText("SendAt", props),
+                OnlyFor:     parseSelect("OnlyFor", props),
+                Expiry:      parseDate("Expiry", props),
+                SentAt:      parseDate("SentAt", props),
 	}
 
-	expiry := props["Expiry"].Date
-	if expiry != nil {
-		letter.Expiry = &expiry.Start
-	}
-	sentat := props["SentAt"].Date
-	if sentat != nil {
-		letter.SentAt = &sentat.Start
-	}
 	return letter
 }
 
@@ -284,6 +279,30 @@ func GetLetter(n *types.Notion, uniqueID uint64) (*mtypes.Letter, error) {
 
 	if len(pages) == 0 {
 		return nil, fmt.Errorf("Couldn't find missive with UID#%d", uniqueID)
+	}
+
+	letter := parseLetter(pages[0].ID, pages[0].Properties)
+	return letter, nil
+}
+
+func GetLetterFor(n *types.Notion, onlyfor string) (*mtypes.Letter, error) {
+	var err error
+	var pages []*notion.Page
+	pages, _, _, err = n.Client.QueryDatabase(context.Background(),
+		n.Config.MissivesDb, notion.QueryDatabaseParam{
+			Filter: &notion.Filter{
+				Property: "OnlyFor",
+				Select: &notion.SelectFilterCondition{
+					Equals: onlyfor,
+				},
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pages) == 0 {
+		return nil, fmt.Errorf("Couldn't find missive OnlyFor %s", onlyfor)
 	}
 
 	letter := parseLetter(pages[0].ID, pages[0].Properties)
