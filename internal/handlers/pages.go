@@ -113,9 +113,36 @@ type ApplicationStats struct {
 type VolShiftPage struct {
         Name      string
         Hometown  string
+        Email     string
+        HMAC      string
         VolApps   []*types.Volunteer
         Stats     *ApplicationStats
         Confs     []*types.Conf
         Year      uint
+}
+
+type ShiftDisplay struct {
+        Shift       *types.WorkShift
+        IsAvailable bool   // Vol available on that day
+        IsEligible  bool   // Not on WillNotWork list
+        IsFull      bool   // No spots left
+        IsSelected  bool   // Already assigned
+        Conflicts   bool   // Overlaps with selected shift
+        CanSelect   bool   // Computed eligibility
+        Reason      string // Why can't select
+}
+
+type ShiftSignupPage struct {
+        Vol           *types.Volunteer
+        Conf          *types.Conf
+        AvailShifts   map[string][]*ShiftDisplay // Grouped by day
+        SelectedShifts []*types.WorkShift
+        MinShifts     int
+        ShiftProgress int
+        CanSubmit     bool
+        ConfRef       string
+        Email         string
+        HMAC          string
+        Year          uint
 }
 

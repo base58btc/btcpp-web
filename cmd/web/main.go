@@ -73,6 +73,8 @@ func loadConfig() *types.EnvConfig {
 			VolunteerDb:     os.Getenv("NOTION_VOLUNTEER_DB"),
 			JobTypeDb:     os.Getenv("NOTION_JOBTYPE_DB"),
 			TalkAppDb:     os.Getenv("NOTION_TALKAPP_DB"),
+			ShiftDb:     os.Getenv("NOTION_SHIFTS_DB"),
+                        VolInfoDb:   os.Getenv("NOTION_VOLINFO_DB"),
 		}
 		config.Google = types.GoogleConfig{
 			Key:    os.Getenv("GOOGLE_KEY"),

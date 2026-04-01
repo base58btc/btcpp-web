@@ -3,7 +3,7 @@
   <head>
     <title>volunteer @ bitcoin++</title>
     {{ block "header" . }} {{ end }}
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#10024;</text></svg>">
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
@@ -12,53 +12,151 @@
             <section id="topline">
                 <div class="overflow-hidden sm:rounded-lg bg-white shadow">
                     <div class="px-4 py-5 sm:p-6">
-                        <h2 id="profile-overview-title" class="sr-only">Volunteer Shift Overview</h2>
+                        <h2 id="profile-overview-title" class="sr-only">Volunteer Dashboard</h2>
                         <div class="bg-white p-6">
                             <div class="sm:flex sm:items-center sm:justify-between">
                                 <div class="sm:flex sm:space-x-5">
                                     <div class="shrink-0">
-                                        <img src="https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="" class="mx-auto size-20 rounded-full" />
+                                        <div class="mx-auto size-20 rounded-full bg-indigo-100 flex items-center justify-center">
+                                            <span class="text-3xl">&#128075;</span>
+                                        </div>
                                     </div>
                                     <div class="mt-4 text-center sm:mt-0 sm:pt-1 sm:text-left">
                                         <p class="text-sm font-medium text-gray-600">Welcome back,</p>
-                                        <p class="text-xl font-bold text-gray-900 sm:text-2xl"> {{ .Name }}</p>
+                                        <p class="text-xl font-bold text-gray-900 sm:text-2xl">{{ .Name }}</p>
                                         <p class="text-sm font-medium text-gray-600">Traveling from {{ .Hometown }}</p>
                                     </div>
                                 </div>
-                                <!-- right side button 
-                                <div class="mt-5 flex justify-center sm:mt-0">
-                                    <a href="#" class="flex items-center justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">View profile</a>
-                                </div>
-                                -->
                             </div>
                         </div>
                         <div class="grid grid-cols-1 divide-y divide-gray-200 border-t border-gray-200 bg-gray-50 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
                             <div class="px-6 py-5 text-center text-sm font-medium">
                                 <span class="text-gray-900">{{ .Stats.Applied }}</span>
-                                <span class="text-gray-600">Confs Applied for</span>
+                                <span class="text-gray-600">Confs Applied</span>
                             </div>
                             <div class="px-6 py-5 text-center text-sm font-medium">
                                 <span class="text-gray-900">{{ .Stats.Pending }}</span>
-                                <span class="text-gray-600">Applications Pending</span>
+                                <span class="text-gray-600">Pending</span>
                             </div>
                             <div class="px-6 py-5 text-center text-sm font-medium">
                                 <span class="text-gray-900">{{ .Stats.Accepted }}</span>
-                                <span class="text-gray-600">Confs Accepted</span>
+                                <span class="text-gray-600">Accepted</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
-            <section id="calendar">
-            {{ block "vol_shift_card" . }} {{ end }}
+
+            <section id="applications" class="mt-8">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Your Volunteer Applications</h2>
+                <div class="space-y-4">
+                    {{ range .VolApps }}
+                    {{ $conf := index .ScheduleFor 0 }}
+                    <div class="bg-white shadow rounded-lg overflow-hidden">
+                        <div class="px-4 py-5 sm:p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-3xl">{{ $conf.Emoji }}</div>
+                                    <div>
+                                        <h3 class="text-sm font-medium text-gray-900">{{ $conf.Desc }}</h3>
+                                        <p class="text-sm text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <!-- Status Badge -->
+                                    {{ if eq .Status "Waitlist" }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                        Pending Review
+                                    </span>
+                                    {{ else if eq .Status "Accepted" }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Accepted
+                                    </span>
+                                    {{ else if eq .Status "PendingShifts" }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                        Select Shifts
+                                    </span>
+                                    {{ else if eq .Status "Scheduled" }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        Scheduled
+                                    </span>
+                                    {{ else if eq .Status "Declined" }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                        Declined
+                                    </span>
+                                    {{ else }}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        {{ .Status }}
+                                    </span>
+                                    {{ end }}
+                                </div>
+                            </div>
+
+                            <!-- Action buttons based on status -->
+                            <div class="mt-4">
+                                {{ if eq .Status "PendingShifts" }}
+                                <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                    Select Your Shifts
+                                </a>
+                                {{ else if eq .Status "Scheduled" }}
+                                <div class="space-y-3">
+                                    <!-- Show assigned shifts -->
+                                    {{ if .WorkShifts }}
+                                    <div class="bg-gray-50 rounded-lg p-3">
+                                        <h4 class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Your Shifts</h4>
+                                        <ul class="space-y-1">
+                                            {{ range .WorkShifts }}
+                                            <li class="text-sm text-gray-700">
+                                                <span class="font-medium">{{ .Name }}</span>
+                                                <span class="text-gray-500">- {{ .DayOfDesc }} {{ .TimeDesc }}</span>
+                                            </li>
+                                            {{ end }}
+                                        </ul>
+                                    </div>
+                                    {{ end }}
+                                    <div class="flex space-x-3">
+                                        <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                                           class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
+                                            View/Edit Shifts
+                                        </a>
+                                        <a href="/ticket/vol-{{ .Ref }}"
+                                           class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200">
+                                            Download Ticket
+                                        </a>
+                                    </div>
+                                </div>
+                                {{ else if eq .Status "Accepted" }}
+                                <p class="text-sm text-gray-600">Your application has been accepted! Shift selection will open soon.</p>
+                                {{ else if eq .Status "Waitlist" }}
+                                <p class="text-sm text-gray-600">Your application is being reviewed. We'll notify you by email.</p>
+                                {{ else }}
+                                <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                                    Sign Up for Shifts
+                                </a>
+                                {{ end }}
+                            </div>
+                        </div>
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+
+            <!-- Contact Info -->
+            <section id="contact" class="mt-8 mb-12">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h3 class="text-sm font-medium text-gray-900">Need Help?</h3>
+                        <p class="mt-1 text-sm text-gray-600">
+                            If you have questions about your volunteer application or shifts, contact us at
+                            <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>
+                        </p>
+                    </div>
+                </div>
             </section>
         </div>
     </div>
-    <section id="about">
-    {{ block "about" . }} {{ end }}
-    </section>
     {{ block "footer" . }} {{ end }}
-    <!-- Include this script tag or install `@tailwindplus/elements` via npm: -->
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindplus/elements@1" type="module"></script>
   </body>
 </html>

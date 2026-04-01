@@ -22,6 +22,7 @@ type (
 		JobTypeDb    string
                 TalkAppDb    string
                 VolInfoDb    string
+                ShiftDb      string
 	}
 
 	Notion struct {

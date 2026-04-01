@@ -614,6 +614,42 @@ func (ws *WorkShift) DayOf() string {
 	return ws.ShiftTime.Start.Format("01/02/2006")
 }
 
+func (ws *WorkShift) DayOfDesc() string {
+	return ws.ShiftTime.Start.Format("Mon. Jan 2")
+}
+
+func (ws *WorkShift) SpotsAvailable() uint {
+	assigned := uint(len(ws.AssigneesRef))
+	if assigned >= ws.MaxVols {
+		return 0
+	}
+	return ws.MaxVols - assigned
+}
+
+func (ws *WorkShift) IsFull() bool {
+	return ws.SpotsAvailable() == 0
+}
+
+func (ws *WorkShift) TimeDesc() string {
+	if ws.ShiftTime == nil {
+		return ""
+	}
+	start := ws.ShiftTime.Start.Format("3:04pm")
+	if ws.ShiftTime.End != nil {
+		return fmt.Sprintf("%s - %s", start, ws.ShiftTime.End.Format("3:04pm"))
+	}
+	return start
+}
+
+func (ws *WorkShift) IsAssigned(volRef string) bool {
+	for _, ref := range ws.AssigneesRef {
+		if ref == volRef {
+			return true
+		}
+	}
+	return false
+}
+
 func (v *Volunteer) AvailableOn(ws *WorkShift) bool {
         shiftDay := ws.DayOf()
         for _, day := range v.Availability {

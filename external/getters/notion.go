@@ -1,11 +1,14 @@
 package getters
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +32,9 @@ var lastHotelFetch time.Time
 var jobs []*types.JobType
 var lastJobTypeFetch time.Time
 
+var shifts []*types.WorkShift
+var lastShiftFetch time.Time
+
 type (
 	JobType int
 )
@@ -40,6 +46,7 @@ const (
 	JobDiscounts
 	JobHotels
 	JobJobs
+	JobShifts
 )
 
 var taskChan chan JobType = make(chan JobType)
@@ -77,12 +84,16 @@ func WaitFetch(ctx *config.AppContext) {
 	runJob(ctx, JobJobs)
 	lastJobTypeFetch = time.Now()
 
+	runJob(ctx, JobShifts)
+	lastShiftFetch = time.Now()
+
 	ctx.Infos.Printf("wait fetch loaded!")
 	ctx.Infos.Printf("has confs?? %t", confs != nil)
 	ctx.Infos.Printf("has talks?? %t", talks != nil)
 	ctx.Infos.Printf("has speakers?? %t", cacheSpeakers != nil)
 	ctx.Infos.Printf("has hotels?? %t", hotels != nil)
 	ctx.Infos.Printf("has jobs?? %t", jobs != nil)
+	ctx.Infos.Printf("has shifts?? %t", shifts != nil)
 }
 
 func runJob(ctx *config.AppContext, job JobType) {
@@ -99,6 +110,8 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getHotels(ctx)
         case JobJobs:
 		getJobs(ctx)
+	case JobShifts:
+		getShifts(ctx)
 	}
 }
 
@@ -248,12 +261,36 @@ func getJobs(ctx *config.AppContext) {
 func FetchJobsCached(ctx *config.AppContext) ([]*types.JobType, error) {
 	now := time.Now()
 	deadline := now.Add(time.Duration(-5) * time.Minute)
-	if jobs == nil || lastHotelFetch.Before(deadline) {
-		lastHotelFetch = time.Now()
+	if jobs == nil || lastJobTypeFetch.Before(deadline) {
+		lastJobTypeFetch = time.Now()
 		taskChan <- JobJobs
 	}
 
 	return jobs, nil
+}
+
+func getShifts(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting shifts...")
+	shifts, err = ListWorkShifts(ctx)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching shifts %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d shifts!", len(shifts))
+	}
+}
+
+/* This may return nil */
+func FetchShiftsCached(ctx *config.AppContext) ([]*types.WorkShift, error) {
+	now := time.Now()
+	deadline := now.Add(time.Duration(-5) * time.Minute)
+	if shifts == nil || lastShiftFetch.Before(deadline) {
+		lastShiftFetch = time.Now()
+		taskChan <- JobShifts
+	}
+
+	return shifts, nil
 }
 
 func FetchTokens(n *types.Notion) (types.AuthTokens, error) {
@@ -527,6 +564,219 @@ func ListJobs(n *types.Notion) ([]*types.JobType, error) {
 	}
 
 	return jobs, nil
+}
+
+func ListWorkShifts(ctx *config.AppContext) ([]*types.WorkShift, error) {
+	var shiftList []*types.WorkShift
+	n := ctx.Notion
+
+	jobtypes, err := FetchJobsCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.ShiftDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+		for _, page := range pages {
+			shift := parseWorkShift(ctx, page.ID, page.Properties, jobtypes)
+			shiftList = append(shiftList, shift)
+		}
+	}
+
+	return shiftList, nil
+}
+
+func GetShiftsForConf(ctx *config.AppContext, confTag string) ([]*types.WorkShift, error) {
+	allShifts, err := FetchShiftsCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var filtered []*types.WorkShift
+	for _, shift := range allShifts {
+		if shift.Conf != nil && shift.Conf.Tag == confTag {
+			filtered = append(filtered, shift)
+		}
+	}
+	return filtered, nil
+}
+
+func AssignVolunteerToShift(ctx *config.AppContext, volRef, shiftRef string) error {
+	n := ctx.Notion
+
+	// First get the current shift to get existing assignees
+	allShifts, err := FetchShiftsCached(ctx)
+	if err != nil {
+		return err
+	}
+
+	var shift *types.WorkShift
+	for _, s := range allShifts {
+		if s.Ref == shiftRef {
+			shift = s
+			break
+		}
+	}
+	if shift == nil {
+		return fmt.Errorf("shift %s not found", shiftRef)
+	}
+
+	// Check if already assigned
+	for _, assignee := range shift.AssigneesRef {
+		if assignee == volRef {
+			return nil // Already assigned
+		}
+	}
+
+	// Build new assignees list
+	newAssignees := make([]*notion.ObjectReference, len(shift.AssigneesRef)+1)
+	for i, ref := range shift.AssigneesRef {
+		newAssignees[i] = &notion.ObjectReference{
+			Object: notion.ObjectPage,
+			ID:     ref,
+		}
+	}
+	newAssignees[len(shift.AssigneesRef)] = &notion.ObjectReference{
+		Object: notion.ObjectPage,
+		ID:     volRef,
+	}
+
+	_, err = n.Client.UpdatePageProperties(context.Background(), shiftRef,
+		map[string]*notion.PropertyValue{
+			"Assignees": {
+				Type:     notion.PropertyRelation,
+				Relation: newAssignees,
+			},
+		})
+
+	if err == nil {
+		// Update local cache
+		shift.AssigneesRef = append(shift.AssigneesRef, volRef)
+	}
+
+	return err
+}
+
+func RemoveVolunteerFromShift(ctx *config.AppContext, volRef, shiftRef string) error {
+	n := ctx.Notion
+
+	// First get the current shift to get existing assignees
+	allShifts, err := FetchShiftsCached(ctx)
+	if err != nil {
+		return err
+	}
+
+	var shift *types.WorkShift
+	for _, s := range allShifts {
+		if s.Ref == shiftRef {
+			shift = s
+			break
+		}
+	}
+	if shift == nil {
+		return fmt.Errorf("shift %s not found", shiftRef)
+	}
+
+	// Build new assignees list without the volunteer
+	newAssignees := make([]*notion.ObjectReference, 0)
+	newAssigneesRef := make([]string, 0)
+	for _, ref := range shift.AssigneesRef {
+		if ref != volRef {
+			newAssignees = append(newAssignees, &notion.ObjectReference{
+				Object: notion.ObjectPage,
+				ID:     ref,
+			})
+			newAssigneesRef = append(newAssigneesRef, ref)
+		}
+	}
+
+	// If relation is empty, use direct HTTP request since go-notion's
+	// omitempty causes empty slices to be omitted from JSON
+	if len(newAssignees) == 0 {
+		err = clearRelationProperty(n.Config.Token, shiftRef, "Assignees")
+	} else {
+		_, err = n.Client.UpdatePageProperties(context.Background(), shiftRef,
+			map[string]*notion.PropertyValue{
+				"Assignees": {
+					Type:     notion.PropertyRelation,
+					Relation: newAssignees,
+				},
+			})
+	}
+
+	if err == nil {
+		// Update local cache
+		shift.AssigneesRef = newAssigneesRef
+	}
+
+	return err
+}
+
+// clearRelationProperty makes a direct HTTP request to Notion API to clear a relation
+func clearRelationProperty(token, pageID, propertyName string) error {
+	payload := map[string]interface{}{
+		"properties": map[string]interface{}{
+			propertyName: map[string]interface{}{
+				"relation": []interface{}{},
+			},
+		},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", "https://api.notion.com/v1/pages/"+pageID, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Notion-Version", "2022-06-28")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		var errResp map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		return fmt.Errorf("notion API error: %v", errResp)
+	}
+
+	return nil
+}
+
+func UpdateVolunteerStatus(ctx *config.AppContext, volRef, status string) error {
+	n := ctx.Notion
+
+	_, err := n.Client.UpdatePageProperties(context.Background(), volRef,
+		map[string]*notion.PropertyValue{
+			"Status": {
+				Type: notion.PropertySelect,
+				Select: &notion.SelectOption{
+					Name: status,
+				},
+			},
+		})
+
+	return err
 }
 
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {

@@ -3,185 +3,254 @@
   <head>
     <title>sponsor bitcoin++</title>
     {{ block "header" . }} {{ end }}
-    <!-- for the cognito forms section -->
-    <script src="https://www.cognitoforms.com/f/iframe.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
     <section id="form">
-      <form method="POST" class="grid grid-cols-1 gap-y-2 gap-x-8 text-base w-full sm:w-2xl">
-            <label for="Name" class="text-gray-300 mt-4 mb-2">
-              Name or Nym *
-            </label>
-            <input class="rounded-md" name="Name" id="Name" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="Your Name"
-            />
-
-            <label for="Phone" class="text-gray-300 mt-4 mb-2">
-              Phone *
-            </label>
-            <input class="rounded-md mt-2" type="tel" id="Phone" name="Phone" placeholder="+1 555-928-2999" required>
-
-            <label for="Email" class="text-gray-300 mt-4 mb-2">
-              Email *
-            </label>
-            <input class="rounded-md mt-2" type="email" id="Email" name="Email" placeholder="hello@example.com" required>
-
-            <label for="Hometown" class="text-gray-300 mt-4 mb-2">
-              I live in... *
-            </label>
-            <input class="rounded-md" name="Hometown" id="Hometown" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="Hometown, USA"
-            />
-
-            <label for="Signal" class="text-gray-300 mt-4 mb-2">
-              Signal Username or Number *
-            </label>
-            <input class="rounded-md" name="Signal" id="Signal" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="example.99"
-            />
-
-            <label for="Twitter" class="text-gray-300 mt-4 mb-2">
-              X Account Username
-            </label>
-            <input class="rounded-md" name="Twitter" id="Twitter" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="@btcplusplus"
-            />
-
-            <label for="npub" class="text-gray-300 mt-4 mb-2">
-            Nostr Npub
-            </label>
-            <input class="rounded-md" name="Twitter" id="Twitter" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="npub1dwah..."
-            />
-
-            <label for="ContactAt" class="text-gray-300 mt-4 mb-2">
-            Best Way to Contact You?
-            </label>
-            <input class="rounded-md" name="ContactAt" id="ContactAt" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="Signal"
-            />
-
-            <!-- todo: make dynamic based how we arrived here -->
-            <fieldset >
-                <legend>
-                Events I'm Interested in Volunteering At
-                </legend>
-                <div>
-                Select as many as you'd like
-                </div>
-                <div>
-                <!-- todo: mark YES if chosen at prev screen -->
-                {{ range .ConfItems }}
-                   {{ block "form_list" . }} {{ end }}
-                {{ end }}
-                </div>
-            </fieldset>
-
-            <fieldset >
-                <legend>
-                Things I'd Like to Help With
-                </legend>
-                <div>
-                Select as many as you'd like
-                </div>
-                <div>
-                {{ range .JobsList }}
-                   {{ block "form_list" . }} {{ end }}
-                {{ end }}
-                </div>
-            </fieldset>
-
-            <fieldset >
-                <legend>
-                Things I Don't Want to Help With
-                </legend>
-                <div>
-                Select as many as you'd like
-                </div>
-                <div>
-                {{ range .JobsList }}
-                   {{ block "form_list" . }} {{ end }}
-                {{ end }}
-                </div>
-            </fieldset>
-
-            <fieldset >
-                <legend>
-                This is my first <span class="font-bitcoin">bitcoin++</span> event
-                </legend>
-                <div>
-                Select as many as you'd like
-                </div>
-                <div>
-                  <div class="flex my-4 sm:col-span-2">
-                    <div class="flex h-6 items-center mr-4">
-                      <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                        <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                     <input id="FirstEvent" type="radio" name="FirstEvent" value="Yes"
-                         class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
-                      </div>
-                    </div>
-                    <label for="conftag" class="text-sm/6 text-gray-300">
-                    Yes
-                    </label>
-                  </div>
-                  <div class="flex my-4 sm:col-span-2">
-                    <div class="flex h-6 items-center mr-4">
-                      <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                       <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                       <input id="FirstEvent" type="radio" name="FirstEvent" value="No"
-                         class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
+        <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Sponsor Inquiry</h2>
+                <p ="mt-2 text-lg/8 text-gray-600">Support development at the cutting edge with a sponsorship for one of our upcoming events or hackathons</p>
+            </div>
+            <form action="#" 
+            hx-post="/sponsor"
+            class="mx-auto mt-16 max-w-xl sm:mt-20"
+            hx-target="#post_result"
+            hx-swap="innerHTML"
+            hx-validate="true"
+            hx-disabled-elt="find input[type='text'], find button"
+            >
+                <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Your Name</label>
+                        <div class="mt-2.5">
+                            <input id="Name" type="text" name="Name" 
+                            autocomplete="given-name" 
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Your Name"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
-                      </div>
-                      <label for="FirstEvent" class="text-sm/6 text-gray-300">
-                      No
-                      </label>
                     </div>
+                    <div class="sm:col-span-2">
+                        <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
+                        <div class="mt-2.5">
+                            <input id="Phone" type="tel" name="Phone" 
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="+1 555-928-1900"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
+                        <div class="mt-2.5">
+                            <input id="Email" type="Email" name="Email" autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Signal" id="Signal" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="example.99"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Telegram" class="block text-sm/6 font-semibold text-gray-900">Telegram Username or Number</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Telegram" id="Telegram" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@niftynei"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="ContactAt" class="block text-sm/6 font-semibold text-gray-900">
+                        Best Way to Contact You?
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="ContactAt" id="ContactAt" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Signal or email"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Org" class="block text-sm/6 font-semibold text-gray-900">
+                        Company or Organization *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Org" id="Org" type="text" 
+                            autoComplete="organization" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="bitcoin++"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgSite" class="block text-sm/6 font-semibold text-gray-900">Org's website</label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgSite" id="OrgSite" type="url" 
+                            autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="https://btcplusplus.dev"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgTwitter" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's X Account
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgTwitter" id="OrgTwitter" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="@btcplusplus"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgNostr" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's Nostr npub
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgNostr" id="OrgNostr" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="npub1dwah..."
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="OrgLogoFile" class="block text-sm/6 font-semibold text-gray-900">
+                        Org's Logo
+                        </label>
+                        <div class="block text-sm/6 text-gray-600">
+                        Must be less than 10MB.
+                        </div>
+                        <div class="mt-2.5">
+                            <input 
+                            name="OrgLogoFile" id="OrgLogoFile" type="file" 
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Events I'm Interested in Sponsoring *
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .ConfItems }}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="Budget" class="block text-sm/6 font-semibold text-gray-900">
+                        What's your budget? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Budget" id="Budget" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                    <fieldset>
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Sponsorship Opps I'm Interested In *
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .SponsorOpps}}
+                           {{ block "form_list" . }} {{ end }}
+                        {{ end }}
+                        </div>
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
+                        How did you find out about <span class="font-bitcoin">bitcoin++</span>?
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="twitter..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+
+                    <div class="sm:col-span-2">
+                        <label for="Comments" class="block text-sm/6 font-semibold text-gray-900">
+                        Additional Comments
+                        </label>
+                        <div class="mt-2.5">
+                            <textarea 
+                            name="Comments" id="Comments"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Excited about..."
+                            rows="3" 
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-x-4 sm:col-span-2">
+                        <div class="flex h-6 items-center">
+                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
+                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
+                                <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                            </div>
+                        </div>
+                        <label for="sub-newsletter" class="text-sm/6 text-gray-600">
+                        Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
+                        </label>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">
+                        What is ten divided by two? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input 
+                            name="Captcha" id="Captcha" type="number" 
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="5"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+
                 </div>
-            </fieldset>
-
-            <label for="DiscoveredVia" class="text-gray-300 mt-4 mb-2">
-            How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
-            </label>
-            <input class="rounded-md" name="DiscoveredVia" id="DiscoveredVia" type="text" 
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="twitter..."
-            />
-
-            <label for="Comments" class="text-gray-300 mt-4 mb-2">
-            Additional Comments
-            </label>
-            <textarea class="rounded-md" name="Comments" id="Comments"
-            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-            placeholder="Excited about..."
-            />
-
-            <div class="flex my-4 sm:col-span-2">
-              <div class="flex h-6 items-center mr-4">
-                <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcoin has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                    <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-
-                    <input id="sub-newsletter" type="checkbox" name="Subscribe" checked aria-label="Subscribe to Newsletter" class="absolute opacity-0 inset-0 appearance-none focus:outline-none" />
+                <div class="mt-10">
+                    <button type="submit" 
+                    class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin
+                    disabled:opacity-25"
+                    >Submit Application</button>
                 </div>
-              </div>
-              <label for="sub-newsletter" class="text-sm/6 text-gray-300">
-                Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
-              </label>
+            </form>
+            <div id="post_result" name="hidden_stuffs" class="mt-5 mx-auto max-w-xl">
             </div>
-            <div class="mt-8">
-                <button type="submit" class="inline-flex rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Submit</button>
-            </div>
-        </form>
+        </div>
     </section>
     <section id="about">
     {{ block "about" . }} {{ end }}
