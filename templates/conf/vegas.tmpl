@@ -148,11 +148,11 @@
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Bus Pick-Ups Begin</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">9:00am</dt>
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">9:30am</dt>
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Doors Open</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:00am</dt>
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:30am</dt>
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Talks + Presentations Begin</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
@@ -179,11 +179,11 @@
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Bus Pick-Ups Begin</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">9:00am</dt>
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">9:30am</dt>
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Doors Open</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
-                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:00am</dt>
+                            <dt class="text-sm/6 font-medium text-gray-900 dark:text-gray-100">10:30am</dt>
                             <dd class="text-left mt-1 text-sm/6 text-gray-700 sm:col-span-2 sm:mt-0 dark:text-gray-400">Talks + Presentations Begin</dd>
                         </div>
                         <div class="px-4 py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0">
@@ -229,7 +229,7 @@
 	      <div class="w-full border-t border-gray-300"></div>
 	    </div>
 	    <div class="relative flex justify-start">
-	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:00 am </span>
+	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:30 am </span>
 	    </div>
 	  </div>
 
@@ -282,7 +282,7 @@
         <div class="w-full border-t border-gray-300"></div>
       </div>
       <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:15 pm</span>
       </div>
     </div>
     {{ with (index .Days 0) }}
@@ -301,6 +301,7 @@
     </div>
       {{ end }}
       {{ end }}
+    {{ end }}
 
     <h3 class="mt-8 text-xl tracking-tight text-gray-900 sm:text-xl">Fri, April 24th</h3>
 	  <div class="mt-6 relative">
@@ -308,7 +309,7 @@
 	      <div class="w-full border-t border-gray-300"></div>
 	    </div>
 	    <div class="relative flex justify-start">
-	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:00 am </span>
+	      <span class="bg-white px-2 text-sm text-gray-500">Check-in Opens + Breakfast, 9:30 am </span>
 	    </div>
 	  </div>
 
@@ -361,7 +362,7 @@
         <div class="w-full border-t border-gray-300"></div>
       </div>
       <div class="relative flex justify-start">
-        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:00 pm</span>
+        <span class="bg-white px-2 text-sm text-gray-500">Afternoon Break, 2:30 pm - 3:30 pm</span>
       </div>
     </div>
     {{ with (index .Days 1) }}
@@ -380,7 +381,6 @@
     </div>
       {{ end }}
       {{ end }}
-    {{ end }}
     {{ end }}
   </div>
 </div>
@@ -522,26 +522,47 @@
           <p class="mt-6 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span> is proud to be supported by a wide range of companies from across the bitcoin ecosystem. Check out what they're up to, both here online as well as at the conference.</p>
         </div>
         <div class="mx-auto grid w-full max-w-xl grid-cols-2 items-center gap-y-12 sm:gap-y-14 lg:mx-0 lg:max-w-none lg:pl-8">
-          <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
-            <h3 class="text-xl font-bold tracking-tight text-gray-900">🔶Sponsors🔶</h3>
+            <h3 class="text-xl tracking-tight text-gray-900" style="font-family: courier;">Headline Sponsors</h3>
+            <a href="https://www.nydig.com/" target="_blank" class="p-4 sm:p-12"
+             style="grid-column: span 2">
+              <img class="max-h-36 w-full object-contain object-center" src="/static/img/sponsors/nydig_dark.svg" alt="NYDIG" width="150" height="auto">
+            </a>
+            <a href="https://hrf.org/" target="_blank" class="p-4 sm:p-12"
+            style="grid-column: span 2">
+              <img class="max-h-32 w-full object-contain object-center" src="/static/img/hrf.svg" alt="HRF" width="300" height="300">
+            </a>
+
+          <div style="margin-bottom: -3.5em; grid-column: span 2">
+            <h3 class="text-xl tracking-tight text-gray-900" style="font-family: courier;">Title Sponsor</h3>
           </div>
-        <a href="https://base58.school" target="_blank" class="p-4 sm:p-8"
-           style="grid-column: span 2; margin-top: -2rem;">
+            <a href="https://nakamoto.com/" target="_blank" class="p-4 sm:p-12"
+             style="grid-column: span 2; padding: 20px 106px;">
+              <img class="max-h-24 w-full object-contain object-center" src="/static/img/sponsors/nakamoto-wordmark_black.svg" alt="Nakamoto" width="150" height="auto">
+             </a>
+
+          <div style="margin-bottom: -3.5em; grid-column: span 2">
+            <h3 class="text-xl tracking-tight text-gray-900" style="font-family: courier;">Workshops Sponsor</h3>
+          </div>
+          <a href="https://stakwork.com/" target="_blank" class="p-4 sm:p-12"
+             style="grid-column: span 2; padding: 20px 175px;">
+            <img class="max-h-24 w-full object-contain object-center" src="/static/img/sponsors/stak.svg" alt="Access a global workforce" width="150" height="auto">
+          </a>
+
+          <div style="margin-bottom: -3.5em; grid-column: span 2">
+            <h3 class="text-xl tracking-tight text-gray-900" style="font-family: courier;">Silver Sponsors</h3>
+          </div>
+
+          <a href="https://www.btcpolicy.org/" target="_blank" class="p-6">
+            <img class="w-full object-contain object-center" src="/static/img/sponsors/bpi.svg" alt="Bitcoin Policy Institute" style="max-height: 8rem;">
+          </a>
+
+          <a href="https://unchained.com/" target="_blank" class="p-6">
+            <img class="w-full object-contain object-center" src="/static/img/sponsors/unchained.svg" alt="Unchained" style="max-height: 8rem;">
+          </a>
+
+        <a href="https://base58.school" target="_blank" class="p-4 sm:p-8">
             <img class="max-h-20 w-full object-contain object-center" src="/static/img/base58.svg" alt="Base58" width="150" height="auto">
         </a>
-        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center">
-          <h3 class="text-lg font-bold tracking-tight text-gray-900">📡 Media Partners 📺</h3>
-        </div>
-          <a href="https://insider.btcpp.dev/" target="_blank" class="pt-8">
-            <img class="max-h-32 w-full object-contain object-center" src="/static/img/riga/insider.png" alt="btc++ insider edition" width="200" height="auto">
-          </a>
-        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center pb-8">
-          <h3 class="text-lg font-bold tracking-tight text-gray-900">🏡 Community Partners 🛠️</h3>
-        </div>
-          <a href="https://forms.gle/tw3aSiy3foba3iHF6" target="_blank">
-            <img class="max-h-24 w-full object-contain object-center" src="/static/img/plebprintshop.png" alt="pleb print shop" width="200" height="auto">
-          </a>
-        </div>
       </div>
     </div>
   </div>
