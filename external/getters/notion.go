@@ -1189,6 +1189,12 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
                                 Name: vol.Shirt,
                         },
                 },
+                "Status": {
+                        Type: notion.PropertySelect,
+                        Select: &notion.SelectOption{
+                                Name: "Applied",
+                        },
+                },
 
         }
 

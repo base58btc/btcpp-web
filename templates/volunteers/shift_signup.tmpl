@@ -5,9 +5,50 @@
     {{ block "header" . }} {{ end }}
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ .Conf.Emoji }}</text></svg>">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+      /* Loading overlay */
+      #loading-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+      }
+      #loading-overlay.htmx-request {
+        display: flex;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 4px solid #e5e7eb;
+        border-top-color: #4f46e5;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      /* Disable buttons during request */
+      .htmx-request button,
+      .htmx-request a.btn {
+        pointer-events: none;
+        opacity: 0.5;
+      }
+    </style>
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
+
+    <!-- Loading overlay -->
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+    </div>
+
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div class="mx-auto max-w-4xl">
             <section id="header" class="py-6">
@@ -15,6 +56,12 @@
                     <div>
                         <h1 class="text-2xl font-bold text-gray-900">Select Your Shifts</h1>
                         <p class="mt-1 text-sm text-gray-600">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                        <a href="/volunteer/{{ .ConfRef }}" class="mt-2 inline-flex items-center text-sm text-indigo-600 hover:text-indigo-500">
+                            <svg class="mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Update availability &amp; preferences
+                        </a>
                     </div>
                     <div class="mt-4 sm:mt-0">
                         <a href="/vols/shift?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-indigo-600 hover:text-indigo-500">
@@ -24,7 +71,7 @@
                 </div>
             </section>
 
-            <div id="shift-list">
+            <div id="shift-list" hx-indicator="#loading-overlay">
                 {{ template "shift_list_content" . }}
             </div>
         </div>

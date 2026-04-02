@@ -1724,6 +1724,20 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
         }
 
+	// Populate WorkShifts for each volunteer application
+	for _, vol := range volapps {
+		if len(vol.ScheduleFor) == 0 {
+			continue
+		}
+		conf := vol.ScheduleFor[0]
+		confShifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+		if err != nil {
+			ctx.Err.Printf("/vol/shift failed to get shifts for conf %s: %s", conf.Tag, err.Error())
+			continue
+		}
+		vol.WorkShifts = getSelectedShifts(vol, confShifts)
+	}
+
 	encodedEmail := r.URL.Query().Get("em")
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/shift.tmpl", &VolShiftPage{
                 Name:     volapps[0].Name,
