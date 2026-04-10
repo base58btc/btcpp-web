@@ -1295,6 +1295,19 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
 	return err
 }
 
+func GetVolInfo(ctx *config.AppContext, confRef string) (*types.VolInfo, error) {
+        infos, err := GetVolInfos(ctx, confRef)
+        if err != nil {
+                return nil, err
+        }
+
+        if len(infos) == 0 {
+                return nil, fmt.Errorf("Invalid confref for volinfos %s", confRef)
+        }
+
+        return infos[0], nil
+}
+
 func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
         vmap := make(map[string]*types.VolInfo)
         volinfos, err := GetVolInfos(ctx, "")

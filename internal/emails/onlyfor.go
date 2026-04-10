@@ -19,6 +19,13 @@ type (
                 VolShiftLink string
         }
 
+        VolSignup struct {
+                Volunteer    *types.Volunteer
+                Conf         *types.Conf
+                Email        string
+                VolShiftLink string
+        }
+
         VolShifts struct {
                 Volunteer    *types.Volunteer
                 Conf         *types.Conf
@@ -57,6 +64,18 @@ func OnlyForVolLogin(ctx *config.AppContext, email string) ([]byte, error) {
 	}
 
         return execOnlyFor(ctx, email, onlyFor, tmplData)
+}
+
+func OnlyForVolSignup(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf) ([]byte, error) {
+        onlyFor := "volsignup"
+        tmplData := &VolSignup{
+                Email: vol.Email,
+                Conf: conf,
+                Volunteer: vol,
+                VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+	}
+
+        return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
 }
 
 func OnlyForVolApp(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf, volinfo *types.VolInfo) ([]byte, error) {

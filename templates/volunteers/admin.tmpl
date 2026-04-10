@@ -40,13 +40,13 @@
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "PendingShifts" }}bg-blue-800 text-white{{ else }}bg-blue-100 text-blue-800 hover:bg-blue-200{{ end }}">
                             Pending Shifts
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Scheduled"
-                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Scheduled" }}bg-green-800 text-white{{ else }}bg-green-100 text-green-800 hover:bg-green-200{{ end }}">
-                            Scheduled
-                        </a>
                         <a href="/vols/admin/{{ .Conf.Tag }}?status=Waitlist"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Waitlist" }}bg-yellow-800 text-white{{ else }}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{{ end }}">
                             Waitlist
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Scheduled"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Scheduled" }}bg-green-800 text-white{{ else }}bg-green-100 text-green-800 hover:bg-green-200{{ end }}">
+                            Scheduled
                         </a>
                         <a href="/vols/admin/{{ .Conf.Tag }}?status=Declined"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Declined" }}bg-red-800 text-white{{ else }}bg-red-100 text-red-800 hover:bg-red-200{{ end }}">
@@ -72,47 +72,6 @@
                     </div>
                 </div>
             </section>
-
-            <!-- Shift Capacity Overview -->
-            {{ if .Shifts }}
-            <section id="shifts" class="mb-6">
-                <div class="bg-white shadow rounded-lg overflow-hidden">
-                    <div class="px-4 py-4 sm:px-6">
-                        <h3 class="text-sm font-medium text-gray-900 mb-3">Shift Capacity</h3>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filled</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                {{ range .Shifts }}
-                                <tr>
-                                    <td class="px-4 py-2 text-sm text-gray-900">{{ .Name }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .DayOfDesc }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .TimeDesc }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ if .Type }}{{ .Type.Title }}{{ end }}</td>
-                                    <td class="px-4 py-2 whitespace-nowrap text-sm">
-                                        {{ if .IsFull }}
-                                        <span class="text-red-600 font-medium">{{ len .AssigneesRef }}/{{ .MaxVols }} Full</span>
-                                        {{ else }}
-                                        <span class="text-green-600">{{ len .AssigneesRef }}/{{ .MaxVols }}</span>
-                                        {{ end }}
-                                    </td>
-                                </tr>
-                                {{ end }}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-            {{ end }}
 
             <!-- Volunteers Table -->
             <section id="volunteers" class="mb-8">
@@ -173,6 +132,48 @@
                     {{ end }}
                 </div>
             </section>
+
+            <!-- Shift Capacity Overview -->
+            {{ if .Shifts }}
+            <section id="shifts" class="mb-6">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-4 sm:px-6">
+                        <h3 class="text-sm font-medium text-gray-900 mb-3">Shift Capacity</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filled</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {{ range .Shifts }}
+                                <tr>
+                                    <td class="px-4 py-2 text-sm text-gray-900">{{ .Name }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .DayOfDesc }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .TimeDesc }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ if .Type }}{{ .Type.Title }}{{ end }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm">
+                                        {{ if .IsFull }}
+                                        <span class="text-green-600 font-medium">{{ len .AssigneesRef }}/{{ .MaxVols }} Full</span>
+                                        {{ else }}
+                                        <span class="text-red-600">{{ len .AssigneesRef }}/{{ .MaxVols }}</span>
+                                        {{ end }}
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            {{ end }}
+
         </div>
     </div>
   </body>

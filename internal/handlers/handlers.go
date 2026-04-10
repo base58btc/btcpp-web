@@ -833,17 +833,11 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                 }
 
                 /* Send application acknowledgment email */
-	        volinfos, err := getters.GetVolInfos(ctx, conf.Ref)
+	        volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
                 if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to fetch volinfos %s", err)
                         w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
-                }
-                var volinfo *types.VolInfo
-                if err != nil {
-                        ctx.Err.Printf("/vols/shift/%s/submit failed to get volinfo: %s", conf.Tag, err.Error())
-                } else if len(volinfos) > 0 {
-                        volinfo = volinfos[0]
                 }
 
                 _, err = emails.OnlyForVolApp(ctx, &vol, conf, volinfo)
@@ -2163,12 +2157,10 @@ func VolunteerSubmitShifts(w http.ResponseWriter, r *http.Request, ctx *config.A
 	// Send onboarding email with shift details, group chat link, orientation info
 	vol.WorkShifts = selectedShifts
 	conf := vol.ScheduleFor[0]
-	volinfos, err := getters.GetVolInfos(ctx, conf.Ref)
-	var volinfo *types.VolInfo
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
 	if err != nil {
 		ctx.Err.Printf("/vols/shift/%s/submit failed to get volinfo: %s", confTag, err.Error())
-	} else if len(volinfos) > 0 {
-		volinfo = volinfos[0]
+                return
 	}
 
 	_, err = emails.OnlyForVolShift(ctx, volinfo, vol)
@@ -2255,9 +2247,11 @@ func VolunteerSubmitShifts(w http.ResponseWriter, r *http.Request, ctx *config.A
 }
 
 func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if !helpers.CheckPin(w, r, ctx) {
-		return
-	}
+        /* Check for verified */
+        if ok := helpers.CheckPin(w, r, ctx); !ok {
+                helpers.Render401(w, r, ctx)
+                return
+        }
 
 	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
@@ -2311,9 +2305,11 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if !helpers.CheckPin(w, r, ctx) {
-		return
-	}
+        /* Check for verified */
+        if ok := helpers.CheckPin(w, r, ctx); !ok {
+                helpers.Render401(w, r, ctx)
+                return
+        }
 
 	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
@@ -2350,7 +2346,7 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 
 		// Send shift signup email when promoting to PendingShifts
 		if targetStatus == "PendingShifts" {
-			_, emailErr := emails.OnlyForVolLogin(ctx, vol.Email)
+			_, emailErr := emails.OnlyForVolSignup(ctx, vol, conf)
 			if emailErr != nil {
 				ctx.Err.Printf("/vols/admin/%s/promote email failed for %s: %s", conf.Tag, vol.Email, emailErr)
 			}
