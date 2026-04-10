@@ -3,9 +3,6 @@ package getters
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/binary"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -864,11 +861,17 @@ func CheckIn(n *types.Notion, ticket string) (string, bool, error) {
 			},
 		})
 
-	if len(pages) != 1 {
+	if len(pages) == 0 {
 		return "", true, fmt.Errorf("Ticket not found")
 	}
 
 	page := pages[0]
+
+        revoked := page.Properties["Revoked"].Checkbox
+        if revoked != nil && *revoked {
+                return "", true, fmt.Errorf("Ticket was revoked")
+        }
+
 	if len(page.Properties["Checked In"].RichText) == 0 {
 		/* Update to checked in at time.now() */
 		now := time.Now()
@@ -1027,23 +1030,67 @@ func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.
 	return btcppres, nil
 }
 
-func UniqueID(email string, ref string, counter int32) string {
-	// sha256 of ref || email || count (4, le)
-	h := sha256.New()
-	h.Write([]byte(email))
-	h.Write([]byte(ref))
+func LookupTicketPages(n *types.Notion, lookupID string) ([]*notion.Page, error) {
+        return TicketPages(n, "Lookup ID", lookupID)
+}
 
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, uint32(counter))
-	h.Write(b)
-	return hex.EncodeToString(h.Sum(nil))
+func RefTicketPages(n *types.Notion, refid string) ([]*notion.Page, error) {
+        return TicketPages(n, "RefID", refid)
+}
+
+func TicketPages(n *types.Notion, field, uniqID string) ([]*notion.Page, error) {
+	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
+		n.Config.PurchasesDb, notion.QueryDatabaseParam{
+			Filter: &notion.Filter{
+				Property: field,
+				Text: &notion.TextFilterCondition{
+					Equals: uniqID,
+				},
+			},
+		})
+
+        return pages, err
+}
+
+func ToggleTicketBlock(n *types.Notion, pageID string, block bool) error {
+        _, err := n.Client.UpdatePageProperties(context.Background(), pageID,
+                map[string]*notion.PropertyValue{
+                        "Revoked": {
+                                Type: notion.PropertyCheckbox,
+                                Checkbox: &block,
+                        },
+                })
+        return err
+}
+
+func RevokeTicket(n *types.Notion, lookupID string) error {
+        pages, err := LookupTicketPages(n, lookupID)
+
+        for _, page := range pages {
+                ToggleTicketBlock(n, page.ID, true)
+        } 
+        return err
 }
 
 func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 	parent := notion.NewDatabaseParent(n.Config.PurchasesDb)
 
 	for i, item := range entry.Items {
-		uniqID := UniqueID(entry.Email, entry.ID, int32(i))
+		uniqID := types.UniqueID(entry.Email, entry.ID, int32(i))
+
+                /* Check for existing ticket already */
+                pages, err := RefTicketPages(n, uniqID)
+                if err != nil {
+                        return err
+                }
+                if len(pages) > 0 {
+                        /* Set each page to unrevoked */
+                        for _, page := range pages {
+                                ToggleTicketBlock(n, page.ID, false)
+                        }
+                        continue
+                }
+         
 		vals := map[string]*notion.PropertyValue{
 			"RefID": notion.NewTitlePropertyValue(
 				[]*notion.RichText{
@@ -1101,7 +1148,7 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 				[]*notion.ObjectReference{{ID: entry.DiscountRef}}...,
 			)
 		}
-		_, err := n.Client.CreatePage(context.Background(), parent, vals)
+		_, err = n.Client.CreatePage(context.Background(), parent, vals)
 		if err != nil {
 			return err
 		}
@@ -1248,6 +1295,29 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
 	return err
 }
 
+func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
+        vmap := make(map[string]*types.VolInfo)
+        volinfos, err := GetVolInfos(ctx, "")
+        if err != nil {
+                return vmap, err
+        }
+
+	confs, err = FetchConfsCached(ctx)
+        if err != nil {
+                return vmap, err
+        }
+        for _, vi := range volinfos {
+                for _, conf := range confs {
+                        if conf.Ref == vi.ConfRef {
+                                vmap[conf.Tag] = vi
+                                break
+                        }
+                }
+        }
+
+        return vmap, nil
+}
+
 func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
 	var vis []*types.VolInfo
 	hasMore := true
@@ -1299,6 +1369,39 @@ func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer
 				Equals: email,
 			},
 		}
+	}
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
+			StartCursor: nextCursor,
+			Filter:      filter,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			v := parseVolunteer(ctx, page.ID, page.Properties)
+			vols = append(vols, v)
+		}
+	}
+
+	return vols, nil
+}
+
+func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Volunteer, error) {
+	var vols []*types.Volunteer
+	hasMore := true
+	nextCursor := ""
+	n := ctx.Notion
+	db := ctx.Env.Notion.VolunteerDb
+
+	filter := &notion.Filter{
+		Property: "ScheduleFor",
+		Relation: &notion.RelationFilterCondition{
+			Contains: confRef,
+		},
 	}
 	for hasMore {
 		var err error

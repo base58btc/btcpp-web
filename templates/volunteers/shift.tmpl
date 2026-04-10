@@ -29,7 +29,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="grid grid-cols-1 divide-y divide-gray-200 border-t border-gray-200 bg-gray-50 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                        <div class="grid grid-cols-1 divide-y divide-gray-200 border-t border-gray-200 bg-gray-50 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
                             <div class="px-6 py-5 text-center text-sm font-medium">
                                 <span class="text-gray-900">{{ .Stats.Applied }}</span>
                                 <span class="text-gray-600">Confs Applied</span>
@@ -41,6 +41,10 @@
                             <div class="px-6 py-5 text-center text-sm font-medium">
                                 <span class="text-gray-900">{{ .Stats.Accepted }}</span>
                                 <span class="text-gray-600">Accepted</span>
+                            </div>
+                            <div class="px-6 py-5 text-center text-sm font-medium">
+                                <span class="text-gray-900">{{ .Stats.TotalShifts }}</span>
+                                <span class="text-gray-600">Total Shifts</span>
                             </div>
                         </div>
                     </div>
@@ -66,7 +70,7 @@
                                     <!-- Status Badge -->
                                     {{ if eq .Status "Waitlist" }}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                        Pending Review
+                                        Waitlist
                                     </span>
                                     {{ else if eq .Status "Accepted" }}
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -77,7 +81,7 @@
                                         Select Shifts
                                     </span>
                                     {{ else if eq .Status "Scheduled" }}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                                         Scheduled
                                     </span>
                                     {{ else if eq .Status "Declined" }}
@@ -92,8 +96,38 @@
                                 </div>
                             </div>
 
+                            <!-- Orientation Info (Scheduled only) -->
+                            {{ if eq .Status "Scheduled" }}
+                            {{ $vinfo := index $.VolInfos $conf.Tag }}
+                            {{ if $vinfo }}
+                            <div class="mt-4 border-t border-gray-200 pt-4">
+                                <div class="rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-4">
+                                    <div class="flex items-start justify-between">
+                                        <div>
+                                            <h4 class="text-sm font-semibold text-indigo-900">Volunteer Orientation</h4>
+                                            {{ if $vinfo.OrientTimes }}
+                                            <p class="mt-1 text-sm text-indigo-800">{{ $vinfo.OrientTimes.FmtRange }}</p>
+                                            {{ else }}
+                                            <p class="mt-1 text-sm text-indigo-700">Time TBD - check back soon!</p>
+                                            {{ end }}
+                                            {{ if $vinfo.Notes }}
+                                            <p class="mt-1 text-xs text-indigo-700">{{ $vinfo.Notes }}</p>
+                                            {{ end }}
+                                        </div>
+                                        {{ if $vinfo.OrientLink }}
+                                        <a href="{{ $vinfo.OrientLink }}" target="_blank" rel="noopener noreferrer"
+                                           class="ml-4 shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
+                                            Join Orientation
+                                        </a>
+                                        {{ end }}
+                                    </div>
+                                </div>
+                            </div>
+                            {{ end }}
+                            {{ end }}
+
                             <!-- Shifts Table -->
-                            {{ if .WorkShifts }}
+                            {{ if and .WorkShifts (ne .Status "Declined") }}
                             <div class="mt-4 border-t border-gray-200 pt-4">
                                 <h4 class="text-sm font-medium text-gray-900 mb-3">Your Scheduled Shifts</h4>
                                 <div class="overflow-hidden rounded-lg border border-gray-200">
@@ -128,32 +162,48 @@
 
                             <!-- Action buttons based on status -->
                             <div class="mt-4">
-                                {{ if eq .Status "PendingShifts" }}
-                                <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                                   class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
-                                    Select Your Shifts
-                                </a>
-                                {{ else if eq .Status "Scheduled" }}
-                                <div class="flex space-x-3">
+                                <div class="flex flex-wrap items-center gap-3">
+                                    {{ if eq .Status "PendingShifts" }}
+                                    <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                                       class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                                        Select Your Shifts
+                                    </a>
+                                    {{ else if eq .Status "Scheduled" }}
                                     <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
                                        class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">
                                         View/Edit Shifts
                                     </a>
-                                    <a href="/ticket/vol-{{ .Ref }}"
-                                       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200">
+                                    <a href="/ticket/{{ .TicketRef }}?type=volunteer&conf={{ $conf.Ref }}"
+                                       class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-orange-700 bg-orange-100 hover:bg-orange-200">
                                         Download Ticket
                                     </a>
+                                    {{ else if eq .Status "Applied" }}
+                                    <p class="text-sm text-gray-600">Your application has been accepted! Shift selection will open soon.</p>
+                                    {{ else if eq .Status "Waitlist" }}
+                                    <p class="text-sm text-gray-600">We're currently out of available shifts. We'll notify you by email if a spot opens up.</p>
+                                    {{ else if eq .Status "Declined" }}
+                                    <p class="text-sm text-gray-600">You've let us know you can't attend. Thanks for letting us know!</p>
+                                    {{ else }}
+                                    <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                                       class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+                                        Sign Up for Shifts
+                                    </a>
+                                    {{ end }}
+
+                                    {{ if ne .Status "Declined" }}
+                                    {{ if and (eq .Status "Scheduled") $conf.WithinTwoWeeks }}
+                                    <p class="text-sm text-gray-600">You're scheduled for shifts and we're within two weeks of the conference. If you can no longer attend, please reach out to the Volunteer coordinator or send us an email at 
+                            <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>.
+                                    {{ end }}
+                                    <form method="POST" action="/vols/shift/{{ $conf.Tag }}/decline?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+                                        <button type="submit"
+                                                class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                                                onclick="return confirm('Let us know you can no longer attend? This will release any shifts you signed up for.')">
+                                            Can't Attend
+                                        </button>
+                                    </form>
+                                    {{ end }}
                                 </div>
-                                {{ else if eq .Status "Accepted" }}
-                                <p class="text-sm text-gray-600">Your application has been accepted! Shift selection will open soon.</p>
-                                {{ else if eq .Status "Waitlist" }}
-                                <p class="text-sm text-gray-600">Your application is being reviewed. We'll notify you by email.</p>
-                                {{ else }}
-                                <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                                   class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
-                                    Sign Up for Shifts
-                                </a>
-                                {{ end }}
                             </div>
                         </div>
                     </div>
@@ -170,6 +220,53 @@
                             If you have questions about your volunteer application or shifts, contact us at
                             <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>
                         </p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQs -->
+            <section id="faq" class="mt-8 mb-12">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-6">Volunteer FAQs</h2>
+                        <dl class="divide-y divide-gray-200">
+                            <details class="py-4 group">
+                                <summary class="flex w-full items-center justify-between cursor-pointer list-none">
+                                    <dt class="text-base font-medium text-gray-900">How many shifts do I need to work?</dt>
+                                    <span class="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform duration-200">
+                                        <svg class="size-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    </span>
+                                </summary>
+                                <dd class="mt-2 text-sm text-gray-600">Every volunteer that signs up for at least 3 four-hour shifts is eligible for a free pass to the event.</dd>
+                            </details>
+                            <details class="py-4 group">
+                                <summary class="flex w-full items-center justify-between cursor-pointer list-none">
+                                    <dt class="text-base font-medium text-gray-900">Do I need a ticket to bitcoin++ to volunteer?</dt>
+                                    <span class="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform duration-200">
+                                        <svg class="size-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    </span>
+                                </summary>
+                                <dd class="mt-2 text-sm text-gray-600">No, if you're scheduled to work at least 3 shifts, you'll receive a ticket for the event.</dd>
+                            </details>
+                            <details class="py-4 group">
+                                <summary class="flex w-full items-center justify-between cursor-pointer list-none">
+                                    <dt class="text-base font-medium text-gray-900">When should I arrive for my shift?</dt>
+                                    <span class="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform duration-200">
+                                        <svg class="size-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    </span>
+                                </summary>
+                                <dd class="mt-2 text-sm text-gray-600">We ask that you arrive about 10-15m before your shift starts so that you have time to find the place and do check-in as required. Each shift will have a coordinator that's responsible for making sure you've arrived and are at your post when your shift starts. Please make sure you check-in with them when you arrive.</dd>
+                            </details>
+                            <details class="py-4 group">
+                                <summary class="flex w-full items-center justify-between cursor-pointer list-none">
+                                    <dt class="text-base font-medium text-gray-900">I can no longer attend/cover my volunteer shift. What should I do?</dt>
+                                    <span class="ml-4 shrink-0 text-gray-400 group-open:rotate-180 transition-transform duration-200">
+                                        <svg class="size-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                    </span>
+                                </summary>
+                                <dd class="mt-2 text-sm text-gray-600">Please send us a note via DMs or email <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a> to let us know you can no longer make it!</dd>
+                            </details>
+                        </dl>
                     </div>
                 </div>
             </section>

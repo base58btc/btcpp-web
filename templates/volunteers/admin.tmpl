@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>volcoord @ bitcoin++</title>
+    {{ block "header" . }} {{ end }}
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#10024;</text></svg>">
+  </head>
+  <body>
+    {{ block "mainnav" . }} {{ end }}
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-5xl">
+            <section id="topline" class="mb-6">
+                <div class="overflow-hidden sm:rounded-lg bg-white shadow">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h1 class="text-xl font-bold text-gray-900">Volunteer Coordinator Dashboard</h1>
+                                <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                            </div>
+                            <div class="text-3xl">{{ .Conf.Emoji }}</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Status Filter -->
+            <section id="filters" class="mb-6">
+                <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
+                    <div class="flex items-center space-x-3 flex-wrap">
+                        <span class="text-sm font-medium text-gray-700">Filter by status:</span>
+                        <a href="/vols/admin/{{ .Conf.Tag }}"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "" }}bg-gray-800 text-white{{ else }}bg-gray-100 text-gray-800 hover:bg-gray-200{{ end }}">
+                            All
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Applied"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Applied" }}bg-gray-800 text-white{{ else }}bg-gray-100 text-gray-800 hover:bg-gray-200{{ end }}">
+                            Applied
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=PendingShifts"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "PendingShifts" }}bg-blue-800 text-white{{ else }}bg-blue-100 text-blue-800 hover:bg-blue-200{{ end }}">
+                            Pending Shifts
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Scheduled"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Scheduled" }}bg-green-800 text-white{{ else }}bg-green-100 text-green-800 hover:bg-green-200{{ end }}">
+                            Scheduled
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Waitlist"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Waitlist" }}bg-yellow-800 text-white{{ else }}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{{ end }}">
+                            Waitlist
+                        </a>
+                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Declined"
+                           class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Declined" }}bg-red-800 text-white{{ else }}bg-red-100 text-red-800 hover:bg-red-200{{ end }}">
+                            Declined
+                        </a>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Promote Actions -->
+            <section id="actions" class="mb-6">
+                <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
+                    <h3 class="text-sm font-medium text-gray-900 mb-3">Bulk Actions</h3>
+                    <div class="flex items-center space-x-4">
+                        <form method="POST" action="/vols/admin/{{ .Conf.Tag }}/promote" class="flex items-center space-x-2">
+                            <input type="hidden" name="from_status" value="Applied">
+                            <input type="hidden" name="target_status" value="PendingShifts">
+                            <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                                    onclick="return confirm('Promote all Applied volunteers to PendingShifts and send shift signup emails?')">
+                                Applied &rarr; Pending Shifts
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Shift Capacity Overview -->
+            {{ if .Shifts }}
+            <section id="shifts" class="mb-6">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-4 sm:px-6">
+                        <h3 class="text-sm font-medium text-gray-900 mb-3">Shift Capacity</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Filled</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {{ range .Shifts }}
+                                <tr>
+                                    <td class="px-4 py-2 text-sm text-gray-900">{{ .Name }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .DayOfDesc }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .TimeDesc }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ if .Type }}{{ .Type.Title }}{{ end }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm">
+                                        {{ if .IsFull }}
+                                        <span class="text-red-600 font-medium">{{ len .AssigneesRef }}/{{ .MaxVols }} Full</span>
+                                        {{ else }}
+                                        <span class="text-green-600">{{ len .AssigneesRef }}/{{ .MaxVols }}</span>
+                                        {{ end }}
+                                    </td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+            {{ end }}
+
+            <!-- Volunteers Table -->
+            <section id="volunteers" class="mb-8">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-4 sm:px-6">
+                        <h3 class="text-sm font-medium text-gray-900">
+                            Volunteers ({{ len .Volunteers }})
+                            {{ if .StatusFilter }} - {{ .StatusFilter }}{{ end }}
+                        </h3>
+                    </div>
+                    {{ if .Volunteers }}
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signal</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+                                {{ range .Volunteers }}
+                                <tr>
+                                    <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ .Name }}</td>
+                                    <td class="px-4 py-2 whitespace-nowrap text-sm">
+                                        {{ if eq .Status "Applied" }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Applied</span>
+                                        {{ else if eq .Status "Waitlist" }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlist</span>
+                                        {{ else if eq .Status "PendingShifts" }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Pending Shifts</span>
+                                        {{ else if eq .Status "Scheduled" }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Scheduled</span>
+                                        {{ else if eq .Status "Declined" }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Declined</span>
+                                        {{ else }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
+                                        {{ end }}
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Email }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Signal }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Phone }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Hometown }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ len .WorkShifts }}</td>
+                                </tr>
+                                {{ end }}
+                            </tbody>
+                        </table>
+                    </div>
+                    {{ else }}
+                    <div class="px-4 py-8 text-center text-sm text-gray-500">
+                        No volunteers found{{ if .StatusFilter }} with status "{{ .StatusFilter }}"{{ end }}.
+                    </div>
+                    {{ end }}
+                </div>
+            </section>
+        </div>
+    </div>
+  </body>
+</html>

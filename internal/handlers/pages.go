@@ -108,6 +108,7 @@ type ApplicationStats struct {
         Applied int
         Pending int
         Accepted int
+        TotalShifts int
 }
 
 type VolShiftPage struct {
@@ -118,6 +119,7 @@ type VolShiftPage struct {
         VolApps   []*types.Volunteer
         Stats     *ApplicationStats
         Confs     []*types.Conf
+        VolInfos  map[string]*types.VolInfo
         Year      uint
 }
 
@@ -143,6 +145,14 @@ type ShiftSignupPage struct {
         ConfRef       string
         Email         string
         HMAC          string
+        Year          uint
+}
+
+type VolAdminPage struct {
+        Conf          *types.Conf
+        Volunteers    []*types.Volunteer
+        Shifts        []*types.WorkShift
+        StatusFilter  string
         Year          uint
 }
 

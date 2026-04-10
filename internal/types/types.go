@@ -1,6 +1,9 @@
 package types
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
         "net/url"
 	"path/filepath"
@@ -197,7 +200,8 @@ type (
                 Ref         string
                 ConfRef     string
                 OrientLink  string
-                OrientTimes *time.Time
+                OrientTimes *Times
+                Notes       string
         }
 
         Volunteer struct {
@@ -459,6 +463,10 @@ func (c *Conf) InFuture() bool {
         return c.StartDate.After(time.Now())
 }
 
+func (c *Conf) WithinTwoWeeks() bool {
+        return time.Until(c.StartDate) <= 12 * 24 * time.Hour
+}
+
 func (c *Conf) DateBeforeStart(daysbefore int) string {
         start := c.StartDate.AddDate(0, 0, daysbefore * -1)
         return start.Format("Mon. Jan 2, 2006")
@@ -484,6 +492,36 @@ func (c *Conf) DaysList(prefix string, addone bool) []CheckItem {
         }
 
         return items
+}
+
+func RegistrationHash(prefix, confRef, email string) string {
+	h := sha256.New()
+	h.Write([]byte(email))
+        h.Write([]byte(confRef))
+	infohash := hex.EncodeToString(h.Sum(nil)[:18])
+        return fmt.Sprintf("btcpp-%s-%s", prefix, infohash)
+}
+
+func UniqueID(email string, ref string, counter int32) string {
+	// sha256 of ref || email || count (4, le)
+	h := sha256.New()
+	h.Write([]byte(email))
+	h.Write([]byte(ref))
+
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, uint32(counter))
+	h.Write(b)
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+func (vol *Volunteer) RegisID() (string) {
+        conf := vol.ScheduleFor[0]
+        return RegistrationHash("volreg", conf.Ref, vol.Email)
+}
+
+func (vol *Volunteer) TicketRef() (string) {
+        tixID := vol.RegisID()
+	return UniqueID(vol.Email, tixID, int32(0))
 }
 
 func (vol *Volunteer) ParseAvailability(prefix string, form url.Values) (error) {

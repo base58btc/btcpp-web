@@ -390,6 +390,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 
         /* Internal pages */
+	r.HandleFunc("/vols/admin/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		VolAdmin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/vols/admin/{conf}/promote", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminPromote(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/vols/shift", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerShift(w, r, app)
 	}).Methods("GET", "POST")
@@ -408,6 +416,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/vols/shift/{conf}/submit", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerSubmitShifts(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/shift/{conf}/decline", func(w http.ResponseWriter, r *http.Request) {
+		VolunteerDecline(w, r, app)
 	}).Methods("POST")
 
 
@@ -820,6 +832,25 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 			return
                 }
 
+                /* Send application acknowledgment email */
+	        volinfos, err := getters.GetVolInfos(ctx, conf.Ref)
+                if err != nil {
+			ctx.Err.Printf("/volunteer/{conf} unable to fetch volinfos %s", err)
+                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
+			return
+                }
+                var volinfo *types.VolInfo
+                if err != nil {
+                        ctx.Err.Printf("/vols/shift/%s/submit failed to get volinfo: %s", conf.Tag, err.Error())
+                } else if len(volinfos) > 0 {
+                        volinfo = volinfos[0]
+                }
+
+                _, err = emails.OnlyForVolApp(ctx, &vol, conf, volinfo)
+                if err != nil {
+                        ctx.Err.Printf("/volunteer/{conf} unable to send ack email: %s", err)
+                }
+
                 /* Register to mailing lists :) */
                 /* Note: this also sends pre-saved missives for the vol app list! */
                 newslist := missives.MakeApplicationSublist(conf.Tag, "volapp", vol.Subscribe)
@@ -1013,8 +1044,9 @@ func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		/* Send cal invites!! */
 		calInvite := &google.CalInvite{
 			ConfTag:   confTag,
-			EventName: "btc++:" + talk.Name,
+			EventName: "speak @ btc++:" + talk.Name,
 			Location:  talk.VenueName(),
+                        Desc:      "Your talk is happening now!",
 			Invitees:  emails,
 			StartTime: talk.Sched.Start,
 			EndTime:   *talk.Sched.End,
@@ -1654,21 +1686,25 @@ func RenderFindShift(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 }
 
 func calcStats(apps []*types.Volunteer) *ApplicationStats {
-        
-        pending, accepted := 0, 0
+
+        pending, accepted, totalShifts := 0, 0, 0
         for _, app := range apps {
                 switch app.Status {
+                case "Applied":
+                case "PendingShifts":
                 case "Waitlist":
                         pending += 1
-                case "Accepted":
+                case "Scheduled":
                         accepted += 1
                 }
+                totalShifts += len(app.WorkShifts)
         }
 
         return &ApplicationStats{
                 Applied: len(apps),
                 Pending: pending,
                 Accepted: accepted,
+                TotalShifts: totalShifts,
         }
 }
 
@@ -1709,7 +1745,6 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
         }
         ctx.Infos.Printf("/vols/shift validated email: %s", email)
 
-        confs := listConfs(w, ctx)
         /* Find volunteer signups */
         volapps, err := getters.ListVolunteerApps(ctx, email)
         if err != nil {
@@ -1724,11 +1759,15 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
         }
 
-	// Populate WorkShifts for each volunteer application
+	// Populate WorkShifts and per-conf VolInfo for each volunteer application
+	volInfosByConf, err := getters.GetVolInfoMap(ctx)
+        if err != nil {
+		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+		ctx.Err.Printf("/vol/shift getvolinfomap failed ! %s", err.Error())
+                return
+        }
+
 	for _, vol := range volapps {
-		if len(vol.ScheduleFor) == 0 {
-			continue
-		}
 		conf := vol.ScheduleFor[0]
 		confShifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 		if err != nil {
@@ -1739,6 +1778,7 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 
 	encodedEmail := r.URL.Query().Get("em")
+        confs := listConfs(w, ctx)
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/shift.tmpl", &VolShiftPage{
                 Name:     volapps[0].Name,
                 Hometown: volapps[0].Hometown,
@@ -1747,6 +1787,7 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
                 Stats:    calcStats(volapps),
                 VolApps:  volapps,
 	        Confs:    confs,
+                VolInfos: volInfosByConf,
 		Year:     helpers.CurrentYear(),
 	})
 
@@ -1998,6 +2039,12 @@ func VolunteerRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		return
 	}
 
+	// Prevent removal within two weeks of conference start
+	if len(vol.ScheduleFor) > 0 && vol.ScheduleFor[0].WithinTwoWeeks() {
+		http.Error(w, "Cannot modify shifts within two weeks of the conference", http.StatusBadRequest)
+		return
+	}
+
 	// Remove volunteer from shift
 	err = getters.RemoveVolunteerFromShift(ctx, vol.Ref, shiftRef)
 	if err != nil {
@@ -2113,9 +2160,284 @@ func VolunteerSubmitShifts(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
+	// Send onboarding email with shift details, group chat link, orientation info
+	vol.WorkShifts = selectedShifts
+	conf := vol.ScheduleFor[0]
+	volinfos, err := getters.GetVolInfos(ctx, conf.Ref)
+	var volinfo *types.VolInfo
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/submit failed to get volinfo: %s", confTag, err.Error())
+	} else if len(volinfos) > 0 {
+		volinfo = volinfos[0]
+	}
+
+	_, err = emails.OnlyForVolShift(ctx, volinfo, vol)
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/submit failed to send onboarding email: %s", confTag, err.Error())
+	}
+
+        // Send volunteer ticket
+        tixType := "volunteer"
+	entry := types.Entry{
+		ID:          vol.RegisID(),
+		ConfRef:     conf.Ref,
+		Currency:    "USD",
+		Created:     time.Now(),
+		Email:       email,
+                Items:       []types.Item {
+                        types.Item{
+                                Total: 1,
+                                Desc: conf.Desc,
+                                Type: tixType,
+                        },
+                },
+	}
+
+        err = getters.AddTickets(ctx.Notion, &entry, "volreg")
+        if err != nil {
+                ctx.Err.Printf("!!! Unable to add vol ticket %s", err)
+                w.WriteHeader(http.StatusInternalServerError)
+                return 
+        }
+        
+	err = missives.NewTicketSub(ctx, email, conf.Tag, tixType, true)
+
+	if err != nil {
+		ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ctx.Infos.Println("Added volunteer ticket!", entry.ID)
+
+	// Send calendar invites for each shift (if Google Calendar is connected)
+	if google.IsLoggedIn() {
+		for _, shift := range selectedShifts {
+			if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+				continue
+			}
+			calInvite := &google.CalInvite{
+				ConfTag:   confTag,
+				EventName: fmt.Sprintf("volunteer @ btc++: %s", shift.Name),
+				Location:  conf.Location,
+                                Desc:      shift.Type.LongDesc,
+				Invitees:  []string{vol.Email},
+				StartTime: shift.ShiftTime.Start,
+				EndTime:   *shift.ShiftTime.End,
+			}
+			_, calErr := google.RunCalendarInvites("", calInvite)
+			if calErr != nil {
+				ctx.Err.Printf("/vols/shift/%s/submit cal invite failed for shift %s: %s", confTag, shift.Name, calErr)
+			}
+		}
+
+		// Send orientation calendar invite if available
+		if volinfo != nil && volinfo.OrientTimes != nil {
+			orientInvite := &google.CalInvite{
+				ConfTag:   confTag,
+				EventName: fmt.Sprintf("volunteer @ bitcoin++: %s Volunteer Orientation", confTag),
+				Invitees:  []string{vol.Email},
+				StartTime: volinfo.OrientTimes.Start,
+				EndTime:   *volinfo.OrientTimes.End,
+			}
+			_, calErr := google.RunCalendarInvites("", orientInvite)
+			if calErr != nil {
+				ctx.Err.Printf("/vols/shift/%s/submit orientation cal invite failed: %s", confTag, calErr)
+			}
+		}
+	}
+
 	// Redirect back to dashboard
 	encodedHMAC := r.URL.Query().Get("hr")
 	encodedEmail := r.URL.Query().Get("em")
 	redirectURL := fmt.Sprintf("/vols/shift?hr=%s&em=%s", encodedHMAC, encodedEmail)
 	w.Header().Set("HX-Redirect", redirectURL)
+}
+
+func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if !helpers.CheckPin(w, r, ctx) {
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s failed to get volunteers: %s", conf.Tag, err.Error())
+		return
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s failed to get shifts: %s", conf.Tag, err.Error())
+		return
+	}
+
+	// Populate WorkShifts for each volunteer
+	for _, vol := range vols {
+		vol.WorkShifts = getSelectedShifts(vol, shifts)
+	}
+
+	statusFilter := r.URL.Query().Get("status")
+
+	// Filter by status if requested
+	if statusFilter != "" {
+		var filtered []*types.Volunteer
+		for _, vol := range vols {
+			if vol.Status == statusFilter {
+				filtered = append(filtered, vol)
+			}
+		}
+		vols = filtered
+	}
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
+		Conf:         conf,
+		Volunteers:   vols,
+		Shifts:       shifts,
+		StatusFilter: statusFilter,
+		Year:         helpers.CurrentYear(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s template failed: %s", conf.Tag, err.Error())
+	}
+}
+
+func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if !helpers.CheckPin(w, r, ctx) {
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	targetStatus := r.FormValue("target_status")
+	fromStatus := r.FormValue("from_status")
+
+	if targetStatus == "" || fromStatus == "" {
+		http.Error(w, "Missing status parameters", http.StatusBadRequest)
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		return
+	}
+
+	promoted := 0
+	for _, vol := range vols {
+		if vol.Status != fromStatus {
+			continue
+		}
+
+		err = getters.UpdateVolunteerStatus(ctx, vol.Ref, targetStatus)
+		if err != nil {
+			ctx.Err.Printf("/vols/admin/%s/promote failed to update %s: %s", conf.Tag, vol.Name, err.Error())
+			continue
+		}
+
+		// Send shift signup email when promoting to PendingShifts
+		if targetStatus == "PendingShifts" {
+			_, emailErr := emails.OnlyForVolLogin(ctx, vol.Email)
+			if emailErr != nil {
+				ctx.Err.Printf("/vols/admin/%s/promote email failed for %s: %s", conf.Tag, vol.Email, emailErr)
+			}
+		}
+
+		promoted++
+	}
+
+	// Redirect back to admin page
+	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s", conf.Tag), http.StatusSeeOther)
+}
+
+func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	email, _, err := validateVolEmail(r, ctx)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
+	volapps, err := getters.ListVolunteerApps(ctx, email)
+	if err != nil {
+		http.Error(w, "Unable to load volunteer", http.StatusInternalServerError)
+		return
+	}
+
+	vol := findVolForConf(volapps, confTag)
+	if vol == nil {
+		http.Error(w, "Volunteer not found", http.StatusNotFound)
+		return
+	}
+
+	if vol.Status == "Declined" {
+		http.Error(w, "Already declined", http.StatusBadRequest)
+		return
+	}
+
+	if len(vol.ScheduleFor) == 0 {
+		http.Error(w, "No conference associated", http.StatusBadRequest)
+		return
+	}
+	conf := vol.ScheduleFor[0]
+
+	// Prevent cancellation within two weeks of conference start
+	if vol.Status == "Scheduled" && conf.WithinTwoWeeks() {
+		http.Error(w, "Cannot cancel shifts within two weeks of the conference. Please reach out to the organizers if you can no longer attend.", http.StatusBadRequest)
+		return
+	}
+
+	// Release any shift assignments
+	confShifts, err := getters.GetShiftsForConf(ctx, confTag)
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/decline failed to load shifts: %s", confTag, err.Error())
+	} else {
+		selectedShifts := getSelectedShifts(vol, confShifts)
+		for _, shift := range selectedShifts {
+			err = getters.RemoveVolunteerFromShift(ctx, vol.Ref, shift.Ref)
+			if err != nil {
+				ctx.Err.Printf("/vols/shift/%s/decline failed to remove shift %s: %s", confTag, shift.Name, err.Error())
+			}
+		}
+	}
+
+	// Update status to Declined
+	err = getters.UpdateVolunteerStatus(ctx, vol.Ref, "Declined")
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/decline status update failed: %s", confTag, err.Error())
+	}
+
+	// Send cancellation email
+	_, err = emails.OnlyForVolCancel(ctx, vol, conf)
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/decline email failed: %s", confTag, err)
+	}
+
+	// Revoke their ticket if one was issued
+	ctx.Infos.Printf("revoking ticket with id %s", vol.RegisID())
+	err = getters.RevokeTicket(ctx.Notion, vol.RegisID())
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/decline ticket revoke failed: %s", confTag, err.Error())
+	}
+
+	// Redirect back to dashboard
+	encodedHMAC := r.URL.Query().Get("hr")
+	encodedEmail := r.URL.Query().Get("em")
+	redirectURL := fmt.Sprintf("/vols/shift?hr=%s&em=%s", encodedHMAC, encodedEmail)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }

@@ -128,6 +128,7 @@ type CalInvite struct {
 	ConfTag   string
 	EventName string
 	Location  string
+        Desc      string
 	Invitees  []string
 	StartTime time.Time
 	EndTime   time.Time
@@ -153,7 +154,7 @@ func RunCalendarInvites(calNotif string, invite *CalInvite) (string, error) {
 	event := &calendar.Event{
 		Summary:     invite.EventName,
 		Location:    invite.Location,
-		Description: "Your talk is happening now!",
+		Description: invite.Desc,
 		Start: &calendar.EventDateTime{
 			DateTime: invite.StartFmt(),
 		},

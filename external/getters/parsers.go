@@ -282,6 +282,21 @@ func parseSelectList(field string, props map[string]notion.PropertyValue) []stri
         return list
 }
 
+func parseConfOne(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) *types.Conf {
+        objRefs := props[field].Relation
+
+        confs, _ := FetchConfsCached(ctx)
+        for _, ref := range objRefs {
+                for _, c := range confs {
+                        if c.Ref == ref.ID {
+                                return c
+                        }
+                }
+        }
+
+        return nil
+}
+
 func parseConfList(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) []*types.Conf {
         var list []*types.Conf
         objRefs := props[field].Relation
@@ -345,10 +360,11 @@ func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]noti
 
 func parseVolInfo(pageID string, props map[string]notion.PropertyValue) *types.VolInfo {
         vinfo := &types.VolInfo{
-                Ref: pageID,
-                ConfRef: parseConfRef(props),
-                OrientLink: props["OrientLink"].URL,
-                OrientTimes: parseDate("OrientTime", props),
+                Ref:           pageID,
+                ConfRef:       parseConfRef(props),
+                OrientLink:    props["OrientLink"].URL,
+                OrientTimes:   parseTimes("OrientTimes", props),
+                Notes:         parseRichText("Notes", props),
         }
 
         return vinfo
@@ -396,40 +412,26 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 	return talk
 }
 
-func parseJobTypes(field string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) []*types.JobType {
-        jtypes := make([]*types.JobType, 0)
-        
+func parseJobTypes(field string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) *types.JobType {
         for _, jobRel := range props[field].Relation {
                 for _, job := range jobtypes {
                         if jobRel.ID == job.Ref {
-                                jtypes = append(jtypes, job)
+                                return job
                         }
                 }
         }
 
-        return jtypes
+        return nil
 }
 
 func parseWorkShift(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) *types.WorkShift {
-
-        jobs := parseJobTypes("Type", props, jobtypes)
-        var jobtype *types.JobType
-        if len(jobs) > 0 {
-                jobtype = jobs[0]
-        }
-
-        conflist := parseConfList(ctx, "ConfRef", props)
-        var conf *types.Conf
-        if len(conflist) > 0 {
-                conf = conflist[0]
-        }
 
 	shift := &types.WorkShift{
 		Ref:         pageID,
 		Name:        parseRichText("Name", props),
 		MaxVols:     uint(props["MaxVols"].Number),
-                Type:        jobtype,
-                Conf:        conf,
+                Type:        parseJobTypes("TypeRef", props, jobtypes),
+                Conf:        parseConfOne(ctx, "ConfRef", props),
 		ShiftTime:   parseTimes("ShiftTime", props),
 		Priority:    uint(props["Priority"].Number),
 	}
