@@ -349,6 +349,36 @@ func GetLetters(n *types.Notion, newsletter string) ([]*mtypes.Letter, error) {
 	return letters, nil
 }
 
+// ListOnlyForLetters returns all missives that have a non-empty OnlyFor slug.
+// Used to populate the missive picker on the volunteer admin dashboard.
+func ListOnlyForLetters(n *types.Notion) ([]*mtypes.Letter, error) {
+	hasMore := true
+	nextCursor := ""
+	var letters []*mtypes.Letter
+
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.MissivesDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			letter := parseLetter(page.ID, page.Properties)
+			if letter.OnlyFor == "" {
+				continue
+			}
+			letters = append(letters, letter)
+		}
+	}
+
+	return letters, nil
+}
+
 func MarkLetterSent(n *types.Notion, letter *mtypes.Letter, sentAt time.Time) error {
 
 	_, err := n.Client.UpdatePageProperties(context.Background(), letter.PageID,

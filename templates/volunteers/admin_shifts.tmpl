@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>volcoord shifts: {{ .Conf.Desc }}</title>
+    {{ block "header" . }} {{ end }}
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#10024;</text></svg>">
+    <style>
+      .gantt {
+        position: relative;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.375rem;
+        height: auto;
+        min-height: 60px;
+      }
+      .gantt-hours {
+        position: relative;
+        height: 24px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .gantt-hour {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        font-size: 10px;
+        color: #6b7280;
+        padding-left: 4px;
+        border-left: 1px dashed #e5e7eb;
+      }
+      .gantt-rows {
+        position: relative;
+        padding: 6px 0;
+      }
+      .gantt-row {
+        position: relative;
+        height: 28px;
+        margin-bottom: 4px;
+      }
+      .gantt-bar {
+        position: absolute;
+        top: 0;
+        height: 24px;
+        border-radius: 4px;
+        font-size: 11px;
+        line-height: 24px;
+        color: white;
+        padding: 0 6px;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        cursor: pointer;
+      }
+      .gantt-bar:hover {
+        outline: 2px solid #4f46e5;
+        outline-offset: 1px;
+      }
+      .bar-color-0 { background: #4f46e5; }
+      .bar-color-1 { background: #059669; }
+      .bar-color-2 { background: #d97706; }
+      .bar-color-3 { background: #db2777; }
+      .bar-color-4 { background: #0891b2; }
+      .bar-color-5 { background: #7c3aed; }
+      .bar-color-6 { background: #dc2626; }
+    </style>
+  </head>
+  <body>
+    {{ block "mainnav" . }} {{ end }}
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-6xl">
+            <!-- Back link + header -->
+            <div class="mb-4 mt-4 flex items-center justify-between">
+                <div>
+                    <a href="/vols/admin/{{ .Conf.Tag }}" class="text-sm text-indigo-600 hover:text-indigo-500">&larr; Back to volunteers</a>
+                    <h1 class="mt-2 text-2xl font-bold text-gray-900">Manage Shifts</h1>
+                    <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                </div>
+                <button type="button" onclick="document.getElementById('new-shift-form').classList.toggle('hidden')"
+                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                    + New Shift
+                </button>
+            </div>
+
+            <!-- New Shift Form (hidden by default) -->
+            <section id="new-shift-form" class="hidden mb-6">
+                <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Create New Shift</h3>
+                    <form method="POST" action="/vols/admin/{{ .Conf.Tag }}/shifts/new" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                            <input type="text" name="name" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Job Type</label>
+                            <select name="job_type" class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                <option value="">-- none --</option>
+                                {{ range .JobTypes }}
+                                <option value="{{ .Tag }}">{{ .Title }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Day</label>
+                            <select name="day" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                {{ range .DaysList }}
+                                <option value="{{ slice .ItemID 5 }}">{{ .ItemDesc }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                            <input type="time" name="start_time" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                            <input type="time" name="end_time" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Max Volunteers</label>
+                            <input type="number" name="max_vols" min="1" value="1" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+                            <input type="number" name="priority" min="0" value="0" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                        </div>
+                        <div class="sm:col-span-2 flex items-center gap-3">
+                            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Create Shift</button>
+                            <button type="button" onclick="document.getElementById('new-shift-form').classList.add('hidden')" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Per-day Gantt + Shift list -->
+            {{ if .Days }}
+            {{ range $dayIdx, $day := .Days }}
+            <section class="mb-8">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-4 py-3 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-base font-semibold text-gray-900">{{ $day.DateDesc }}</h3>
+                        <p class="text-xs text-gray-500">{{ len $day.Shifts }} shifts</p>
+                    </div>
+
+                    <!-- Gantt chart -->
+                    <div class="px-4 py-3 sm:px-6">
+                        <div class="gantt">
+                            <div class="gantt-hours">
+                                {{ range $h := iterRange $day.MinHour $day.MaxHour }}
+                                <div class="gantt-hour" style="left: {{ printf "%.2f" (hourPct $h $day.MinHour $day.MaxHour) }}%;">{{ $h }}:00</div>
+                                {{ end }}
+                            </div>
+                            <div class="gantt-rows">
+                                {{ range $sIdx, $shift := $day.Shifts }}
+                                <div class="gantt-row">
+                                    <a href="#shift-{{ $shift.Ref }}"
+                                       class="gantt-bar bar-color-{{ mod $sIdx 7 }}"
+                                       style="left: {{ printf "%.2f" (ganttLeft $shift.ShiftTime $day.MinHour $day.MaxHour) }}%; width: {{ printf "%.2f" (ganttWidth $shift.ShiftTime $day.MinHour $day.MaxHour) }}%;"
+                                       title="{{ $shift.Name }} - {{ $shift.TimeDesc }}">
+                                        {{ $shift.Name }}
+                                    </a>
+                                </div>
+                                {{ end }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Shift detail list -->
+                    <ul class="divide-y divide-gray-200">
+                        {{ range $shift := $day.Shifts }}
+                        <li id="shift-{{ $shift.Ref }}" class="px-4 py-4 sm:px-6">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <h4 class="text-sm font-semibold text-gray-900">{{ $shift.Name }}</h4>
+                                        {{ if $shift.Type }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{{ $shift.Type.Title }}</span>
+                                        {{ end }}
+                                        <span class="text-xs text-gray-500">{{ $shift.TimeDesc }}</span>
+                                        <span class="text-xs {{ if $shift.IsFull }}text-red-600 font-medium{{ else }}text-gray-500{{ end }}">{{ len $shift.AssigneesRef }}/{{ $shift.MaxVols }}</span>
+                                    </div>
+
+                                    <!-- Assignees -->
+                                    {{ if $shift.AssigneesRef }}
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        {{ range $shift.AssigneesRef }}
+                                        {{ $vol := index $.VolMap . }}
+                                        {{ if $vol }}
+                                        <a href="/vols/admin/{{ $.Conf.Tag }}/vol/{{ $vol.Ref }}" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
+                                            {{ $vol.Name }}
+                                        </a>
+                                        {{ else }}
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-500">unknown vol</span>
+                                        {{ end }}
+                                        {{ end }}
+                                    </div>
+                                    {{ else }}
+                                    <p class="mt-2 text-xs text-gray-500 italic">No volunteers assigned yet.</p>
+                                    {{ end }}
+                                </div>
+
+                                <div class="ml-4 flex items-center gap-2 shrink-0">
+                                    <button type="button" onclick="document.getElementById('edit-{{ $shift.Ref }}').classList.toggle('hidden')" class="text-xs text-indigo-600 hover:text-indigo-800">Edit</button>
+                                </div>
+                            </div>
+
+                            <!-- Edit form (hidden by default) -->
+                            <div id="edit-{{ $shift.Ref }}" class="hidden mt-3 pt-3 border-t border-gray-200">
+                                <form method="POST" action="/vols/admin/{{ $.Conf.Tag }}/shifts/{{ $shift.Ref }}/update" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                                        <input type="text" name="name" value="{{ $shift.Name }}" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Job Type</label>
+                                        <select name="job_type" class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                            <option value="">-- none --</option>
+                                            {{ range $.JobTypes }}
+                                            <option value="{{ .Tag }}" {{ if and $shift.Type (eq .Tag $shift.Type.Tag) }}selected{{ end }}>{{ .Title }}</option>
+                                            {{ end }}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Day</label>
+                                        <select name="day" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                            {{ $currentDay := $shift.DayOf }}
+                                            {{ range $.DaysList }}
+                                            {{ $d := slice .ItemID 5 }}
+                                            <option value="{{ $d }}" {{ if eq $d $currentDay }}selected{{ end }}>{{ .ItemDesc }}</option>
+                                            {{ end }}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                                        <input type="time" name="start_time" value="{{ shiftStartHHMM $shift }}" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                                        <input type="time" name="end_time" value="{{ shiftEndHHMM $shift }}" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Max Volunteers</label>
+                                        <input type="number" name="max_vols" min="1" value="{{ $shift.MaxVols }}" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-medium text-gray-700 mb-1">Priority</label>
+                                        <input type="number" name="priority" min="0" value="{{ $shift.Priority }}" required class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                    </div>
+                                    <div class="sm:col-span-2 flex items-center gap-3">
+                                        <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save Changes</button>
+                                        <button type="button" onclick="document.getElementById('edit-{{ $shift.Ref }}').classList.add('hidden')" class="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </li>
+                        {{ end }}
+                    </ul>
+                </div>
+            </section>
+            {{ end }}
+            {{ else }}
+            <div class="bg-white shadow rounded-lg px-4 py-12 text-center text-sm text-gray-500">
+                No shifts created yet. Click "+ New Shift" to add one.
+            </div>
+            {{ end }}
+        </div>
+    </div>
+  </body>
+</html>

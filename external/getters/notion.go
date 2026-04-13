@@ -610,6 +610,125 @@ func GetShiftsForConf(ctx *config.AppContext, confTag string) ([]*types.WorkShif
 	return filtered, nil
 }
 
+// invalidateShiftCache forces the next FetchShiftsCached call to refetch.
+func invalidateShiftCache() {
+	shifts = nil
+}
+
+// buildShiftPropertiesJSON constructs the Notion `properties` payload for a
+// shift page. We build this by hand (rather than using go-notion's
+// PropertyValue/CreatePage) because the library marks every value field as
+// json:omitempty, which silently drops zero-value Numbers (e.g. Priority=0)
+// and produces an invalid Notion request.
+func buildShiftPropertiesJSON(name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) map[string]interface{} {
+	props := map[string]interface{}{
+		"Name": map[string]interface{}{
+			"title": []map[string]interface{}{
+				{"text": map[string]interface{}{"content": name}},
+			},
+		},
+		"MaxVols":  map[string]interface{}{"number": maxVols},
+		"Priority": map[string]interface{}{"number": priority},
+	}
+
+	if !start.IsZero() {
+		date := map[string]interface{}{
+			"start": start.Format(time.RFC3339),
+		}
+		if !end.IsZero() {
+			date["end"] = end.Format(time.RFC3339)
+		}
+		props["ShiftTime"] = map[string]interface{}{"date": date}
+	}
+
+	if jobType != nil {
+		props["TypeRef"] = map[string]interface{}{
+			"relation": []map[string]interface{}{{"id": jobType.Ref}},
+		}
+	}
+
+	return props
+}
+
+// notionPagePost sends a JSON request directly to Notion's pages API. method
+// is "POST" for create, "PATCH" for update. urlPath is appended to the v1/pages
+// base. Returns the parsed JSON response or an error.
+func notionPagePost(token, method, urlPath string, body map[string]interface{}) error {
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(method, "https://api.notion.com/v1/pages"+urlPath, bytes.NewReader(jsonBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Notion-Version", "2022-06-28")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		var errResp map[string]interface{}
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		return fmt.Errorf("notion API error: %v", errResp)
+	}
+	return nil
+}
+
+// CreateShift creates a new WorkShift page in the Notion ShiftDb. ShiftTime
+// must have a non-nil End. Bypasses go-notion's CreatePage to avoid the
+// omitempty zero-value bug for Number properties.
+func CreateShift(ctx *config.AppContext, conf *types.Conf, jobType *types.JobType, name string, start, end time.Time, maxVols, priority uint) error {
+	if conf == nil || conf.Ref == "" {
+		return fmt.Errorf("CreateShift: conf is nil or has empty ref")
+	}
+
+	props := buildShiftPropertiesJSON(name, jobType, start, end, maxVols, priority)
+	props["ConfRef"] = map[string]interface{}{
+		"relation": []map[string]interface{}{{"id": conf.Ref}},
+	}
+
+	body := map[string]interface{}{
+		"parent": map[string]interface{}{
+			"database_id": ctx.Notion.Config.ShiftDb,
+		},
+		"properties": props,
+	}
+
+	err := notionPagePost(ctx.Notion.Config.Token, "POST", "", body)
+	if err != nil {
+		return err
+	}
+
+	invalidateShiftCache()
+	return nil
+}
+
+// UpdateShift updates a WorkShift's mutable fields. Pass nil for jobType to
+// skip updating the type. Pass a zero start to skip updating the time. Uses
+// direct HTTP PATCH to avoid go-notion's omitempty issues.
+func UpdateShift(ctx *config.AppContext, shiftRef, name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) error {
+	props := buildShiftPropertiesJSON(name, jobType, start, end, maxVols, priority)
+
+	body := map[string]interface{}{
+		"properties": props,
+	}
+
+	err := notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+shiftRef, body)
+	if err != nil {
+		return err
+	}
+
+	invalidateShiftCache()
+	return nil
+}
+
 func AssignVolunteerToShift(ctx *config.AppContext, volRef, shiftRef string) error {
 	n := ctx.Notion
 
@@ -775,6 +894,72 @@ func UpdateVolunteerStatus(ctx *config.AppContext, volRef, status string) error 
 
 	return err
 }
+
+func UpdateVolunteerAvailability(ctx *config.AppContext, volRef string, days []string) error {
+	n := ctx.Notion
+
+	availability := make([]*notion.SelectOption, len(days))
+	for i, d := range days {
+		availability[i] = &notion.SelectOption{Name: d}
+	}
+
+	_, err := n.Client.UpdatePageProperties(context.Background(), volRef,
+		map[string]*notion.PropertyValue{
+			"Availability": {
+				Type:        notion.PropertyMultiSelect,
+				MultiSelect: &availability,
+			},
+		})
+
+	return err
+}
+
+func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs, workNoRefs []string) error {
+	n := ctx.Notion
+
+	// WorkYes
+	if len(workYesRefs) == 0 {
+		err := clearRelationProperty(n.Config.Token, volRef, "WorkYes")
+		if err != nil {
+			return err
+		}
+	} else {
+		yesRel := make([]*notion.ObjectReference, len(workYesRefs))
+		for i, r := range workYesRefs {
+			yesRel[i] = &notion.ObjectReference{Object: notion.ObjectPage, ID: r}
+		}
+		_, err := n.Client.UpdatePageProperties(context.Background(), volRef,
+			map[string]*notion.PropertyValue{
+				"WorkYes": {
+					Type:     notion.PropertyRelation,
+					Relation: yesRel,
+				},
+			})
+		if err != nil {
+			return err
+		}
+	}
+
+	// WorkNo
+	if len(workNoRefs) == 0 {
+		return clearRelationProperty(n.Config.Token, volRef, "WorkNo")
+	}
+
+	noRel := make([]*notion.ObjectReference, len(workNoRefs))
+	for i, r := range workNoRefs {
+		noRel[i] = &notion.ObjectReference{Object: notion.ObjectPage, ID: r}
+	}
+	_, err := n.Client.UpdatePageProperties(context.Background(), volRef,
+		map[string]*notion.PropertyValue{
+			"WorkNo": {
+				Type:     notion.PropertyRelation,
+				Relation: noRel,
+			},
+		})
+
+	return err
+}
+
 
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	var discounts []*types.DiscountCode
@@ -1401,6 +1586,18 @@ func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer
 	}
 
 	return vols, nil
+}
+
+// FetchVolunteer retrieves a single volunteer page directly by ID. This is a
+// strongly-consistent read (unlike QueryDatabase, which uses an
+// eventually-consistent index), so it should be used after writes when the
+// caller needs to render the just-updated state.
+func FetchVolunteer(ctx *config.AppContext, volRef string) (*types.Volunteer, error) {
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), volRef)
+	if err != nil {
+		return nil, err
+	}
+	return parseVolunteer(ctx, page.ID, page.Properties), nil
 }
 
 func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Volunteer, error) {

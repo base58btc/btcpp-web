@@ -26,7 +26,22 @@ type (
                 VolShiftLink string
         }
 
+        VolWaitlist struct {
+                Volunteer    *types.Volunteer
+                Conf         *types.Conf
+                Email        string
+                VolShiftLink string
+        }
+
         VolShifts struct {
+                Volunteer    *types.Volunteer
+                Conf         *types.Conf
+                VolInfo      *types.VolInfo
+                Email        string
+                VolShiftLink string
+        }
+
+        VolCustom struct {
                 Volunteer    *types.Volunteer
                 Conf         *types.Conf
                 VolInfo      *types.VolInfo
@@ -64,6 +79,18 @@ func OnlyForVolLogin(ctx *config.AppContext, email string) ([]byte, error) {
 	}
 
         return execOnlyFor(ctx, email, onlyFor, tmplData)
+}
+
+func OnlyForVolWaitlist(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf) ([]byte, error) {
+        onlyFor := "volwaitlist"
+        tmplData := &VolWaitlist{
+                Email: vol.Email,
+                Conf: conf,
+                Volunteer: vol,
+                VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+	}
+
+        return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
 }
 
 func OnlyForVolSignup(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf) ([]byte, error) {
@@ -123,6 +150,37 @@ func templatizeTitle(title string, tmplData interface{}) string {
         titletemp := Create("tt", title)
         titletemp.Execute(&tt, &tmplData)
         return tt.String()
+}
+
+// SendCustomToVol renders a custom markdown body and title to a single
+// volunteer using the VolShifts data shape. The markdown is parsed as a Go
+// template so admins can use {{ .Volunteer.Name }} etc. in the body and title.
+func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf, volinfo *types.VolInfo, title, markdown string) ([]byte, error) {
+        tmplData := &VolCustom{
+                Volunteer:    vol,
+                Conf:         conf,
+                VolInfo:      volinfo,
+                Email:        vol.Email,
+                VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+        }
+
+        // Build an in-memory Letter so we can reuse the existing renderer pipeline.
+        // The UID is used to cache parsed templates by hash; using time.Now() means
+        // each send gets its own template entry which is what we want for one-off custom mails.
+        letter := &mtypes.Letter{
+                UID:      uint64(time.Now().UnixNano()),
+                Title:    title,
+                Markdown: markdown,
+        }
+
+        var buf bytes.Buffer
+        err := missiveTemplate(ctx, letter).Execute(&buf, &tmplData)
+        if err != nil {
+                return nil, err
+        }
+
+        renderedTitle := templatizeTitle(title, tmplData)
+        return sendOnlyFor(ctx, vol.Email, letter, renderedTitle, buf)
 }
 
 func execOnlyFor(ctx *config.AppContext, email, onlyFor string, tmplData interface{}) ([]byte, error) {

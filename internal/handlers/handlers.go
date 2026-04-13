@@ -26,6 +26,7 @@ import (
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
+	"btcpp-web/internal/volunteers"
 
 	"github.com/gorilla/mux"
 	"github.com/gorilla/schema"
@@ -103,6 +104,65 @@ func loadTemplates(ctx *config.AppContext) error {
 		},
 		"ge": func(a, b int) bool {
 			return a >= b
+		},
+		"mod": func(a, b int) int {
+			if b == 0 {
+				return 0
+			}
+			return a % b
+		},
+		"iterRange": func(start, end int) []int {
+			if end <= start {
+				return nil
+			}
+			out := make([]int, 0, end-start+1)
+			for i := start; i <= end; i++ {
+				out = append(out, i)
+			}
+			return out
+		},
+		"ganttLeft": func(times *types.Times, dayMin, dayMax int) float64 {
+			if times == nil {
+				return 0
+			}
+			startMin := float64(times.Start.Hour()*60 + times.Start.Minute())
+			dayStartMin := float64(dayMin * 60)
+			dayWidth := float64((dayMax - dayMin) * 60)
+			if dayWidth == 0 {
+				return 0
+			}
+			return (startMin - dayStartMin) / dayWidth * 100
+		},
+		"ganttWidth": func(times *types.Times, dayMin, dayMax int) float64 {
+			if times == nil || times.End == nil {
+				return 0
+			}
+			startMin := float64(times.Start.Hour()*60 + times.Start.Minute())
+			endMin := float64(times.End.Hour()*60 + times.End.Minute())
+			dayWidth := float64((dayMax - dayMin) * 60)
+			if dayWidth == 0 {
+				return 0
+			}
+			return (endMin - startMin) / dayWidth * 100
+		},
+		"hourPct": func(hour, dayMin, dayMax int) float64 {
+			width := float64(dayMax - dayMin)
+			if width == 0 {
+				return 0
+			}
+			return float64(hour-dayMin) / width * 100
+		},
+		"shiftStartHHMM": func(s *types.WorkShift) string {
+			if s == nil || s.ShiftTime == nil {
+				return ""
+			}
+			return s.ShiftTime.Start.Format("15:04")
+		},
+		"shiftEndHHMM": func(s *types.WorkShift) string {
+			if s == nil || s.ShiftTime == nil || s.ShiftTime.End == nil {
+				return ""
+			}
+			return s.ShiftTime.End.Format("15:04")
 		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
@@ -398,6 +458,56 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdminPromote(w, r, app)
 	}).Methods("POST")
 
+	r.HandleFunc("/vols/admin/{conf}/auto-assign", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminAutoAssign(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/shifts", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminShifts(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/vols/admin/{conf}/shifts/new", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminCreateShift(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/shifts/{shiftRef}/update", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminUpdateShift(w, r, app)
+	}).Methods("POST")
+
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminDetails(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/status", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminUpdateStatus(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/availability", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminUpdateAvailability(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminUpdateWorkPrefs(w, r, app)
+	}).Methods("POST")
+
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/add-shift", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminAddShift(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/remove-shift", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminRemoveShift(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/scheduled", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminMarkScheduled(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/admin/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminBulkEmail(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/vols/shift", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerShift(w, r, app)
 	}).Methods("GET", "POST")
@@ -420,6 +530,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/vols/shift/{conf}/decline", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerDecline(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/shift/{conf}/availability", func(w http.ResponseWriter, r *http.Request) {
+		VolunteerUpdateAvailability(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/vols/shift/{conf}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
+		VolunteerUpdateWorkPrefs(w, r, app)
 	}).Methods("POST")
 
 
@@ -674,7 +792,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
                 if err != nil {
                         http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteer/{conf} ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+                        ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
                         return
                 }
                         return
@@ -1938,6 +2056,36 @@ func VolunteerShiftSignup(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	encodedHMAC := r.URL.Query().Get("hr")
 	encodedEmail := r.URL.Query().Get("em")
 
+	// Build form helpers (availability + work prefs editor) so the volunteer
+	// can update them inline without going back to the application form.
+	jobs := listJobs(w, ctx)
+	yesJobs := helpers.BuildJobs("yjob-", jobs, false)
+	noJobs := helpers.BuildJobs("njob-", jobs, false)
+
+	yesSet := make(map[string]bool)
+	for _, j := range vol.WorkYes {
+		yesSet[j.Tag] = true
+	}
+	noSet := make(map[string]bool)
+	for _, j := range vol.WorkNo {
+		noSet[j.Tag] = true
+	}
+	for i := range yesJobs {
+		yesJobs[i].Checked = yesSet[yesJobs[i].ItemID[len("yjob-"):]]
+	}
+	for i := range noJobs {
+		noJobs[i].Checked = noSet[noJobs[i].ItemID[len("njob-"):]]
+	}
+
+	daysList := conf.DaysList("days-", true)
+	availSet := make(map[string]bool)
+	for _, d := range vol.Availability {
+		availSet[d] = true
+	}
+	for i := range daysList {
+		daysList[i].Checked = availSet[daysList[i].ItemID[len("days-"):]]
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/shift_signup.tmpl", &ShiftSignupPage{
 		Vol:            vol,
 		Conf:           conf,
@@ -1949,6 +2097,9 @@ func VolunteerShiftSignup(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		ConfRef:        confTag,
 		Email:          encodedEmail,
 		HMAC:           encodedHMAC,
+		DaysList:       daysList,
+		YesJobs:        yesJobs,
+		NoJobs:         noJobs,
 		Year:           helpers.CurrentYear(),
 	})
 
@@ -2146,97 +2297,14 @@ func VolunteerSubmitShifts(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
-	// Update volunteer status to Scheduled
-	err = getters.UpdateVolunteerStatus(ctx, vol.Ref, "Scheduled")
-	if err != nil {
-		ctx.Err.Printf("/vols/shift/%s/submit status update failed: %s", confTag, err.Error())
-		http.Error(w, "Failed to update status", http.StatusInternalServerError)
-		return
-	}
-
-	// Send onboarding email with shift details, group chat link, orientation info
-	vol.WorkShifts = selectedShifts
+	// Run the full scheduled flow (status update, email, ticket, calendar)
 	conf := vol.ScheduleFor[0]
-	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	vol.WorkShifts = selectedShifts
+	err = runScheduledFlow(ctx, vol, conf)
 	if err != nil {
-		ctx.Err.Printf("/vols/shift/%s/submit failed to get volinfo: %s", confTag, err.Error())
-                return
-	}
-
-	_, err = emails.OnlyForVolShift(ctx, volinfo, vol)
-	if err != nil {
-		ctx.Err.Printf("/vols/shift/%s/submit failed to send onboarding email: %s", confTag, err.Error())
-	}
-
-        // Send volunteer ticket
-        tixType := "volunteer"
-	entry := types.Entry{
-		ID:          vol.RegisID(),
-		ConfRef:     conf.Ref,
-		Currency:    "USD",
-		Created:     time.Now(),
-		Email:       email,
-                Items:       []types.Item {
-                        types.Item{
-                                Total: 1,
-                                Desc: conf.Desc,
-                                Type: tixType,
-                        },
-                },
-	}
-
-        err = getters.AddTickets(ctx.Notion, &entry, "volreg")
-        if err != nil {
-                ctx.Err.Printf("!!! Unable to add vol ticket %s", err)
-                w.WriteHeader(http.StatusInternalServerError)
-                return 
-        }
-        
-	err = missives.NewTicketSub(ctx, email, conf.Tag, tixType, true)
-
-	if err != nil {
-		ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, entry)
-		w.WriteHeader(http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/shift/%s/submit scheduled flow failed: %s", confTag, err.Error())
+		http.Error(w, "Failed to schedule volunteer", http.StatusInternalServerError)
 		return
-	}
-
-	ctx.Infos.Println("Added volunteer ticket!", entry.ID)
-
-	// Send calendar invites for each shift (if Google Calendar is connected)
-	if google.IsLoggedIn() {
-		for _, shift := range selectedShifts {
-			if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
-				continue
-			}
-			calInvite := &google.CalInvite{
-				ConfTag:   confTag,
-				EventName: fmt.Sprintf("volunteer @ btc++: %s", shift.Name),
-				Location:  conf.Location,
-                                Desc:      shift.Type.LongDesc,
-				Invitees:  []string{vol.Email},
-				StartTime: shift.ShiftTime.Start,
-				EndTime:   *shift.ShiftTime.End,
-			}
-			_, calErr := google.RunCalendarInvites("", calInvite)
-			if calErr != nil {
-				ctx.Err.Printf("/vols/shift/%s/submit cal invite failed for shift %s: %s", confTag, shift.Name, calErr)
-			}
-		}
-
-		// Send orientation calendar invite if available
-		if volinfo != nil && volinfo.OrientTimes != nil {
-			orientInvite := &google.CalInvite{
-				ConfTag:   confTag,
-				EventName: fmt.Sprintf("volunteer @ bitcoin++: %s Volunteer Orientation", confTag),
-				Invitees:  []string{vol.Email},
-				StartTime: volinfo.OrientTimes.Start,
-				EndTime:   *volinfo.OrientTimes.End,
-			}
-			_, calErr := google.RunCalendarInvites("", orientInvite)
-			if calErr != nil {
-				ctx.Err.Printf("/vols/shift/%s/submit orientation cal invite failed: %s", confTag, calErr)
-			}
-		}
 	}
 
 	// Redirect back to dashboard
@@ -2244,6 +2312,104 @@ func VolunteerSubmitShifts(w http.ResponseWriter, r *http.Request, ctx *config.A
 	encodedEmail := r.URL.Query().Get("em")
 	redirectURL := fmt.Sprintf("/vols/shift?hr=%s&em=%s", encodedHMAC, encodedEmail)
 	w.Header().Set("HX-Redirect", redirectURL)
+}
+
+// runScheduledFlow runs the post-status-update logic that promotes a volunteer
+// to "Scheduled": updates Notion status, sends the onboarding email, issues a
+// ticket, subscribes to the volunteer newsletter, and sends calendar invites
+// (if Google Calendar is connected). Caller must have already populated
+// vol.WorkShifts with the assigned shifts. Failures in non-critical steps
+// (email, calendar invites) are logged but don't abort the flow.
+func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf) error {
+	// Update status
+	err := getters.UpdateVolunteerStatus(ctx, vol.Ref, "Scheduled")
+	if err != nil {
+		return fmt.Errorf("status update: %w", err)
+	}
+
+	// Look up VolInfo for orientation details
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("scheduled flow: failed to get volinfo for %s: %s", conf.Tag, err)
+		// continue without volinfo
+	}
+
+	// Send onboarding email
+	_, err = emails.OnlyForVolShift(ctx, volinfo, vol)
+	if err != nil {
+		ctx.Err.Printf("scheduled flow: failed to send onboarding email to %s: %s", vol.Email, err)
+	}
+
+	// Issue volunteer ticket
+	tixType := "volunteer"
+	entry := types.Entry{
+		ID:       vol.RegisID(),
+		ConfRef:  conf.Ref,
+		Currency: "USD",
+		Created:  time.Now(),
+		Email:    vol.Email,
+		Items: []types.Item{
+			types.Item{
+				Total: 1,
+				Desc:  conf.Desc,
+				Type:  tixType,
+			},
+		},
+	}
+
+	err = getters.AddTickets(ctx.Notion, &entry, "volreg")
+	if err != nil {
+		return fmt.Errorf("add ticket: %w", err)
+	}
+
+	err = missives.NewTicketSub(ctx, vol.Email, conf.Tag, tixType, true)
+	if err != nil {
+		ctx.Err.Printf("scheduled flow: newsletter sub failed for %s: %s", vol.Email, err)
+	}
+
+	ctx.Infos.Println("Scheduled volunteer, ticket added:", entry.ID)
+
+	// Send calendar invites if connected
+	if google.IsLoggedIn() {
+		for _, shift := range vol.WorkShifts {
+			if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+				continue
+			}
+			desc := ""
+			if shift.Type != nil {
+				desc = shift.Type.LongDesc
+			}
+			calInvite := &google.CalInvite{
+				ConfTag:   conf.Tag,
+				EventName: fmt.Sprintf("volunteer @ btc++: %s", shift.Name),
+				Location:  conf.Location,
+				Desc:      desc,
+				Invitees:  []string{vol.Email},
+				StartTime: shift.ShiftTime.Start,
+				EndTime:   *shift.ShiftTime.End,
+			}
+			_, calErr := google.RunCalendarInvites("", calInvite)
+			if calErr != nil {
+				ctx.Err.Printf("scheduled flow: cal invite failed for shift %s: %s", shift.Name, calErr)
+			}
+		}
+
+		if volinfo != nil && volinfo.OrientTimes != nil && volinfo.OrientTimes.End != nil {
+			orientInvite := &google.CalInvite{
+				ConfTag:   conf.Tag,
+				EventName: fmt.Sprintf("volunteer @ bitcoin++: %s Volunteer Orientation", conf.Tag),
+				Invitees:  []string{vol.Email},
+				StartTime: volinfo.OrientTimes.Start,
+				EndTime:   *volinfo.OrientTimes.End,
+			}
+			_, calErr := google.RunCalendarInvites("", orientInvite)
+			if calErr != nil {
+				ctx.Err.Printf("scheduled flow: orientation cal invite failed: %s", calErr)
+			}
+		}
+	}
+
+	return nil
 }
 
 func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -2278,6 +2444,30 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		vol.WorkShifts = getSelectedShifts(vol, shifts)
 	}
 
+	// Sort shifts by day and time, earliest first
+	sort.SliceStable(shifts, func(i, j int) bool {
+		a, b := shifts[i].ShiftTime, shifts[j].ShiftTime
+		if a == nil {
+			return false
+		}
+		if b == nil {
+			return true
+		}
+		return a.Start.Before(b.Start)
+	})
+
+	// Sort volunteers by created time, most recent first
+	sort.SliceStable(vols, func(i, j int) bool {
+		a, b := vols[i].CreatedAt, vols[j].CreatedAt
+		if a == nil {
+			return false
+		}
+		if b == nil {
+			return true
+		}
+		return a.Before(*b)
+	})
+
 	statusFilter := r.URL.Query().Get("status")
 
 	// Filter by status if requested
@@ -2291,11 +2481,19 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		vols = filtered
 	}
 
+	missiveList, err := getters.ListOnlyForLetters(ctx.Notion)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s failed to load missives: %s", conf.Tag, err.Error())
+		// continue without missives
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
 		Conf:         conf,
 		Volunteers:   vols,
 		Shifts:       shifts,
 		StatusFilter: statusFilter,
+		Missives:     missiveList,
+		FlashMessage: r.URL.Query().Get("flash"),
 		Year:         helpers.CurrentYear(),
 	})
 	if err != nil {
@@ -2356,6 +2554,50 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	}
 
 	// Redirect back to admin page
+	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s", conf.Tag), http.StatusSeeOther)
+}
+
+func VolAdminAutoAssign(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s/auto-assign failed to get volunteers: %s", conf.Tag, err.Error())
+		return
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s/auto-assign failed to get shifts: %s", conf.Tag, err.Error())
+		return
+	}
+
+	// Only consider PendingShifts volunteers; pre-populate their existing assignments
+	var eligibleVols []*types.Volunteer
+	for _, vol := range vols {
+		if vol.Status != "PendingShifts" {
+			continue
+		}
+		vol.WorkShifts = getSelectedShifts(vol, shifts)
+		eligibleVols = append(eligibleVols, vol)
+	}
+
+	err = volunteers.AssignShifts(ctx, eligibleVols, shifts)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/auto-assign failed: %s", conf.Tag, err.Error())
+	}
+
 	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s", conf.Tag), http.StatusSeeOther)
 }
 
@@ -2437,3 +2679,724 @@ func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	redirectURL := fmt.Sprintf("/vols/shift?hr=%s&em=%s", encodedHMAC, encodedEmail)
 	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
+
+// volAdminLoadVol fetches a single volunteer for the conf, populates their
+// volSelfRedirect returns the volunteer to their own shift signup page,
+// preserving the HMAC + email query string.
+func volSelfRedirect(w http.ResponseWriter, r *http.Request, confTag string) {
+	encodedHMAC := r.URL.Query().Get("hr")
+	encodedEmail := r.URL.Query().Get("em")
+	http.Redirect(w, r, fmt.Sprintf("/vols/shift/%s?hr=%s&em=%s", confTag, encodedHMAC, encodedEmail), http.StatusSeeOther)
+}
+
+func VolunteerUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	email, _, err := validateVolEmail(r, ctx)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
+	volapps, err := getters.ListVolunteerApps(ctx, email)
+	if err != nil {
+		http.Error(w, "Unable to load volunteer", http.StatusInternalServerError)
+		return
+	}
+	vol := findVolForConf(volapps, confTag)
+	if vol == nil {
+		http.Error(w, "Volunteer not found", http.StatusNotFound)
+		return
+	}
+
+	r.ParseForm()
+	var days []string
+	for k := range r.PostForm {
+		if strings.HasPrefix(k, "days-") {
+			days = append(days, k[len("days-"):])
+		}
+	}
+
+	err = getters.UpdateVolunteerAvailability(ctx, vol.Ref, days)
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/availability update failed: %s", confTag, err)
+		http.Error(w, "Failed to update availability", http.StatusInternalServerError)
+		return
+	}
+
+	volSelfRedirect(w, r, confTag)
+}
+
+func VolunteerUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	email, _, err := validateVolEmail(r, ctx)
+	if err != nil {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	params := mux.Vars(r)
+	confTag := params["conf"]
+
+	volapps, err := getters.ListVolunteerApps(ctx, email)
+	if err != nil {
+		http.Error(w, "Unable to load volunteer", http.StatusInternalServerError)
+		return
+	}
+	vol := findVolForConf(volapps, confTag)
+	if vol == nil {
+		http.Error(w, "Volunteer not found", http.StatusNotFound)
+		return
+	}
+
+	jobs := listJobs(w, ctx)
+	r.ParseForm()
+	yesJobs := helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
+	noJobs := helpers.ParseFormJobs("njob-", r.PostForm, jobs)
+
+	yesRefs := make([]string, len(yesJobs))
+	for i, j := range yesJobs {
+		yesRefs[i] = j.Ref
+	}
+	noRefs := make([]string, len(noJobs))
+	for i, j := range noJobs {
+		noRefs[i] = j.Ref
+	}
+
+	err = getters.UpdateVolunteerWorkPrefs(ctx, vol.Ref, yesRefs, noRefs)
+	if err != nil {
+		ctx.Err.Printf("/vols/shift/%s/work-prefs update failed: %s", confTag, err)
+		http.Error(w, "Failed to update work preferences", http.StatusInternalServerError)
+		return
+	}
+
+	volSelfRedirect(w, r, confTag)
+}
+
+// WorkShifts from the current shift assignments, and returns it. Used by
+// every per-volunteer admin handler. Returns nil and writes an error response
+// on failure.
+func volAdminLoadVol(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) (*types.Conf, *types.Volunteer, []*types.WorkShift) {
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return nil, nil, nil
+	}
+
+	params := mux.Vars(r)
+	volRef := params["volRef"]
+
+	// Use a direct page fetch (strongly consistent) so the page reflects any
+	// edits made in a preceding write within the same redirect chain. The
+	// QueryDatabase index used by ListVolunteersForConf is eventually
+	// consistent and can return stale results immediately after a PATCH.
+	vol, err := getters.FetchVolunteer(ctx, volRef)
+	if err != nil {
+		http.Error(w, "Unable to load volunteer", http.StatusInternalServerError)
+		ctx.Err.Printf("vol admin: failed to fetch vol %s: %s", volRef, err.Error())
+		return nil, nil, nil
+	}
+	if vol == nil {
+		handle404(w, r, ctx)
+		return nil, nil, nil
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
+		ctx.Err.Printf("vol admin: failed to load shifts for %s: %s", conf.Tag, err.Error())
+		return nil, nil, nil
+	}
+	vol.WorkShifts = getSelectedShifts(vol, shifts)
+
+	return conf, vol, shifts
+}
+
+func VolAdminDetails(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, shifts := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	// Build form helpers, marking current values as Checked
+	jobs := listJobs(w, ctx)
+	yesJobs := helpers.BuildJobs("yjob-", jobs, false)
+	noJobs := helpers.BuildJobs("njob-", jobs, false)
+
+	// Mark which jobs are currently in WorkYes/WorkNo
+	yesSet := make(map[string]bool)
+	for _, j := range vol.WorkYes {
+		yesSet[j.Tag] = true
+	}
+	noSet := make(map[string]bool)
+	for _, j := range vol.WorkNo {
+		noSet[j.Tag] = true
+	}
+	for i := range yesJobs {
+		yesJobs[i].Checked = yesSet[yesJobs[i].ItemID[len("yjob-"):]]
+	}
+	for i := range noJobs {
+		noJobs[i].Checked = noSet[noJobs[i].ItemID[len("njob-"):]]
+	}
+
+	daysList := conf.DaysList("days-", true)
+	availSet := make(map[string]bool)
+	for _, d := range vol.Availability {
+		availSet[d] = true
+	}
+	for i := range daysList {
+		daysList[i].Checked = availSet[daysList[i].ItemID[len("days-"):]]
+	}
+
+	// Build shift selection display data (mirrors the volunteer's own selection page)
+	selectedShifts := getSelectedShifts(vol, shifts)
+	shiftDisplays := buildShiftDisplays(vol, shifts, selectedShifts)
+
+	// Sorted day keys so the table renders chronologically
+	dayKeys := make([]string, 0, len(shiftDisplays))
+	for k := range shiftDisplays {
+		dayKeys = append(dayKeys, k)
+	}
+	sort.Slice(dayKeys, func(i, j int) bool {
+		return shiftDisplays[dayKeys[i]][0].Shift.ShiftTime.Start.Before(
+			shiftDisplays[dayKeys[j]][0].Shift.ShiftTime.Start)
+	})
+
+	// Unique job types appearing in this conf's shifts (for the type filter)
+	seenJobs := make(map[string]bool)
+	var jobTypes []*types.JobType
+	for _, s := range shifts {
+		if s.Type == nil || seenJobs[s.Type.Tag] {
+			continue
+		}
+		seenJobs[s.Type.Tag] = true
+		jobTypes = append(jobTypes, s.Type)
+	}
+	sort.Slice(jobTypes, func(i, j int) bool {
+		return jobTypes[i].Title < jobTypes[j].Title
+	})
+
+	err := ctx.TemplateCache.ExecuteTemplate(w, "volunteers/vol_details.tmpl", &VolDetailsPage{
+		Conf:           conf,
+		Vol:            vol,
+		AllShifts:      shifts,
+		ShiftDisplays:  shiftDisplays,
+		SelectedShifts: selectedShifts,
+		DayKeys:        dayKeys,
+		JobTypes:       jobTypes,
+		YesJobs:        yesJobs,
+		NoJobs:         noJobs,
+		DaysList:       daysList,
+		Statuses:       []string{"Applied", "Waitlist", "PendingShifts", "Scheduled", "Declined"},
+		Year:           helpers.CurrentYear(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("vol admin details template failed: %s", err.Error())
+	}
+}
+
+func volAdminRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf, volRef string) {
+	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s/vol/%s", conf.Tag, volRef), http.StatusSeeOther)
+}
+
+func VolAdminUpdateStatus(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	r.ParseForm()
+	status := r.FormValue("status")
+	if status == "" {
+		http.Error(w, "Missing status", http.StatusBadRequest)
+		return
+	}
+
+	err := getters.UpdateVolunteerStatus(ctx, vol.Ref, status)
+	if err != nil {
+		ctx.Err.Printf("vol admin update status failed: %s", err)
+		http.Error(w, "Failed to update status", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	r.ParseForm()
+	var days []string
+	for k := range r.PostForm {
+		if strings.HasPrefix(k, "days-") {
+			days = append(days, k[len("days-"):])
+		}
+	}
+
+	err := getters.UpdateVolunteerAvailability(ctx, vol.Ref, days)
+	if err != nil {
+		ctx.Err.Printf("vol admin update availability failed: %s", err)
+		http.Error(w, "Failed to update availability", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	jobs := listJobs(w, ctx)
+	r.ParseForm()
+	yesJobs := helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
+	noJobs := helpers.ParseFormJobs("njob-", r.PostForm, jobs)
+
+	yesRefs := make([]string, len(yesJobs))
+	for i, j := range yesJobs {
+		yesRefs[i] = j.Ref
+	}
+	noRefs := make([]string, len(noJobs))
+	for i, j := range noJobs {
+		noRefs[i] = j.Ref
+	}
+
+	err := getters.UpdateVolunteerWorkPrefs(ctx, vol.Ref, yesRefs, noRefs)
+	if err != nil {
+		ctx.Err.Printf("vol admin update work prefs failed: %s", err)
+		http.Error(w, "Failed to update work preferences", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminAddShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	r.ParseForm()
+	shiftRef := r.FormValue("shiftRef")
+	if shiftRef == "" {
+		http.Error(w, "Missing shiftRef", http.StatusBadRequest)
+		return
+	}
+
+	err := getters.AssignVolunteerToShift(ctx, vol.Ref, shiftRef)
+	if err != nil {
+		ctx.Err.Printf("vol admin add shift failed: %s", err)
+		http.Error(w, "Failed to add shift", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	r.ParseForm()
+	shiftRef := r.FormValue("shiftRef")
+	if shiftRef == "" {
+		http.Error(w, "Missing shiftRef", http.StatusBadRequest)
+		return
+	}
+
+	err := getters.RemoveVolunteerFromShift(ctx, vol.Ref, shiftRef)
+	if err != nil {
+		ctx.Err.Printf("vol admin remove shift failed: %s", err)
+		http.Error(w, "Failed to remove shift", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminMarkScheduled(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, vol, _ := volAdminLoadVol(w, r, ctx)
+	if vol == nil {
+		return
+	}
+
+	if len(vol.WorkShifts) == 0 {
+		http.Error(w, "Cannot schedule a volunteer with zero assigned shifts", http.StatusBadRequest)
+		return
+	}
+
+	// Make sure ScheduleFor is set so runScheduledFlow has the conf
+	if len(vol.ScheduleFor) == 0 {
+		vol.ScheduleFor = []*types.Conf{conf}
+	}
+
+	err := runScheduledFlow(ctx, vol, conf)
+	if err != nil {
+		ctx.Err.Printf("vol admin mark scheduled failed for %s: %s", vol.Ref, err)
+		http.Error(w, "Failed to schedule volunteer", http.StatusInternalServerError)
+		return
+	}
+
+	volAdminRedirect(w, r, conf, vol.Ref)
+}
+
+func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	volRefs := r.Form["vol_refs"]
+	if len(volRefs) == 0 {
+		http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=No+volunteers+selected", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	// Load volunteers + filter to selected
+	allVols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		return
+	}
+
+	refSet := make(map[string]bool, len(volRefs))
+	for _, ref := range volRefs {
+		refSet[ref] = true
+	}
+
+	var targets []*types.Volunteer
+	for _, v := range allVols {
+		if refSet[v.Ref] {
+			targets = append(targets, v)
+		}
+	}
+
+	// Pre-load shifts and volinfo so each send can include shift context
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/email failed to load shifts: %s", conf.Tag, err.Error())
+	}
+	for _, v := range targets {
+		v.WorkShifts = getSelectedShifts(v, shifts)
+	}
+
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/email failed to load volinfo: %s", conf.Tag, err.Error())
+	}
+
+	sent := 0
+        title := r.FormValue("title")
+        body := r.FormValue("body")
+        if title == "" || body == "" {
+                http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+                return
+        }
+        for _, v := range targets {
+                _, err := emails.SendCustomToVol(ctx, v, conf, volinfo, title, body)
+                if err != nil {
+                        ctx.Err.Printf("/vols/admin/%s/email custom -> %s failed: %s", conf.Tag, v.Email, err)
+                        continue
+                }
+                sent++
+        }
+
+	flash := fmt.Sprintf("Sent+to+%d+of+%d+volunteers", sent, len(targets))
+	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+// parseShiftFormTimes turns a date (YYYY-MM-DD or 01/02/2006) plus two HH:MM
+// time strings into start/end time.Time values in the conference's timezone.
+// End is rolled over to the next day if it's earlier than start (e.g. an
+// overnight shift).
+func parseShiftFormTimes(conf *types.Conf, dayStr, startStr, endStr string) (time.Time, time.Time, error) {
+	// Accept either Notion's "01/02/2006" or HTML date input "2006-01-02"
+	loc := conf.StartDate.Location()
+	var day time.Time
+	var err error
+	if t, e := time.ParseInLocation("2006-01-02", dayStr, loc); e == nil {
+		day = t
+	} else if t, e := time.ParseInLocation("01/02/2006", dayStr, loc); e == nil {
+		day = t
+	} else {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid date %q", dayStr)
+	}
+
+	startHM, err := time.Parse("15:04", startStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid start time %q", startStr)
+	}
+	endHM, err := time.Parse("15:04", endStr)
+	if err != nil {
+		return time.Time{}, time.Time{}, fmt.Errorf("invalid end time %q", endStr)
+	}
+
+	start := time.Date(day.Year(), day.Month(), day.Day(), startHM.Hour(), startHM.Minute(), 0, 0, loc)
+	end := time.Date(day.Year(), day.Month(), day.Day(), endHM.Hour(), endHM.Minute(), 0, 0, loc)
+	if !end.After(start) {
+		end = end.Add(24 * time.Hour)
+	}
+	return start, end, nil
+}
+
+// findJobByTag locates a JobType by its Tag from the cached job list.
+func findJobByTag(jobs []*types.JobType, tag string) *types.JobType {
+	for _, j := range jobs {
+		if j.Tag == tag {
+			return j
+		}
+	}
+	return nil
+}
+
+func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s/shifts failed to get shifts: %s", conf.Tag, err.Error())
+		return
+	}
+
+	jobs, err := getters.FetchJobsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/shifts failed to fetch jobs: %s", conf.Tag, err.Error())
+	}
+
+	// Resolve all unique assignees → Volunteer for name display
+	volMap := make(map[string]*types.Volunteer)
+	allVols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/shifts failed to load vols: %s", conf.Tag, err.Error())
+	}
+	for _, v := range allVols {
+		volMap[v.Ref] = v
+	}
+
+	// Group shifts by day
+	groups := make(map[string]*ShiftDayGroup)
+	for _, shift := range shifts {
+		if shift.ShiftTime == nil {
+			continue
+		}
+		day := shift.DayOf()
+		g, ok := groups[day]
+		if !ok {
+			g = &ShiftDayGroup{
+				Date:     day,
+				DateDesc: shift.DayOfDesc(),
+				MinHour:  24,
+				MaxHour:  0,
+			}
+			groups[day] = g
+		}
+		g.Shifts = append(g.Shifts, shift)
+		startH := shift.ShiftTime.Start.Hour()
+		if startH < g.MinHour {
+			g.MinHour = startH
+		}
+		if shift.ShiftTime.End != nil {
+			endH := shift.ShiftTime.End.Hour()
+			if shift.ShiftTime.End.Minute() > 0 {
+				endH++
+			}
+			if endH > g.MaxHour {
+				g.MaxHour = endH
+			}
+		}
+	}
+
+	// Sort each day's shifts and finalize hour ranges
+	var dayList []*ShiftDayGroup
+	for _, g := range groups {
+		sort.Slice(g.Shifts, func(i, j int) bool {
+			return g.Shifts[i].ShiftTime.Start.Before(g.Shifts[j].ShiftTime.Start)
+		})
+		// Pad ranges so the gantt has a little headroom
+		if g.MinHour > 0 {
+			g.MinHour--
+		}
+		if g.MaxHour < 24 {
+			g.MaxHour++
+		}
+		if g.MaxHour <= g.MinHour {
+			g.MaxHour = g.MinHour + 1
+		}
+		dayList = append(dayList, g)
+	}
+	sort.Slice(dayList, func(i, j int) bool {
+		return dayList[i].Shifts[0].ShiftTime.Start.Before(dayList[j].Shifts[0].ShiftTime.Start)
+	})
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin_shifts.tmpl", &VolAdminShiftsPage{
+		Conf:     conf,
+		Days:     dayList,
+		VolMap:   volMap,
+		JobTypes: jobs,
+		DaysList: conf.DaysList("days-", true),
+		Year:     helpers.CurrentYear(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/vols/admin/%s/shifts template failed: %s", conf.Tag, err.Error())
+	}
+}
+
+func volAdminShiftsRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf) {
+	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s/shifts", conf.Tag), http.StatusSeeOther)
+}
+
+func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	name := r.FormValue("name")
+	jobTag := r.FormValue("job_type")
+	day := r.FormValue("day")
+	startStr := r.FormValue("start_time")
+	endStr := r.FormValue("end_time")
+	maxVols, _ := strconv.ParseUint(r.FormValue("max_vols"), 10, 32)
+	priority, _ := strconv.ParseUint(r.FormValue("priority"), 10, 32)
+
+	if name == "" {
+		http.Error(w, "Name required", http.StatusBadRequest)
+		return
+	}
+
+	start, end, err := parseShiftFormTimes(conf, day, startStr, endStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	jobs, _ := getters.FetchJobsCached(ctx)
+	jobType := findJobByTag(jobs, jobTag)
+
+	err = getters.CreateShift(ctx, conf, jobType, name, start, end, uint(maxVols), uint(priority))
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/shifts/new failed: %s", conf.Tag, err.Error())
+		http.Error(w, "Failed to create shift: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	volAdminShiftsRedirect(w, r, conf)
+}
+
+func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	shiftRef := mux.Vars(r)["shiftRef"]
+
+	r.ParseForm()
+	name := r.FormValue("name")
+	jobTag := r.FormValue("job_type")
+	day := r.FormValue("day")
+	startStr := r.FormValue("start_time")
+	endStr := r.FormValue("end_time")
+	maxVols, _ := strconv.ParseUint(r.FormValue("max_vols"), 10, 32)
+	priority, _ := strconv.ParseUint(r.FormValue("priority"), 10, 32)
+
+	if name == "" {
+		http.Error(w, "Name required", http.StatusBadRequest)
+		return
+	}
+
+	start, end, err := parseShiftFormTimes(conf, day, startStr, endStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	jobs, _ := getters.FetchJobsCached(ctx)
+	jobType := findJobByTag(jobs, jobTag)
+
+	err = getters.UpdateShift(ctx, shiftRef, name, jobType, start, end, uint(maxVols), uint(priority))
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/shifts/%s/update failed: %s", conf.Tag, shiftRef, err.Error())
+		http.Error(w, "Failed to update shift: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	volAdminShiftsRedirect(w, r, conf)
+}
+
+

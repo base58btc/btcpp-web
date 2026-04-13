@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"btcpp-web/internal/mtypes"
 	"btcpp-web/internal/types"
 )
 
@@ -145,6 +146,9 @@ type ShiftSignupPage struct {
         ConfRef       string
         Email         string
         HMAC          string
+        DaysList      []types.CheckItem
+        YesJobs       []types.CheckItem
+        NoJobs        []types.CheckItem
         Year          uint
 }
 
@@ -153,6 +157,40 @@ type VolAdminPage struct {
         Volunteers    []*types.Volunteer
         Shifts        []*types.WorkShift
         StatusFilter  string
+        Missives      []*mtypes.Letter
+        FlashMessage  string
         Year          uint
+}
+
+type ShiftDayGroup struct {
+        Date     string             // "01/02/2006"
+        DateDesc string             // "Mon. Jan 2"
+        MinHour  int                // earliest start hour across this day's shifts
+        MaxHour  int                // latest end hour
+        Shifts   []*types.WorkShift // sorted by start time
+}
+
+type VolAdminShiftsPage struct {
+        Conf     *types.Conf
+        Days     []*ShiftDayGroup
+        VolMap   map[string]*types.Volunteer // ref → volunteer for assignee resolution
+        JobTypes []*types.JobType
+        DaysList []types.CheckItem // for shift form day selector
+        Year     uint
+}
+
+type VolDetailsPage struct {
+        Conf            *types.Conf
+        Vol             *types.Volunteer
+        AllShifts       []*types.WorkShift
+        ShiftDisplays   map[string][]*ShiftDisplay
+        SelectedShifts  []*types.WorkShift
+        DayKeys         []string
+        JobTypes        []*types.JobType
+        YesJobs         []types.CheckItem
+        NoJobs          []types.CheckItem
+        DaysList        []types.CheckItem
+        Statuses        []string
+        Year            uint
 }
 
