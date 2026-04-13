@@ -19,6 +19,10 @@ png-conv:
 .PHONY: build-all
 build-all: build css-build
 
+.PHONY: test
+test:
+	go test ./...
+
 .PHONY: clean
 clean:
 	rm -f target/*

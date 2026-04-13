@@ -500,7 +500,7 @@ func UnscheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	err = emails.SendCancelMissiveRequest(ctx, missive)
 	if err != nil {
-		ctx.Infos.Printf("Unable to unschedule missive %s: %s", missive, err)
+		ctx.Infos.Printf("Unable to unschedule missive %v: %s", missive, err)
 		/* Return the homepage page */
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return

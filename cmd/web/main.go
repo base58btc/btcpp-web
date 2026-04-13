@@ -161,7 +161,7 @@ func run(env *types.EnvConfig) error {
 	app.InProduction = env.Prod
 	app.EmailCache = make(map[string]*template.Template)
 
-	app.Infos.Println("\n\n\n")
+	app.Infos.Println("")
 	app.Infos.Println("~~~~app restarted, here we go~~~~~")
 	app.Infos.Println("Running in prod?", env.Prod)
 

@@ -608,7 +608,7 @@ func (at AuthTokens) Swap(i, j int) {
 /* I want most recent first */
 func (at AuthTokens) Less(i, j int) bool {
 	/* Sort by time */
-	if at[j].CreatedAt == nil && at[j].CreatedAt == nil {
+	if at[i].CreatedAt == nil && at[j].CreatedAt == nil {
 		return false
 	} else if at[j].CreatedAt == nil {
 		return true

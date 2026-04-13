@@ -340,7 +340,7 @@ func SendCancelMissiveRequest(ctx *config.AppContext, missive *mtypes.Letter) er
 		return fmt.Errorf("Unable to delete missive %s: %s", del.Missive, err)
 	}
 
-	ctx.Infos.Printf("Rm'd missive %s", missive)
+	ctx.Infos.Printf("Rm'd missive %v", missive)
 	return nil
 }
 

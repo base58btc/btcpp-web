@@ -181,7 +181,7 @@ func contains(list []string, item string) bool {
 func findTicket(app *config.AppContext, tixID string) (*types.ConfTicket, *types.Conf) {
 	confs, err := getters.FetchConfsCached(app)
 	if err != nil {
-		app.Err.Println("unable to find ticket?? %s", err)
+		app.Err.Printf("unable to find ticket?? %s", err)
 		return nil, nil
 	}
 
@@ -912,7 +912,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 
                 if err != nil {
                         http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteer/{conf} ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+                        ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
                         return
                 }
                         return
@@ -1247,7 +1247,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	tix_type, ok, err := getters.CheckIn(ctx.Notion, ticket)
 	if !ok && err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to check-in %s:", ticket, err.Error())
+		ctx.Err.Printf("Unable to check-in %s: %s", ticket, err.Error())
 		return
 	}
 
@@ -1318,7 +1318,7 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	/* Go get the actual event data */
 	charge, err := GetCharge(ctx, ev.ID)
 	if err != nil {
-		ctx.Err.Printf("Unable to fetch charge", err)
+		ctx.Err.Printf("Unable to fetch charge: %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -1585,7 +1585,7 @@ func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 
 	if err != nil {
 		http.Error(w, "unable to init btc payment", http.StatusInternalServerError)
-		ctx.Err.Printf("opennode payment init failed", err.Error())
+		ctx.Err.Printf("opennode payment init failed: %s", err.Error())
 		return
 	}
 
@@ -1681,7 +1681,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		}
 		conf := helpers.FindConfByRef(confs, confRef)
 		if conf == nil {
-			ctx.Err.Println("Couldn't find conf %s", confRef)
+			ctx.Err.Printf("Couldn't find conf %s", confRef)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -1735,7 +1735,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		err = getters.AddTickets(ctx.Notion, &entry, "stripe")
 
 		if err != nil {
-			ctx.Err.Printf("!!! Unable to add ticket %s: %v", err)
+			ctx.Err.Printf("!!! Unable to add ticket: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}

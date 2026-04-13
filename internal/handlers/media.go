@@ -305,7 +305,7 @@ func PreviewSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	confTag := params["conf"]
 	card := params["card"]
 
-	template := fmt.Sprintf("media/%s_%s.tmpl", card)
+	template := fmt.Sprintf("media/%s_%s.tmpl", confTag, card)
 	err := ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
 		ConfTag:   confTag,
 		Name:      "Speaker's Name",
