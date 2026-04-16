@@ -11,7 +11,7 @@ import (
 )
 
 func fileGetURL(files []*notion.File) string {
-	if files == nil {
+	if len(files) == 0 {
 		return ""
 	}
 
