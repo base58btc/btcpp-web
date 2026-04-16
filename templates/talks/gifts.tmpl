@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>speaker gifts @ bitcoin++</title>
+    {{ block "header" . }} {{ end }}
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127908;</text></svg>">
+  </head>
+  <body>
+    {{ block "mainnav" . }} {{ end }}
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="mx-auto max-w-5xl">
+            <section id="topline" class="mb-6">
+                <div class="overflow-hidden sm:rounded-lg bg-white shadow">
+                    <div class="px-4 py-5 sm:p-6">
+                        <h1 class="text-xl font-bold text-gray-900">Speaker Gifts List</h1>
+                        {{ if .Conf }}
+                        <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                        {{ end }}
+                    </div>
+                </div>
+            </section>
+
+            <section id="controls" class="mb-6">
+                <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
+                    <form method="GET" action="/talks/gifts" class="flex items-end gap-4 flex-wrap">
+                        <div>
+                            <label for="conf" class="block text-sm font-medium text-gray-700 mb-1">Event</label>
+                            <select name="conf" id="conf" class="rounded border border-gray-300 px-3 py-1.5 text-sm">
+                                <option value="">-- select event --</option>
+                                {{ range .Confs }}
+                                <option value="{{ .Tag }}" {{ if $.Conf }}{{ if eq $.Conf.Tag .Tag }}selected{{ end }}{{ end }}>{{ .Desc }}</option>
+                                {{ end }}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filepath" class="block text-sm font-medium text-gray-700 mb-1">File Path Prefix</label>
+                            <input type="text" name="filepath" id="filepath" value="{{ .FilePath }}" placeholder="/path/to/clipart/" class="rounded border border-gray-300 px-3 py-1.5 text-sm w-64">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Load Talks</button>
+                            {{ if .Rows }}
+                            <button type="button" onclick="downloadCSV()" class="px-3 py-1.5 text-sm rounded-md text-white bg-green-600 hover:bg-green-700">Download CSV</button>
+                            {{ end }}
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            {{ if .Rows }}
+            <section id="talks-table" class="mb-6">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Clipart</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Speaker</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {{ range .Rows }}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 text-sm text-gray-900">{{ if $.FilePath }}{{ $.FilePath }}{{ end }}{{ .Clipart }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900">{{ .SpeakerName }}</td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
+                    <div class="px-6 py-3 bg-gray-50 text-sm text-gray-500">
+                        {{ len .Rows }} talks
+                    </div>
+                </div>
+            </section>
+            {{ else if .Conf }}
+            <section class="mb-6">
+                <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6 text-center text-gray-500">
+                    No talks found for this event.
+                </div>
+            </section>
+            {{ end }}
+        </div>
+    </div>
+    {{ if .Rows }}
+    <script>
+    function downloadCSV() {
+        var rows = document.querySelectorAll('#talks-table tbody tr');
+        var csv = '@Photo,Name\n';
+        rows.forEach(function(row) {
+            var cells = row.querySelectorAll('td');
+            var photo = '"' + cells[0].textContent.trim().replace(/"/g, '""') + '"';
+            var name = '"' + cells[1].textContent.trim().replace(/"/g, '""') + '"';
+            csv += photo + ',' + name + '\n';
+        });
+        var blob = new Blob([csv], {type: 'text/csv'});
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'speaker_canvases.csv';
+        a.click();
+    }
+    </script>
+    {{ end }}
+  </body>
+</html>

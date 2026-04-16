@@ -179,6 +179,19 @@ type VolAdminShiftsPage struct {
         Year     uint
 }
 
+type GiftRow struct {
+        Clipart     string
+        SpeakerName string
+}
+
+type TalksGiftsPage struct {
+        Confs         []*types.Conf
+        Conf          *types.Conf
+        Rows          []*GiftRow
+        FilePath      string
+        Year          uint
+}
+
 type VolDetailsPage struct {
         Conf            *types.Conf
         Vol             *types.Volunteer

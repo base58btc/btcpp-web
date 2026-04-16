@@ -541,6 +541,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 
 
+	r.HandleFunc("/talks/gifts", func(w http.ResponseWriter, r *http.Request) {
+		TalksGifts(w, r, app)
+	}).Methods("GET")
+
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
@@ -3399,4 +3403,66 @@ func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 	volAdminShiftsRedirect(w, r, conf)
 }
 
+func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		http.Error(w, "Unable to load conferences", http.StatusInternalServerError)
+		ctx.Err.Printf("/talks/gifts failed to get confs: %s", err.Error())
+		return
+	}
+
+	confTag := r.URL.Query().Get("conf")
+	filePath := r.URL.Query().Get("filepath")
+
+	var selectedConf *types.Conf
+	var talks []*types.Talk
+	var rows []*GiftRow
+
+	if confTag != "" {
+		for _, conf := range confs {
+			if conf.Tag == confTag {
+				selectedConf = conf
+				break
+			}
+		}
+		if selectedConf != nil {
+			talks, err = getters.GetTalksFor(ctx, selectedConf.Tag)
+			if err != nil {
+				http.Error(w, "Unable to load talks", http.StatusInternalServerError)
+				ctx.Err.Printf("/talks/gifts failed to get talks for %s: %s", confTag, err.Error())
+				return
+			}
+
+			for _, talk := range talks {
+				for _, speaker := range talk.Speakers {
+					rows = append(rows, &GiftRow{
+						Clipart:     talk.Clipart,
+						SpeakerName: speaker.Name,
+					})
+				}
+			}
+
+			sort.SliceStable(rows, func(i, j int) bool {
+				return rows[i].SpeakerName < rows[j].SpeakerName
+			})
+		}
+	}
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/gifts.tmpl", &TalksGiftsPage{
+		Confs:    confs,
+		Conf:     selectedConf,
+		Rows:     rows,
+		FilePath: filePath,
+		Year:     helpers.CurrentYear(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/talks/gifts template failed: %s", err.Error())
+	}
+}
 
