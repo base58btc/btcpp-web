@@ -83,7 +83,7 @@ body {
           </blockquote>
           <figcaption class="mt-4 text-base text-white"> 
             <div class="talk font-semibold">{{ .TalkTitle }}</div>
-	    {{ if .Twitter }}
+	    {{ if ne .Twitter "" }}
             <div class="social mt-1">@{{ .Twitter }}</div>
 	    {{ end }}
           </figcaption>

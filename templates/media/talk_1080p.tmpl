@@ -96,7 +96,7 @@ body {
 	        {{ if .Company }}
             <p class="text-white mt-4 text-4xl">{{ .Company }}</p>
 	        {{ end }}
-	        {{ if .TwitterHandle }}
+	        {{ if ne .TwitterHandle "" }}
             <p class="text-white mt-4 text-4xl">@{{ .TwitterHandle }}</p>
 	        {{ end }}
 	      {{ end }}
