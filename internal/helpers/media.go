@@ -12,6 +12,9 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
+// chromeSem limits concurrent headless Chrome instances
+var chromeSem = make(chan struct{}, 4)
+
 type PDFPage struct {
 	URL    string
 	Height float64
@@ -35,6 +38,9 @@ func pdfGrabber(pdf *PDFPage, res *[]byte) chromedp.Tasks {
 }
 
 func BuildChromePdf(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
+	chromeSem <- struct{}{}
+	defer func() { <-chromeSem }()
+
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("allow-insecure-localhost", true),
 		chromedp.Flag("ignore-certificate-errors", true),
@@ -44,10 +50,7 @@ func BuildChromePdf(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
 
-	taskCtx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(ctx.Infos.Printf),
-	)
+	taskCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 	var pdfBuffer []byte
 	if err := chromedp.Run(taskCtx, pdfGrabber(pdfPage, &pdfBuffer)); err != nil {
@@ -73,6 +76,9 @@ func pngGrabber(pg *PDFPage, res *[]byte) chromedp.Tasks {
 }
 
 func BuildChromePng(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
+	chromeSem <- struct{}{}
+	defer func() { <-chromeSem }()
+
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("allow-insecure-localhost", true),
 		chromedp.Flag("ignore-certificate-errors", true),
@@ -82,10 +88,7 @@ func BuildChromePng(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
 	defer cancel()
 
-	taskCtx, cancel := chromedp.NewContext(
-		allocCtx,
-		chromedp.WithLogf(ctx.Infos.Printf),
-	)
+	taskCtx, cancel := chromedp.NewContext(allocCtx)
 	defer cancel()
 	var pngBuffer []byte
 	if err := chromedp.Run(taskCtx, pngGrabber(pdfPage, &pngBuffer)); err != nil {
