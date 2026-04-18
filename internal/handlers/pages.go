@@ -197,6 +197,13 @@ type SpeakerAdminPage struct {
         Year          uint
 }
 
+type SponsorFormPage struct {
+        Confs       []*types.Conf
+        ConfItems   []types.CheckItem
+        SponsorOpps []types.CheckItem
+        Year        uint
+}
+
 type SocialSpeakerRow struct {
         ID              string
         Name            string

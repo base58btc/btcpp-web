@@ -38,7 +38,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "sponsor", "press", "vegas25" }
+var pages []string = []string{"index", "about", "press", "vegas25" }
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -382,6 +382,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/contact", func(w http.ResponseWriter, r *http.Request) {
 		ContactPage(w, r, app)
+	}).Methods("GET", "POST")
+
+	r.HandleFunc("/sponsor", func(w http.ResponseWriter, r *http.Request) {
+		SponsorPage(w, r, app)
 	}).Methods("GET", "POST")
 
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
@@ -1100,6 +1104,177 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+		return
+	}
+}
+
+func getSponsorOpps() []types.CheckItem {
+	return []types.CheckItem{
+		{ItemID: "opp-event", ItemDesc: "Event Sponsorship"},
+		{ItemID: "opp-hackathon", ItemDesc: "Hackathon Sponsorship"},
+		{ItemID: "opp-workshop", ItemDesc: "Workshop Sponsorship"},
+		{ItemID: "opp-happy-hour", ItemDesc: "Happy Hour / After Party"},
+		{ItemID: "opp-lanyard", ItemDesc: "Lanyards / Swag"},
+		{ItemID: "opp-other", ItemDesc: "Other"},
+	}
+}
+
+func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	confs := listConfs(w, ctx)
+	if confs == nil {
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		// Build conf items from all active future confs
+		var confItems []types.CheckItem
+		for _, c := range confs {
+			if !c.Active || !c.InFuture() {
+				continue
+			}
+			confItems = append(confItems, types.CheckItem{
+				ItemID:   "conf-" + c.Ref,
+				ItemDesc: c.Desc + " " + c.DateDesc,
+			})
+		}
+
+		err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/sponsor.tmpl", &SponsorFormPage{
+			Confs:       confs,
+			ConfItems:   confItems,
+			SponsorOpps: getSponsorOpps(),
+			Year:        helpers.CurrentYear(),
+		})
+		if err != nil {
+			http.Error(w, "Unable to load page", http.StatusInternalServerError)
+			ctx.Err.Printf("/sponsor ExecuteTemplate failed: %s", err.Error())
+		}
+		return
+	case http.MethodPost:
+		r.ParseForm()
+
+		name := r.FormValue("Name")
+		phone := r.FormValue("Phone")
+		email := r.FormValue("Email")
+		signal := r.FormValue("Signal")
+		telegram := r.FormValue("Telegram")
+		contactAt := r.FormValue("ContactAt")
+		org := r.FormValue("Org")
+		orgSite := r.FormValue("OrgSite")
+		orgTwitter := r.FormValue("OrgTwitter")
+		orgNostr := r.FormValue("OrgNostr")
+		budget := r.FormValue("Budget")
+		discoveredVia := r.FormValue("DiscoveredVia")
+		comments := r.FormValue("Comments")
+		captcha := r.FormValue("Captcha")
+
+		if captcha != "5" {
+			w.Write([]byte(helpers.ErrApp("Incorrect captcha. The answer is 5.", "sponsors")))
+			return
+		}
+
+		if email == "" || !strings.Contains(email, "@") {
+			w.Write([]byte(helpers.ErrApp("Please provide a valid email address.", "sponsors")))
+			return
+		}
+
+		if name == "" || org == "" {
+			w.Write([]byte(helpers.ErrApp("Name and organization are required.", "sponsors")))
+			return
+		}
+
+		// Collect selected conferences
+		var selectedConfs []string
+		for key := range r.PostForm {
+			if strings.HasPrefix(key, "conf-") {
+				confRef := strings.TrimPrefix(key, "conf-")
+				for _, c := range confs {
+					if c.Ref == confRef {
+						selectedConfs = append(selectedConfs, c.Desc+" "+c.DateDesc)
+						break
+					}
+				}
+			}
+		}
+
+		// Collect selected sponsor opps
+		var selectedOpps []string
+		for _, opp := range getSponsorOpps() {
+			if r.FormValue(opp.ItemID) != "" {
+				selectedOpps = append(selectedOpps, opp.ItemDesc)
+			}
+		}
+
+		htmlBody := fmt.Sprintf(
+			"<h3>Sponsor Inquiry</h3>"+
+				"<p><strong>Name:</strong> %s</p>"+
+				"<p><strong>Email:</strong> %s</p>"+
+				"<p><strong>Phone:</strong> %s</p>"+
+				"<p><strong>Signal:</strong> %s</p>"+
+				"<p><strong>Telegram:</strong> %s</p>"+
+				"<p><strong>Best way to contact:</strong> %s</p>"+
+				"<hr/>"+
+				"<p><strong>Organization:</strong> %s</p>"+
+				"<p><strong>Website:</strong> %s</p>"+
+				"<p><strong>X:</strong> %s</p>"+
+				"<p><strong>Nostr:</strong> %s</p>"+
+				"<hr/>"+
+				"<p><strong>Budget:</strong> %s</p>"+
+				"<p><strong>Events:</strong> %s</p>"+
+				"<p><strong>Interested in:</strong> %s</p>"+
+				"<p><strong>Discovered via:</strong> %s</p>"+
+				"<hr/>"+
+				"<p><strong>Comments:</strong></p><p>%s</p>",
+			name, email, phone, signal, telegram, contactAt,
+			org, orgSite, orgTwitter, orgNostr,
+			budget, strings.Join(selectedConfs, ", "), strings.Join(selectedOpps, ", "),
+			discoveredVia, comments)
+
+		textBody := fmt.Sprintf(
+			"Sponsor Inquiry\n\nName: %s\nEmail: %s\nPhone: %s\nSignal: %s\nTelegram: %s\nBest way to contact: %s\n\n"+
+				"Organization: %s\nWebsite: %s\nX: %s\nNostr: %s\n\n"+
+				"Budget: %s\nEvents: %s\nInterested in: %s\nDiscovered via: %s\n\nComments:\n%s",
+			name, email, phone, signal, telegram, contactAt,
+			org, orgSite, orgTwitter, orgNostr,
+			budget, strings.Join(selectedConfs, ", "), strings.Join(selectedOpps, ", "),
+			discoveredVia, comments)
+
+		mail := &emails.Mail{
+			JobKey:   fmt.Sprintf("sponsor-%s-%d", email, time.Now().Unix()),
+			Email:    "sponsors@btcpp.dev",
+			ReplyTo:  email,
+			Title:    fmt.Sprintf("Sponsor Inquiry: %s (%s)", org, name),
+			SendAt:   time.Now(),
+			HTMLBody: []byte(htmlBody),
+			TextBody: []byte(textBody),
+		}
+
+		err := emails.ComposeAndSendMail(ctx, mail)
+		if err != nil {
+			ctx.Err.Printf("/sponsor failed to send email: %s", err.Error())
+			w.Write([]byte(helpers.ErrApp("Unable to send your inquiry. Please try again.", "sponsors")))
+			return
+		}
+
+		// Send a copy to the submitter
+		copyMail := &emails.Mail{
+			JobKey:   fmt.Sprintf("sponsor-copy-%s-%d", email, time.Now().Unix()),
+			Email:    email,
+			ReplyTo:  "sponsors@btcpp.dev",
+			Title:    fmt.Sprintf("Your Sponsor Inquiry: %s", org),
+			SendAt:   time.Now(),
+			HTMLBody: []byte("<p>Thanks for your interest in sponsoring bitcoin++! Here's a copy of your inquiry:</p><hr/>" + htmlBody),
+			TextBody: []byte("Thanks for your interest in sponsoring bitcoin++! Here's a copy of your inquiry:\n\n" + textBody),
+		}
+
+		err = emails.ComposeAndSendMail(ctx, copyMail)
+		if err != nil {
+			ctx.Err.Printf("/sponsor failed to send copy to %s: %s", email, err.Error())
+			// Don't fail the whole submission for a copy failure
+		}
+
+		ctx.Infos.Printf("Sponsor inquiry from %s (%s) at %s", name, email, org)
+		w.Write([]byte(`<div class="text-green-700 font-semibold">Your sponsor inquiry has been sent! We'll get back to you soon.</div><script>document.querySelector('form').reset();</script>`))
 		return
 	}
 }
