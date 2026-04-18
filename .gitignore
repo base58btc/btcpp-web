@@ -1,6 +1,7 @@
 *.swp
 btcpp-web
 config.toml
+_cache/
 target
 todo
 *.log

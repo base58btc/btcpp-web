@@ -48,6 +48,7 @@ const (
 )
 
 var taskChan chan JobType = make(chan JobType)
+var cacheTTL time.Duration
 
 type TalksCallback func(ctx *config.AppContext, talks []*types.Talk)
 type SpeakersCallback func(ctx *config.AppContext, speakers []*types.Speaker)
@@ -77,7 +78,46 @@ func CloseWorkPool() {
 	close(taskChan)
 }
 
+func loadFromCache() bool {
+        loaded := true
+        if !readCache("confs", &confs) { loaded = false }
+        if !readCache("speakers", &cacheSpeakers) { loaded = false }
+        if !readCache("talks", &talks) { loaded = false }
+        if !readCache("discounts", &discounts) { loaded = false }
+        if !readCache("hotels", &hotels) { loaded = false }
+        if !readCache("jobs", &jobs) { loaded = false }
+        if !readCache("shifts", &shifts) { loaded = false }
+
+        if loaded {
+                now := time.Now()
+                lastConfsFetch = now
+                lastSpeakerFetch = now
+                lastTalksFetch = now
+                lastDiscountFetch = now
+                lastHotelFetch = now
+                lastJobTypeFetch = now
+                lastShiftFetch = now
+                return true
+        }
+
+        return false
+}
+
 func WaitFetch(ctx *config.AppContext) {
+	cacheTTL = time.Duration(ctx.Env.CacheTTLSec) * time.Second
+
+	if !ctx.InProduction {
+		EnableDiskCache()
+	}
+
+	// Try loading from disk cache first (dev only)
+	if diskCacheEnabled && loadFromCache() {
+                ctx.Infos.Printf("Loaded all data from disk cache!")
+                return 
+	}
+
+	ctx.Infos.Printf("Disk cache incomplete, fetching from Notion...")
+
 	// Phase 1: fetch all independent data in parallel
 	var wg sync.WaitGroup
 	wg.Add(5)
@@ -93,14 +133,6 @@ func WaitFetch(ctx *config.AppContext) {
 	go func() { defer wg.Done(); runJob(ctx, JobTalks); lastTalksFetch = time.Now() }()
 	go func() { defer wg.Done(); runJob(ctx, JobShifts); lastShiftFetch = time.Now() }()
 	wg.Wait()
-
-	ctx.Infos.Printf("wait fetch loaded!")
-	ctx.Infos.Printf("has confs?? %t", confs != nil)
-	ctx.Infos.Printf("has talks?? %t", talks != nil)
-	ctx.Infos.Printf("has speakers?? %t", cacheSpeakers != nil)
-	ctx.Infos.Printf("has hotels?? %t", hotels != nil)
-	ctx.Infos.Printf("has jobs?? %t", jobs != nil)
-	ctx.Infos.Printf("has shifts?? %t", shifts != nil)
 }
 
 func runJob(ctx *config.AppContext, job JobType) {
@@ -139,12 +171,13 @@ func getConfs(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching confs %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d confs!", len(confs))
+		writeCache("confs", confs)
 	}
 }
 
 func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if confs == nil || lastConfsFetch.Before(deadline) {
 		lastConfsFetch = time.Now()
 		taskChan <- JobConfs
@@ -162,6 +195,7 @@ func getSpeakers(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching speakers %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
+		writeCache("speakers", cacheSpeakers)
                 ctx.Infos.Printf("there are %d callbacks", len(onSpeakersRefresh))
 		for _, cb := range onSpeakersRefresh {
 			cb(ctx, cacheSpeakers)
@@ -172,7 +206,7 @@ func getSpeakers(ctx *config.AppContext) {
 /* This may return nil */
 func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
 		/* Set last fetch to now even if there's errors */
 		lastSpeakerFetch = time.Now()
@@ -191,6 +225,7 @@ func getTalks(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching talks %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d talks!", len(talks))
+		writeCache("talks", talks)
 		for _, cb := range onTalksRefresh {
 			cb(ctx, talks)
 		}
@@ -200,7 +235,7 @@ func getTalks(ctx *config.AppContext) {
 /* This may return nil */
 func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if talks == nil || lastTalksFetch.Before(deadline) {
 		/* Set last fetch to now even if fails */
 		lastTalksFetch = time.Now()
@@ -219,13 +254,14 @@ func getDiscounts(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching discounts %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d discounts!", len(discounts))
+		writeCache("discounts", discounts)
 	}
 }
 
 /* This may return nil */
 func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if discounts == nil || lastDiscountFetch.Before(deadline) {
 		/* Set last fetch to now even if there's errors */
 		lastDiscountFetch = time.Now()
@@ -244,13 +280,14 @@ func getHotels(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching hotels %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d hotels!", len(hotels))
+		writeCache("hotels", hotels)
 	}
 }
 
 /* This may return nil */
 func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if hotels == nil || lastHotelFetch.Before(deadline) {
 		lastHotelFetch = time.Now()
 		taskChan <- JobHotels
@@ -268,13 +305,14 @@ func getJobs(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching jobs %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d jobs!", len(jobs))
+		writeCache("jobs", jobs)
 	}
 }
 
 /* This may return nil */
 func FetchJobsCached(ctx *config.AppContext) ([]*types.JobType, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if jobs == nil || lastJobTypeFetch.Before(deadline) {
 		lastJobTypeFetch = time.Now()
 		taskChan <- JobJobs
@@ -292,13 +330,14 @@ func getShifts(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching shifts %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d shifts!", len(shifts))
+		writeCache("shifts", shifts)
 	}
 }
 
 /* This may return nil */
 func FetchShiftsCached(ctx *config.AppContext) ([]*types.WorkShift, error) {
 	now := time.Now()
-	deadline := now.Add(time.Duration(-5) * time.Minute)
+	deadline := now.Add(-cacheTTL)
 	if shifts == nil || lastShiftFetch.Before(deadline) {
 		lastShiftFetch = time.Now()
 		taskChan <- JobShifts

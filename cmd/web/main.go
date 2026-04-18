@@ -93,8 +93,19 @@ func loadConfig() *types.EnvConfig {
 			Secret:   os.Getenv("SPACES_SECRET"),
 		}
 
+		if ttl := os.Getenv("CACHE_TTL_SEC"); ttl != "" {
+			if v, err := strconv.Atoi(ttl); err == nil {
+				config.CacheTTLSec = v
+			}
+		}
+
 		secretHex := os.Getenv("HMAC_SECRET")
 		config.HMACKey = sha256.Sum256([]byte(secretHex))
+	}
+
+	// Default cache TTL to 300s (5 min) if not set
+	if config.CacheTTLSec == 0 {
+		config.CacheTTLSec = 300
 	}
 
 	return &config

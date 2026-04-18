@@ -35,6 +35,7 @@ type (
 		HMACKey           [32]byte
 		BufferAPI         string
 		Spaces            SpacesConfig
+		CacheTTLSec       int
 	}
 
 	GoogleConfig struct {
