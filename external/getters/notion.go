@@ -458,6 +458,21 @@ func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
 	return err
 }
 
+func ShiftUpdateCalNotif(n *types.Notion, shiftID string, calnotif string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), shiftID,
+		map[string]*notion.PropertyValue{
+			"CalNotif": notion.NewRichTextPropertyValue(
+				[]*notion.RichText{
+					{
+						Type: notion.RichTextText,
+						Text: &notion.Text{
+							Content: calnotif,
+						}},
+				}...),
+		})
+	return err
+}
+
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
 	var speakers []*types.Speaker
 

@@ -454,6 +454,26 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdmin(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/vols/admin/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		/* Check for verified */
+		if ok := helpers.CheckPin(w, r, app); !ok {
+			helpers.Render401(w, r, app)
+			return
+		}
+
+		if !google.IsLoggedIn() {
+			app.Session.Put(r.Context(), "r", r.URL.Path)
+			http.Redirect(w, r, "/auth-login", http.StatusFound)
+			return
+		}
+
+		SendVolCals(w, r, app)
+
+		params := mux.Vars(r)
+		confTag := params["conf"]
+		http.Redirect(w, r, "/vols/admin/"+confTag+"?flash=Shift+calendar+invites+sent", http.StatusFound)
+	}).Methods("GET", "POST")
+
 	r.HandleFunc("/vols/admin/{conf}/promote", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminPromote(w, r, app)
 	}).Methods("POST")
@@ -552,6 +572,30 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/social/{conf}/post", func(w http.ResponseWriter, r *http.Request) {
 		SocialPost(w, r, app)
 	}).Methods("POST")
+
+	r.HandleFunc("/admin/speakers/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerAdmin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		/* Check for verified */
+		if ok := helpers.CheckPin(w, r, app); !ok {
+			helpers.Render401(w, r, app)
+			return
+		}
+
+		if !google.IsLoggedIn() {
+			app.Session.Put(r.Context(), "r", r.URL.Path)
+			http.Redirect(w, r, "/auth-login", http.StatusFound)
+			return
+		}
+
+		SendCals(w, r, app)
+
+		params := mux.Vars(r)
+		confTag := params["conf"]
+		http.Redirect(w, r, "/admin/speakers/"+confTag+"?flash=Calendar+invites+sent", http.StatusFound)
+	}).Methods("GET", "POST")
 
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
@@ -3481,3 +3525,128 @@ func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 }
 
+func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/speakers/%s failed to get talks: %s", conf.Tag, err.Error())
+		return
+	}
+
+	var rows []*SpeakerRow
+	seen := make(map[string]bool)
+	for _, talk := range talks {
+		for _, speaker := range talk.Speakers {
+			if !seen[speaker.Email] {
+				seen[speaker.Email] = true
+				rows = append(rows, &SpeakerRow{
+					Name:  speaker.Name,
+					Email: speaker.Email,
+				})
+			}
+		}
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		return rows[i].Name < rows[j].Name
+	})
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/speakers.tmpl", &SpeakerAdminPage{
+		Conf:         conf,
+		Rows:         rows,
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/talks/speakers template failed: %s", err.Error())
+	}
+}
+
+func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/sendcal failed to get shifts: %s", conf.Tag, err.Error())
+		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s/sendcal failed to get volunteers: %s", conf.Tag, err.Error())
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		return
+	}
+
+	// Build a map of volunteer ref -> email
+	volEmails := make(map[string]string)
+	for _, vol := range vols {
+		volEmails[vol.Ref] = vol.Email
+	}
+
+	for _, shift := range shifts {
+		if len(shift.AssigneesRef) == 0 {
+			continue
+		}
+
+		if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+			ctx.Err.Printf("Skipping shift %s: no end time", shift.Name)
+			continue
+		}
+
+		// Collect emails for assigned volunteers
+		var emails []string
+		for _, ref := range shift.AssigneesRef {
+			if email, ok := volEmails[ref]; ok && email != "" {
+				emails = append(emails, email)
+			}
+		}
+
+		if len(emails) == 0 {
+			continue
+		}
+
+		ctx.Infos.Printf("Sending vol cal invite for shift %s (%d volunteers)", shift.Name, len(emails))
+
+		calInvite := &google.CalInvite{
+			ConfTag:   conf.Tag,
+			EventName: "vol shift @ btc++: " + shift.Name,
+			Location:  conf.Venue,
+			Desc:      "Your volunteer shift is happening now!",
+			Invitees:  emails,
+			StartTime: shift.ShiftTime.Start,
+			EndTime:   *shift.ShiftTime.End,
+		}
+
+		ident, err := google.RunCalendarInvites(shift.CalNotif, calInvite)
+		if err != nil {
+			ctx.Err.Printf("Failure sending cal invite for shift %s: %s", shift.Name, err)
+			continue
+		}
+
+		err = getters.ShiftUpdateCalNotif(ctx.Notion, shift.Ref, ident)
+		if err != nil {
+			ctx.Err.Printf("Failure updating shift calnotif for %s: %s", shift.Name, err)
+			continue
+		}
+
+		ctx.Infos.Printf("Cal invite sent for shift %s to %d volunteers", shift.Name, len(emails))
+	}
+}

@@ -242,6 +242,7 @@ type (
                 Conf *Conf
                 ShiftTime *Times
                 Priority uint
+                CalNotif string
         }
 
         JobType struct {
@@ -424,12 +425,13 @@ func (t *Times) Day() string {
 }
 
 func (t *Times) FmtRange() string {
-        start := t.Desc() 
+        start := t.Desc()
         end := ""
         if t.End != nil {
                 end = t.End.Format("- 3:04pm")
         }
-        return start + end
+        tz, _ := t.Start.Zone()
+        return start + end + " " + tz
 }
 
 

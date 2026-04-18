@@ -156,6 +156,7 @@ type VolAdminPage struct {
         Conf          *types.Conf
         Volunteers    []*types.Volunteer
         Shifts        []*types.WorkShift
+        VolInfo       *types.VolInfo
         StatusFilter  string
         Missives      []*mtypes.Letter
         FlashMessage  string

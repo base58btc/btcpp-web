@@ -434,6 +434,7 @@ func parseWorkShift(ctx *config.AppContext, pageID string, props map[string]noti
                 Conf:        parseConfOne(ctx, "ConfRef", props),
 		ShiftTime:   parseTimes("ShiftTime", props),
 		Priority:    uint(props["Priority"].Number),
+		CalNotif:    parseRichText("CalNotif", props),
 	}
 
 	/* Find all assignees for this shift */
