@@ -13,6 +13,7 @@ import (
 	"btcpp-web/external/buffer"
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
+	"btcpp-web/external/spaces"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/handlers"
@@ -84,6 +85,14 @@ func loadConfig() *types.EnvConfig {
 
 		config.BufferAPI = os.Getenv("BUFFER_KEY")
 
+		config.Spaces = types.SpacesConfig{
+			Endpoint: os.Getenv("SPACES_ENDPOINT"),
+			Region:   os.Getenv("SPACES_REGION"),
+			Bucket:   os.Getenv("SPACES_BUCKET"),
+			Key:      os.Getenv("SPACES_KEY"),
+			Secret:   os.Getenv("SPACES_SECRET"),
+		}
+
 		secretHex := os.Getenv("HMAC_SECRET")
 		config.HMACKey = sha256.Sum256([]byte(secretHex))
 	}
@@ -109,6 +118,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	/* Start up Spaces (S3-compatible storage) */
+	spaces.Init(app.Env.Spaces)
 
 	/* Load cached data */
 	getters.WaitFetch(&app)

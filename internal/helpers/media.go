@@ -125,36 +125,7 @@ func MakeTalkPng(ctx *config.AppContext, confTag, card, talkID string) ([]byte, 
 	return MakeMediaPng(ctx, card, path)
 }
 
-func MakeSpeakerImg(ctx *config.AppContext, confTag, card, speakerID, talkID string) ([]byte, error) {
-	path := fmt.Sprintf("/media/imgs/%s/speaker/%s/%s/%s", confTag, card, talkID, speakerID)
-	return MakeMediaImg(ctx, card, path)
-}
-
-func MakeTalkImg(ctx *config.AppContext, confTag, card, talkID string) ([]byte, error) {
-	path := fmt.Sprintf("/media/imgs/%s/talk/%s/%s", confTag, card, talkID)
-	return MakeMediaImg(ctx, card, path)
-}
-
 func MakeAgendaImg(ctx *config.AppContext, confTag, dayref, venue string) ([]byte, error) {
 	path := fmt.Sprintf("/media/imgs/%s/agenda/%s/%s", confTag, dayref, venue)
-	card := "agenda"
-	return MakeMediaImg(ctx, card, path)
-}
-
-func MakeMediaImg(ctx *config.AppContext, card, path string) ([]byte, error) {
-
-	dimens, ok := types.MediaDimens[card]
-	if !ok {
-		return nil, fmt.Errorf("can't find card %s", card)
-	}
-
-	pdf := &PDFPage{
-		URL:    ctx.Env.GetURI() + path,
-		Height: dimens.Height,
-		Width:  dimens.Width,
-	}
-
-	ctx.Infos.Printf("URL: %s", pdf.URL)
-
-	return BuildChromePdf(ctx, pdf)
+	return MakeMediaPng(ctx, "agenda", path)
 }

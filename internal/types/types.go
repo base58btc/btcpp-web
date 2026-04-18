@@ -34,6 +34,7 @@ type (
 		HMACSecret        string
 		HMACKey           [32]byte
 		BufferAPI         string
+		Spaces            SpacesConfig
 	}
 
 	GoogleConfig struct {
@@ -126,6 +127,7 @@ type (
 		Section     string
 		Speakers    []*Speaker
 		CalNotif    string
+		TalkCardURL string
 	}
 
 	Session struct {

@@ -85,6 +85,14 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return
 	}
 
+	// Build a map of speaker ID -> their talks
+	speakerTalks := make(map[string][]*types.Talk)
+	for _, talk := range talks {
+		for _, speaker := range talk.Speakers {
+			speakerTalks[speaker.ID] = append(speakerTalks[speaker.ID], talk)
+		}
+	}
+
 	// Build deduplicated speaker rows
 	seenSpeakers := make(map[string]bool)
 	var speakerRows []*SocialSpeakerRow
@@ -95,23 +103,38 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			}
 			seenSpeakers[speaker.ID] = true
 
+			// Prefer a talk where this speaker is the sole speaker
+			bestTalk := talk
+			for _, t := range speakerTalks[speaker.ID] {
+				if len(t.Speakers) == 1 {
+					bestTalk = t
+					break
+				}
+			}
+
+			// Only include talk name if the speaker is the sole speaker
+			talkName := ""
+			if len(bestTalk.Speakers) == 1 {
+				talkName = bestTalk.Name
+			}
+
 			var buf bytes.Buffer
 			speakerPostTmpl.Execute(&buf, &speakerPostData{
 				Conf:          conf,
 				SpeakerName:   speaker.Name,
                                 Org:           speaker.Company,
 				TwitterHandle: speaker.TwitterHandle(),
-				TalkName:      talk.Name,
+				TalkName:      talkName,
 			})
 
-			speakerPhotoURL := ctx.Env.GetURI() + "/static/img/speakers/" + speaker.Photo
-			photoURL := fmt.Sprintf("%s/media/png/%s/speaker/1080p/%s/%s", ctx.Env.GetURI(), conf.Tag, talk.ID, speaker.ID)
-			instaURL := fmt.Sprintf("%s/media/png/%s/speaker/insta/%s/%s", ctx.Env.GetURI(), conf.Tag, talk.ID, speaker.ID)
+			speakerPhotoURL := SpeakerPhotoURL(ctx, speaker.Photo)
+			photoURL := SpeakerCardURL(ctx, conf.Tag, "1080p", speaker.ID, bestTalk.ID)
+			instaURL := SpeakerCardURL(ctx, conf.Tag, "insta", speaker.ID, bestTalk.ID)
 			speakerRows = append(speakerRows, &SocialSpeakerRow{
 				ID:              speaker.ID,
 				Name:            speaker.Name,
 				TwitterHandle:   speaker.TwitterHandle(),
-				TalkName:        talk.Name,
+				TalkName:        talkName,
 				SpeakerPhotoURL: speakerPhotoURL,
 				PhotoURL:        photoURL,
 				InstaPhotoURL:   instaURL,
@@ -148,7 +171,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			displayNames = append(displayNames, s.Name)
 		}
 
-		photoURL := fmt.Sprintf("%s/media/png/%s/talk/insta/%s", ctx.Env.GetURI(), conf.Tag, talk.ID)
+		photoURL := TalkCardURL(ctx, conf.Tag, "1080p", talk.ID)
 		talkRows = append(talkRows, &SocialTalkRow{
 			ID:           talk.ID,
 			Name:         talk.Name,
@@ -243,6 +266,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			if speakerPhotoURL != "" {
 				imgs = append(imgs, speakerPhotoURL)
 			}
+			ctx.Infos.Printf("Posting speaker %s to %s with images: %v", speakerID, ch.Service, imgs)
 			_, err := buffer.CreatePost(ch.ID, postText, imgs, ch.Service)
 			if err != nil {
 				ctx.Err.Printf("Failed to post speaker %s to %s: %s", speakerID, ch.Service, err.Error())

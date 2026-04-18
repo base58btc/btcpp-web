@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"btcpp-web/internal/config"
@@ -48,6 +49,20 @@ const (
 
 var taskChan chan JobType = make(chan JobType)
 
+type TalksCallback func(ctx *config.AppContext, talks []*types.Talk)
+type SpeakersCallback func(ctx *config.AppContext, speakers []*types.Speaker)
+
+var onTalksRefresh []TalksCallback
+var onSpeakersRefresh []SpeakersCallback
+
+func OnTalksRefresh(cb TalksCallback) {
+	onTalksRefresh = append(onTalksRefresh, cb)
+}
+
+func OnSpeakersRefresh(cb SpeakersCallback) {
+	onSpeakersRefresh = append(onSpeakersRefresh, cb)
+}
+
 func StartWorkPool(ctx *config.AppContext) {
 	// FIXME: I don't think go-notion is threadsafe lmao
 	numWorkers := 1
@@ -63,26 +78,21 @@ func CloseWorkPool() {
 }
 
 func WaitFetch(ctx *config.AppContext) {
-	runJob(ctx, JobConfs)
-	lastConfsFetch = time.Now()
+	// Phase 1: fetch all independent data in parallel
+	var wg sync.WaitGroup
+	wg.Add(5)
+	go func() { defer wg.Done(); runJob(ctx, JobConfs); lastConfsFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobSpeakers); lastSpeakerFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobDiscounts); lastDiscountFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobHotels); lastHotelFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobJobs); lastJobTypeFetch = time.Now() }()
+	wg.Wait()
 
-	runJob(ctx, JobSpeakers)
-	lastSpeakerFetch = time.Now()
-
-	runJob(ctx, JobTalks)
-	lastTalksFetch = time.Now()
-
-	runJob(ctx, JobDiscounts)
-	lastDiscountFetch = time.Now()
-
-	runJob(ctx, JobHotels)
-	lastHotelFetch = time.Now()
-
-	runJob(ctx, JobJobs)
-	lastJobTypeFetch = time.Now()
-
-	runJob(ctx, JobShifts)
-	lastShiftFetch = time.Now()
+	// Phase 2: fetch data that depends on phase 1
+	wg.Add(2)
+	go func() { defer wg.Done(); runJob(ctx, JobTalks); lastTalksFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobShifts); lastShiftFetch = time.Now() }()
+	wg.Wait()
 
 	ctx.Infos.Printf("wait fetch loaded!")
 	ctx.Infos.Printf("has confs?? %t", confs != nil)
@@ -152,6 +162,10 @@ func getSpeakers(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching speakers %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
+                ctx.Infos.Printf("there are %d callbacks", len(onSpeakersRefresh))
+		for _, cb := range onSpeakersRefresh {
+			cb(ctx, cacheSpeakers)
+		}
 	}
 }
 
@@ -177,6 +191,9 @@ func getTalks(ctx *config.AppContext) {
 		ctx.Err.Printf("error fetching talks %s", err)
 	} else {
 		ctx.Infos.Printf("Loaded %d talks!", len(talks))
+		for _, cb := range onTalksRefresh {
+			cb(ctx, talks)
+		}
 	}
 }
 
@@ -420,6 +437,12 @@ func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk
 	var talks []*types.Talk
 	n := ctx.Notion
 
+	// Build speaker map for O(1) lookups during parsing
+	speakerMap := make(map[string]*types.Speaker)
+	for _, s := range speakers {
+		speakerMap[s.ID] = s
+	}
+
 	hasMore := true
 	nextCursor := ""
 	for hasMore {
@@ -435,12 +458,20 @@ func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk
 			return nil, err
 		}
 		for _, page := range pages {
-			talk := parseTalk(page.ID, page.Properties, speakers)
+			talk := parseTalk(page.ID, page.Properties, speakerMap)
 			talks = append(talks, talk)
 		}
 	}
 
 	return talks, nil
+}
+
+func TalkUpdateCardURL(n *types.Notion, talkID string, cardURL string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), talkID,
+		map[string]*notion.PropertyValue{
+			"TalkCardURL": notion.NewURLPropertyValue(cardURL),
+		})
+	return err
 }
 
 func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {

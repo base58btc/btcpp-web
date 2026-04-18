@@ -166,6 +166,14 @@ func FindConfByRef(confs []*types.Conf, confRef string) *types.Conf {
 	return nil
 }
 
+func ConfTagSet(confs []*types.Conf) map[string]*types.Conf {
+        confset := make(map[string]*types.Conf)
+        for _, conf := range confs {
+                confset[conf.Tag] = conf
+        }
+        return confset
+}
+
 func HotelsForConf(ctx *config.AppContext, conf *types.Conf) []*types.Hotel {
 	hotels := make([]*types.Hotel, 0)
 	allhotels, err := getters.FetchHotelsCached(ctx)
@@ -296,4 +304,18 @@ func EmailLink(ctx *config.AppContext, email, path string) string {
         q.Set("em", encodedEmail)
         u.RawQuery = q.Encode()
         return u.String()
+}
+
+func SpeakerTalks(speaker *types.Speaker, talks []*types.Talk) []*types.Talk {
+        st := make([]*types.Talk, 0)
+        for _, talk := range talks {
+                for _, sp := range talk.Speakers {
+                        if speaker.ID == sp.ID {
+                                st = append(st, talk)
+                                break
+                        }
+                }
+        }
+
+        return st
 }

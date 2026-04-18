@@ -123,7 +123,7 @@ func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		}
 		for _, speaker := range talk.Speakers {
 			for _, card := range types.MediaCards {
-				img, err := helpers.MakeSpeakerImg(ctx, confTag, card, speaker.ID, talk.ID)
+				img, err := helpers.MakeSpeakerPng(ctx, confTag, card, speaker.ID, talk.ID)
 				if err != nil {
 					ctx.Err.Printf("oh no can't make speaker image %s: %s", speaker.Name, err)
 					return
@@ -132,7 +132,7 @@ func GenSpeakerCards(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 				ctx.Infos.Printf("made image for (%s) %s", card, speaker.Name)
 
 				imgName := strings.Split(speaker.Photo, ".")[0]
-				fileName := fmt.Sprintf("%s/%s-%s.pdf", path, imgName, card)
+				fileName := fmt.Sprintf("%s/%s-%s.png", path, imgName, card)
 				err = os.WriteFile(fileName, img, 0644)
 				if err != nil {
 					ctx.Err.Printf("oh no can't write speaker image %s: %s", speaker.Name, err)
@@ -165,7 +165,7 @@ func GenTalkCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	// FIXME: do all sizes for talks ?
 	card := "1080p"
 	for _, talk := range talks {
-		img, err := helpers.MakeTalkImg(ctx, confTag, card, talk.ID)
+		img, err := helpers.MakeTalkPng(ctx, confTag, card, talk.ID)
 		if err != nil {
 			ctx.Err.Printf("oh no can't make talk image %s: %s", talk.Name, err)
 			return
@@ -174,7 +174,7 @@ func GenTalkCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		ctx.Infos.Printf("made image for (%s) %s", card, talk.Name)
 
 		imgName := strings.Split(talk.Clipart, ".")[0]
-		fileName := fmt.Sprintf("%s/%s-%s.pdf", path, imgName, card)
+		fileName := fmt.Sprintf("%s/%s-%s.png", path, imgName, card)
 		err = os.WriteFile(fileName, img, 0644)
 		if err != nil {
 			ctx.Err.Printf("oh no can't write talk image %s: %s", talk.Name, err)
@@ -231,7 +231,7 @@ func GenAgendaCards(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 				ctx.Infos.Printf("made image for %s-%s", dayref, venue)
 
 				venueName := strings.Split(types.NameVenue(venue), " ")[0]
-				fileName := fmt.Sprintf("%s/day%d-%s-%s.pdf", path, day.Idx, venueName, daytime)
+				fileName := fmt.Sprintf("%s/day%d-%s-%s.png", path, day.Idx, venueName, daytime)
 				err = os.WriteFile(fileName, img, 0644)
 				if err != nil {
 					ctx.Err.Printf("oh no can't write agenda image %s (%s): %s", dayref, venue, err)

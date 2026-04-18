@@ -151,7 +151,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 	return speaker
 }
 
-func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []*types.Speaker) *types.Talk {
+func parseTalk(pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker) *types.Talk {
 
 	talk := &types.Talk{
 		ID:          pageID,
@@ -159,6 +159,7 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []
 		Clipart:     parseRichText("Clipart", props),
 		Description: parseRichText("Description", props),
 		CalNotif:    parseRichText("CalNotif", props),
+		TalkCardURL: props["TalkCardURL"].URL,
 		Sched:       parseTimes("Talk Time", props),
                 Venue:       parseSelect("Venue", props),
                 Event:       parseSelect("Event", props),
@@ -172,12 +173,10 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakers []
 	}
 
 	/* Find all speakers for this talk */
-	if speakers != nil {
+	if speakerMap != nil {
 		for _, speakerRel := range props["speakers"].Relation {
-			for _, speaker := range speakers {
-				if speakerRel.ID == speaker.ID {
-					talk.Speakers = append(talk.Speakers, speaker)
-				}
+			if speaker, ok := speakerMap[speakerRel.ID]; ok {
+				talk.Speakers = append(talk.Speakers, speaker)
 			}
 		}
 	}
