@@ -2,15 +2,105 @@
 <html>
   <head>
     <title>contact bitcoin++</title>
-    <!-- for the cognito forms section -->
-    <script src="https://www.cognitoforms.com/f/iframe.js"></script>
     {{ block "header" . }} {{ end }}
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#10024;</text></svg>">
   </head>
   <body>
     {{ block "mainnav" . }} {{ end }}
     <section id="form">
-      <iframe src="https://www.cognitoforms.com/f/aDbqSIu5XEqr7KsGaJGtCQ/6" allow="payment" style="border:0;width:100%;" height="1105"></iframe>
+        <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Contact Us</h2>
+                <p class="mt-2 text-lg/8 text-gray-600">Have a question or want to get in touch? Drop us a message!</p>
+            </div>
+            <form action="#"
+            hx-post="/contact"
+            class="mx-auto mt-16 max-w-xl sm:mt-20"
+            hx-validate="true"
+            hx-target="#result"
+            hx-swap="innerHTML"
+            hx-disabled-elt="find input[type='text'], find button"
+            >
+                <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name *</label>
+                        <div class="mt-2.5">
+                            <input id="Name" type="text" name="Name"
+                            autocomplete="name"
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Your Name"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number</label>
+                        <div class="mt-2.5">
+                            <input id="Phone" type="tel" name="Phone"
+                            autoComplete="home tel"
+                            autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="+1 555-928-1900"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
+                        <div class="mt-2.5">
+                            <input id="Email" type="email" name="Email"
+                            required
+                            autocomplete="email"
+                            placeholder="hello@example.com"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="ContactAt" class="block text-sm/6 font-semibold text-gray-900">Best Way to Contact You? *</label>
+                        <div class="mt-2.5">
+                            <input
+                            name="ContactAt" id="ContactAt" type="text"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="Signal, email, phone..."
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label for="Message" class="block text-sm/6 font-semibold text-gray-900">Message *</label>
+                        <div class="mt-2.5">
+                            <textarea
+                            name="Message" id="Message"
+                            rows="4"
+                            required
+                            placeholder="How can we help?"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">
+                        What is ten divided by two? *
+                        </label>
+                        <div class="mt-2.5">
+                            <input
+                            name="Captcha" id="Captcha" type="number"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="5"
+                            required
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                    </div>
+
+                </div>
+                <div class="mt-10">
+                    <button type="submit"
+                    class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin
+                    disabled:opacity-25"
+                    >Send Message</button>
+                </div>
+            </form>
+            <div id="result" class="mt-5 mx-auto max-w-xl text-red-700">
+            </div>
+        </div>
     </section>
     <section id="about">
     {{ block "about" . }} {{ end }}

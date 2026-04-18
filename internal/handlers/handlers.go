@@ -38,7 +38,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "sponsor", "contact", "press", "vegas25" }
+var pages []string = []string{"index", "about", "sponsor", "press", "vegas25" }
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -379,6 +379,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
         r.HandleFunc("/talk/{conf}", func (w http.ResponseWriter, r *http.Request) {
                 RenderSpeakerConf(w, r, app)
         }).Methods("GET", "POST")
+
+	r.HandleFunc("/contact", func(w http.ResponseWriter, r *http.Request) {
+		ContactPage(w, r, app)
+	}).Methods("GET", "POST")
 
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
 		HandleEmail(w, r, app)
@@ -1096,6 +1100,79 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+		return
+	}
+}
+
+func ContactPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	switch r.Method {
+	case http.MethodGet:
+		err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/contact.tmpl", &struct{ Year uint }{
+			Year: helpers.CurrentYear(),
+		})
+		if err != nil {
+			http.Error(w, "Unable to load page", http.StatusInternalServerError)
+			ctx.Err.Printf("/contact ExecuteTemplate failed: %s", err.Error())
+		}
+		return
+	case http.MethodPost:
+		r.ParseForm()
+
+		name := r.FormValue("Name")
+		phone := r.FormValue("Phone")
+		email := r.FormValue("Email")
+		contactAt := r.FormValue("ContactAt")
+		message := r.FormValue("Message")
+		captcha := r.FormValue("Captcha")
+
+		if captcha != "5" {
+			w.Write([]byte(helpers.ErrApp("Incorrect captcha. The answer is 5.", "hello")))
+			return
+		}
+
+		if email == "" || !strings.Contains(email, "@") {
+			w.Write([]byte(helpers.ErrApp("Please provide a valid email address.", "hello")))
+			return
+		}
+
+		if name == "" || message == "" {
+			w.Write([]byte(helpers.ErrApp("Name and message are required.", "hello")))
+			return
+		}
+
+		htmlBody := fmt.Sprintf(
+			"<h3>Contact Form Submission</h3>"+
+				"<p><strong>Name:</strong> %s</p>"+
+				"<p><strong>Email:</strong> %s</p>"+
+				"<p><strong>Phone:</strong> %s</p>"+
+				"<p><strong>Best way to contact:</strong> %s</p>"+
+				"<hr/>"+
+				"<p>%s</p>",
+			name, email, phone, contactAt, message)
+
+		textBody := fmt.Sprintf(
+			"Contact Form Submission\n\nName: %s\nEmail: %s\nPhone: %s\nBest way to contact: %s\n\n%s",
+			name, email, phone, contactAt, message)
+
+		mail := &emails.Mail{
+			JobKey:   fmt.Sprintf("contact-%s-%d", email, time.Now().Unix()),
+			Email:    "hello@btcpp.dev",
+			ReplyTo:  email,
+			Title:    fmt.Sprintf("Contact Form: %s", name),
+			SendAt:   time.Now(),
+			HTMLBody: []byte(htmlBody),
+			TextBody: []byte(textBody),
+		}
+
+		err := emails.ComposeAndSendMail(ctx, mail)
+		if err != nil {
+			ctx.Err.Printf("/contact failed to send email: %s", err.Error())
+			w.Write([]byte(helpers.ErrApp("Unable to send your message. Please try again.", "hello")))
+			return
+		}
+
+		ctx.Infos.Printf("Contact form submitted by %s (%s)", name, email)
+		w.Write([]byte(`<div class="text-green-700 font-semibold">Your message has been sent! We'll get back to you soon.</div>`))
 		return
 	}
 }
