@@ -81,13 +81,14 @@ body {
         <blockquote class="speaker text-lg font-semibold text-white sm:text-xl/8 mb-4">
           <p>{{ .Talk.Name }}</p>
         </blockquote>
+        {{ if .Talk.Speakers }}
         <div class="flex items-center gap-x-4">
 	  {{ $first := index .Talk.Speakers 0 }}
 	  {{ $solo := eq (len .Talk.Speakers) 1 }}
 	  {{ range .Talk.Speakers }}
 	    {{ if eq $first . }}
 	  <img src="/static/img/speakers/{{ .Photo }}" alt="" class="size-64 rounded-full bg-gray-100" />
-	      {{ if $solo }} 
+	      {{ if $solo }}
           <div class="text-sm/6">
             <p class="font-semibold text-white talk">
                <span class="absolute inset-0"></span>
@@ -106,6 +107,7 @@ body {
 	  {{ end }}
           </div>
         </div>
+        {{ end }}
       </figure>
       <div class="flex flex-col flex-initial justify-end">
 	<div class="flex-1"></div>

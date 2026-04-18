@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"btcpp-web/external/buffer"
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
 	"btcpp-web/internal/config"
@@ -81,6 +82,8 @@ func loadConfig() *types.EnvConfig {
 			Config: os.Getenv("GOOGLE_CONFIG"),
 		}
 
+		config.BufferAPI = os.Getenv("BUFFER_KEY")
+
 		secretHex := os.Getenv("HMAC_SECRET")
 		config.HMACKey = sha256.Sum256([]byte(secretHex))
 	}
@@ -113,6 +116,9 @@ func main() {
 
 	/* Start up Google stuffs */
 	google.InitOauth(&app)
+
+	/* Start up Buffer */
+	buffer.Init(app.Env.BufferAPI)
 
 	/* Set up Routes + Templates */
 	routes, err := handlers.Routes(&app)

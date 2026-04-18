@@ -63,6 +63,14 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 		MakeTalkCard(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/media/png/{conf}/speaker/{card}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
+		ServeSpeakerPng(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/media/png/{conf}/talk/{card}/{talk}", func(w http.ResponseWriter, r *http.Request) {
+		ServeTalkPng(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/media/imgs/{conf}/agenda/{ref}/{venue}", func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 		confTag := params["conf"]
@@ -284,14 +292,17 @@ func MakeTalkCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		return
 	}
 
-	template := fmt.Sprintf("media/talk_%s.tmpl", card)
-	err = ctx.TemplateCache.ExecuteTemplate(w, template, &TalkCard{
+	tmplName := fmt.Sprintf("media/talk_%s.tmpl", card)
+	if ctx.TemplateCache.Lookup(tmplName) == nil {
+		tmplName = "media/talk_1080p.tmpl"
+	}
+	err = ctx.TemplateCache.ExecuteTemplate(w, tmplName, &TalkCard{
 		ConfTag: confTag,
 		Talk:    talk,
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("exec speaker_social failed")
+		ctx.Err.Printf("exec %s failed: %s", tmplName, err.Error())
 		return
 	}
 }
@@ -407,7 +418,42 @@ func MakeAgendaCard(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("exec speaker_social failed")
+		ctx.Err.Printf("exec agenda card failed")
 		return
 	}
+}
+
+func ServeSpeakerPng(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+	talkID := params["talk"]
+	speakerID := params["speaker"]
+
+	png, err := helpers.MakeSpeakerPng(ctx, confTag, card, speakerID, talkID)
+	if err != nil {
+		http.Error(w, "Failed to generate image", http.StatusInternalServerError)
+		ctx.Err.Printf("failed to generate speaker png: %s", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(png)
+}
+
+func ServeTalkPng(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+	talkID := params["talk"]
+
+	png, err := helpers.MakeTalkPng(ctx, confTag, card, talkID)
+	if err != nil {
+		http.Error(w, "Failed to generate image", http.StatusInternalServerError)
+		ctx.Err.Printf("failed to generate talk png: %s", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(png)
 }

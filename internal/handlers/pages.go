@@ -184,6 +184,46 @@ type GiftRow struct {
         SpeakerName string
 }
 
+type SpeakerRow struct {
+        Name  string
+        Email string
+}
+
+type SpeakerAdminPage struct {
+        Conf          *types.Conf
+        Rows          []*SpeakerRow
+        FlashMessage  string
+        Year          uint
+}
+
+type SocialSpeakerRow struct {
+        ID              string
+        Name            string
+        TwitterHandle   string
+        TalkName        string
+        SpeakerPhotoURL string
+        PhotoURL        string
+        InstaPhotoURL   string
+        PostText        string
+}
+
+type SocialTalkRow struct {
+        ID           string
+        Name         string
+        SpeakerNames string
+        PostText     string
+        PhotoURL     string
+}
+
+type SocialAdminPage struct {
+        Conf         *types.Conf
+        SpeakerRows  []*SocialSpeakerRow
+        TalkRows     []*SocialTalkRow
+        FlashMessage string
+        Year         uint
+        BufferOK     bool
+}
+
 type TalksGiftsPage struct {
         Confs         []*types.Conf
         Conf          *types.Conf

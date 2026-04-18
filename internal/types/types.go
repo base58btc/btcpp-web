@@ -33,6 +33,7 @@ type (
 		LocalExternal     string
 		HMACSecret        string
 		HMACKey           [32]byte
+		BufferAPI         string
 	}
 
 	GoogleConfig struct {

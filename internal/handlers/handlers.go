@@ -545,6 +545,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		TalksGifts(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/admin/social/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		SocialAdmin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/social/{conf}/post", func(w http.ResponseWriter, r *http.Request) {
+		SocialPost(w, r, app)
+	}).Methods("POST")
+
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
@@ -2491,10 +2499,17 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		// continue without missives
 	}
 
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/vols/admin/%s failed to load volinfo: %s", conf.Tag, err.Error())
+		// continue without volinfo
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
 		Conf:         conf,
 		Volunteers:   vols,
 		Shifts:       shifts,
+		VolInfo:      volinfo,
 		StatusFilter: statusFilter,
 		Missives:     missiveList,
 		FlashMessage: r.URL.Query().Get("flash"),
