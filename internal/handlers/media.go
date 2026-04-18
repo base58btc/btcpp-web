@@ -332,10 +332,6 @@ func PreviewSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 }
 
 func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ctx.Env.Prod {
-		return
-	}
-
 	params := mux.Vars(r)
 	confTag := params["conf"]
 	card := params["card"]
