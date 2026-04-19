@@ -3,7 +3,9 @@ package spaces
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"btcpp-web/internal/types"
@@ -71,43 +73,67 @@ func Upload(key string, data []byte, contentType string, hash string) (string, e
 	return PublicURL(key), nil
 }
 
-// LoadHashes lists all objects in the bucket and reads their card-hash
-// metadata, returning a map of S3 key -> hash.
+const hashIndexKey = "_hashes.json"
+
+// LoadHashes reads the hash index file from the bucket.
 func LoadHashes() (map[string]string, error) {
 	if client == nil {
 		return nil, fmt.Errorf("spaces not configured")
 	}
 
-	hashes := make(map[string]string)
-
-	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+	result, err := client.GetObject(context.Background(), &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
+		Key:    aws.String(hashIndexKey),
 	})
+	if err != nil {
+		// File doesn't exist yet — return empty map
+		return make(map[string]string), nil
+	}
+	defer result.Body.Close()
 
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(context.Background())
-		if err != nil {
-			return nil, fmt.Errorf("failed to list objects: %w", err)
-		}
+	data, err := io.ReadAll(result.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read hash index: %w", err)
+	}
 
-		for _, obj := range page.Contents {
-			key := aws.ToString(obj.Key)
-
-			head, err := client.HeadObject(context.Background(), &s3.HeadObjectInput{
-				Bucket: aws.String(bucket),
-				Key:    aws.String(key),
-			})
-			if err != nil {
-				continue
-			}
-
-			if hash, ok := head.Metadata["card-hash"]; ok {
-				hashes[key] = hash
-			}
-		}
+	hashes := make(map[string]string)
+	if err := json.Unmarshal(data, &hashes); err != nil {
+		return nil, fmt.Errorf("failed to parse hash index: %w", err)
 	}
 
 	return hashes, nil
+}
+
+// SaveHashes writes the hash index file to the bucket.
+func SaveHashes(hashes map[string]string) error {
+	if client == nil {
+		return fmt.Errorf("spaces not configured")
+	}
+
+	data, err := json.Marshal(hashes)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(hashIndexKey),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String("application/json"),
+	})
+	return err
+}
+
+// Exists checks if an object exists in the bucket
+func Exists(key string) bool {
+	if client == nil {
+		return false
+	}
+	_, err := client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	return err == nil
 }
 
 func PublicURL(key string) string {

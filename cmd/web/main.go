@@ -162,6 +162,16 @@ func main() {
 		go RunNewMails(&app)
 	}
 
+	/* Start media card refresh after server is listening */
+	if spaces.IsConfigured() {
+		go func() {
+			time.Sleep(3 * time.Second)
+			handlers.InitMediaRefresh(&app)
+	                app.Infos.Printf("media refresh done")
+		}()
+	        app.Infos.Printf("scheduling media refresh")
+        }
+
 	/* Start the server */
 	app.Infos.Printf("Starting application on port %s\n", app.Env.Port)
 	app.Infos.Printf("... Current domain is %s\n", app.Env.GetDomain())

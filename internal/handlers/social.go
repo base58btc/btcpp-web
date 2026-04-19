@@ -256,9 +256,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	if err != nil {
 		ctx.Err.Printf("/admin/social/%s failed to get sponsorships: %s", conf.Tag, err.Error())
 	} else {
-		ctx.Infos.Printf("/admin/social/%s found %d sponsorships for conf ref %s", conf.Tag, len(sponsorships), conf.Ref)
 		for _, sp := range sponsorships {
-			ctx.Infos.Printf("  sponsorship %s: org=%v, confs=%d, level=%s", sp.Ref, sp.Org != nil, len(sp.Confs), sp.Level)
 			if sp.Org == nil {
 				continue
 			}

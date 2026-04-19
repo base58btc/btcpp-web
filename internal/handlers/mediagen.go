@@ -71,15 +71,22 @@ func generateAndUploadSpeakerPng(ctx *config.AppContext, confTag, card string, s
 	cardHashesMu.Lock()
 	if cardHashes[key] == hash {
 		cardHashesMu.Unlock()
-                ctx.Infos.Printf("speaker media already exists %s (%s)", key, hash)
 		return spaces.PublicURL(key), nil
 	}
 	cardHashesMu.Unlock()
 
+	// If already in Spaces, just record the hash without re-uploading
+	if spaces.Exists(key) {
+		cardHashesMu.Lock()
+		cardHashes[key] = hash
+		cardHashesMu.Unlock()
+		return spaces.PublicURL(key), nil
+	}
+
         ctx.Infos.Printf("generating speaker media %s (%s)", key, hash)
 	png, err := helpers.MakeSpeakerPng(ctx, confTag, card, speaker.ID, talk.ID)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate speaker png %s/%s: %w", talk.ID, speaker.Name, card, err)
+		return "", fmt.Errorf("failed to generate speaker png %s/%s: %w", speaker.Name, card, err)
 	}
 
 	url, err := spaces.Upload(key, png, "image/png", hash)
@@ -102,10 +109,17 @@ func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk
 	cardHashesMu.Lock()
 	if cardHashes[key] == hash {
 		cardHashesMu.Unlock()
-                ctx.Infos.Printf("talks media already exists %s (%s)", key, hash)
 		return spaces.PublicURL(key), nil
 	}
 	cardHashesMu.Unlock()
+
+	// If already in Spaces, just record the hash without re-uploading
+	if spaces.Exists(key) {
+		cardHashesMu.Lock()
+		cardHashes[key] = hash
+		cardHashesMu.Unlock()
+		return spaces.PublicURL(key), nil
+	}
 
         ctx.Infos.Printf("generating talks media %s (%s)", key, hash)
 	png, err := helpers.MakeTalkPng(ctx, confTag, card, talk.ID)
@@ -132,6 +146,102 @@ func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk
 
 	ctx.Infos.Printf("media refresh: uploaded %s", key)
 	return url, nil
+}
+
+func sponsorCardHash(sp *types.Sponsorship) string {
+	h := sha256.New()
+	if sp.Org != nil {
+		h.Write([]byte(sp.Org.Name))
+		h.Write([]byte(sp.Org.LogoDark))
+		h.Write([]byte(sp.Org.LogoLight))
+		h.Write([]byte(sp.Org.Twitter.Handle))
+		h.Write([]byte(sp.Org.Website))
+	}
+	h.Write([]byte(sp.Level))
+	return fmt.Sprintf("%x", h.Sum(nil))[:16]
+}
+
+func generateAndUploadSponsorPng(ctx *config.AppContext, confTag, card string, sp *types.Sponsorship) (string, error) {
+	key := fmt.Sprintf("%s/sponsors/%s-%s.png", confTag, sp.Ref, card)
+	hash := sponsorCardHash(sp)
+
+	cardHashesMu.Lock()
+	if cardHashes[key] == hash {
+		cardHashesMu.Unlock()
+		return spaces.PublicURL(key), nil
+	}
+	cardHashesMu.Unlock()
+
+	// If already in Spaces, just record the hash without re-uploading
+	if spaces.Exists(key) {
+		cardHashesMu.Lock()
+		cardHashes[key] = hash
+		cardHashesMu.Unlock()
+		return spaces.PublicURL(key), nil
+	}
+
+	ctx.Infos.Printf("generating sponsor media %s (%s)", key, hash)
+	png, err := helpers.MakeSponsorPng(ctx, confTag, card, sp.Ref)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate sponsor png %s/%s: %w", sp.Ref, card, err)
+	}
+
+	url, err := spaces.Upload(key, png, "image/png", hash)
+	if err != nil {
+		return "", err
+	}
+
+	cardHashesMu.Lock()
+	cardHashes[key] = hash
+	cardHashesMu.Unlock()
+
+	ctx.Infos.Printf("media refresh: uploaded %s", key)
+	return url, nil
+}
+
+func RefreshSponsorCards(ctx *config.AppContext) {
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("media refresh sponsors: failed to fetch confs: %s", err)
+		return
+	}
+
+	for _, conf := range confs {
+		if !conf.Active || !conf.InFuture() {
+			continue
+		}
+
+		sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
+		if err != nil {
+			ctx.Err.Printf("media refresh sponsors: failed to fetch sponsorships for %s: %s", conf.Tag, err)
+			continue
+		}
+
+		for _, sp := range sponsorships {
+			if sp.Org == nil {
+				continue
+			}
+			for _, card := range []string{"1080p", "insta", "social"} {
+				_, err := generateAndUploadSponsorPng(ctx, conf.Tag, card, sp)
+				if err != nil {
+					ctx.Err.Printf("media refresh sponsors: %s", err)
+				}
+			}
+		}
+
+		ctx.Infos.Printf("media refresh sponsors: finished %s (%d sponsorships)", conf.Tag, len(sponsorships))
+	}
+
+	// Persist hash index to Spaces
+	cardHashesMu.Lock()
+	hashCopy := make(map[string]string, len(cardHashes))
+	for k, v := range cardHashes {
+		hashCopy[k] = v
+	}
+	cardHashesMu.Unlock()
+	if err := spaces.SaveHashes(hashCopy); err != nil {
+		ctx.Err.Printf("media refresh: failed to save hash index: %s", err)
+	}
 }
 
 func RefreshTalkCards(ctx *config.AppContext, talks []*types.Talk) {
@@ -182,6 +292,17 @@ func RefreshTalkCards(ctx *config.AppContext, talks []*types.Talk) {
         }
 
         ctx.Infos.Printf("media refresh talks: finished (%d talks)", len(talks))
+
+	// Persist hash index to Spaces
+	cardHashesMu.Lock()
+	hashCopy := make(map[string]string, len(cardHashes))
+	for k, v := range cardHashes {
+		hashCopy[k] = v
+	}
+	cardHashesMu.Unlock()
+	if err := spaces.SaveHashes(hashCopy); err != nil {
+		ctx.Err.Printf("media refresh: failed to save hash index: %s", err)
+	}
 }
 
 func RefreshSpeakerCards(ctx *config.AppContext, speakers []*types.Speaker) {
@@ -189,17 +310,21 @@ func RefreshSpeakerCards(ctx *config.AppContext, speakers []*types.Speaker) {
 }
 
 func InitMediaRefresh(ctx *config.AppContext) {
+	ctx.Infos.Println("InitMediaRefresh: starting...")
+
 	// Load existing hashes from S3 to avoid regenerating unchanged cards
+	ctx.Infos.Println("InitMediaRefresh: loading hashes from spaces...")
 	hashes, err := spaces.LoadHashes()
 	if err != nil {
 		ctx.Err.Printf("media refresh: failed to load hashes from spaces: %s", err)
 	} else {
+		ctx.Infos.Printf("media refresh: loaded %d existing hashes from spaces", len(hashes))
 		cardHashesMu.Lock()
 		for k, v := range hashes {
 			cardHashes[k] = v
 		}
 		cardHashesMu.Unlock()
-		ctx.Infos.Printf("media refresh: loaded %d existing hashes from spaces", len(hashes))
+		ctx.Infos.Printf("lock completed")
 	}
 
 	// Register callbacks so cards refresh when data changes
@@ -219,6 +344,10 @@ func InitMediaRefresh(ctx *config.AppContext) {
 		ctx.Infos.Println("Running initial media card refresh...")
 		RefreshTalkCards(ctx, talks)
 	}
+
+	// Initial sponsor card refresh
+	ctx.Infos.Println("Running initial sponsor card refresh...")
+	RefreshSponsorCards(ctx)
 }
 
 // SpeakerCardURL returns the S3 URL for a speaker card, falling back to dynamic PNG route
@@ -239,8 +368,12 @@ func TalkCardURL(ctx *config.AppContext, confTag, card, talkID string) string {
 	return fmt.Sprintf("%s/media/png/%s/talk/%s/%s", ctx.Env.GetURI(), confTag, card, talkID)
 }
 
-// SponsorCardURL returns the URL for a sponsor card PNG
+// SponsorCardURL returns the S3 URL for a sponsor card, falling back to dynamic PNG route
 func SponsorCardURL(ctx *config.AppContext, confTag, card, sponsorRef string) string {
+	if spaces.IsConfigured() {
+		key := fmt.Sprintf("%s/sponsors/%s-%s.png", confTag, sponsorRef, card)
+		return spaces.PublicURL(key)
+	}
 	return fmt.Sprintf("%s/media/png/%s/sponsor/%s/%s", ctx.Env.GetURI(), confTag, card, sponsorRef)
 }
 
