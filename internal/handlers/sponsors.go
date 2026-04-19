@@ -112,7 +112,7 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		Name:      r.FormValue("Name"),
 		Email:     r.FormValue("Email"),
 		Website:   r.FormValue("Website"),
-		Twitter:   r.FormValue("Twitter"),
+		Twitter:   types.ParseTwitter(r.FormValue("Twitter")),
 		Nostr:     r.FormValue("Nostr"),
 		Matrix:    r.FormValue("Matrix"),
 		LinkedIn:  r.FormValue("LinkedIn"),

@@ -38,7 +38,7 @@ func speakerCardHash(speaker *types.Speaker, talk *types.Talk) string {
 	h := sha256.New()
 	h.Write([]byte(speaker.Name))
 	h.Write([]byte(speaker.Photo))
-	h.Write([]byte(speaker.Twitter))
+	h.Write([]byte(speaker.Twitter.Handle))
 	h.Write([]byte(speaker.Company))
 	h.Write([]byte(talk.Name))
 	h.Write([]byte(talk.Clipart))

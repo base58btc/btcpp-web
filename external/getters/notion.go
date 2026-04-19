@@ -1570,11 +1570,11 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
                 }
         }
 
-        if vol.Twitter != "" {
+        if vol.Twitter.Handle != "" {
                 vals["Twitter"] = notion.NewRichTextPropertyValue(
                         []*notion.RichText{
                                 {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: vol.Twitter}},
+                                 Text: &notion.Text{Content: vol.Twitter.Handle}},
                         }...)
         }
 
@@ -1883,11 +1883,11 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
                         }...)
         }
 
-        if tapp.Twitter != "" {
+        if tapp.Twitter.Handle != "" {
                 vals["Twitter"] = notion.NewRichTextPropertyValue(
                         []*notion.RichText{
                                 {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.Twitter}},
+                                 Text: &notion.Text{Content: tapp.Twitter.Handle}},
                         }...)
         }
 
@@ -1903,11 +1903,11 @@ func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
                 vals["Website"] = notion.NewURLPropertyValue(tapp.Website)
         }
 
-        if tapp.OrgTwitter != "" {
+        if tapp.OrgTwitter.Handle != "" {
                 vals["OrgTwitter"] = notion.NewRichTextPropertyValue(
                         []*notion.RichText{
                                 {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.OrgTwitter}},
+                                 Text: &notion.Text{Content: tapp.OrgTwitter.Handle}},
                         }...)
         }
 

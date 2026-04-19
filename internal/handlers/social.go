@@ -215,7 +215,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			var buf bytes.Buffer
 			sponsorPostTmpl.Execute(&buf, &sponsorPostData{
 				OrgName: sp.Org.Name,
-				Twitter: sp.Org.Twitter,
+				Twitter: sp.Org.Twitter.Handle,
 				Website: sp.Org.Website,
 				Level:   sp.Level,
 				Conf:    conf,
@@ -226,7 +226,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			sponsorRows = append(sponsorRows, &SocialSponsorRow{
 				Ref:      sp.Ref,
 				OrgName:  sp.Org.Name,
-				Twitter:  sp.Org.Twitter,
+				Twitter:  sp.Org.Twitter.Handle,
 				Level:    sp.Level,
 				CardURL:  cardURL,
 				PostText: buf.String(),

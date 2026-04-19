@@ -103,7 +103,7 @@ type (
 		Name     string
 		Email    string
 		Photo    string
-		Twitter  string
+		Twitter  Twitter
 		Github   string
 		Website  string
 		Nostr    string
@@ -224,7 +224,7 @@ type (
                 WorkNo        []*JobType
                 FirstEvent    bool
                 Hometown      string
-                Twitter       string
+                Twitter       Twitter
                 Nostr         string
                 Shirt         string
                 WorkShifts    []*WorkShift
@@ -267,7 +267,7 @@ type (
                 Telegram      string
                 ContactAt     string
                 Hometown      string
-                Twitter       string
+                Twitter       Twitter
                 Nostr         string
                 Github        string
                 Website       string
@@ -275,7 +275,7 @@ type (
                 Pic           string
                 Org           string
                 Sponsor       bool
-                OrgTwitter    string
+                OrgTwitter    Twitter
                 OrgNostr      string
                 OrgSite       string
                 OrgLogo       string
@@ -639,15 +639,7 @@ func (s Speakers) Less(i, j int) bool {
 }
 
 func (s *Speaker) TwitterHandle() string {
-	indx := strings.LastIndex(s.Twitter, "/")
-	if indx == -1 {
-		return ""
-	}
-	handle := s.Twitter[indx+1:]
-	if strings.HasPrefix(handle, "@") {
-		return handle[1:]
-	}
-	return handle
+	return s.Twitter.Handle
 }
 
 func (j *JobType) IsWildcard() bool {

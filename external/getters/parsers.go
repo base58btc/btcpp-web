@@ -1,8 +1,6 @@
 package getters
 
 import (
-	"fmt"
-	"strings"
         "time"
 
 	"btcpp-web/internal/config"
@@ -127,14 +125,6 @@ func parseHotel(pageID string, props map[string]notion.PropertyValue) *types.Hot
 }
 
 func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.Speaker {
-	var twitter string
-	parseTwitter := parseRichText("Twitter", props)
-	if strings.Contains(parseTwitter, "http") {
-		twitter = parseTwitter
-	} else if parseTwitter != "" {
-		twitter = fmt.Sprintf("https://x.com/%s", parseTwitter)
-	}
-
 	speaker := &types.Speaker{
 		ID:       pageID,
 		Name:     parseRichText("Name", props),
@@ -143,7 +133,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 		Website:  props["Website"].URL,
 		Github:   props["Github"].URL,
 		Email:    props["Email"].Email,
-		Twitter:  twitter,
+		Twitter:  types.ParseTwitter(parseRichText("Twitter", props)),
 		Nostr:    parseRichText("npub", props),
 		Company:  parseRichText("Company", props),
 	}
@@ -362,7 +352,7 @@ func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]noti
 
 		FirstEvent:    parseCheckbox(props["FirstEvent"].Checkbox),
 		Hometown: parseRichText("Hometown", props),
-		Twitter: parseRichText("Twitter", props),
+		Twitter: types.ParseTwitter(parseRichText("Twitter", props)),
 		Nostr: parseRichText("npub", props),
                 Shirt: parseSelect("Shirt", props),
                 Status: parseSelect("Status", props),
@@ -395,7 +385,7 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 		ContactAt:     parseRichText("ContactAt", props),
 		Hometown:   parseRichText("Hometown", props),
                 Visa:       parseSelect("Visa", props),
-		Twitter:    parseRichText("Twitter", props),
+		Twitter:    types.ParseTwitter(parseRichText("Twitter", props)),
 		Nostr:      parseRichText("npub", props),
 		Github:     props["Github"].URL,
 		Website:    props["Website"].URL,
@@ -403,7 +393,7 @@ func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion
 		Pic:        fileGetURL(props["Pic"].Files),
 		Org:        parseRichText("Org", props),
 		Sponsor:    parseCheckbox(props["Sponsor"].Checkbox),
-		OrgTwitter:    parseRichText("OrgTwitter", props),
+		OrgTwitter:    types.ParseTwitter(parseRichText("OrgTwitter", props)),
 		OrgNostr:      parseRichText("OrgNpub", props),
 		OrgSite:       props["OrgSite"].URL,
 		OrgLogo:        fileGetURL(props["OrgLogo"].Files),

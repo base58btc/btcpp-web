@@ -276,7 +276,7 @@ func PreviewTalkCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	speakers := make([]*types.Speaker, 1)
 	speakers[0] = &types.Speaker{
 		Photo:   "niftynei.png",
-		Twitter: "https://x.com/niftynei",
+		Twitter: types.ParseTwitter("niftynei"),
 		Company: "bitcoin++",
 		Name:    "lisa neigut",
 	}
@@ -538,7 +538,7 @@ func MakeSponsorCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		SponsorLogo:   logo,
 		SponsorLevel:  level,
 		BackgroundImg: bgImg,
-		Twitter:       sp.Org.Twitter,
+		Twitter:       sp.Org.Twitter.Handle,
 		Website:       sp.Org.Website,
 	})
 	if err != nil {

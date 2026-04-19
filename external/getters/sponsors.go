@@ -19,7 +19,7 @@ func parseOrg(pageID string, props map[string]notion.PropertyValue) *types.Org {
 		Email:     props["Email"].Email,
 		Github:    props["Github"].URL,
 		Website:   props["Website"].URL,
-		Twitter:   parseRichText("Twitter", props),
+		Twitter:   types.ParseTwitter(parseRichText("Twitter", props)),
 		Nostr:     parseRichText("Nostr", props),
 		Matrix:   parseRichText("Matrix", props),
 		LinkedIn:  props["LinkedIn"].URL,
@@ -134,7 +134,7 @@ func richText(s string) []*notion.RichText {
 func RegisterOrg(n *types.Notion, org *types.Org) error {
 	props := map[string]*notion.PropertyValue{
 		"Name":    notion.NewTitlePropertyValue(richText(org.Name)...),
-		"Twitter": notion.NewRichTextPropertyValue(richText(org.Twitter)...),
+		"Twitter": notion.NewRichTextPropertyValue(richText(org.Twitter.Handle)...),
 		"Nostr":   notion.NewRichTextPropertyValue(richText(org.Nostr)...),
 		"Matrix":  notion.NewRichTextPropertyValue(richText(org.Matrix)...),
 		"Notes":   notion.NewRichTextPropertyValue(richText(org.Notes)...),

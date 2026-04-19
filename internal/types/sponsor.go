@@ -13,7 +13,7 @@ type (
 		Instagram   string
 		Youtube     string
 		Github      string
-		Twitter     string
+		Twitter     Twitter
 		Nostr       string
 		Matrix      string
 		Hiring      bool
