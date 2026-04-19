@@ -19,6 +19,7 @@
             air 
             ffmpeg
 	    git
+	    rclone
           ];
           # Automatically run ??? when entering the shell.
           #shellHook = "???";
