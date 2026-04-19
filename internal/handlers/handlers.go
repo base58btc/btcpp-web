@@ -573,6 +573,26 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		TalksGifts(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/admin/orgs", func(w http.ResponseWriter, r *http.Request) {
+		OrgList(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/orgs/new", func(w http.ResponseWriter, r *http.Request) {
+		OrgCreate(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/admin/orgs/{ref}", func(w http.ResponseWriter, r *http.Request) {
+		OrgDetail(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/sponsors/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		SponsorshipsList(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/sponsors/{conf}/new", func(w http.ResponseWriter, r *http.Request) {
+		SponsorshipCreate(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/admin/social/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		SocialAdmin(w, r, app)
 	}).Methods("GET")

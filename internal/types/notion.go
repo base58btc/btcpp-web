@@ -23,6 +23,8 @@ type (
                 TalkAppDb    string
                 VolInfoDb    string
                 ShiftDb      string
+                OrgDb        string
+                SponsorshipsDb string
 	}
 
 	Notion struct {

@@ -143,6 +143,59 @@
                 </div>
             </section>
 
+            <!-- Sponsors Section -->
+            <section id="sponsors" class="mb-6">
+                <div class="bg-white shadow rounded-lg overflow-hidden">
+                    <div class="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                        <h2 class="text-lg font-semibold text-gray-900">Sponsors</h2>
+                        {{ if .SponsorRows }}
+                        <label class="flex items-center gap-2 text-sm text-gray-600">
+                            <input type="checkbox" onclick="toggleAll(this, 'sponsor_')" class="rounded border-gray-300">
+                            Select All
+                        </label>
+                        {{ end }}
+                    </div>
+                    {{ if .SponsorRows }}
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10"></th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sponsor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Logo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Post Text</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {{ range .SponsorRows }}
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4 align-top">
+                                    <input type="checkbox" name="sponsor_{{ .Ref }}" value="1" class="rounded border-gray-300">
+                                    <input type="hidden" name="card_sponsor_{{ .Ref }}" value="{{ .CardURL }}">
+                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-900 align-top">
+                                    {{ .OrgName }}
+                                    {{ if .Twitter }}<div class="text-xs text-gray-400">@{{ .Twitter }}</div>{{ end }}
+                                    <div class="text-xs text-gray-400">{{ .Level }}</div>
+                                </td>
+                                <td class="px-6 py-4 align-top">
+                                    {{ if .CardURL }}<img {{ safesrc .CardURL }} loading="lazy" class="w-32 rounded border border-gray-200" alt="{{ .OrgName }}">{{ end }}
+                                </td>
+                                <td class="px-6 py-4">
+                                    <textarea name="text_sponsor_{{ .Ref }}" rows="5" class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono">{{ .PostText }}</textarea>
+                                </td>
+                            </tr>
+                            {{ end }}
+                        </tbody>
+                    </table>
+                    <div class="px-6 py-3 bg-gray-50 text-sm text-gray-500">
+                        {{ len .SponsorRows }} sponsors
+                    </div>
+                    {{ else }}
+                    <div class="px-6 py-4 text-sm text-gray-500 text-center">No sponsors found for this event.</div>
+                    {{ end }}
+                </div>
+            </section>
+
             <section class="mb-6">
                 <button type="submit" class="w-full px-4 py-3 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700" onclick="return confirm('Queue selected posts to Buffer?')">
                     Queue Selected Posts to Buffer

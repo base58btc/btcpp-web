@@ -312,6 +312,21 @@ func parseConfList(ctx *config.AppContext, field string, props map[string]notion
         return list
 }
 
+func parseOrgOne(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) *types.Org {
+        objRefs := props[field].Relation
+
+        orgs, _ := FetchOrgsCached(ctx)
+        for _, ref := range objRefs {
+                for _, org := range orgs {
+                        if org.Ref == ref.ID {
+                                return org
+                        }
+                }
+        }
+
+        return nil
+}
+
 func parseJobList(ctx *config.AppContext, field string, props map[string]notion.PropertyValue) []*types.JobType {
         var list []*types.JobType
         objRefs := props[field].Relation

@@ -71,6 +71,14 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 		ServeTalkPng(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/media/imgs/{conf}/sponsor/{card}/{sponsorRef}", func(w http.ResponseWriter, r *http.Request) {
+		MakeSponsorCard(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/media/png/{conf}/sponsor/{card}/{sponsorRef}", func(w http.ResponseWriter, r *http.Request) {
+		ServeSponsorPng(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/media/imgs/{conf}/agenda/{ref}/{venue}", func(w http.ResponseWriter, r *http.Request) {
 		params := mux.Vars(r)
 		confTag := params["conf"]
@@ -91,6 +99,16 @@ type SpeakerCard struct {
 	TalkImg   string
 	Name      string
 	Twitter   string
+}
+
+type SponsorCard struct {
+	ConfTag       string
+	SponsorName   string
+	SponsorLogo   string
+	SponsorLevel  string
+	BackgroundImg string
+	Twitter       string
+	Website       string
 }
 
 type SessionCard struct {
@@ -447,6 +465,98 @@ func ServeTalkPng(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	if err != nil {
 		http.Error(w, "Failed to generate image", http.StatusInternalServerError)
 		ctx.Err.Printf("failed to generate talk png: %s", err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/png")
+	w.Write(png)
+}
+
+func findSponsorBackground(ctx *config.AppContext, confTag string) string {
+	talks, err := getters.GetTalksFor(ctx, confTag)
+	if err == nil {
+		for _, talk := range talks {
+			if strings.Contains(strings.ToLower(talk.Name), "kickoff") && talk.Clipart != "" {
+				return "/static/img/talks/" + talk.Clipart
+			}
+		}
+	}
+	return "/static/img/" + confTag + "/landing.png"
+}
+
+func MakeSponsorCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+	sponsorRef := params["sponsorRef"]
+
+	sponsorships, err := getters.ListSponsorships(ctx, "")
+	if err != nil {
+		http.Error(w, "Unable to load sponsorships", http.StatusInternalServerError)
+		ctx.Err.Printf("sponsor card: failed to load sponsorships: %s", err.Error())
+		return
+	}
+
+	var sp *types.Sponsorship
+	for _, s := range sponsorships {
+		if s.Ref == sponsorRef {
+			sp = s
+			break
+		}
+	}
+
+	if sp == nil || sp.Org == nil {
+		http.Error(w, "Sponsorship not found", http.StatusNotFound)
+		return
+	}
+
+	// Use dark logo for the card, prefer it from Spaces
+	logo := sp.Org.LogoDark
+	if logo == "" {
+		logo = sp.Org.LogoLight
+	}
+	// If logo is a full URL, use it as-is; otherwise treat as local path
+	if logo != "" && !strings.HasPrefix(logo, "http") {
+		logo = "/static/img/sponsors/" + logo
+	}
+
+	bgImg := findSponsorBackground(ctx, confTag)
+
+	tmplName := fmt.Sprintf("media/sponsor_%s.tmpl", card)
+	if ctx.TemplateCache.Lookup(tmplName) == nil {
+		tmplName = "media/sponsor_1080p.tmpl"
+	}
+
+	level := sp.Level
+	if strings.EqualFold(level, "Bronze") {
+		level = "Sponsor"
+	}
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, tmplName, &SponsorCard{
+		ConfTag:       confTag,
+		SponsorName:   sp.Org.Name,
+		SponsorLogo:   logo,
+		SponsorLevel:  level,
+		BackgroundImg: bgImg,
+		Twitter:       sp.Org.Twitter,
+		Website:       sp.Org.Website,
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("exec %s failed: %s", tmplName, err.Error())
+	}
+}
+
+func ServeSponsorPng(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+	sponsorRef := params["sponsorRef"]
+
+	png, err := helpers.MakeSponsorPng(ctx, confTag, card, sponsorRef)
+	if err != nil {
+		http.Error(w, "Failed to generate image", http.StatusInternalServerError)
+		ctx.Err.Printf("failed to generate sponsor png: %s", err.Error())
 		return
 	}
 

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link rel="stylesheet" href="/static/css/mini.css" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  </head>
+  <body class="bounding">
+
+<style>
+* {
+  box-sizing: border-box;
+}
+html {
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  background: #1a1a2e;
+  min-height: 100%;
+}
+
+.bounding {
+  height: 314px;
+  width: 600px;
+}
+
+.img {
+  background-image: url({{ .BackgroundImg }});
+  background-size: cover;
+  background-position: center;
+  mask-image: linear-gradient(to top, transparent 10%, black);
+}
+
+.logo {
+  width: 110px;
+  height: 40px;
+
+  background-image: url(/static/img/{{ .ConfTag }}/logo.png);
+  background-size: contain;
+  background-position: bottom right;
+  background-repeat: no-repeat;
+}
+
+.sponsor-logo {
+  width: 65%;
+  max-width: 80%;
+  height: 50%;
+  object-fit: contain;
+}
+
+.level {
+  font-size: 1rem;
+  line-height: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.sponsor-name {
+  font-size: 2rem;
+  line-height: 2rem;
+}
+</style>
+<section class="bounding relative">
+    <div class="absolute inset-0 bounding img"></div>
+    <div class="bounding flex flex-col items-center justify-center relative">
+        <div class="level font-semibold text-white mb-4">{{ .SponsorLevel }}</div>
+        <img {{ safesrc .SponsorLogo }} alt="{{ .SponsorName }}" class="sponsor-logo" />
+    </div>
+    <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: flex-end; justify-content: space-between;">
+        <div style="text-align: left;">
+            {{ if .Twitter }}<div class="text-white" style="font-size: 1.1rem; letter-spacing: 0.05em;">@{{ .Twitter }}</div>{{ end }}
+            {{ if .Website }}<div class="text-gray-300" style="font-size: 0.9rem; letter-spacing: 0.05em;">{{ .Website }}</div>{{ end }}
+        </div>
+        <div class="logo"></div>
+    </div>
+</section>
+  </body>
+</html>

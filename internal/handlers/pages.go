@@ -223,10 +223,20 @@ type SocialTalkRow struct {
         PhotoURL     string
 }
 
+type SocialSponsorRow struct {
+        Ref      string
+        OrgName  string
+        Twitter  string
+        Level    string
+        CardURL  string
+        PostText string
+}
+
 type SocialAdminPage struct {
         Conf         *types.Conf
         SpeakerRows  []*SocialSpeakerRow
         TalkRows     []*SocialTalkRow
+        SponsorRows  []*SocialSponsorRow
         FlashMessage string
         Year         uint
         BufferOK     bool

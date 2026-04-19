@@ -239,6 +239,11 @@ func TalkCardURL(ctx *config.AppContext, confTag, card, talkID string) string {
 	return fmt.Sprintf("%s/media/png/%s/talk/%s/%s", ctx.Env.GetURI(), confTag, card, talkID)
 }
 
+// SponsorCardURL returns the URL for a sponsor card PNG
+func SponsorCardURL(ctx *config.AppContext, confTag, card, sponsorRef string) string {
+	return fmt.Sprintf("%s/media/png/%s/sponsor/%s/%s", ctx.Env.GetURI(), confTag, card, sponsorRef)
+}
+
 // SpeakerPhotoURL returns the URL for a speaker's photo
 func SpeakerPhotoURL(ctx *config.AppContext, photo string) string {
 	if photo == "" {

@@ -44,6 +44,20 @@ type talkPostData struct {
         Conf         *types.Conf
 }
 
+var sponsorPostTmpl = template.Must(template.New("sponsor").Parse(
+	`Thank you to {{.OrgName}} for sponsoring bitcoin++ {{.Conf.Desc}}! {{.Conf.Emoji}}` +
+		`{{if .Twitter}}` + "\n" + `@{{.Twitter}}{{end}}` +
+		`{{if .Website}}` + "\n" + `{{.Website}}{{end}}` +
+		"\n\n" + `Join us 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
+
+type sponsorPostData struct {
+	OrgName string
+	Twitter string
+	Website string
+	Level   string
+	Conf    *types.Conf
+}
+
 type channelFilter struct {
 	Service string
 	Name    string // if non-empty, channel name must contain this (case-insensitive)
@@ -185,10 +199,50 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return talkRows[i].Name < talkRows[j].Name
 	})
 
+	// Build sponsor rows
+	var sponsorRows []*SocialSponsorRow
+	sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/admin/social/%s failed to get sponsorships: %s", conf.Tag, err.Error())
+	} else {
+		ctx.Infos.Printf("/admin/social/%s found %d sponsorships for conf ref %s", conf.Tag, len(sponsorships), conf.Ref)
+		for _, sp := range sponsorships {
+			ctx.Infos.Printf("  sponsorship %s: org=%v, confs=%d, level=%s", sp.Ref, sp.Org != nil, len(sp.Confs), sp.Level)
+			if sp.Org == nil {
+				continue
+			}
+
+			var buf bytes.Buffer
+			sponsorPostTmpl.Execute(&buf, &sponsorPostData{
+				OrgName: sp.Org.Name,
+				Twitter: sp.Org.Twitter,
+				Website: sp.Org.Website,
+				Level:   sp.Level,
+				Conf:    conf,
+			})
+
+			cardURL := SponsorCardURL(ctx, conf.Tag, "1080p", sp.Ref)
+
+			sponsorRows = append(sponsorRows, &SocialSponsorRow{
+				Ref:      sp.Ref,
+				OrgName:  sp.Org.Name,
+				Twitter:  sp.Org.Twitter,
+				Level:    sp.Level,
+				CardURL:  cardURL,
+				PostText: buf.String(),
+			})
+		}
+
+		sort.SliceStable(sponsorRows, func(i, j int) bool {
+			return sponsorRows[i].OrgName < sponsorRows[j].OrgName
+		})
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/social.tmpl", &SocialAdminPage{
 		Conf:         conf,
 		SpeakerRows:  speakerRows,
 		TalkRows:     talkRows,
+		SponsorRows:  sponsorRows,
 		FlashMessage: r.URL.Query().Get("flash"),
 		Year:         helpers.CurrentYear(),
 		BufferOK:     buffer.IsConfigured(),
@@ -303,6 +357,35 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued talk post for %s to %s", talkID, ch.Service)
+		}
+	}
+
+	// Process selected sponsors
+	for key := range r.Form {
+		if !strings.HasPrefix(key, "sponsor_") {
+			continue
+		}
+		sponsorRef := strings.TrimPrefix(key, "sponsor_")
+
+		postText := r.FormValue("text_sponsor_" + sponsorRef)
+		if postText == "" {
+			continue
+		}
+
+		cardURL := r.FormValue("card_sponsor_" + sponsorRef)
+		var imgs []string
+		if cardURL != "" {
+			imgs = append(imgs, cardURL)
+		}
+
+		for _, ch := range targetChannels {
+			_, err := buffer.CreatePost(ch.ID, postText, imgs, ch.Service)
+			if err != nil {
+				ctx.Err.Printf("Failed to post sponsor %s to %s: %s", sponsorRef, ch.Service, err.Error())
+				continue
+			}
+			posted++
+			ctx.Infos.Printf("Queued sponsor post for %s to %s", sponsorRef, ch.Service)
 		}
 	}
 

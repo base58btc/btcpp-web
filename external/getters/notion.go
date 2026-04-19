@@ -33,6 +33,9 @@ var lastJobTypeFetch time.Time
 var shifts []*types.WorkShift
 var lastShiftFetch time.Time
 
+var orgs []*types.Org
+var lastOrgFetch time.Time
+
 type (
 	JobType int
 )
@@ -45,6 +48,7 @@ const (
 	JobHotels
 	JobJobs
 	JobShifts
+	JobOrgs
 )
 
 var taskChan chan JobType = make(chan JobType)
@@ -87,6 +91,7 @@ func loadFromCache() bool {
         if !readCache("hotels", &hotels) { loaded = false }
         if !readCache("jobs", &jobs) { loaded = false }
         if !readCache("shifts", &shifts) { loaded = false }
+        if !readCache("orgs", &orgs) { loaded = false }
 
         if loaded {
                 now := time.Now()
@@ -97,6 +102,7 @@ func loadFromCache() bool {
                 lastHotelFetch = now
                 lastJobTypeFetch = now
                 lastShiftFetch = now
+                lastOrgFetch = now
                 return true
         }
 
@@ -120,12 +126,13 @@ func WaitFetch(ctx *config.AppContext) {
 
 	// Phase 1: fetch all independent data in parallel
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(6)
 	go func() { defer wg.Done(); runJob(ctx, JobConfs); lastConfsFetch = time.Now() }()
 	go func() { defer wg.Done(); runJob(ctx, JobSpeakers); lastSpeakerFetch = time.Now() }()
 	go func() { defer wg.Done(); runJob(ctx, JobDiscounts); lastDiscountFetch = time.Now() }()
 	go func() { defer wg.Done(); runJob(ctx, JobHotels); lastHotelFetch = time.Now() }()
 	go func() { defer wg.Done(); runJob(ctx, JobJobs); lastJobTypeFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobOrgs); lastOrgFetch = time.Now() }()
 	wg.Wait()
 
 	// Phase 2: fetch data that depends on phase 1
@@ -151,6 +158,8 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getJobs(ctx)
 	case JobShifts:
 		getShifts(ctx)
+	case JobOrgs:
+		getOrgs(ctx)
 	}
 }
 
@@ -344,6 +353,31 @@ func FetchShiftsCached(ctx *config.AppContext) ([]*types.WorkShift, error) {
 	}
 
 	return shifts, nil
+}
+
+func getOrgs(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting orgs...")
+	orgs, err = ListOrgs(ctx.Notion)
+
+	if err != nil {
+		ctx.Err.Printf("error fetching orgs %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d orgs!", len(orgs))
+		writeCache("orgs", orgs)
+	}
+}
+
+/* This may return nil */
+func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
+	now := time.Now()
+	deadline := now.Add(-cacheTTL)
+	if orgs == nil || lastOrgFetch.Before(deadline) {
+		lastOrgFetch = time.Now()
+		taskChan <- JobOrgs
+	}
+
+	return orgs, nil
 }
 
 func FetchTokens(n *types.Notion) (types.AuthTokens, error) {

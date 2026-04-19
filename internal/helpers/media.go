@@ -125,6 +125,11 @@ func MakeTalkPng(ctx *config.AppContext, confTag, card, talkID string) ([]byte, 
 	return MakeMediaPng(ctx, card, path)
 }
 
+func MakeSponsorPng(ctx *config.AppContext, confTag, card, sponsorRef string) ([]byte, error) {
+	path := fmt.Sprintf("/media/imgs/%s/sponsor/%s/%s", confTag, card, sponsorRef)
+	return MakeMediaPng(ctx, card, path)
+}
+
 func MakeAgendaImg(ctx *config.AppContext, confTag, dayref, venue string) ([]byte, error) {
 	path := fmt.Sprintf("/media/imgs/%s/agenda/%s/%s", confTag, dayref, venue)
 	return MakeMediaPng(ctx, "agenda", path)
