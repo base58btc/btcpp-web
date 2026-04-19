@@ -206,6 +206,7 @@ type SponsorFormPage struct {
 
 type SocialSpeakerRow struct {
         ID              string
+        TalkID          string
         Name            string
         TwitterHandle   string
         TalkName        string

@@ -64,6 +64,7 @@
                             <tr class="hover:bg-gray-50">
                                 <td class="px-6 py-4 align-top">
                                     <input type="checkbox" name="speaker_{{ .ID }}" value="1" class="rounded border-gray-300">
+                                    <input type="hidden" name="talkid_speaker{{ .ID }}" value="{{ .TalkID }}" class="rounded border-gray-300">
                                     <input type="hidden" name="speakerphoto_speaker_{{ .ID }}" value="{{ .SpeakerPhotoURL }}">
                                     <input type="hidden" name="photo_speaker_{{ .ID }}" value="{{ .PhotoURL }}">
                                     <input type="hidden" name="instaphoto_speaker_{{ .ID }}" value="{{ .InstaPhotoURL }}">

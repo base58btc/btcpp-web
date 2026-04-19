@@ -319,3 +319,15 @@ func SpeakerTalks(speaker *types.Speaker, talks []*types.Talk) []*types.Talk {
 
         return st
 }
+
+func SponsorSocialPostRef(confTag, sponsorID string) string {
+        return fmt.Sprintf("%s-%s", confTag, sponsorID)
+}
+
+func SpeakerSocialPostRef(confTag, talkID, speakerID string) string {
+        return fmt.Sprintf("%s-%s-%s", confTag, talkID, speakerID)
+}
+
+func TalkSocialPostRef(confTag, talkID string) string {
+        return fmt.Sprintf("%s-%s", confTag, talkID)
+}

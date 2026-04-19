@@ -25,6 +25,7 @@ type (
                 ShiftDb      string
                 OrgDb        string
                 SponsorshipsDb string
+                SocialPostsDb  string
 	}
 
 	Notion struct {

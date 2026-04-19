@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"text/template"
+	"time"
 
 	"btcpp-web/external/buffer"
 	"btcpp-web/external/getters"
@@ -83,6 +84,13 @@ func sponsorSortOrder(level string) int {
 	return 99
 }
 
+type selectedSponsor struct {
+	ref     string
+	text    string
+	cardURL string
+	level   string
+}
+
 type channelFilter struct {
 	Service string
 	Name    string // if non-empty, channel name must contain this (case-insensitive)
@@ -115,6 +123,13 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	if err != nil {
 		handle404(w, r, ctx)
 		return
+	}
+
+	// Load already-posted refs to hide them
+	postedRefs, err := getters.ListPostedRefs(ctx.Notion, conf)
+	if err != nil {
+		ctx.Err.Printf("/admin/social/%s failed to load posted refs: %s", conf.Tag, err.Error())
+		postedRefs = make(map[string]bool)
 	}
 
 	talks, err := getters.GetTalksFor(ctx, conf.Tag)
@@ -151,6 +166,11 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				}
 			}
 
+			// Skip if already posted
+			if postedRefs[helpers.SpeakerSocialPostRef(conf.Tag, bestTalk.ID, speaker.ID)] {
+				continue
+			}
+
 			// Only include talk name if the speaker is the sole speaker
 			talkName := ""
 			if len(bestTalk.Speakers) == 1 {
@@ -171,6 +191,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			instaURL := SpeakerCardURL(ctx, conf.Tag, "insta", speaker.ID, bestTalk.ID)
 			speakerRows = append(speakerRows, &SocialSpeakerRow{
 				ID:              speaker.ID,
+                                TalkID:          talk.ID,
 				Name:            speaker.Name,
 				TwitterHandle:   speaker.TwitterHandle(),
 				TalkName:        talkName,
@@ -189,6 +210,11 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	// Build talk rows
 	var talkRows []*SocialTalkRow
 	for _, talk := range talks {
+		// Skip if already posted
+		if postedRefs[helpers.TalkSocialPostRef(conf.Tag, talk.ID)] {
+			continue
+		}
+
 		var speakerNames []string
 		for _, s := range talk.Speakers {
 			name := s.Name
@@ -234,6 +260,11 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		for _, sp := range sponsorships {
 			ctx.Infos.Printf("  sponsorship %s: org=%v, confs=%d, level=%s", sp.Ref, sp.Org != nil, len(sp.Confs), sp.Level)
 			if sp.Org == nil {
+				continue
+			}
+
+			// Skip if already posted
+			if postedRefs[helpers.SponsorSocialPostRef(conf.Tag, sp.Ref)] {
 				continue
 			}
 
@@ -353,6 +384,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		}
 
 		speakerPhotoURL := r.FormValue("speakerphoto_speaker_" + speakerID)
+		talkID := r.FormValue("talkid_speaker" + speakerID)
 		photoURL := r.FormValue("photo_speaker_" + speakerID)
 		instaPhotoURL := r.FormValue("instaphoto_speaker_" + speakerID)
 
@@ -374,6 +406,8 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued speaker post for %s to %s", speakerID, ch.Service)
+                        id := helpers.SpeakerSocialPostRef(conf.Tag, talkID, speakerID)
+			getters.RecordSocialPost(ctx.Notion, id, postText, ch.Service, time.Now())
 		}
 	}
 
@@ -403,16 +437,11 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued talk post for %s to %s", talkID, ch.Service)
+                        postid := helpers.TalkSocialPostRef(conf.Tag, talkID)
+			getters.RecordSocialPost(ctx.Notion, postid, postText, ch.Service, time.Now())
 		}
 	}
 
-	// Collect selected sponsors with their level for sorting
-	type selectedSponsor struct {
-		ref     string
-		text    string
-		cardURL string
-		level   string
-	}
 	var selectedSponsors []selectedSponsor
 	for key := range r.Form {
 		if !strings.HasPrefix(key, "sponsor_") {
@@ -452,6 +481,8 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued sponsor post for %s to %s", sp.ref, ch.Service)
+                        postid := helpers.SponsorSocialPostRef(conf.Tag, sp.ref)
+			getters.RecordSocialPost(ctx.Notion, postid, sp.text, ch.Service, time.Now())
 		}
 	}
 
@@ -475,11 +506,20 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 					continue
 				}
 				posted++
+
 				ctx.Infos.Printf("Queued sponsor batch post to instagram with %d images", len(batchImgs))
+                                RecordInstagramBatch(ctx, conf, selectedSponsors, batchText, ch)
 			}
 		}
 	}
 
 	flash := fmt.Sprintf("%d posts queued to Buffer", posted)
 	http.Redirect(w, r, "/admin/social/"+conf.Tag+"?flash="+strings.ReplaceAll(flash, " ", "+"), http.StatusFound)
+}
+
+func RecordInstagramBatch(ctx *config.AppContext, conf *types.Conf, sponsors []selectedSponsor, text string, channel buffer.Channel) {
+        for _, sponsor := range sponsors {
+                postid := helpers.SponsorSocialPostRef(conf.Tag, sponsor.ref)
+                getters.RecordSocialPost(ctx.Notion, postid, text, channel.Service, time.Now())
+        }
 }
