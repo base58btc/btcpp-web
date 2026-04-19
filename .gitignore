@@ -4,6 +4,7 @@ config.toml
 _cache/
 target
 todo
+reqs/
 *.log
 .env
 .DS_Store
