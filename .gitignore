@@ -8,7 +8,7 @@ reqs/
 *.log
 .env
 .DS_Store
-<<<<<<< HEAD
+chat
 
 /media/*/
 credentials.json
