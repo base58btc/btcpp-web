@@ -171,6 +171,7 @@
                                 <td class="px-6 py-4 align-top">
                                     <input type="checkbox" name="sponsor_{{ .Ref }}" value="1" class="rounded border-gray-300">
                                     <input type="hidden" name="card_sponsor_{{ .Ref }}" value="{{ .CardURL }}">
+                                    <input type="hidden" name="level_sponsor_{{ .Ref }}" value="{{ .Level }}">
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-900 align-top">
                                     {{ .OrgName }}
@@ -192,6 +193,13 @@
                     </div>
                     {{ else }}
                     <div class="px-6 py-4 text-sm text-gray-500 text-center">No sponsors found for this event.</div>
+                    {{ end }}
+
+                    {{ if .SponsorBatchText }}
+                    <div class="px-6 py-4 border-t border-gray-200">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Instagram Batch Post Text (all checked sponsors as carousel)</label>
+                        <textarea name="text_sponsor_batch" rows="5" class="w-full rounded border border-gray-300 px-3 py-2 text-sm font-mono">{{ .SponsorBatchText }}</textarea>
+                    </div>
                     {{ end }}
                 </div>
             </section>

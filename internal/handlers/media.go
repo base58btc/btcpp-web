@@ -23,6 +23,8 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 			PreviewSpeakerCard(w, r, app)
 		case "talk":
 			PreviewTalkCard(w, r, app)
+		case "sponsor":
+			PreviewSponsorCard(w, r, app)
 		case "agenda":
 			confTag := params["conf"]
 			ref := params["card"]
@@ -472,16 +474,31 @@ func ServeTalkPng(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	w.Write(png)
 }
 
-func findSponsorBackground(ctx *config.AppContext, confTag string) string {
-	talks, err := getters.GetTalksFor(ctx, confTag)
-	if err == nil {
-		for _, talk := range talks {
-			if strings.Contains(strings.ToLower(talk.Name), "kickoff") && talk.Clipart != "" {
-				return "/static/img/talks/" + talk.Clipart
-			}
-		}
+func findSponsorBackground(confTag string) string {
+	return "/static/img/" + confTag + "/leading.png"
+}
+
+func PreviewSponsorCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	params := mux.Vars(r)
+	confTag := params["conf"]
+	card := params["card"]
+
+	bgImg := findSponsorBackground(confTag)
+
+	tmplName := fmt.Sprintf("media/sponsor_%s.tmpl", card)
+	err := ctx.TemplateCache.ExecuteTemplate(w, tmplName, &SponsorCard{
+		ConfTag:       confTag,
+		SponsorName:   "Unchained",
+		SponsorLogo:   "/static/img/sponsors/unchained_white.svg",
+		SponsorLevel:  "Sponsor",
+		BackgroundImg: bgImg,
+		Twitter:       "unchained",
+		Website:       "unchained.com",
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("exec %s failed: %s", tmplName, err.Error())
 	}
-	return "/static/img/" + confTag + "/landing.png"
 }
 
 func MakeSponsorCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -520,7 +537,7 @@ func MakeSponsorCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		logo = "/static/img/sponsors/" + logo
 	}
 
-	bgImg := findSponsorBackground(ctx, confTag)
+	bgImg := findSponsorBackground(confTag)
 
 	tmplName := fmt.Sprintf("media/sponsor_%s.tmpl", card)
 	if ctx.TemplateCache.Lookup(tmplName) == nil {

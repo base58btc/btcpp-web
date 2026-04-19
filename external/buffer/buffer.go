@@ -167,7 +167,11 @@ func CreatePost(channelID, text string, imageURLs []string, service string) (*Po
 
 	var metadataBlock string
 	if service == "instagram" {
-		metadataBlock = `, metadata: { instagram: { type: post, shouldShareToFeed: true } }`
+		igType := "post"
+		if len(imageURLs) > 1 {
+			igType = "carousel"
+		}
+		metadataBlock = fmt.Sprintf(`, metadata: { instagram: { type: %s, shouldShareToFeed: true } }`, igType)
 	}
 
 	query := fmt.Sprintf(`mutation {

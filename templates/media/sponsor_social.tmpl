@@ -43,9 +43,14 @@ body {
 }
 
 .sponsor-logo {
-  width: 65%;
   max-width: 80%;
-  height: 50%;
+  height: 60%;
+  object-fit: contain;
+}
+
+.sponsor-logo-small {
+  max-width: 60%;
+  height: 40%;
   object-fit: contain;
 }
 
@@ -65,7 +70,7 @@ body {
     <div class="absolute inset-0 bounding img"></div>
     <div class="bounding flex flex-col items-center justify-center relative">
         <div class="level font-semibold text-white mb-4">{{ .SponsorLevel }}</div>
-        <img {{ safesrc .SponsorLogo }} alt="{{ .SponsorName }}" class="sponsor-logo" />
+        <img {{ safesrc .SponsorLogo }} alt="{{ .SponsorName }}" class="{{ if or (eq .SponsorLevel "Title") (eq .SponsorLevel "Headline") }}sponsor-logo{{ else }}sponsor-logo-small{{ end }}" />
     </div>
     <div style="position: absolute; bottom: 12px; left: 12px; right: 12px; display: flex; align-items: flex-end; justify-content: space-between;">
         <div style="text-align: left;">

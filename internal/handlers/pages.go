@@ -233,13 +233,14 @@ type SocialSponsorRow struct {
 }
 
 type SocialAdminPage struct {
-        Conf         *types.Conf
-        SpeakerRows  []*SocialSpeakerRow
-        TalkRows     []*SocialTalkRow
-        SponsorRows  []*SocialSponsorRow
-        FlashMessage string
-        Year         uint
-        BufferOK     bool
+        Conf             *types.Conf
+        SpeakerRows      []*SocialSpeakerRow
+        TalkRows         []*SocialTalkRow
+        SponsorRows      []*SocialSponsorRow
+        SponsorBatchText string
+        FlashMessage     string
+        Year             uint
+        BufferOK         bool
 }
 
 type TalksGiftsPage struct {

@@ -45,17 +45,42 @@ type talkPostData struct {
 }
 
 var sponsorPostTmpl = template.Must(template.New("sponsor").Parse(
-	`Thank you to {{.OrgName}} for sponsoring bitcoin++ {{.Conf.Desc}}! {{.Conf.Emoji}}` +
-		`{{if .Twitter}}` + "\n" + `@{{.Twitter}}{{end}}` +
-		`{{if .Website}}` + "\n" + `{{.Website}}{{end}}` +
-		"\n\n" + `Join us 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
+	`JUST IN: {{.OrgName}} ` +
+	`{{if ne .Twitter.Handle "" }}({{.Twitter.Mention }}) {{end}}` +
+        `to sponsor {{.Conf.Desc}} {{.Conf.Emoji}}` +
+        `{{ if .Level }} as our {{ .Level }} sponsor{{ end }}` +
+        "\n\n" + `Join us this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
 
 type sponsorPostData struct {
 	OrgName string
-	Twitter string
+	Twitter types.Twitter
 	Website string
 	Level   string
 	Conf    *types.Conf
+}
+
+var sponsorBatchTmpl = template.Must(template.New("sponsor_batch").Parse(
+	`JUST IN {{ .Conf.Emoji }}: @btcplusplus is thrilled to announce the sponsorship of{{ range .Sponsors }} {{ .OrgName }}{{ end }} for our upcoming {{ .Conf.Desc }} this {{ .Conf.DateDesc }} #bitcoin #btcplusplus #btcpp`))
+
+type sponsorBatchData struct {
+	Conf     *types.Conf
+	Sponsors []*SocialSponsorRow
+}
+
+var sponsorLevelOrder = map[string]int{
+	"Headline": 0,
+	"Title":    1,
+	"Workshop": 2,
+	"Gold":     3,
+	"Silver":   4,
+	"Bronze":   5,
+}
+
+func sponsorSortOrder(level string) int {
+	if order, ok := sponsorLevelOrder[level]; ok {
+		return order
+	}
+	return 99
 }
 
 type channelFilter struct {
@@ -212,12 +237,17 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				continue
 			}
 
+                        level := sp.Level
+                        if sp.Level == "Bronze" {
+                                level = "" 
+                        }
+
 			var buf bytes.Buffer
 			sponsorPostTmpl.Execute(&buf, &sponsorPostData{
 				OrgName: sp.Org.Name,
-				Twitter: sp.Org.Twitter.Handle,
+				Twitter: sp.Org.Twitter,
 				Website: sp.Org.Website,
-				Level:   sp.Level,
+				Level:   level,
 				Conf:    conf,
 			})
 
@@ -234,18 +264,34 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		}
 
 		sort.SliceStable(sponsorRows, func(i, j int) bool {
+			oi, oj := sponsorSortOrder(sponsorRows[i].Level), sponsorSortOrder(sponsorRows[j].Level)
+			if oi != oj {
+				return oi < oj
+			}
 			return sponsorRows[i].OrgName < sponsorRows[j].OrgName
 		})
 	}
 
+	// Generate batch text for Instagram sponsor carousel
+	var sponsorBatchText string
+	if len(sponsorRows) > 0 {
+		var buf bytes.Buffer
+		sponsorBatchTmpl.Execute(&buf, &sponsorBatchData{
+			Conf:     conf,
+			Sponsors: sponsorRows,
+		})
+		sponsorBatchText = buf.String()
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/social.tmpl", &SocialAdminPage{
-		Conf:         conf,
-		SpeakerRows:  speakerRows,
-		TalkRows:     talkRows,
-		SponsorRows:  sponsorRows,
-		FlashMessage: r.URL.Query().Get("flash"),
-		Year:         helpers.CurrentYear(),
-		BufferOK:     buffer.IsConfigured(),
+		Conf:             conf,
+		SpeakerRows:      speakerRows,
+		TalkRows:         talkRows,
+		SponsorRows:      sponsorRows,
+		SponsorBatchText: sponsorBatchText,
+		FlashMessage:     r.URL.Query().Get("flash"),
+		Year:             helpers.CurrentYear(),
+		BufferOK:         buffer.IsConfigured(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
@@ -360,32 +406,77 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		}
 	}
 
-	// Process selected sponsors
+	// Collect selected sponsors with their level for sorting
+	type selectedSponsor struct {
+		ref     string
+		text    string
+		cardURL string
+		level   string
+	}
+	var selectedSponsors []selectedSponsor
 	for key := range r.Form {
 		if !strings.HasPrefix(key, "sponsor_") {
 			continue
 		}
 		sponsorRef := strings.TrimPrefix(key, "sponsor_")
-
 		postText := r.FormValue("text_sponsor_" + sponsorRef)
 		if postText == "" {
 			continue
 		}
-
 		cardURL := r.FormValue("card_sponsor_" + sponsorRef)
-		var imgs []string
-		if cardURL != "" {
-			imgs = append(imgs, cardURL)
-		}
+		level := r.FormValue("level_sponsor_" + sponsorRef)
+		selectedSponsors = append(selectedSponsors, selectedSponsor{
+			ref: sponsorRef, text: postText, cardURL: cardURL, level: level,
+		})
+	}
 
+	// Sort by sponsor level order
+	sort.SliceStable(selectedSponsors, func(i, j int) bool {
+		return sponsorSortOrder(selectedSponsors[i].level) < sponsorSortOrder(selectedSponsors[j].level)
+	})
+
+	// For non-Instagram channels, send individual sponsor posts
+	for _, sp := range selectedSponsors {
+		var imgs []string
+		if sp.cardURL != "" {
+			imgs = append(imgs, sp.cardURL)
+		}
 		for _, ch := range targetChannels {
-			_, err := buffer.CreatePost(ch.ID, postText, imgs, ch.Service)
+			if ch.Service == "instagram" {
+				continue
+			}
+			_, err := buffer.CreatePost(ch.ID, sp.text, imgs, ch.Service)
 			if err != nil {
-				ctx.Err.Printf("Failed to post sponsor %s to %s: %s", sponsorRef, ch.Service, err.Error())
+				ctx.Err.Printf("Failed to post sponsor %s to %s: %s", sp.ref, ch.Service, err.Error())
 				continue
 			}
 			posted++
-			ctx.Infos.Printf("Queued sponsor post for %s to %s", sponsorRef, ch.Service)
+			ctx.Infos.Printf("Queued sponsor post for %s to %s", sp.ref, ch.Service)
+		}
+	}
+
+	// For Instagram, send one batch post with all sponsor images as a carousel
+	if len(selectedSponsors) > 0 {
+		batchText := r.FormValue("text_sponsor_batch")
+		var batchImgs []string
+		for _, sp := range selectedSponsors {
+			if sp.cardURL != "" {
+				batchImgs = append(batchImgs, sp.cardURL)
+			}
+		}
+		if batchText != "" && len(batchImgs) > 0 {
+			for _, ch := range targetChannels {
+				if ch.Service != "instagram" {
+					continue
+				}
+				_, err := buffer.CreatePost(ch.ID, batchText, batchImgs, ch.Service)
+				if err != nil {
+					ctx.Err.Printf("Failed to post sponsor batch to instagram: %s", err.Error())
+					continue
+				}
+				posted++
+				ctx.Infos.Printf("Queued sponsor batch post to instagram with %d images", len(batchImgs))
+			}
 		}
 	}
 
