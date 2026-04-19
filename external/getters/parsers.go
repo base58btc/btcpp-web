@@ -1,6 +1,7 @@
 package getters
 
 import (
+	"strings"
         "time"
 
 	"btcpp-web/internal/config"
@@ -75,13 +76,25 @@ func parseRichText(key string, props map[string]notion.PropertyValue) string {
 	}
 	if len(val.RichText) == 0 {
 		if len(val.Title) != 0 {
-			return val.Title[0].Text.Content
+			var sb strings.Builder
+			for _, t := range val.Title {
+				if t.Text != nil {
+					sb.WriteString(t.Text.Content)
+				}
+			}
+			return sb.String()
 		}
 		/* FIXME: log err? */
 		return ""
 	}
 
-	return val.RichText[0].Text.Content
+	var sb strings.Builder
+	for _, rt := range val.RichText {
+		if rt.Text != nil {
+			sb.WriteString(rt.Text.Content)
+		}
+	}
+	return sb.String()
 }
 
 func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.DiscountCode {
