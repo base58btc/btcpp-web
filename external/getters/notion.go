@@ -1121,16 +1121,16 @@ func FindDiscount(ctx *config.AppContext, code string) (*types.DiscountCode, err
 	return nil, nil
 }
 
-func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice uint) (uint, *types.DiscountCode, error) {
+func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice uint, count uint) (uint, *types.DiscountCode, error) {
 	discount, err := FindDiscount(ctx, code)
 
 	if err != nil {
-		return tixPrice, nil, err
+		return tixPrice * count, nil, err
 	}
 
 	/* Discount not found! */
 	if discount == nil {
-		return tixPrice, nil, fmt.Errorf("Discount code \"%s\" not found", code)
+		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" not found", code)
 	}
 
 	found := false
@@ -1139,17 +1139,35 @@ func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice 
 	}
 
 	if !found {
-		return tixPrice, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
+		return tixPrice * count, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
 	}
 
-	discountTix := float64(100-discount.PercentOff) * float64(tixPrice) / float64(100)
-
-	tix := uint(discountTix)
-	/* Overflows are a thing */
-	if tix == 0 || tix > tixPrice {
-		tix = 1
+	if discount.MaxUses > 0 && discount.UsesCount >= discount.MaxUses {
+		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" has been fully redeemed", code)
 	}
-	return tix, discount, nil
+	if discount.IsDateExpired(time.Now().UTC()) {
+		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" has expired", code)
+	}
+
+	if count == 0 {
+		count = 1
+	}
+
+	total := discount.CalcTotal(tixPrice, count)
+	return total, discount, nil
+}
+
+func IncrementDiscountUses(n *types.Notion, discountRef string, currentUses, addCount uint) error {
+	newCount := float64(currentUses + addCount)
+
+	_, err := n.Client.UpdatePageProperties(context.Background(), discountRef,
+		map[string]*notion.PropertyValue{
+			"UsesCount": {
+				Type:   notion.PropertyNumber,
+				Number: newCount,
+			},
+		})
+	return err
 }
 
 func CheckIn(n *types.Notion, ticket string) (string, bool, error) {

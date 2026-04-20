@@ -99,15 +99,17 @@ func parseRichText(key string, props map[string]notion.PropertyValue) string {
 
 func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.DiscountCode {
 	discount := &types.DiscountCode{
-		Ref:        pageID,
-		CodeName:   parseRichText("CodeName", props),
-		PercentOff: uint(props["PercentOff"].Number),
-                Discount:   parseRichText("Discount", props),
+		Ref:       pageID,
+		CodeName:  parseRichText("CodeName", props),
+		Discount:  parseRichText("Discount", props),
+		UsesCount: uint(props["UsesCount"].Number),
 	}
 
 	for _, confRef := range props["Conference"].Relation {
 		discount.ConfRef = append(discount.ConfRef, confRef.ID)
 	}
+
+	discount.ParseDiscountExpr()
 
 	return discount
 }

@@ -91,11 +91,18 @@ type (
 	}
 
 	DiscountCode struct {
-		Ref        string
-		CodeName   string
-                Discount   string
-		PercentOff uint
-		ConfRef    []string
+		Ref       string
+		CodeName  string
+		Discount  string   // raw expression (e.g. "%50", "$10:50", "=25:70")
+		ConfRef   []string
+		UsesCount uint     // current usage count from Notion
+		// Parsed from Discount expression:
+		DiscType   rune       // '%', '$', or '='
+		Amount     uint       // the number value
+		MaxUses    uint       // from :N modifier, 0 = unlimited
+		ExtraQty   uint       // from +N modifier (BOGO), 0 = not BOGO
+		ValidFrom  *time.Time // from @ modifier, nil = no start restriction
+		ValidUntil *time.Time // from < or @ modifier, nil = no end restriction
 	}
 
 	Speaker struct {

@@ -1779,7 +1779,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	/* Calculate the discount */
 	var discountRef string
-	discountPrice, discount, err := getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice)
+	discountPrice, discount, err := getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice, 1)
 	if discount != nil {
 		discountRef = discount.Ref
 	}
@@ -1843,7 +1843,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		var discountRef string
 		if discountCode != "" {
 			var discount *types.DiscountCode
-			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice)
+			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice, 1)
 			if err != nil {
 				ctx.Err.Printf("/tix/%s/apply-discount discount not available: %s", tixSlug, err)
 				/* We don't bail though.. just continue */
