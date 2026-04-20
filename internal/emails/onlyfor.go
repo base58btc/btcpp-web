@@ -62,6 +62,13 @@ type (
                 Email        string
                 VolShiftLink string
         }
+
+        SpeakerCustom struct {
+                Speaker *types.Speaker
+                Conf    *types.Conf
+                Talks   []*types.Talk
+                Email   string
+        }
 )
 
 
@@ -181,6 +188,30 @@ func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.C
 
         renderedTitle := templatizeTitle(title, tmplData)
         return sendOnlyFor(ctx, vol.Email, letter, renderedTitle, buf)
+}
+
+func SendCustomToSpeaker(ctx *config.AppContext, speaker *types.Speaker, conf *types.Conf, talks []*types.Talk, title, markdown string) ([]byte, error) {
+        tmplData := &SpeakerCustom{
+                Speaker: speaker,
+                Conf:    conf,
+                Talks:   talks,
+                Email:   speaker.Email,
+        }
+
+        letter := &mtypes.Letter{
+                UID:      uint64(time.Now().UnixNano()),
+                Title:    title,
+                Markdown: markdown,
+        }
+
+        var buf bytes.Buffer
+        err := missiveTemplate(ctx, letter).Execute(&buf, &tmplData)
+        if err != nil {
+                return nil, err
+        }
+
+        renderedTitle := templatizeTitle(title, tmplData)
+        return sendOnlyFor(ctx, speaker.Email, letter, renderedTitle, buf)
 }
 
 func execOnlyFor(ctx *config.AppContext, email, onlyFor string, tmplData interface{}) ([]byte, error) {

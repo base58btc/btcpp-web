@@ -22,6 +22,7 @@ import (
 
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
+	"btcpp-web/external/spaces"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
@@ -40,6 +41,18 @@ import (
 )
 
 var pages []string = []string{"index", "about", "press", "vegas25" }
+
+func getStructFields(v interface{}) []string {
+	t := reflect.TypeOf(v)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	var fields []string
+	for i := 0; i < t.NumField(); i++ {
+		fields = append(fields, t.Field(i).Name)
+	}
+	return fields
+}
 
 func newFormDecoder() *schema.Decoder {
 	dec := schema.NewDecoder()
@@ -626,6 +639,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/speakers/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdmin(w, r, app)
 	}).Methods("GET")
+
+	r.HandleFunc("/admin/speakers/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerAdminBulkEmail(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		/* Check for verified */
@@ -3899,8 +3916,10 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 			if !seen[speaker.Email] {
 				seen[speaker.Email] = true
 				rows = append(rows, &SpeakerRow{
-					Name:  speaker.Name,
-					Email: speaker.Email,
+					ID:     speaker.ID,
+					Name:   speaker.Name,
+					Email:  speaker.Email,
+					Signal: speaker.Signal,
 				})
 			}
 		}
@@ -3911,15 +3930,85 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	})
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/speakers.tmpl", &SpeakerAdminPage{
-		Conf:         conf,
-		Rows:         rows,
-		FlashMessage: r.URL.Query().Get("flash"),
-		Year:         helpers.CurrentYear(),
+		Conf:          conf,
+		Rows:          rows,
+		FlashMessage:  r.URL.Query().Get("flash"),
+		Year:          helpers.CurrentYear(),
+		SpeakerFields: getStructFields(types.Speaker{}),
+		ConfFields:    getStructFields(types.Conf{}),
+		TalkFields:    getStructFields(types.Talk{}),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
 		ctx.Err.Printf("/talks/speakers template failed: %s", err.Error())
 	}
+}
+
+func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	speakerRefs := r.Form["speaker_refs"]
+	if len(speakerRefs) == 0 {
+		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+selected", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	if title == "" || body == "" {
+		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
+		return
+	}
+
+	// Build speaker ID -> speaker and speaker ID -> talks maps
+	speakerMap := make(map[string]*types.Speaker)
+	speakerTalks := make(map[string][]*types.Talk)
+	for _, talk := range talks {
+		for _, s := range talk.Speakers {
+			speakerMap[s.ID] = s
+			speakerTalks[s.ID] = append(speakerTalks[s.ID], talk)
+		}
+	}
+
+	refSet := make(map[string]bool, len(speakerRefs))
+	for _, ref := range speakerRefs {
+		refSet[ref] = true
+	}
+
+	sent := 0
+	for id, speaker := range speakerMap {
+		if !refSet[id] {
+			continue
+		}
+		if speaker.Email == "" {
+			continue
+		}
+		_, err := emails.SendCustomToSpeaker(ctx, speaker, conf, speakerTalks[id], title, body)
+		if err != nil {
+			ctx.Err.Printf("/admin/speakers/%s/email -> %s failed: %s", conf.Tag, speaker.Email, err)
+			continue
+		}
+		sent++
+	}
+
+	flash := fmt.Sprintf("Sent+to+%d+of+%d+speakers", sent, len(speakerRefs))
+	http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

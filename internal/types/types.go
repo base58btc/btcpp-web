@@ -115,6 +115,7 @@ type (
 		Github   string
 		Website  string
 		Nostr    string
+		Signal   string
 		Company  string
 		OrgPhoto string
 	}

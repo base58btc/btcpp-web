@@ -154,14 +154,17 @@ type ShiftSignupPage struct {
 }
 
 type VolAdminPage struct {
-        Conf          *types.Conf
-        Volunteers    []*types.Volunteer
-        Shifts        []*types.WorkShift
-        VolInfo       *types.VolInfo
-        StatusFilter  string
-        Missives      []*mtypes.Letter
-        FlashMessage  string
-        Year          uint
+        Conf            *types.Conf
+        Volunteers      []*types.Volunteer
+        Shifts          []*types.WorkShift
+        VolInfo         *types.VolInfo
+        StatusFilter    string
+        Missives        []*mtypes.Letter
+        FlashMessage    string
+        Year            uint
+        VolunteerFields []string
+        ConfFields      []string
+        VolInfoFields   []string
 }
 
 type ShiftDayGroup struct {
@@ -187,15 +190,20 @@ type GiftRow struct {
 }
 
 type SpeakerRow struct {
-        Name  string
-        Email string
+        ID     string
+        Name   string
+        Email  string
+        Signal string
 }
 
 type SpeakerAdminPage struct {
-        Conf          *types.Conf
-        Rows          []*SpeakerRow
-        FlashMessage  string
-        Year          uint
+        Conf           *types.Conf
+        Rows           []*SpeakerRow
+        FlashMessage   string
+        Year           uint
+        SpeakerFields  []string
+        ConfFields     []string
+        TalkFields     []string
 }
 
 type SponsorFormPage struct {

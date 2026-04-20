@@ -150,6 +150,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 		Email:    props["Email"].Email,
 		Twitter:  types.ParseTwitter(parseRichText("Twitter", props)),
 		Nostr:    parseRichText("npub", props),
+		Signal:   parseRichText("Signal", props),
 		Company:  parseRichText("Company", props),
 	}
 
