@@ -389,7 +389,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET", "POST")
 
 	r.HandleFunc("/tix/{tix}/collect-email", func(w http.ResponseWriter, r *http.Request) {
-		HandleEmail(w, r, app)
+		HandleCheckout(w, r, app)
+	}).Methods("GET", "POST")
+	r.HandleFunc("/tix/{tix}/checkout", func(w http.ResponseWriter, r *http.Request) {
+		HandleCheckout(w, r, app)
 	}).Methods("GET", "POST")
 	r.HandleFunc("/tix/{tix}/apply-discount", func(w http.ResponseWriter, r *http.Request) {
 		HandleDiscount(w, r, app)
@@ -1718,6 +1721,14 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		return
 	}
 
+	// Increment discount usage counter
+	if entry.DiscountRef != "" {
+		err = getters.IncrementDiscountUses(ctx, entry.DiscountRef, uint(len(entry.Items)))
+		if err != nil {
+			ctx.Err.Printf("Failed to increment discount uses: %s", err)
+		}
+	}
+
 	ctx.Infos.Println("Added ticket!", entry.ID)
 	w.WriteHeader(http.StatusOK)
 }
@@ -1731,19 +1742,8 @@ func HandleTixSelection(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		return
 	}
 
-	conf, tix, tixPrice, processBTC, err := determineTixPrice(ctx, tixSlug)
-	if err != nil {
-		ctx.Err.Printf("/tix/%s unable to determine tix price: %s", tixSlug, err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	if !processBTC {
-		StripeInit(w, r, ctx, conf, tix, tixPrice)
-		return
-	}
-
-	http.Redirect(w, r, fmt.Sprintf("/tix/%s/collect-email", tixSlug), http.StatusSeeOther)
+	// Both fiat and btc go to the same checkout page
+	http.Redirect(w, r, fmt.Sprintf("/tix/%s/checkout", tixSlug), http.StatusSeeOther)
 }
 
 func getPrice(pricestr string) (uint, error) {
@@ -1812,7 +1812,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 }
 
-func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	params := mux.Vars(r)
 	tixSlug := params["tix"]
 
@@ -1823,14 +1823,15 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 	conf, tix, tixPrice, processBTC, err := determineTixPrice(ctx, tixSlug)
 	if err != nil {
-		ctx.Err.Printf("/tix/%s/collect-email unable to determine tix price: %s", tixSlug, err)
+		ctx.Err.Printf("/tix/%s/checkout unable to determine tix price: %s", tixSlug, err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	if !processBTC {
-		http.Redirect(w, r, fmt.Sprintf("/tix/%s", tixSlug), http.StatusSeeOther)
-		return
+	// Determine payment method from the slug
+	paymentMethod := "fiat"
+	if processBTC {
+		paymentMethod = "btc"
 	}
 
 	switch r.Method {
@@ -1845,8 +1846,7 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			var discount *types.DiscountCode
 			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice, 1)
 			if err != nil {
-				ctx.Err.Printf("/tix/%s/apply-discount discount not available: %s", tixSlug, err)
-				/* We don't bail though.. just continue */
+				ctx.Err.Printf("/tix/%s/checkout discount not available: %s", tixSlug, err)
 				errStr = err.Error()
 			}
 
@@ -1866,10 +1866,11 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
 			Count:         uint(1),
 			Year:          helpers.CurrentYear(),
+			PaymentMethod: paymentMethod,
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/tix/{%s}/collect-email templ exec failed %s", tixSlug, err.Error())
+			ctx.Err.Printf("/tix/%s/checkout templ exec failed %s", tixSlug, err.Error())
 			return
 		}
 		return
@@ -1881,26 +1882,30 @@ func HandleEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		err = dec.Decode(&form, r.PostForm)
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/collect-email unable to decode form %s", err)
+			ctx.Err.Printf("/tix/%s/checkout unable to decode form %s", tixSlug, err)
 			return
 		}
 
 		if form.Email == "" || form.Count < 1 {
-			http.Redirect(w, r, fmt.Sprintf("/collect-email/%s", tixSlug), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/tix/%s/checkout", tixSlug), http.StatusSeeOther)
                         return
 		}
 
 		/*  Validate HMAC */
 		expectedHMAC := calcTixHMAC(ctx, conf, tixPrice, form.DiscountPrice, form.Discount)
 		if expectedHMAC != form.HMAC {
-			ctx.Err.Printf("/tix/%s/collect-email hmac mismatch. %s != %s", tixSlug, expectedHMAC, form.HMAC)
+			ctx.Err.Printf("/tix/%s/checkout hmac mismatch. %s != %s", tixSlug, expectedHMAC, form.HMAC)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		/* The goal is that we hit opennode init, with an email! */
 		isLocal := tixPrice == tix.Local
-		OpenNodeInit(w, r, ctx, conf, tix, form.DiscountPrice, &form, isLocal)
+
+		if form.PaymentMethod == "btc" {
+			OpenNodeInit(w, r, ctx, conf, tix, form.DiscountPrice, &form, isLocal)
+		} else {
+			StripeInitWithDiscount(w, r, ctx, conf, tix, form.DiscountPrice, &form, isLocal)
+		}
 		return
 	default:
 		http.NotFound(w, r)
@@ -1920,6 +1925,51 @@ func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	/* FIXME: v2: implement on-site btc checkout */
 	/* for now we go ahead and just redirect to opennode, see you latrrr */
 	http.Redirect(w, r, payment.HostedCheckoutURL, http.StatusSeeOther)
+}
+
+func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice uint, form *types.TixForm, isLocal bool) {
+	domain := ctx.Env.GetURI()
+	priceAsCents := int64(tixPrice * 100)
+	confDesc := fmt.Sprintf("%d ticket(s) for %s", form.Count, conf.Desc)
+	metadata := make(map[string]string)
+	metadata["conf-tag"] = conf.Tag
+	metadata["conf-ref"] = conf.Ref
+	metadata["tix-id"] = tix.ID
+	metadata["discount-ref"] = form.DiscountRef
+	metadata["subscribe"] = fmt.Sprintf("%t", form.Subscribe)
+	if isLocal {
+		metadata["tix-local"] = "yes"
+	}
+	params := &stripe.CheckoutSessionParams{
+		CustomerEmail: stripe.String(form.Email),
+		LineItems: []*stripe.CheckoutSessionLineItemParams{
+			{
+				PriceData: &stripe.CheckoutSessionLineItemPriceDataParams{
+					ProductData: &stripe.CheckoutSessionLineItemPriceDataProductDataParams{
+						Description: stripe.String(confDesc),
+						Name:        stripe.String(conf.Desc),
+						Metadata:    metadata,
+					},
+					UnitAmount: stripe.Int64(priceAsCents),
+					Currency:   stripe.String(tix.Currency),
+				},
+				Quantity: stripe.Int64(int64(form.Count)),
+			}},
+		Metadata:     metadata,
+		Mode:         stripe.String(string(stripe.CheckoutSessionModePayment)),
+		SuccessURL:   stripe.String(domain + "/conf/" + conf.Tag + "/success"),
+		CancelURL:    stripe.String(domain + "/conf/" + conf.Tag),
+		AutomaticTax: &stripe.CheckoutSessionAutomaticTaxParams{Enabled: stripe.Bool(true)},
+	}
+
+	s, err := session.New(params)
+	if err != nil {
+		ctx.Err.Printf("!!! Unable to create stripe session: %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, s.URL, http.StatusSeeOther)
 }
 
 func StripeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice uint) {
@@ -2014,13 +2064,16 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			return
 		}
 
+		discountRef, _ := checkout.Metadata["discount-ref"]
+
 		entry := types.Entry{
-			ID:       checkout.ID,
-			ConfRef:  conf.Ref,
-			Total:    checkout.AmountTotal,
-			Currency: string(checkout.Currency),
-			Created:  time.Unix(checkout.Created, 0).UTC(),
-			Email:    checkout.CustomerDetails.Email,
+			ID:          checkout.ID,
+			ConfRef:     conf.Ref,
+			Total:       checkout.AmountTotal,
+			Currency:    string(checkout.Currency),
+			Created:     time.Unix(checkout.Created, 0).UTC(),
+			Email:       checkout.CustomerDetails.Email,
+			DiscountRef: discountRef,
 		}
 
 		itemParams := &stripe.CheckoutSessionListLineItemsParams{
@@ -2068,6 +2121,14 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			return
 		}
 		ctx.Infos.Printf("Added %d tickets!!", len(entry.Items))
+
+		// Increment discount usage counter
+		if entry.DiscountRef != "" {
+			err = getters.IncrementDiscountUses(ctx, entry.DiscountRef, uint(len(entry.Items)))
+			if err != nil {
+				ctx.Err.Printf("Failed to increment discount uses: %s", err)
+			}
+		}
 
 		/* Add to mailing list + send mails */
 		err = missives.NewTicketSub(ctx, entry.Email, conf.Tag, tixType, false)

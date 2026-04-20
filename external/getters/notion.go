@@ -1157,16 +1157,37 @@ func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice 
 	return total, discount, nil
 }
 
-func IncrementDiscountUses(n *types.Notion, discountRef string, currentUses, addCount uint) error {
+func IncrementDiscountUses(ctx *config.AppContext, discountRef string, addCount uint) error {
+	// Find the discount to get current uses count
+	cachedDiscounts, err := FetchDiscountsCached(ctx)
+	if err != nil {
+		return err
+	}
+
+	var currentUses uint
+	for _, d := range cachedDiscounts {
+		if d.Ref == discountRef {
+			currentUses = d.UsesCount
+			// Update the cached value immediately so subsequent
+			// checks see the new count without waiting for cache refresh
+			d.UsesCount += addCount
+			break
+		}
+	}
+
 	newCount := float64(currentUses + addCount)
 
-	_, err := n.Client.UpdatePageProperties(context.Background(), discountRef,
+	_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), discountRef,
 		map[string]*notion.PropertyValue{
 			"UsesCount": {
 				Type:   notion.PropertyNumber,
 				Number: newCount,
 			},
 		})
+
+	// Force discount cache refresh on next access
+	lastDiscountFetch = time.Time{}
+
 	return err
 }
 

@@ -88,6 +88,7 @@ type (
 		Discount      string
 		DiscountRef   string
 		HMAC          string
+		PaymentMethod string // "btc" or "fiat"
 	}
 
 	DiscountCode struct {

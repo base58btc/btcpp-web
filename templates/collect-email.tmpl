@@ -53,8 +53,9 @@
               </label>
             </div>
             {{ template "tix_details.tmpl" . }}
+            <input type="hidden" name="PaymentMethod" value="{{ .PaymentMethod }}">
             <div class="mt-8">
-                    <button type="submit" class="inline-flex rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Pay Now</button>
+                    <button type="submit" class="inline-flex rounded-md bg-white/10 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-white/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ if eq .PaymentMethod "btc" }}Pay with Bitcoin{{ else }}Pay with Card{{ end }}</button>
                   </div>
                 </form>
               </div>

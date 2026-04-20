@@ -69,6 +69,7 @@ type TixFormPage struct {
 	HMAC          string
 	Err           string
 	Year          uint
+	PaymentMethod string // "btc" or "fiat"
 }
 
 type SchedulePage struct {
