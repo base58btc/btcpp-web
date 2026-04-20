@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -39,6 +40,15 @@ import (
 )
 
 var pages []string = []string{"index", "about", "press", "vegas25" }
+
+func newFormDecoder() *schema.Decoder {
+	dec := schema.NewDecoder()
+	dec.IgnoreUnknownKeys(true)
+	dec.RegisterConverter(types.Twitter{}, func(value string) reflect.Value {
+		return reflect.ValueOf(types.ParseTwitter(value))
+	})
+	return dec
+}
 
 /* Thank you StackOverflow https://stackoverflow.com/a/50581032 */
 func findAndParseTemplates(rootDir string, funcMap template.FuncMap) (*template.Template, error) {
@@ -900,8 +910,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 			return
                 }
 
-		dec := schema.NewDecoder()
-		dec.IgnoreUnknownKeys(true)
+		dec := newFormDecoder()
 		var talkapp types.TalkApp
 		err = dec.Decode(&talkapp, r.PostForm)
 		if err != nil {
@@ -1014,8 +1023,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                         return
         case http.MethodPost:
 		r.ParseForm()
-		dec := schema.NewDecoder()
-		dec.IgnoreUnknownKeys(true)
+		dec := newFormDecoder()
 		var vol types.Volunteer
 		err = dec.Decode(&vol, r.PostForm)
 		if err != nil {
@@ -1629,7 +1637,7 @@ func validHash(key, id, msgMAC string) bool {
 	return msgMAC == actual
 }
 
-var decoder = schema.NewDecoder()
+var decoder = newFormDecoder()
 
 func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	err := r.ParseForm()
@@ -1885,8 +1893,7 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
 	case http.MethodPost:
 		r.ParseForm()
-		dec := schema.NewDecoder()
-		dec.IgnoreUnknownKeys(true)
+		dec := newFormDecoder()
 		var form types.TixForm
 		err = dec.Decode(&form, r.PostForm)
 		if err != nil {
@@ -2173,8 +2180,7 @@ func RenderFindShift(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
                 }
         case http.MethodPost:
 		r.ParseForm()
-		dec := schema.NewDecoder()
-		dec.IgnoreUnknownKeys(true)
+		dec := newFormDecoder()
 		var form EmailForm
                 err := dec.Decode(&form, r.PostForm)
 		if err != nil {
