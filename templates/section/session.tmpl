@@ -32,7 +32,7 @@
               <circle cx="1" cy="1" r="1" />
             </svg>
             <div class="flex gap-x-2.5">
-              <img src="/static/img/speakers/{{ .Photo }}" alt="" class="h-6 w-6 flex-none rounded-full bg-white/10">
+              <img src="{{ speakerPhoto .Photo }}" alt="" class="h-6 w-6 flex-none rounded-full bg-white/10">
               {{ if eq $spkCount 1 }}
                 {{ .Name }}
               {{ end }}

@@ -87,7 +87,7 @@ body {
 	  {{ $solo := eq (len .Talk.Speakers) 1 }}
 	  {{ range .Talk.Speakers }}
 	    {{ if eq $first . }}
-	  <img src="/static/img/speakers/{{ .Photo }}" alt="" class="size-64 rounded-full bg-gray-100" />
+	  <img src="{{ speakerPhoto .Photo }}" alt="" class="size-64 rounded-full bg-gray-100" />
 	      {{ if $solo }}
           <div class="text-sm/6">
             <p class="font-semibold text-white talk">
@@ -102,7 +102,7 @@ body {
 	        {{ end }}
 	      {{ end }}
 	    {{ else }}
-	      <img src="/static/img/speakers/{{ .Photo }}" alt="" style="margin-left: -4rem;" class="size-64 rounded-full bg-gray-100" />
+	      <img src="{{ speakerPhoto .Photo }}" alt="" style="margin-left: -4rem;" class="size-64 rounded-full bg-gray-100" />
 	    {{ end }}
 	  {{ end }}
           </div>

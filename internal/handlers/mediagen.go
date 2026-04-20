@@ -385,5 +385,5 @@ func SpeakerPhotoURL(ctx *config.AppContext, photo string) string {
 	if strings.HasPrefix(photo, "http") {
 		return photo
 	}
-	return ctx.Env.GetURI() + "/static/img/speakers/" + photo
+	return spaces.PublicURL("speakers/" + photo)
 }

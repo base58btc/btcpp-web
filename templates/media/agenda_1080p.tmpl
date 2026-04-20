@@ -99,7 +99,7 @@ body {
 	<!-- no speakers for 'hackathons' -->
 	{{ else }}
         {{ range .Speakers}}
-              <img src="/static/img/speakers/{{ .Photo }}" alt="" class="size-24 rounded-full bg-gray-100" 
+              <img src="{{ speakerPhoto .Photo }}" alt="" class="size-24 rounded-full bg-gray-100" 
 	      {{ if ne $first .}}
 	      style="margin-left: -2rem;"
 	      {{ end }}

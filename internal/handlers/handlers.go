@@ -164,6 +164,15 @@ func loadTemplates(ctx *config.AppContext) error {
 			}
 			return s.ShiftTime.End.Format("15:04")
 		},
+		"spacesURL": func(key string) string {
+			return spaces.PublicURL(key)
+		},
+		"speakerPhoto": func(photo string) string {
+			if photo == "" {
+				return spaces.PublicURL("speakers/default.avif")
+			}
+			return spaces.PublicURL("speakers/" + photo)
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err

@@ -1,6 +1,6 @@
 {{ define "speaker" }}
 <li>
-  <img class="mx-auto h-56 w-56 rounded-full" src="/static/img/speakers/{{ .Photo }}" alt="">
+  <img class="mx-auto h-56 w-56 rounded-full" src="{{ speakerPhoto .Photo }}" alt="">
   <h3 class="mt-6 text-base font-semibold leading-7 tracking-tight text-gray-900">{{ .Name }}</h3>
   <p class="text-sm leading-6 text-gray-600">{{ .Company }}</p>
   <ul role="list" class="mt-6 flex justify-center gap-x-6">

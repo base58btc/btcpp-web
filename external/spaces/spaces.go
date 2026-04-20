@@ -136,9 +136,14 @@ func Exists(key string) bool {
 	return err == nil
 }
 
+// BaseURL returns the public base URL for the bucket (e.g. https://btcpp.nyc3.digitaloceanspaces.com)
+func BaseURL() string {
+	if endpoint == "" || bucket == "" {
+		return ""
+	}
+	return strings.Replace(endpoint, "https://", fmt.Sprintf("https://%s.", bucket), 1)
+}
+
 func PublicURL(key string) string {
-	// DO Spaces uses subdomain-style URLs for public access
-	// https://nyc3.digitaloceanspaces.com -> https://bucket.nyc3.digitaloceanspaces.com
-	base := strings.Replace(endpoint, "https://", fmt.Sprintf("https://%s.", bucket), 1)
-	return fmt.Sprintf("%s/%s", base, key)
+	return fmt.Sprintf("%s/%s", BaseURL(), key)
 }
