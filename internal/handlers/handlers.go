@@ -2915,14 +2915,17 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
-		Conf:         conf,
-		Volunteers:   vols,
-		Shifts:       shifts,
-		VolInfo:      volinfo,
-		StatusFilter: statusFilter,
-		Missives:     missiveList,
-		FlashMessage: r.URL.Query().Get("flash"),
-		Year:         helpers.CurrentYear(),
+		Conf:            conf,
+		Volunteers:      vols,
+		Shifts:          shifts,
+		VolInfo:         volinfo,
+		StatusFilter:    statusFilter,
+		Missives:        missiveList,
+		FlashMessage:    r.URL.Query().Get("flash"),
+		Year:            helpers.CurrentYear(),
+		VolunteerFields: getStructFields(types.Volunteer{}),
+		ConfFields:      getStructFields(types.Conf{}),
+		VolInfoFields:   getStructFields(types.VolInfo{}),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
