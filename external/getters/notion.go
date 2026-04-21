@@ -506,15 +506,9 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk, error) {
+func listTalksForEvent(ctx *config.AppContext, speakerMap map[string]*types.Speaker, eventTag string) ([]*types.Talk, error) {
 	var talks []*types.Talk
 	n := ctx.Notion
-
-	// Build speaker map for O(1) lookups during parsing
-	speakerMap := make(map[string]*types.Speaker)
-	for _, s := range speakers {
-		speakerMap[s.ID] = s
-	}
 
 	hasMore := true
 	nextCursor := ""
@@ -525,6 +519,12 @@ func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk
 		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
 			n.Config.TalksDb, notion.QueryDatabaseParam{
 				StartCursor: nextCursor,
+				Filter: &notion.Filter{
+					Property: "Event",
+					Select: &notion.SelectFilterCondition{
+						Equals: eventTag,
+					},
+				},
 			})
 
 		if err != nil {
@@ -537,6 +537,34 @@ func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk
 	}
 
 	return talks, nil
+}
+
+func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk, error) {
+	// Build speaker map for O(1) lookups during parsing
+	speakerMap := make(map[string]*types.Speaker)
+	for _, s := range speakers {
+		speakerMap[s.ID] = s
+	}
+
+	// Fetch talks per conference to stay under Notion's pagination limits
+	cachedConfs, err := FetchConfsCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var allTalks []*types.Talk
+	for _, conf := range cachedConfs {
+		confTalks, err := listTalksForEvent(ctx, speakerMap, conf.Tag)
+		if err != nil {
+			ctx.Err.Printf("listTalks: failed for event %s: %s", conf.Tag, err)
+			continue
+		}
+		ctx.Infos.Printf("listTalks: loaded %d talks for %s", len(confTalks), conf.Tag)
+		allTalks = append(allTalks, confTalks...)
+	}
+
+	ctx.Infos.Printf("listTalks: total %d talks loaded across %d confs", len(allTalks), len(cachedConfs))
+	return allTalks, nil
 }
 
 func TalkUpdateCardURL(n *types.Notion, talkID string, cardURL string) error {

@@ -217,6 +217,7 @@
     </div>
 </section>
 {{ if .Conf.ShowAgenda }}
+{{ if .Days }}
 <section id="agenda">
 <div class="bg-white py-32">
   <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
@@ -385,6 +386,7 @@
   </div>
 </div>
 </section>
+{{ end }}
 {{ end }}
 <section id="tickets">
   <div class="mx-auto max-w-7xl px-6 text-center lg:px-8">
