@@ -1819,6 +1819,33 @@ func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Vol
 	return vols, nil
 }
 
+func ListTalkApps(ctx *config.AppContext) ([]*types.TalkApp, error) {
+	n := ctx.Notion
+	var apps []*types.TalkApp
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.TalkAppDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+		for _, page := range pages {
+			app := parseTalkApp(ctx, page.ID, page.Properties)
+			apps = append(apps, app)
+		}
+	}
+
+	return apps, nil
+}
+
 func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
 	parent := notion.NewDatabaseParent(n.Config.TalkAppDb)
 

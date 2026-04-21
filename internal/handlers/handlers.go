@@ -42,6 +42,19 @@ import (
 
 var pages []string = []string{"index", "about", "press", "vegas25" }
 
+func fieldGroup(name string, v interface{}, isRange bool) EmailFieldGroup {
+	fields := getStructFields(v)
+	prefix := name + "."
+	if isRange {
+		prefix = "."
+	}
+	items := make([]string, len(fields))
+	for i, f := range fields {
+		items[i] = prefix + f
+	}
+	return EmailFieldGroup{Name: name, Items: items, IsRange: isRange}
+}
+
 func getStructFields(v interface{}) []string {
 	t := reflect.TypeOf(v)
 	if t.Kind() == reflect.Ptr {
@@ -642,6 +655,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/admin/speakers/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdminBulkEmail(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/admin/applicants/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		TalkAppAdmin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/applicants/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+		TalkAppAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
@@ -2915,17 +2936,25 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
-		Conf:            conf,
-		Volunteers:      vols,
-		Shifts:          shifts,
-		VolInfo:         volinfo,
-		StatusFilter:    statusFilter,
-		Missives:        missiveList,
-		FlashMessage:    r.URL.Query().Get("flash"),
-		Year:            helpers.CurrentYear(),
-		VolunteerFields: getStructFields(types.Volunteer{}),
-		ConfFields:      getStructFields(types.Conf{}),
-		VolInfoFields:   getStructFields(types.VolInfo{}),
+		Conf:         conf,
+		Volunteers:   vols,
+		Shifts:       shifts,
+		VolInfo:      volinfo,
+		StatusFilter: statusFilter,
+		Missives:     missiveList,
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+		EmailCompose: &EmailComposeData{
+			Title:            "Email Selected Volunteers",
+			Description:      "Write a one-off email to volunteers. Uses Go template syntax.",
+			TitlePlaceholder: "Subject line",
+			BodyPlaceholder:  "Hi {{ .Volunteer.Name }},\n\nYour shifts for {{ .Conf.Desc }}...",
+			Fields: []EmailFieldGroup{
+				fieldGroup(".Volunteer", types.Volunteer{}, false),
+				fieldGroup(".Conf", types.Conf{}, false),
+				fieldGroup(".VolInfo", types.VolInfo{}, false),
+			},
+		},
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
@@ -3529,7 +3558,11 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
 	r.ParseForm()
 	volRefs := r.Form["vol_refs"]
-	if len(volRefs) == 0 {
+
+	testEmail := r.FormValue("test_email")
+	isTest := r.FormValue("send_test") == "1" && testEmail != ""
+
+	if len(volRefs) == 0 && !isTest {
 		http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=No+volunteers+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
@@ -3574,6 +3607,31 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
                 return
         }
+
+	if isTest {
+		// Use first selected volunteer, or first available if none selected
+		var testVol *types.Volunteer
+		if len(targets) > 0 {
+			testVol = targets[0]
+		} else if len(allVols) > 0 {
+			testVol = allVols[0]
+		}
+		if testVol == nil {
+			http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=No+volunteers+available+for+test", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		tv := *testVol
+		tv.Email = testEmail
+		_, err := emails.SendCustomToVol(ctx, &tv, conf, volinfo, title, body)
+		if err != nil {
+			ctx.Err.Printf("/vols/admin/%s/email test -> %s failed: %s", conf.Tag, testEmail, err)
+			http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		return
+	}
+
         for _, v := range targets {
                 _, err := emails.SendCustomToVol(ctx, v, conf, volinfo, title, body)
                 if err != nil {
@@ -3916,8 +3974,8 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	seen := make(map[string]bool)
 	for _, talk := range talks {
 		for _, speaker := range talk.Speakers {
-			if !seen[speaker.Email] {
-				seen[speaker.Email] = true
+			if !seen[speaker.ID] {
+				seen[speaker.ID] = true
 				rows = append(rows, &SpeakerRow{
 					ID:     speaker.ID,
 					Name:   speaker.Name,
@@ -3933,13 +3991,21 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	})
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/speakers.tmpl", &SpeakerAdminPage{
-		Conf:          conf,
-		Rows:          rows,
-		FlashMessage:  r.URL.Query().Get("flash"),
-		Year:          helpers.CurrentYear(),
-		SpeakerFields: getStructFields(types.Speaker{}),
-		ConfFields:    getStructFields(types.Conf{}),
-		TalkFields:    getStructFields(types.Talk{}),
+		Conf:         conf,
+		Rows:         rows,
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+		EmailCompose: &EmailComposeData{
+			Title:            "Email Selected Speakers",
+			Description:      "Write a one-off email to speakers. Uses Go template syntax.",
+			TitlePlaceholder: "Subject line",
+			BodyPlaceholder:  "Hi {{ .Speaker.Name }},\n\nLooking forward to your talk at {{ .Conf.Desc }}...",
+			Fields: []EmailFieldGroup{
+				fieldGroup(".Speaker", types.Speaker{}, false),
+				fieldGroup(".Conf", types.Conf{}, false),
+				fieldGroup(".Talks", types.Talk{}, true),
+			},
+		},
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
@@ -3961,15 +4027,20 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	r.ParseForm()
 	speakerRefs := r.Form["speaker_refs"]
-	if len(speakerRefs) == 0 {
-		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+selected", conf.Tag), http.StatusSeeOther)
-		return
-	}
 
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	if title == "" || body == "" {
 		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	// For test mode, don't require speaker selection
+	testEmail := r.FormValue("test_email")
+	isTest := r.FormValue("send_test") == "1" && testEmail != ""
+
+	if len(speakerRefs) == 0 && !isTest {
+		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -3994,6 +4065,33 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		refSet[ref] = true
 	}
 
+	if isTest {
+		// Use first selected speaker, or first available if none selected
+		var testSpeaker *types.Speaker
+		var testTalks []*types.Talk
+		for id, speaker := range speakerMap {
+			if len(refSet) == 0 || refSet[id] {
+				testSpeaker = speaker
+				testTalks = speakerTalks[id]
+				break
+			}
+		}
+		if testSpeaker == nil {
+			http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+available+for+test", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		ts := *testSpeaker
+		ts.Email = testEmail
+		_, err := emails.SendCustomToSpeaker(ctx, &ts, conf, testTalks, title, body)
+		if err != nil {
+			ctx.Err.Printf("/admin/speakers/%s/email test -> %s failed: %s", conf.Tag, testEmail, err)
+			http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		return
+	}
+
 	sent := 0
 	for id, speaker := range speakerMap {
 		if !refSet[id] {
@@ -4012,6 +4110,138 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+speakers", sent, len(speakerRefs))
 	http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+func TalkAppAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	apps, err := getters.ListTalkApps(ctx)
+	if err != nil {
+		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/applicants/%s failed: %s", conf.Tag, err.Error())
+		return
+	}
+
+	// Filter to applicants for this conference
+	var filtered []*types.TalkApp
+	for _, app := range apps {
+		for _, c := range app.ScheduleFor {
+			if c.Ref == conf.Ref {
+				filtered = append(filtered, app)
+				break
+			}
+		}
+	}
+
+	sort.SliceStable(filtered, func(i, j int) bool {
+		return filtered[i].Name < filtered[j].Name
+	})
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/applicants.tmpl", &TalkAppAdminPage{
+		Conf:         conf,
+		Apps:         filtered,
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+		EmailCompose: &EmailComposeData{
+			Title:            "Email Selected Applicants",
+			Description:      "Write a one-off email to speaker applicants. Uses Go template syntax.",
+			TitlePlaceholder: "Subject line",
+			BodyPlaceholder:  "Hi {{ .Applicant.Name }},\n\nThank you for applying to speak at {{ .Conf.Desc }}...",
+			Fields: []EmailFieldGroup{
+				fieldGroup(".Applicant", types.TalkApp{}, false),
+				fieldGroup(".Conf", types.Conf{}, false),
+			},
+		},
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/applicants/%s template failed: %s", conf.Tag, err.Error())
+	}
+}
+
+func TalkAppAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	appRefs := r.Form["app_refs"]
+	if len(appRefs) == 0 {
+		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicants+selected", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	if title == "" || body == "" {
+		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	apps, err := getters.ListTalkApps(ctx)
+	if err != nil {
+		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
+		return
+	}
+
+	refSet := make(map[string]bool, len(appRefs))
+	for _, ref := range appRefs {
+		refSet[ref] = true
+	}
+
+	// Test mode
+	testEmail := r.FormValue("test_email")
+	isTest := r.FormValue("send_test") == "1" && testEmail != ""
+
+	if isTest {
+		for _, app := range apps {
+			if refSet[app.Ref] {
+				testApp := *app
+				testApp.Email = testEmail
+				_, err := emails.SendCustomToApplicant(ctx, &testApp, conf, title, body)
+				if err != nil {
+					http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+email+failed:+%s", conf.Tag, err.Error()), http.StatusSeeOther)
+					return
+				}
+				http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+				return
+			}
+		}
+		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicant+selected+for+test", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	sent := 0
+	for _, app := range apps {
+		if !refSet[app.Ref] || app.Email == "" {
+			continue
+		}
+		_, err := emails.SendCustomToApplicant(ctx, app, conf, title, body)
+		if err != nil {
+			ctx.Err.Printf("/admin/applicants/%s/email -> %s failed: %s", conf.Tag, app.Email, err)
+			continue
+		}
+		sent++
+	}
+
+	flash := fmt.Sprintf("Sent+to+%d+of+%d+applicants", sent, len(appRefs))
+	http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

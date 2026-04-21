@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>speaker admin @ bitcoin++</title>
+    <title>speaker applicants @ bitcoin++</title>
     {{ block "header" . }} {{ end }}
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127908;</text></svg>">
   </head>
@@ -12,7 +12,7 @@
             <section id="topline" class="mb-6">
                 <div class="overflow-hidden sm:rounded-lg bg-white shadow">
                     <div class="px-4 py-5 sm:p-6">
-                        <h1 class="text-xl font-bold text-gray-900">Speaker Admin</h1>
+                        <h1 class="text-xl font-bold text-gray-900">Speaker Applicants</h1>
                         <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
                     </div>
                 </div>
@@ -26,50 +26,36 @@
             </section>
             {{ end }}
 
-            <section id="controls" class="mb-6">
-                <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
-                    <div class="flex items-center gap-2">
-                        {{ if .Rows }}
-                        <button type="button" onclick="downloadCSV()" class="px-3 py-1.5 text-sm rounded-md text-white bg-green-600 hover:bg-green-700">Download CSV</button>
-                        <a href="#compose" class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Email Selected</a>
-                        {{ end }}
-                        <form method="POST" action="/admin/speakers/{{ .Conf.Tag }}/sendcal">
-                            <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-orange-600 hover:bg-orange-700" onclick="return confirm('Send calendar invites to all speakers for {{ .Conf.Desc }}?')">Send Speaker Calendar Invites</button>
-                        </form>
-                    </div>
-                </div>
-            </section>
-
-            {{ if .Rows }}
-            <form id="speaker-email-form" method="POST" action="/admin/speakers/{{ .Conf.Tag }}/email">
-            <section id="speakers-table" class="mb-6">
+            {{ if .Apps }}
+            <form method="POST" action="/admin/applicants/{{ .Conf.Tag }}/email">
+            <section id="applicants-table" class="mb-6">
                 <div class="bg-white shadow rounded-lg overflow-hidden">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
-                                    <input type="checkbox" onclick="toggleAllSpeakers(this)" class="rounded border-gray-300">
+                                    <input type="checkbox" onclick="toggleAll(this)" class="rounded border-gray-300">
                                 </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signal</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talk</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white divide-y divide-gray-200">
-                            {{ range .Rows }}
+                            {{ range .Apps }}
                             <tr class="hover:bg-gray-50">
                                 <td class="px-3 py-4">
-                                    <input type="checkbox" name="speaker_refs" value="{{ .ID }}" class="speaker-checkbox rounded border-gray-300">
+                                    <input type="checkbox" name="app_refs" value="{{ .Ref }}" class="app-checkbox rounded border-gray-300">
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-900">{{ .Name }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900">{{ .Email }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ .Signal }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ .TalkTitle }}</td>
                             </tr>
                             {{ end }}
                         </tbody>
                     </table>
                     <div class="px-6 py-3 bg-gray-50 text-sm text-gray-500">
-                        {{ len .Rows }} speakers
+                        {{ len .Apps }} applicants
                     </div>
                 </div>
             </section>
@@ -79,34 +65,17 @@
             {{ else }}
             <section class="mb-6">
                 <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6 text-center text-gray-500">
-                    No speakers found for this event.
+                    No applicants found for this event.
                 </div>
             </section>
             {{ end }}
         </div>
     </div>
-    {{ if .Rows }}
     <script>
-    function downloadCSV() {
-        var rows = document.querySelectorAll('#speakers-table tbody tr');
-        var csv = 'Name,Email\n';
-        rows.forEach(function(row) {
-            var cells = row.querySelectorAll('td');
-            var name = '"' + cells[1].textContent.trim().replace(/"/g, '""') + '"';
-            var email = '"' + cells[2].textContent.trim().replace(/"/g, '""') + '"';
-            csv += name + ',' + email + '\n';
-        });
-        var blob = new Blob([csv], {type: 'text/csv'});
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = '{{ .Conf.Tag }}_speakers.csv';
-        a.click();
-    }
-    function toggleAllSpeakers(source) {
-        var checkboxes = document.querySelectorAll('.speaker-checkbox');
+    function toggleAll(source) {
+        var checkboxes = document.querySelectorAll('.app-checkbox');
         checkboxes.forEach(function(cb) { cb.checked = source.checked; });
     }
     </script>
-    {{ end }}
   </body>
 </html>

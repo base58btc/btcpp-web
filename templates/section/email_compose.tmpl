@@ -1,0 +1,44 @@
+{{ define "email_compose" }}
+<section id="compose" class="mb-6">
+    <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">{{ .Title }}</h3>
+        <p class="text-xs text-gray-500 mb-3">{{ .Description }}</p>
+
+        {{ if .Fields }}
+        <details class="mb-3 text-xs text-gray-500">
+            <summary class="cursor-pointer font-medium text-gray-700 hover:text-gray-900">Available template fields</summary>
+            <div class="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-4 p-3 bg-gray-50 rounded">
+                {{ range .Fields }}
+                <div>
+                    <h4 class="font-semibold text-gray-700 mb-1">{{ .Name }}</h4>
+                    {{ if .IsRange }}<p class="mb-1"><code>{{` {{ range `}}{{ .Name }}{{` }} `}}</code></p>{{ end }}
+                    <ul class="space-y-0.5">
+                        {{ range .Items }}<li><code>{{ . }}</code></li>
+                        {{ end }}
+                    </ul>
+                    {{ if .IsRange }}<p class="mt-1"><code>{{` {{ end }} `}}</code></p>{{ end }}
+                </div>
+                {{ end }}
+            </div>
+        </details>
+        {{ end }}
+
+        <label class="block text-xs font-medium text-gray-700 mb-1">Title</label>
+        <input type="text" name="title" class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm mb-3" placeholder="{{ .TitlePlaceholder }}">
+        <label class="block text-xs font-medium text-gray-700 mb-1">Body (Markdown)</label>
+        <textarea name="body" rows="10" class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm font-mono" placeholder="{{ .BodyPlaceholder }}"></textarea>
+
+        <div class="mt-3 flex items-center gap-3">
+            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                    onclick="return confirm('Send email to all selected recipients?')">
+                Send Email
+            </button>
+            <span class="text-xs text-gray-400">or</span>
+            <input type="email" name="test_email" placeholder="test@example.com" class="rounded border border-gray-300 px-3 py-1.5 text-sm w-48">
+            <button type="submit" name="send_test" value="1" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300">
+                Send Test
+            </button>
+        </div>
+    </div>
+</section>
+{{ end }}

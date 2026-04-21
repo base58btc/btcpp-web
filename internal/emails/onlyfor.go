@@ -190,6 +190,33 @@ func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.C
         return sendOnlyFor(ctx, vol.Email, letter, renderedTitle, buf)
 }
 
+func SendCustomToApplicant(ctx *config.AppContext, app *types.TalkApp, conf *types.Conf, title, markdown string) ([]byte, error) {
+        tmplData := &struct {
+                Applicant *types.TalkApp
+                Conf      *types.Conf
+                Email     string
+        }{
+                Applicant: app,
+                Conf:      conf,
+                Email:     app.Email,
+        }
+
+        letter := &mtypes.Letter{
+                UID:      uint64(time.Now().UnixNano()),
+                Title:    title,
+                Markdown: markdown,
+        }
+
+        var buf bytes.Buffer
+        err := missiveTemplate(ctx, letter).Execute(&buf, &tmplData)
+        if err != nil {
+                return nil, err
+        }
+
+        renderedTitle := templatizeTitle(title, tmplData)
+        return sendOnlyFor(ctx, app.Email, letter, renderedTitle, buf)
+}
+
 func SendCustomToSpeaker(ctx *config.AppContext, speaker *types.Speaker, conf *types.Conf, talks []*types.Talk, title, markdown string) ([]byte, error) {
         tmplData := &SpeakerCustom{
                 Speaker: speaker,
@@ -222,7 +249,7 @@ func execOnlyFor(ctx *config.AppContext, email, onlyFor string, tmplData interfa
 
         /* Execute template for this type */
 	var buf bytes.Buffer
-	err = missiveTemplate(ctx, letter).Execute(&buf, &tmplData)
+	err = missiveTemplate(ctx, letter).Execute(&buf, tmplData)
 
 	if err != nil {
 		return nil, err

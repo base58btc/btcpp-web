@@ -162,9 +162,7 @@ type VolAdminPage struct {
         Missives        []*mtypes.Letter
         FlashMessage    string
         Year            uint
-        VolunteerFields []string
-        ConfFields      []string
-        VolInfoFields   []string
+        EmailCompose    *EmailComposeData
 }
 
 type ShiftDayGroup struct {
@@ -196,14 +194,34 @@ type SpeakerRow struct {
         Signal string
 }
 
+type TalkAppAdminPage struct {
+        Conf         *types.Conf
+        Apps         []*types.TalkApp
+        FlashMessage string
+        Year         uint
+        EmailCompose *EmailComposeData
+}
+
 type SpeakerAdminPage struct {
         Conf           *types.Conf
         Rows           []*SpeakerRow
         FlashMessage   string
         Year           uint
-        SpeakerFields  []string
-        ConfFields     []string
-        TalkFields     []string
+        EmailCompose   *EmailComposeData
+}
+
+type EmailFieldGroup struct {
+        Name    string
+        Items   []string
+        IsRange bool
+}
+
+type EmailComposeData struct {
+        Title            string
+        Description      string
+        TitlePlaceholder string
+        BodyPlaceholder  string
+        Fields           []EmailFieldGroup
 }
 
 type SponsorFormPage struct {
