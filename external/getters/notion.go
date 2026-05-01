@@ -1312,7 +1312,7 @@ func SoldTixCount(n *types.Notion, confRef string) (uint, error) {
 	return regisCount, nil
 }
 
-func fetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
+func FetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
 	var regis []*types.Registration
 	hasMore := true
 	nextCursor := ""
@@ -1375,12 +1375,12 @@ func checkActive(ctx *config.AppContext, confRef string) bool {
 }
 
 func FetchRegistrationsConf(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
-	return fetchRegistrations(ctx, confRef)
+	return FetchRegistrations(ctx, confRef)
 }
 
 func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.Registration, error) {
 	var btcppres []*types.Registration
-	rezzies, err := fetchRegistrations(ctx, "")
+	rezzies, err := FetchRegistrations(ctx, "")
 
 	if err != nil {
 		return nil, err

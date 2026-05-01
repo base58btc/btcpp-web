@@ -379,6 +379,37 @@ func ListOnlyForLetters(n *types.Notion) ([]*mtypes.Letter, error) {
 	return letters, nil
 }
 
+func CreateMissive(n *types.Notion, title, markdown, sendAt string, newsletters []string) error {
+	// Build multi-select for newsletters
+	opts := make([]*notion.SelectOption, len(newsletters))
+	for i, nl := range newsletters {
+		opts[i] = &notion.SelectOption{Name: nl}
+	}
+
+	props := map[string]*notion.PropertyValue{
+		"Title": notion.NewTitlePropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText, Text: &notion.Text{Content: title}},
+			}...),
+		"Markdown": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText, Text: &notion.Text{Content: markdown}},
+			}...),
+		"SendAt": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText, Text: &notion.Text{Content: sendAt}},
+			}...),
+		"Newsletter": {
+			Type:        notion.PropertyMultiSelect,
+			MultiSelect: &opts,
+		},
+	}
+
+	_, err := n.Client.CreatePage(context.Background(),
+		notion.NewDatabaseParent(n.Config.MissivesDb), props)
+	return err
+}
+
 func MarkLetterSent(n *types.Notion, letter *mtypes.Letter, sentAt time.Time) error {
 
 	_, err := n.Client.UpdatePageProperties(context.Background(), letter.PageID,

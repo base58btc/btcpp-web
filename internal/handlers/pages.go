@@ -194,6 +194,14 @@ type SpeakerRow struct {
         Signal string
 }
 
+type RegistrationsAdminPage struct {
+        Conf          *types.Conf
+        Registrations []*types.Registration
+        FlashMessage  string
+        Year          uint
+        EmailCompose  *EmailComposeData
+}
+
 type TalkAppAdminPage struct {
         Conf         *types.Conf
         Apps         []*types.TalkApp

@@ -657,6 +657,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		SpeakerAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
+	r.HandleFunc("/admin/registrations/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		RegistrationsAdmin(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/admin/registrations/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+		RegistrationsAdminBulkEmail(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/admin/applicants/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		TalkAppAdmin(w, r, app)
 	}).Methods("GET")
@@ -4110,6 +4118,163 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+speakers", sent, len(speakerRefs))
 	http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	regs, err := getters.FetchRegistrations(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load registrations", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/registrations/%s failed: %s", conf.Tag, err.Error())
+		return
+	}
+
+	// Deduplicate by email
+	seen := make(map[string]bool)
+	var unique []*types.Registration
+	for _, r := range regs {
+		if r.Email != "" && !seen[r.Email] {
+			seen[r.Email] = true
+			unique = append(unique, r)
+		}
+	}
+
+	regTypeOrder := map[string]int{
+		"speaker":   0,
+		"sponsor":   1,
+		"volunteer": 2,
+		"local":     3,
+		"genpop":    4,
+	}
+	sort.SliceStable(unique, func(i, j int) bool {
+		oi, oj := regTypeOrder[unique[i].Type], regTypeOrder[unique[j].Type]
+		if oi != oj {
+			return oi < oj
+		}
+		return unique[i].Email < unique[j].Email
+	})
+
+	err = ctx.TemplateCache.ExecuteTemplate(w, "admin/registrations.tmpl", &RegistrationsAdminPage{
+		Conf:          conf,
+		Registrations: unique,
+		FlashMessage:  r.URL.Query().Get("flash"),
+		Year:          helpers.CurrentYear(),
+		EmailCompose: &EmailComposeData{
+			Title:            "Email Attendees",
+			Description:      "Write a one-off email to registered attendees. Uses Go template syntax.",
+			TitlePlaceholder: "Subject line",
+			BodyPlaceholder:  "Hi there!\n\nExciting news about {{ .Conf.Desc }}...",
+			Fields: []EmailFieldGroup{
+				fieldGroup(".Conf", types.Conf{}, false),
+			},
+		},
+	})
+	if err != nil {
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/registrations/%s template failed: %s", conf.Tag, err.Error())
+	}
+}
+
+func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	selectedEmails := r.Form["reg_emails"]
+
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	if title == "" || body == "" {
+		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	testEmail := r.FormValue("test_email")
+	isTest := r.FormValue("send_test") == "1" && testEmail != ""
+
+	if len(selectedEmails) == 0 && !isTest {
+		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=No+attendees+selected", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	// Load registrations
+	regs, err := getters.FetchRegistrations(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load registrations", http.StatusInternalServerError)
+		return
+	}
+
+	if isTest {
+		// Use first available registration as sample data
+		var testReg *types.Registration
+		if len(selectedEmails) > 0 {
+			for _, reg := range regs {
+				if reg.Email == selectedEmails[0] {
+					testReg = reg
+					break
+				}
+			}
+		}
+		if testReg == nil && len(regs) > 0 {
+			testReg = regs[0]
+		}
+		if testReg == nil {
+			http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=No+registrations+available", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		tr := *testReg
+		tr.Email = testEmail
+		_, err := emails.SendCustomToAttendee(ctx, &tr, conf, title, body)
+		if err != nil {
+			ctx.Err.Printf("/admin/registrations/%s/email test failed: %s", conf.Tag, err)
+			http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		return
+	}
+
+	emailSet := make(map[string]bool, len(selectedEmails))
+	for _, e := range selectedEmails {
+		emailSet[e] = true
+	}
+
+	// Deduplicate registrations by email for sending
+	sent := 0
+	sentEmails := make(map[string]bool)
+	for _, reg := range regs {
+		if !emailSet[reg.Email] || sentEmails[reg.Email] {
+			continue
+		}
+		sentEmails[reg.Email] = true
+		_, err := emails.SendCustomToAttendee(ctx, reg, conf, title, body)
+		if err != nil {
+			ctx.Err.Printf("/admin/registrations/%s/email -> %s failed: %s", conf.Tag, reg.Email, err)
+			continue
+		}
+		sent++
+	}
+
+	flash := fmt.Sprintf("Sent+to+%d+of+%d+attendees", sent, len(selectedEmails))
+	http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 func TalkAppAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

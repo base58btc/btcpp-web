@@ -190,6 +190,31 @@ func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.C
         return sendOnlyFor(ctx, vol.Email, letter, renderedTitle, buf)
 }
 
+func SendCustomToAttendee(ctx *config.AppContext, reg *types.Registration, conf *types.Conf, title, markdown string) ([]byte, error) {
+        tmplData := &struct {
+                Conf  *types.Conf
+                Email string
+        }{
+                Conf:  conf,
+                Email: reg.Email,
+        }
+
+        letter := &mtypes.Letter{
+                UID:      uint64(time.Now().UnixNano()),
+                Title:    title,
+                Markdown: markdown,
+        }
+
+        var buf bytes.Buffer
+        err := missiveTemplate(ctx, letter).Execute(&buf, tmplData)
+        if err != nil {
+                return nil, err
+        }
+
+        renderedTitle := templatizeTitle(title, tmplData)
+        return sendOnlyFor(ctx, reg.Email, letter, renderedTitle, buf)
+}
+
 func SendCustomToApplicant(ctx *config.AppContext, app *types.TalkApp, conf *types.Conf, title, markdown string) ([]byte, error) {
         tmplData := &struct {
                 Applicant *types.TalkApp
