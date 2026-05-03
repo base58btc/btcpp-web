@@ -74,7 +74,7 @@ func CheckForNewMails(ctx *config.AppContext) {
 		rezziesSent = make(map[string]*types.Registration)
 	}
 
-	var success, fails, resent int
+	var success, fails, resent, skipped int
 	rezzies, err := getters.FetchBtcppRegistrations(ctx, true)
 	if err != nil {
 		ctx.Err.Println(err)
@@ -85,6 +85,7 @@ func CheckForNewMails(ctx *config.AppContext) {
 		/* check local list (has sent already?) gets lost on restart */
 		_, has := rezziesSent[rez.RefID]
 		if has {
+			skipped++
 			continue
 		}
 
@@ -100,9 +101,8 @@ func CheckForNewMails(ctx *config.AppContext) {
 			fails++
 		}
 	}
-	if success+fails+resent > 0 {
-		ctx.Infos.Printf("Of %d, sent %d mails, %d failed, %d retries", success+fails+resent, success, fails, resent)
-	}
+	ctx.Infos.Printf("mailer tick: fetched=%d skipped-cached=%d sent=%d resent=%d failed=%d",
+		len(rezzies), skipped, success, resent, fails)
 }
 
 func MakeTicketPDF(ctx *config.AppContext, rez *types.Registration) ([]byte, error) {
