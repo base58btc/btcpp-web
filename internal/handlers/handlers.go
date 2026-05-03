@@ -985,9 +985,10 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
         case http.MethodGet: 
 
                 talksDue := 45
-                if conf.Tag == "floripa26" {
-                        talksDue = 21
+                if conf.Tag == "nairobi" {
+                        talksDue = 35
                 }
+
                 daylist := conf.DaysList("days-", true)
                 err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", &SpeakerPage{
                         Conf: conf,
