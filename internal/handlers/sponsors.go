@@ -127,7 +127,7 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	err := getters.RegisterOrg(ctx.Notion, org)
+	_, err := getters.RegisterOrg(ctx.Notion, org)
 	if err != nil {
 		ctx.Err.Printf("/admin/orgs/new failed: %s", err.Error())
 		http.Error(w, "Failed to create org", http.StatusInternalServerError)

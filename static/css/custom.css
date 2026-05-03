@@ -240,6 +240,15 @@
 	}
 }
 
+/* HTMX-driven submit-button state: spinner + "Submitting…" text show only
+   while the enclosing form has class .htmx-request (added by HTMX during the
+   in-flight request). */
+.submit-spinner { display: none; }
+.submit-label-busy { display: none; }
+.htmx-request .submit-spinner { display: inline-block; }
+.htmx-request .submit-label-idle { display: none; }
+.htmx-request .submit-label-busy { display: inline; }
+
 /* Global submit spinner overlay (shown on any non-HTMX form submit) */
 #global-submit-overlay {
 	display: none;

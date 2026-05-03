@@ -18,7 +18,7 @@
             class="mx-auto mt-16 max-w-xl sm:mt-20"
             hx-validate="true"
             hx-target="#result"
-            hx-swap="innerHTML"
+            hx-swap="innerHTML show:#result:top"
             hx-disabled-elt="find input[type='text'], find button"
             >
                 <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
@@ -98,7 +98,7 @@
                     >Send Message</button>
                 </div>
             </form>
-            <div id="result" class="mt-5 mx-auto max-w-xl text-red-700">
+            <div id="result" class="mt-5 mx-auto max-w-xl text-red-700 scroll-mt-24">
             </div>
         </div>
     </section>

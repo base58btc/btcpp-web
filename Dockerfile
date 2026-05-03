@@ -13,5 +13,6 @@ RUN make build
 
 RUN apk --no-cache add ca-certificates
 RUN apk --no-cache add chromium
+RUN apk --no-cache add ffmpeg
 
 CMD [ "./target/btcpp-web" ]

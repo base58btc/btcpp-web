@@ -7,11 +7,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io/ioutil"
         "mime"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -26,6 +28,7 @@ import (
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/imgproc"
 	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
 	"btcpp-web/internal/volunteers"
@@ -666,11 +669,15 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 
 	r.HandleFunc("/admin/applicants/{conf}", func(w http.ResponseWriter, r *http.Request) {
-		TalkAppAdmin(w, r, app)
+		ProposalAdmin(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/admin/applicants/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
-		TalkAppAdminBulkEmail(w, r, app)
+		ProposalAdminBulkEmail(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/admin/applicants/{conf}/accept", func(w http.ResponseWriter, r *http.Request) {
+		ProposalAdminAccept(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
@@ -891,7 +898,7 @@ func contentTypeFromFilename(filename string) string {
 }
 
 func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (string, error) {
-        file, handler, err := r.FormFile(field) 
+        file, handler, err := r.FormFile(field)
         if err != nil {
                 return "", err
         }
@@ -905,9 +912,60 @@ func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (s
 
         filename := handler.Filename
         contentType := contentTypeFromFilename(filename)
-        
+
         return getters.UploadFile(ctx.Notion, contentType, filename, fileData)
 }
+
+// readMultipartFile reads a single named file from a multipart form and
+// returns its bytes + content type + lowercase file extension. It does not
+// upload anywhere — caller decides what to do with the bytes. Returns
+// http.ErrMissingFile when the field is absent (typical for optional
+// uploads).
+func readMultipartFile(r *http.Request, field string) (raw []byte, contentType string, ext string, err error) {
+	file, handler, err := r.FormFile(field)
+	if err != nil {
+		return nil, "", "", err
+	}
+	defer file.Close()
+	raw, err = ioutil.ReadAll(file)
+	if err != nil {
+		return nil, "", "", err
+	}
+	filename := handler.Filename
+	contentType = contentTypeFromFilename(filename)
+	ext = strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		ext = ".jpg"
+	}
+	return raw, contentType, ext, nil
+}
+
+// uploadSpeakerPic uploads PicFile to Notion (returning the file ID) and also
+// returns the raw bytes + content type + extension so the caller can mirror
+// the original to Spaces and generate AVIF derivatives.
+func uploadSpeakerPic(ctx *config.AppContext, r *http.Request) (notionID string, raw []byte, contentType string, ext string, err error) {
+        file, handler, err := r.FormFile("PicFile")
+        if err != nil {
+                return "", nil, "", "", err
+        }
+        defer file.Close()
+
+        raw, err = ioutil.ReadAll(file)
+        if err != nil {
+                return "", nil, "", "", err
+        }
+
+        filename := handler.Filename
+        contentType = contentTypeFromFilename(filename)
+        ext = strings.ToLower(filepath.Ext(filename))
+        if ext == "" {
+                ext = ".jpg"
+        }
+
+        notionID, err = getters.UploadFile(ctx.Notion, contentType, filename, raw)
+        return notionID, raw, contentType, ext, err
+}
+
 
 func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := helpers.FindConf(r, ctx)
@@ -939,6 +997,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                         DaysList:  daylist[1:],
                         RSVPFor: daylist[0].ItemDesc,
                         PresentationType: helpers.GetPresentationTypes(),
+                        RecordingOptions: helpers.GetRecordingOptions(),
                         Year: helpers.CurrentYear(),
                 })
 
@@ -952,7 +1011,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 err = r.ParseMultipartForm(10 << 20) // Limit uploads to 10MB
                 if err != nil {
 			ctx.Err.Printf("/talk/{conf} unable to parse multipart form %s", err)
-                        w.Write([]byte(helpers.ErrTalkApp("Error parsing form.")))
+                        w.Write([]byte(helpers.ErrSpeakerApp("Error parsing form.")))
 			return
                 }
 
@@ -961,13 +1020,13 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		err = dec.Decode(&talkapp, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/speaker/{conf} unable to decode form %s", err)
-                        w.Write([]byte(helpers.ErrTalkApp("Unable to register you: form parsing error")))
+                        w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
 			return
 		}
 
                 /* ten divided by two is five */
                 if talkapp.Captcha != 5 {
-                        w.Write([]byte(helpers.ErrTalkApp("Incorrect captcha. The answer is 5.")))
+                        w.Write([]byte(helpers.ErrSpeakerApp("Incorrect captcha. The answer is 5.")))
 			return
                 }
 
@@ -976,33 +1035,52 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 talkapp.DinnerRSVP = dinneropt == "Yes"
                 talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
 
-                /* Upload pics */
-                talkapp.Pic, err = processFileUpload(ctx, r, "PicFile")
+                /* Read PicFile bytes (no Notion upload — cropped JPEG goes
+                   only to Spaces). */
+                picRaw, picContentType, picExt, err := readMultipartFile(r, "PicFile")
                 if err != nil {
-			ctx.Err.Printf("/talk/{conf} unable to upload speaker profile pic %s", err)
-                        w.Write([]byte(helpers.ErrTalkApp("Error uploading pfp.")))
-			return
-                }
-
-                talkapp.OrgLogo, err = processFileUpload(ctx, r, "OrgLogoFile")
-                if err != nil && err != http.ErrMissingFile {
-                        ctx.Err.Printf("/talk/{conf} unable to upload org logo %s", err)
-
-                        w.Write([]byte(helpers.ErrTalkApp("Error uploading org logo.")))
+                        ctx.Err.Printf("/talk/{conf} unable to read speaker profile pic %s", err)
+                        w.Write([]byte(helpers.ErrSpeakerApp("Error uploading pfp.")))
                         return
                 }
-        
-                if len(talkapp.ScheduleFor) == 0 {
-                        talkapp.ScheduleFor = append(talkapp.ScheduleFor, conf)
+                picShortID := imgproc.ShortID(picRaw)
+                talkapp.NormPhoto = picShortID + picExt
+
+                /* Read OrgLogoFile if present (optional). */
+                logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
+                hasLogo := logoErr == nil && len(logoRaw) > 0
+                if logoErr != nil && logoErr != http.ErrMissingFile {
+                        ctx.Err.Printf("/talk/{conf} unable to read org logo %s", logoErr)
+                        w.Write([]byte(helpers.ErrSpeakerApp("Error uploading org logo.")))
+                        return
+                }
+                if hasLogo {
+                        logoShortID := imgproc.ShortID(logoRaw)
+                        talkapp.OrgLogo = logoShortID + logoExt
+                }
+
+                if talkapp.ScheduleFor == nil {
+                        talkapp.ScheduleFor = conf
                 }
 
                 ctx.Infos.Printf("parsed talkapp: %v", talkapp)
 
-                err = getters.RegisterTalkApp(ctx.Notion, &talkapp)
+                _, err = newSubmitPipeline(ctx).Submit(&talkapp)
                 if err != nil {
-			ctx.Err.Printf("/talk/{conf} unable to register speaker %s", err)
-                        w.Write([]byte(helpers.ErrTalkApp("Unable to register you.")))
-			return
+                        ctx.Err.Printf("/talk/{conf} submit pipeline failed %s", err)
+                        if errors.Is(err, ErrDuplicateSpeakerEmail) {
+                                w.Write([]byte(helpers.ErrSpeakerApp("That email already has multiple speaker records — please contact us to resolve.")))
+                        } else {
+                                w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you.")))
+                        }
+                        return
+                }
+
+                /* Mirror photo to Spaces — fire-and-forget so we don't block
+                   the user behind ffmpeg encodes. */
+                go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+                if hasLogo {
+                        go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
                 }
 
                 /* Register to mailing lists :) */
@@ -1014,8 +1092,8 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                         ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
                 }
 
-                // FIXME: some kind of confirmation notice on redirect
-                w.Header().Set("HX-Redirect", fmt.Sprintf("/conf/%s", conf.Tag))
+                w.Write([]byte(helpers.SuccessApp("Your speaker application has been submitted! We'll be in touch.")))
+                return
         }
 
 }
@@ -1122,8 +1200,8 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                         ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, vol)
                 }
 
-                // FIXME: some kind of confirmation notice on redirect
-                w.Header().Set("HX-Redirect", fmt.Sprintf("/conf/%s", conf.Tag))
+                w.Write([]byte(helpers.SuccessApp("Your volunteer application has been submitted! We'll be in touch.")))
+                return
         }
 
 }
@@ -1360,7 +1438,7 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		}
 
 		ctx.Infos.Printf("Sponsor inquiry from %s (%s) at %s", name, email, org)
-		w.Write([]byte(`<div class="text-green-700 font-semibold">Your sponsor inquiry has been sent! We'll get back to you soon.</div><script>document.querySelector('form').reset();</script>`))
+		w.Write([]byte(helpers.SuccessApp("Your sponsor inquiry has been sent! We'll get back to you soon.")))
 		return
 	}
 }
@@ -1433,7 +1511,7 @@ func ContactPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		}
 
 		ctx.Infos.Printf("Contact form submitted by %s (%s)", name, email)
-		w.Write([]byte(`<div class="text-green-700 font-semibold">Your message has been sent! We'll get back to you soon.</div>`))
+		w.Write([]byte(helpers.SuccessApp("Your message has been sent! We'll get back to you soon.")))
 		return
 	}
 }
@@ -4277,7 +4355,7 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 	http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
-func TalkAppAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if ok := helpers.CheckPin(w, r, ctx); !ok {
 		helpers.Render401(w, r, ctx)
 		return
@@ -4289,40 +4367,30 @@ func TalkAppAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		return
 	}
 
-	apps, err := getters.ListTalkApps(ctx)
+	rows, err := loadProposalRowsForConf(ctx, conf)
 	if err != nil {
 		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
 		ctx.Err.Printf("/admin/applicants/%s failed: %s", conf.Tag, err.Error())
 		return
 	}
 
-	// Filter to applicants for this conference
-	var filtered []*types.TalkApp
-	for _, app := range apps {
-		for _, c := range app.ScheduleFor {
-			if c.Ref == conf.Ref {
-				filtered = append(filtered, app)
-				break
-			}
-		}
-	}
-
-	sort.SliceStable(filtered, func(i, j int) bool {
-		return filtered[i].Name < filtered[j].Name
+	sort.SliceStable(rows, func(i, j int) bool {
+		return speakerName(rows[i].Speaker) < speakerName(rows[j].Speaker)
 	})
 
-	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/applicants.tmpl", &TalkAppAdminPage{
+	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/applicants.tmpl", &ProposalAdminPage{
 		Conf:         conf,
-		Apps:         filtered,
+		Rows:         rows,
 		FlashMessage: r.URL.Query().Get("flash"),
 		Year:         helpers.CurrentYear(),
 		EmailCompose: &EmailComposeData{
 			Title:            "Email Selected Applicants",
 			Description:      "Write a one-off email to speaker applicants. Uses Go template syntax.",
 			TitlePlaceholder: "Subject line",
-			BodyPlaceholder:  "Hi {{ .Applicant.Name }},\n\nThank you for applying to speak at {{ .Conf.Desc }}...",
+			BodyPlaceholder:  "Hi {{ .Speaker.Name }},\n\nThank you for applying to speak at {{ .Conf.Desc }}...",
 			Fields: []EmailFieldGroup{
-				fieldGroup(".Applicant", types.TalkApp{}, false),
+				fieldGroup(".Speaker", types.Speaker{}, false),
+				fieldGroup(".Proposal", types.Proposal{}, false),
 				fieldGroup(".Conf", types.Conf{}, false),
 			},
 		},
@@ -4333,7 +4401,69 @@ func TalkAppAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 }
 
-func TalkAppAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+// loadProposalRowsForConf returns one ProposalAdminRow per Proposal whose
+// ScheduleFor matches conf, joined to the Speaker that filed it via the
+// SpeakerProposal link table. Rows for proposals with no SpeakerProposal
+// (and thus no speaker) still appear, with Speaker == nil.
+func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*ProposalAdminRow, error) {
+	proposals, err := getters.ListProposals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list proposals: %w", err)
+	}
+
+	proposalMap := make(map[string]*types.Proposal)
+	for _, p := range proposals {
+		if p.ScheduleFor != nil && p.ScheduleFor.Ref == conf.Ref {
+			proposalMap[p.ID] = p
+		}
+	}
+	if len(proposalMap) == 0 {
+		return nil, nil
+	}
+
+	speakers, err := getters.ListSpeakers(ctx.Notion)
+	if err != nil {
+		return nil, fmt.Errorf("list speakers: %w", err)
+	}
+	speakerMap := make(map[string]*types.Speaker, len(speakers))
+	for _, sp := range speakers {
+		speakerMap[sp.ID] = sp
+	}
+
+	sps, err := getters.ListSpeakerProposals(ctx, speakerMap, proposalMap)
+	if err != nil {
+		return nil, fmt.Errorf("list speaker proposals: %w", err)
+	}
+
+	speakerByProposal := make(map[string]*types.Speaker, len(proposalMap))
+	for _, sp := range sps {
+		if sp.Proposal == nil || sp.Speaker == nil {
+			continue
+		}
+		if _, ok := speakerByProposal[sp.Proposal.ID]; ok {
+			continue
+		}
+		speakerByProposal[sp.Proposal.ID] = sp.Speaker
+	}
+
+	rows := make([]*ProposalAdminRow, 0, len(proposalMap))
+	for _, p := range proposalMap {
+		rows = append(rows, &ProposalAdminRow{
+			Proposal: p,
+			Speaker:  speakerByProposal[p.ID],
+		})
+	}
+	return rows, nil
+}
+
+func speakerName(sp *types.Speaker) string {
+	if sp == nil {
+		return ""
+	}
+	return sp.Name
+}
+
+func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if ok := helpers.CheckPin(w, r, ctx); !ok {
 		helpers.Render401(w, r, ctx)
 		return
@@ -4346,8 +4476,8 @@ func TalkAppAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	}
 
 	r.ParseForm()
-	appRefs := r.Form["app_refs"]
-	if len(appRefs) == 0 {
+	proposalRefs := r.Form["proposal_refs"]
+	if len(proposalRefs) == 0 {
 		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicants+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
@@ -4359,54 +4489,101 @@ func TalkAppAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
-	apps, err := getters.ListTalkApps(ctx)
+	rows, err := loadProposalRowsForConf(ctx, conf)
 	if err != nil {
 		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
+		ctx.Err.Printf("/admin/applicants/%s/email failed: %s", conf.Tag, err.Error())
 		return
 	}
 
-	refSet := make(map[string]bool, len(appRefs))
-	for _, ref := range appRefs {
+	rowByID := make(map[string]*ProposalAdminRow, len(rows))
+	for _, row := range rows {
+		rowByID[row.Proposal.ID] = row
+	}
+
+	refSet := make(map[string]bool, len(proposalRefs))
+	for _, ref := range proposalRefs {
 		refSet[ref] = true
 	}
 
-	// Test mode
 	testEmail := r.FormValue("test_email")
 	isTest := r.FormValue("send_test") == "1" && testEmail != ""
 
 	if isTest {
-		for _, app := range apps {
-			if refSet[app.Ref] {
-				testApp := *app
-				testApp.Email = testEmail
-				_, err := emails.SendCustomToApplicant(ctx, &testApp, conf, title, body)
-				if err != nil {
-					http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+email+failed:+%s", conf.Tag, err.Error()), http.StatusSeeOther)
-					return
-				}
-				http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		for _, ref := range proposalRefs {
+			row := rowByID[ref]
+			if row == nil || row.Speaker == nil {
+				continue
+			}
+			testSpeaker := *row.Speaker
+			testSpeaker.Email = testEmail
+			_, err := emails.SendCustomToProposalSpeaker(ctx, row.Proposal, &testSpeaker, conf, title, body)
+			if err != nil {
+				http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+email+failed:+%s", conf.Tag, err.Error()), http.StatusSeeOther)
 				return
 			}
+			http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+			return
 		}
 		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicant+selected+for+test", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
 	sent := 0
-	for _, app := range apps {
-		if !refSet[app.Ref] || app.Email == "" {
+	for _, ref := range proposalRefs {
+		row := rowByID[ref]
+		if row == nil || row.Speaker == nil || row.Speaker.Email == "" {
 			continue
 		}
-		_, err := emails.SendCustomToApplicant(ctx, app, conf, title, body)
+		_, err := emails.SendCustomToProposalSpeaker(ctx, row.Proposal, row.Speaker, conf, title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/applicants/%s/email -> %s failed: %s", conf.Tag, app.Email, err)
+			ctx.Err.Printf("/admin/applicants/%s/email -> %s failed: %s", conf.Tag, row.Speaker.Email, err)
 			continue
 		}
 		sent++
 	}
 
-	flash := fmt.Sprintf("Sent+to+%d+of+%d+applicants", sent, len(appRefs))
+	flash := fmt.Sprintf("Sent+to+%d+of+%d+applicants", sent, len(proposalRefs))
 	http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+// ProposalAdminAccept flips a Proposal to Accepted and creates a ConfTalk row.
+// Always redirects back to the applicants page with a flash describing the
+// outcome.
+func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	r.ParseForm()
+	proposalID := r.FormValue("proposal_ref")
+	if proposalID == "" {
+		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+proposal+selected", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	result, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
+	if err != nil {
+		ctx.Err.Printf("/admin/applicants/%s/accept (%s) failed: %s", conf.Tag, proposalID, err)
+		flash := url.QueryEscape(fmt.Sprintf("Accept failed: %s", err.Error()))
+		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+		return
+	}
+
+	var msg string
+	if result.AlreadyAccepted {
+		msg = "Already accepted"
+	} else {
+		msg = "Accepted: created conf talk"
+	}
+	http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, url.QueryEscape(msg)), http.StatusSeeOther)
 }
 
 func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

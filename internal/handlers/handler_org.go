@@ -132,14 +132,13 @@ func talkToSession(talk *types.Talk, conf *types.Conf) *types.Session {
 		Sched:     talk.Sched,
 		Type:      talk.Type,
 		Venue:     talk.Venue,
-		AnchorTag: talk.AnchorTag,
+		AnchorTag: talk.AnchorTag(),
 		ConfTag:   conf.Tag,
 	}
 
 	if talk.Sched != nil {
 		sesh.Len = talk.Sched.LenStr()
 		sesh.StartTime = talk.Sched.StartTime()
-		sesh.DayTag = talk.Sched.Day()
 	}
 
 	return sesh

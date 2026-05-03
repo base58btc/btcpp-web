@@ -304,11 +304,11 @@ func MakeTalkCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	card := params["card"]
 	talkID := params["talk"]
 
-	/* Find talk! */
-	talk, err := getters.GetTalk(ctx, talkID)
+	/* Find talk! talkID is now the ConfTalk page ID. */
+	talk, err := getters.LoadTalkFromConfTalk(ctx, talkID)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
+		ctx.Err.Printf("Unable to fetch conf talk from Notion: %s", err.Error())
 		return
 	}
 
@@ -358,11 +358,11 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	talkID := params["talk"]
 	sID := params["speaker"]
 
-	/* Find talk! */
-	talk, err := getters.GetTalk(ctx, talkID)
+	/* Find talk! talkID is now the ConfTalk page ID. */
+	talk, err := getters.LoadTalkFromConfTalk(ctx, talkID)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
+		ctx.Err.Printf("Unable to fetch conf talk from Notion: %s", err.Error())
 		return
 	}
 

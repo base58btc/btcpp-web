@@ -215,15 +215,17 @@ func SendCustomToAttendee(ctx *config.AppContext, reg *types.Registration, conf 
         return sendOnlyFor(ctx, reg.Email, letter, renderedTitle, buf)
 }
 
-func SendCustomToApplicant(ctx *config.AppContext, app *types.TalkApp, conf *types.Conf, title, markdown string) ([]byte, error) {
+func SendCustomToProposalSpeaker(ctx *config.AppContext, proposal *types.Proposal, speaker *types.Speaker, conf *types.Conf, title, markdown string) ([]byte, error) {
         tmplData := &struct {
-                Applicant *types.TalkApp
-                Conf      *types.Conf
-                Email     string
+                Proposal *types.Proposal
+                Speaker  *types.Speaker
+                Conf     *types.Conf
+                Email    string
         }{
-                Applicant: app,
-                Conf:      conf,
-                Email:     app.Email,
+                Proposal: proposal,
+                Speaker:  speaker,
+                Conf:     conf,
+                Email:    speaker.Email,
         }
 
         letter := &mtypes.Letter{
@@ -239,7 +241,7 @@ func SendCustomToApplicant(ctx *config.AppContext, app *types.TalkApp, conf *typ
         }
 
         renderedTitle := templatizeTitle(title, tmplData)
-        return sendOnlyFor(ctx, app.Email, letter, renderedTitle, buf)
+        return sendOnlyFor(ctx, speaker.Email, letter, renderedTitle, buf)
 }
 
 func SendCustomToSpeaker(ctx *config.AppContext, speaker *types.Speaker, conf *types.Conf, talks []*types.Talk, title, markdown string) ([]byte, error) {

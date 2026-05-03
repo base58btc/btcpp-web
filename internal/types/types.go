@@ -107,19 +107,70 @@ type (
 	}
 
 	Speaker struct {
-		ID       string
-		Name     string
-		Email    string
-		Photo    string
-		Twitter  Twitter
-		Github   string
-		Website  string
-		Nostr    string
-		Signal   string
-		Company  string
-		OrgPhoto string
+		ID         string
+		Name       string
+		Photo      string
+		Email      string
+		Signal     string
+                Phone      string
+                Telegram   string
+		Twitter    Twitter
+		Nostr      string
+		Github     string
+                Instagram  string
+                LinkedIn   string
+		Website    string
+		Company    string
+                OrgLogo    string
+                AvailToHire bool
+                LookingToHire bool
+		TShirt     string
 	}
 	Speakers []*Speaker
+
+        Proposal struct {
+                ID          string
+		Name        string
+                Title       string
+		Description string
+		Setup       string
+                Comments    string
+                TalkType    string
+                Status      string
+                DesiredDuration int
+                AvailDuration   int
+                ScheduleFor *Conf
+                Speakers    []*SpeakerProposal
+        }
+
+        SpeakerProposal struct {
+                ID string
+                ComingFrom    string
+                Speaker       *Speaker
+                Proposal      *Proposal
+                Availability  []string
+                RecordOK      string
+                Visa          string
+                FirstEvent    bool
+                DinnerRSVP    bool
+                Sponsor       bool
+                Company       string
+                OrgPhoto      string
+                OtherEvents   []*Conf
+        }
+
+        ConfTalk struct {
+                ID          string 
+                Conf        *Conf
+                Proposal    *Proposal
+		Clipart     string
+		Sched       *Times
+                ProductionNotes string
+                Venue       string
+                Section     string
+		CalNotif    string
+                SocialCard  string
+        }
 
 	Talk struct {
 		ID          string
@@ -129,11 +180,9 @@ type (
 		Sched       *Times
 		TimeDesc    string
 		Duration    string
-		DayTag      string
 		Type        string
 		Venue       string
 		Event       string
-		AnchorTag   string
 		Section     string
 		Speakers    []*Speaker
 		CalNotif    string
@@ -147,7 +196,6 @@ type (
 		Sched     *Times
 		StartTime string
 		Len       string
-		DayTag    string
 		Type      string
 		Venue     string
 		AnchorTag string
@@ -269,6 +317,7 @@ type (
 
         TalkApp struct {
                 Ref           string
+                Status        string
                 Name          string
                 Phone         string
                 Email         string
@@ -282,6 +331,7 @@ type (
                 Website       string
                 Visa          string
                 Pic           string
+                NormPhoto     string
                 Org           string
                 Sponsor       bool
                 OrgTwitter    Twitter
@@ -291,18 +341,20 @@ type (
                 TalkTitle     string
                 Description   string
                 PresType      string
+                Recording     string
+                Setup         string
                 TalkSetup     bool
                 DinnerRSVP    bool
                 Availability  []string
                 DiscoveredVia string
                 Shirt         string
-                ScheduleFor   []*Conf
+                ScheduleFor   *Conf
                 OtherEvents   []*Conf
                 Comments      string
                 FirstEvent    bool
                 Subscribe     bool
                 Captcha       int
-                
+
         }
 )
 
@@ -326,6 +378,13 @@ var DayTimeChars = map[string]DayTime{
 	"+": Morning,
 	"=": Afternoon,
 	"-": Evening,
+}
+
+func (t *Talk) AnchorTag() string {
+        if len(t.Clipart) <= 4 {
+                return t.Clipart
+        }
+        return t.Clipart[:len(t.Clipart)-4]
 }
 
 func (t *Talk) ClipartAvif() string {

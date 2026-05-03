@@ -136,14 +136,6 @@ func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk
 	cardHashes[key] = hash
 	cardHashesMu.Unlock()
 
-	// Save the card URL back to Notion if not already set
-	if talk.TalkCardURL == "" {
-		err = getters.TalkUpdateCardURL(ctx.Notion, talk.ID, url)
-		if err != nil {
-			ctx.Err.Printf("media refresh: failed to update TalkCardURL for %s: %s", talk.Name, err)
-		}
-	}
-
 	ctx.Infos.Printf("media refresh: uploaded %s", key)
 	return url, nil
 }

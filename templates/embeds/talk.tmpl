@@ -19,7 +19,7 @@
             class="mx-auto mt-16 max-w-xl sm:mt-20"
             hx-validate="true"
             hx-target="#result"
-            hx-swap="innerHTML"
+            hx-swap="innerHTML show:#result:top"
             hx-disabled-elt="find input[type='text'], find button"
             enctype="multipart/form-data"
             >
@@ -75,35 +75,6 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
-                    <div class="sm:col-span-2">
-                        <label for="ContactAt" class="block text-sm/6 font-semibold text-gray-900">
-                        Best Way to Contact You? *
-                        </label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="ContactAt" id="ContactAt" type="text" 
-                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="Signal or email"
-                            required
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="DiscoveredVia" class="block text-sm/6 font-semibold text-gray-900">
-                        How did you find out about <span class="font-bitcoin">bitcoin++</span>? *
-                        </label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="DiscoveredVia" id="DiscoveredVia" type="text" 
-                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="twitter..."
-                            required
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
-
                     <div class="sm:col-span-2">
                         <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
                         <div class="mt-2.5">
@@ -183,13 +154,24 @@
                         Your pfp (Profile Picture) *
                         </label>
                         <div class="block text-sm/6 text-gray-600">
-                        400x400px. Must be less than 10MB.
+                        Square works best — you'll get a chance to crop after selecting. Less than 10MB.
                         </div>
                         <div class="mt-2.5">
-                            <input 
-                            name="PicFile" id="PicFile" type="file" 
+                            <input
+                            name="PicFile" id="PicFile" type="file"
+                            accept="image/*"
                             required
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
+                        </div>
+                        <div id="PicError" class="mt-2.5 hidden rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert" aria-live="polite"></div>
+                        <div id="PicPreview" class="mt-2.5 hidden">
+                            <div class="flex items-start gap-3">
+                                <img id="PicPreviewImg" alt="cropped preview" class="h-24 w-24 flex-none rounded-md object-cover ring-1 ring-gray-300" />
+                                <div class="flex flex-col gap-2">
+                                    <div class="text-xs text-gray-500">Cropped preview. Pick a different file or re-crop to adjust.</div>
+                                    <button type="button" id="PicRecrop" class="self-start rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Re-crop</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -203,11 +185,15 @@
                                 aria-label="Shirt Size" 
                                 required
                                 class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
-                                <option value="S">S</option>
-                                <option value="M" selected>M</option>
-                                <option value="L">L</option>
-                                <option value="XL">XL</option>
-                                <option value="XXL">XXL</option>
+                                <option value="LS">Ladies Small</option>
+                                <option value="LM">Ladies Medium</option>
+                                <option value="LL">Ladies Large</option>
+                                <option value="MS">Men's Small</option>
+                                <option value="MM" selected>Men's Medium</option>
+                                <option value="ML">Men's Large</option>
+                                <option value="MXL">Men's XL</option>
+                                <option value="MXXL">Men's XXL</option>
+                                <option value="MXXXL">Men's XXXL</option>
                             </select>
                         </div>
                     </div>
@@ -238,43 +224,6 @@
                         </label>
                     </div>
                     
-                    <div class="sm:col-span-2">
-                        <label for="OrgTwitter" class="block text-sm/6 font-semibold text-gray-900">
-                        Org's X Account
-                        </label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="OrgTwitter" id="OrgTwitter" type="text" 
-                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="@btcplusplus"
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="OrgNostr" class="block text-sm/6 font-semibold text-gray-900">
-                        Org's Nostr npub
-                        </label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="OrgNostr" id="OrgNostr" type="text" 
-                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="npub1dwah..."
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
-                    <div class="sm:col-span-2">
-                        <label for="OrgSite" class="block text-sm/6 font-semibold text-gray-900">Org's website</label>
-                        <div class="mt-2.5">
-                            <input 
-                            name="OrgSite" id="OrgSite" type="url" 
-                            autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
-                            placeholder="https://btcplusplus.dev"
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
-                        </div>
-                    </div>
-
                     <div class="sm:col-span-2">
                         <label for="OrgLogoFile" class="block text-sm/6 font-semibold text-gray-900">
                         Org's Logo
@@ -330,16 +279,32 @@
                         </div>
                     </fieldset>
 
-                    <div class="flex gap-x-4 sm:col-span-2">
-                        <div class="flex h-6 items-center">
-                            <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
-                                <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-                                <input id="TalkSetup" type="checkbox" name="TalkSetup" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
-                            </div>
+                    <fieldset class="sm:col-span-2">
+                        <legend class="block text-sm/6 font-semibold text-gray-900">
+                        Recording *
+                        </legend>
+                        <div class="mt-2.5">
+                        {{ range .RecordingOptions }}
+                           {{ block "form_radiolist" . }} {{ end }}
+                        {{ end }}
                         </div>
-                        <label for="TalkSetup" class="text-sm/6 text-gray-600">
-                        My workshop/talk requires participants to do setup ahead of time
+                    </fieldset>
+
+                    <div class="sm:col-span-2">
+                        <label for="Setup" class="block text-sm/6 font-semibold text-gray-900">
+                        Workshop / talk setup notes
                         </label>
+                        <div class="block text-sm/6 text-gray-600">
+                        Optional. If your session needs participants to install software, bring hardware, or do anything ahead of time, list it here so we can pass it on.
+                        </div>
+                        <div class="mt-2.5">
+                            <textarea
+                            name="Setup" id="Setup"
+                            autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
+                            placeholder="e.g. Please install Bitcoin Core 27.0 on your laptop ahead of the workshop."
+                            rows="3"
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                        </div>
                     </div>
 
                     <fieldset class="sm:col-span-2">
@@ -436,13 +401,18 @@
 
                 </div>
                 <div class="mt-10">
-                    <button type="submit" 
-                    class="block w-full rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin
-                    disabled:opacity-25"
-                    >Submit Application</button>
+                    <button type="submit"
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin disabled:opacity-60 disabled:cursor-wait">
+                        <svg class="submit-spinner h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                        </svg>
+                        <span class="submit-label-idle">Submit Application</span>
+                        <span class="submit-label-busy">Submitting…</span>
+                    </button>
                 </div>
             </form>
-            <div id="result" class="mt-5 mx-auto max-w-xl text-red-700">
+            <div id="result" class="mt-5 mx-auto max-w-xl text-red-700 scroll-mt-24">
             </div>
         </div>
     </section>
@@ -450,5 +420,147 @@
     {{ block "about" . }} {{ end }}
     </section>
     {{ block "footer" . }} {{ end }}
+
+    <link rel="stylesheet" href="/static/css/cropper-1.6.2.min.css" />
+    <div id="CropperModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/60 p-4">
+        <div class="w-full max-w-2xl rounded-lg bg-white p-4 shadow-xl">
+            <div class="mb-3 text-lg font-semibold text-gray-900">Crop your photo</div>
+            <div class="text-sm text-gray-600 mb-3">Drag the box to position your face. Square crop, please.</div>
+            <div class="max-h-[60vh] overflow-hidden">
+                <img id="CropperImg" alt="" class="block max-w-full" />
+            </div>
+            <div class="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button type="button" id="CropperCancel" class="min-h-[44px] rounded-md bg-gray-100 px-5 py-3 text-base font-semibold text-gray-700 hover:bg-gray-200 sm:py-2.5 sm:text-sm">Cancel</button>
+                <button type="button" id="CropperConfirm" class="min-h-[44px] rounded-md bg-bitcoin px-5 py-3 text-base font-semibold text-white hover:opacity-90 sm:py-2.5 sm:text-sm">Crop &amp; use</button>
+            </div>
+        </div>
+    </div>
+    <script src="/static/js/cropper-1.6.2.min.js" type="text/javascript"></script>
+    <script type="text/javascript">
+    (function () {
+        var input = document.getElementById('PicFile');
+        var modal = document.getElementById('CropperModal');
+        var modalImg = document.getElementById('CropperImg');
+        var cancelBtn = document.getElementById('CropperCancel');
+        var confirmBtn = document.getElementById('CropperConfirm');
+        var preview = document.getElementById('PicPreview');
+        var previewImg = document.getElementById('PicPreviewImg');
+        var recropBtn = document.getElementById('PicRecrop');
+        var errBox = document.getElementById('PicError');
+        if (!input || !modal) return;
+
+        function showError(msg) {
+            if (!errBox) return;
+            errBox.textContent = msg;
+            errBox.classList.remove('hidden');
+        }
+        function clearError() {
+            if (!errBox) return;
+            errBox.textContent = '';
+            errBox.classList.add('hidden');
+        }
+        function looksLikeHEIC(file) {
+            var name = (file && file.name || '').toLowerCase();
+            var type = (file && file.type || '').toLowerCase();
+            return /\.(heic|heif)$/.test(name) || type.indexOf('heic') !== -1 || type.indexOf('heif') !== -1;
+        }
+
+        var cropper = null;
+        var pendingFile = null;
+        var lastObjectURL = null;
+
+        function showModal() {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+        function hideModal() {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+            if (cropper) { cropper.destroy(); cropper = null; }
+            if (lastObjectURL) { URL.revokeObjectURL(lastObjectURL); lastObjectURL = null; }
+        }
+
+        function openCropperWith(file) {
+            if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
+            pendingFile = file;
+            if (lastObjectURL) URL.revokeObjectURL(lastObjectURL);
+            lastObjectURL = URL.createObjectURL(file);
+            modalImg.src = lastObjectURL;
+            showModal();
+            modalImg.onload = function () {
+                if (cropper) cropper.destroy();
+                cropper = new Cropper(modalImg, {
+                    aspectRatio: 1,
+                    viewMode: 1,
+                    autoCropArea: 1,
+                    background: false,
+                    movable: true,
+                    zoomable: true,
+                    rotatable: false,
+                    scalable: false,
+                });
+            };
+        }
+
+        input.addEventListener('change', function (e) {
+            clearError();
+            var f = e.target.files && e.target.files[0];
+            if (!f) return;
+            // Probe decode first — catches HEIC and other formats the browser
+            // can't render (Cropper.js would otherwise fail silently).
+            var probeURL = URL.createObjectURL(f);
+            var probe = new Image();
+            probe.onload = function () {
+                URL.revokeObjectURL(probeURL);
+                openCropperWith(f);
+            };
+            probe.onerror = function () {
+                URL.revokeObjectURL(probeURL);
+                input.value = '';
+                preview.classList.add('hidden');
+                if (looksLikeHEIC(f)) {
+                    showError("This looks like a HEIC photo from an iPhone. Most browsers can't display HEIC — try saving it as a JPEG (iPhone: Settings → Camera → Formats → Most Compatible) or upload from a different device.");
+                } else {
+                    showError("We couldn't read this image. Please pick a different file (JPEG or PNG works best).");
+                }
+            };
+            probe.src = probeURL;
+        });
+
+        cancelBtn.addEventListener('click', function () {
+            input.value = '';
+            preview.classList.add('hidden');
+            hideModal();
+        });
+
+        confirmBtn.addEventListener('click', function () {
+            if (!cropper) return;
+            var canvas = cropper.getCroppedCanvas({
+                width: 1024,
+                height: 1024,
+                imageSmoothingEnabled: true,
+                imageSmoothingQuality: 'high',
+            });
+            if (!canvas) return;
+            canvas.toBlob(function (blob) {
+                if (!blob) return;
+                var name = (pendingFile && pendingFile.name) ? pendingFile.name.replace(/\.[^.]+$/, '') : 'photo';
+                var cropped = new File([blob], name + '-cropped.jpg', { type: 'image/jpeg' });
+                var dt = new DataTransfer();
+                dt.items.add(cropped);
+                input.files = dt.files;
+                previewImg.src = canvas.toDataURL('image/jpeg', 0.8);
+                preview.classList.remove('hidden');
+                hideModal();
+            }, 'image/jpeg', 0.92);
+        });
+
+        recropBtn.addEventListener('click', function () {
+            if (pendingFile) openCropperWith(pendingFile);
+        });
+    })();
+    </script>
   </body>
 </html>

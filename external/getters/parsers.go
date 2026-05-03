@@ -141,20 +141,117 @@ func parseHotel(pageID string, props map[string]notion.PropertyValue) *types.Hot
 
 func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.Speaker {
 	speaker := &types.Speaker{
-		ID:       pageID,
-		Name:     parseRichText("Name", props),
-		Photo:    parseRichText("NormPhoto", props),
-		OrgPhoto: parseRichText("OrgPhoto", props),
-		Website:  props["Website"].URL,
-		Github:   props["Github"].URL,
-		Email:    props["Email"].Email,
-		Twitter:  types.ParseTwitter(parseRichText("Twitter", props)),
-		Nostr:    parseRichText("npub", props),
-		Signal:   parseRichText("Signal", props),
-		Company:  parseRichText("Company", props),
+		ID:            pageID,
+		Name:          parseRichText("Name", props),
+		Photo:         parseRichText("NormPhoto", props),
+		Email:         props["Email"].Email,
+		Phone:         parseRichText("Phone", props),
+		Signal:        parseRichText("Signal", props),
+		Telegram:      parseRichText("Telegram", props),
+		Twitter:       types.ParseTwitter(parseRichText("Twitter", props)),
+		Nostr:         parseRichText("npub", props),
+		Github:        props["Github"].URL,
+		Instagram:     parseRichText("Instagram", props),
+		LinkedIn:      parseRichText("LinkedIn", props),
+		Website:       props["Website"].URL,
+		Company:       parseRichText("Company", props),
+		OrgLogo:       parseRichText("OrgPhoto", props),
+		AvailToHire:   parseCheckbox(props["AvailToHire"].Checkbox),
+		LookingToHire: parseCheckbox(props["LookingToHire"].Checkbox),
+		TShirt:        parseSelect("TShirt", props),
 	}
 
 	return speaker
+}
+
+func parseProposal(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue) *types.Proposal {
+	prop := &types.Proposal{
+		ID:              pageID,
+		Title:           parseRichText("Title", props),
+		Description:     parseRichText("Desc", props),
+		Setup:           parseRichText("Setup", props),
+		Comments:        parseRichText("Comments", props),
+		TalkType:        parseSelect("TalkType", props),
+		Status:          parseSelect("Status", props),
+		DesiredDuration: int(props["DesiredDuration"].Number),
+		AvailDuration:   int(props["AvailDuration"].Number),
+	}
+	if tag := parseSelect("ScheduleFor", props); tag != "" {
+		prop.ScheduleFor = lookupConfByTag(ctx, tag)
+	}
+	return prop
+}
+
+// lookupConfByTag finds a Conf by its tag in the cached Confs list. Returns
+// nil if the tag isn't recognized — callers must handle that case.
+func lookupConfByTag(ctx *config.AppContext, tag string) *types.Conf {
+	confs, err := FetchConfsCached(ctx)
+	if err != nil {
+		return nil
+	}
+	for _, c := range confs {
+		if c.Tag == tag {
+			return c
+		}
+	}
+	return nil
+}
+
+func parseConfTalk(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, proposalMap map[string]*types.Proposal) *types.ConfTalk {
+	ct := &types.ConfTalk{
+		ID:              pageID,
+		Clipart:         parseRichText("Clipart", props),
+		Sched:           parseTimes("TalkTime", props),
+		ProductionNotes: parseRichText("ProductionNotes", props),
+		Venue:           parseSelect("Venue", props),
+		SocialCard:      parseRichText("SocialCard", props),
+	}
+	if tag := parseSelect("Conf", props); tag != "" {
+		ct.Conf = lookupConfByTag(ctx, tag)
+	}
+	if proposalMap != nil {
+		if id := parseRef(props, "proposal"); id != "" {
+			if p, ok := proposalMap[id]; ok {
+				ct.Proposal = p
+			}
+		}
+	}
+	return ct
+}
+
+func parseSpeakerProposal(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) *types.SpeakerProposal {
+	sp := &types.SpeakerProposal{
+		ID:           pageID,
+		ComingFrom:   parseRichText("ComingFrom", props),
+		Availability: parseSelectList("Avails", props),
+		RecordOK:     parseSelect("RecordOK", props),
+		Visa:         parseSelect("Visa", props),
+		FirstEvent:   parseCheckbox(props["FirstEvent"].Checkbox),
+		DinnerRSVP:   parseCheckbox(props["DinnerRSVP"].Checkbox),
+		Sponsor:      parseCheckbox(props["Sponsor"].Checkbox),
+		Company:      parseRichText("Company", props),
+		OrgPhoto:     parseRichText("OrgPhoto", props),
+	}
+	for _, tag := range parseSelectList("OtherEvents", props) {
+		if c := lookupConfByTag(ctx, tag); c != nil {
+			sp.OtherEvents = append(sp.OtherEvents, c)
+		}
+	}
+	if speakerMap != nil {
+		if id := parseRef(props, "speaker"); id != "" {
+			if speaker, ok := speakerMap[id]; ok {
+				sp.Speaker = speaker
+			}
+		}
+	}
+	if proposalMap != nil {
+		if id := parseRef(props, "talk"); id != "" {
+			if proposal, ok := proposalMap[id]; ok {
+				sp.Proposal = proposal
+			}
+		}
+	}
+	return sp
 }
 
 func parseTalk(pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker) *types.Talk {
@@ -175,7 +272,6 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakerMap 
 
 	if talk.Sched != nil {
 		talk.TimeDesc = talk.Sched.Desc()
-		talk.DayTag = talk.Sched.Day()
 	}
 
 	/* Find all speakers for this talk */
@@ -185,10 +281,6 @@ func parseTalk(pageID string, props map[string]notion.PropertyValue, speakerMap 
 				talk.Speakers = append(talk.Speakers, speaker)
 			}
 		}
-	}
-
-	if len(talk.Clipart) > 4 {
-		talk.AnchorTag = talk.Clipart[:len(talk.Clipart)-4]
 	}
 
 	return talk
@@ -388,48 +480,6 @@ func parseVolInfo(pageID string, props map[string]notion.PropertyValue) *types.V
         }
 
         return vinfo
-}
-
-func parseTalkApp(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue) *types.TalkApp {
-	talk := &types.TalkApp{
-		Ref:           pageID,
-		Name:          parseRichText("Name", props),
-		Phone:         props["Phone"].PhoneNumber,
-		Email:         props["Email"].Email,
-		Signal:        parseRichText("Signal", props),
-		Telegram:      parseRichText("Telegram", props),
-		ContactAt:     parseRichText("ContactAt", props),
-		Hometown:   parseRichText("Hometown", props),
-                Visa:       parseSelect("Visa", props),
-		Twitter:    types.ParseTwitter(parseRichText("Twitter", props)),
-		Nostr:      parseRichText("npub", props),
-		Github:     props["Github"].URL,
-		Website:    props["Website"].URL,
-                Shirt:      parseSelect("Shirt", props),
-		Pic:        fileGetURL(props["Pic"].Files),
-		Org:        parseRichText("Org", props),
-		Sponsor:    parseCheckbox(props["Sponsor"].Checkbox),
-		OrgTwitter:    types.ParseTwitter(parseRichText("OrgTwitter", props)),
-		OrgNostr:      parseRichText("OrgNpub", props),
-		OrgSite:       props["OrgSite"].URL,
-		OrgLogo:        fileGetURL(props["OrgLogo"].Files),
-
-		TalkTitle:        parseRichText("TalkTitle", props),
-		Description:        parseRichText("Description", props),
-                PresType:     parseSelect("PresType", props),
-		TalkSetup:    parseCheckbox(props["TalkSetup"].Checkbox),
-
-		DinnerRSVP:    parseCheckbox(props["DinnerRSVP"].Checkbox),
-                Availability:  parseSelectList("Availability", props),
-		DiscoveredVia: parseRichText("DiscoveredVia", props),
-
-		ScheduleFor: parseConfList(ctx, "ScheduleFor", props),
-		OtherEvents: parseConfList(ctx, "OtherEvents", props),
-		Comments:      parseRichText("Comments", props),
-		FirstEvent:    parseCheckbox(props["FirstEvent"].Checkbox),
-	}
-
-	return talk
 }
 
 func parseJobTypes(field string, props map[string]notion.PropertyValue, jobtypes []*types.JobType) *types.JobType {

@@ -20,7 +20,9 @@ type (
 		HotelsDb     string
 		VolunteerDb  string
 		JobTypeDb    string
-                TalkAppDb    string
+                ProposalDb   string
+                SpeakerProposalDb string
+                ConfTalkDb   string
                 VolInfoDb    string
                 ShiftDb      string
                 OrgDb        string

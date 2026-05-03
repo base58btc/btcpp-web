@@ -109,6 +109,13 @@ func loadFromCache() bool {
         return false
 }
 
+// diskCacheBootstrapped tracks whether we've already attempted to bootstrap
+// from the on-disk cache. The disk cache is a startup convenience only — once
+// the process has booted (whether bootstrap succeeded or fell through to
+// Notion), every subsequent WaitFetch goes straight to Notion. This makes
+// /conf-reload always re-fetch live data instead of returning stale rows.
+var diskCacheBootstrapped = false
+
 func WaitFetch(ctx *config.AppContext) {
 	cacheTTL = time.Duration(ctx.Env.CacheTTLSec) * time.Second
 
@@ -116,13 +123,17 @@ func WaitFetch(ctx *config.AppContext) {
 		EnableDiskCache()
 	}
 
-	// Try loading from disk cache first (dev only)
-	if diskCacheEnabled && loadFromCache() {
-                ctx.Infos.Printf("Loaded all data from disk cache!")
-                return 
+	// Try loading from disk cache only on the very first run (dev only).
+	if !diskCacheBootstrapped && diskCacheEnabled && loadFromCache() {
+		diskCacheBootstrapped = true
+		ctx.Infos.Printf("Loaded all data from disk cache!")
+		return
 	}
+	// Mark bootstrap done even if the disk cache was missing/incomplete —
+	// the next WaitFetch should skip the disk cache regardless.
+	diskCacheBootstrapped = true
 
-	ctx.Infos.Printf("Disk cache incomplete, fetching from Notion...")
+	ctx.Infos.Printf("Fetching from Notion...")
 
 	// Phase 1: fetch all independent data in parallel
 	var wg sync.WaitGroup
@@ -565,14 +576,6 @@ func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk
 
 	ctx.Infos.Printf("listTalks: total %d talks loaded across %d confs", len(allTalks), len(cachedConfs))
 	return allTalks, nil
-}
-
-func TalkUpdateCardURL(n *types.Notion, talkID string, cardURL string) error {
-	_, err := n.Client.UpdatePageProperties(context.Background(), talkID,
-		map[string]*notion.PropertyValue{
-			"TalkCardURL": notion.NewURLPropertyValue(cardURL),
-		})
-	return err
 }
 
 func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
@@ -1818,238 +1821,6 @@ func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Vol
 
 	return vols, nil
 }
-
-func ListTalkApps(ctx *config.AppContext) ([]*types.TalkApp, error) {
-	n := ctx.Notion
-	var apps []*types.TalkApp
-
-	hasMore := true
-	nextCursor := ""
-	for hasMore {
-		var err error
-		var pages []*notion.Page
-
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.TalkAppDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-			})
-
-		if err != nil {
-			return nil, err
-		}
-		for _, page := range pages {
-			app := parseTalkApp(ctx, page.ID, page.Properties)
-			apps = append(apps, app)
-		}
-	}
-
-	return apps, nil
-}
-
-func RegisterTalkApp(n *types.Notion, tapp *types.TalkApp) (error) {
-	parent := notion.NewDatabaseParent(n.Config.TalkAppDb)
-
-        // multiselect
-        availability := make([]*notion.SelectOption, len(tapp.Availability))
-        for i, av := range tapp.Availability {
-                availability[i] = &notion.SelectOption{
-                        Name: av,
-                }
-        }
-
-        // relation
-        otherEvents := make([]*notion.ObjectReference, len(tapp.OtherEvents))
-        for i, oe := range tapp.OtherEvents {
-                otherEvents[i] = &notion.ObjectReference{
-                        Object: notion.ObjectPage,
-                        ID: oe.Ref,
-                }
-        }
-
-        vals := map[string]*notion.PropertyValue{
-                "Name": notion.NewTitlePropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                Text: &notion.Text{Content: tapp.Name}},
-                        }...),
-                "Phone": notion.NewPhoneNumberPropertyValue(tapp.Phone),
-                "Email": notion.NewEmailPropertyValue(tapp.Email),
-                "Signal": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.Signal}},
-                        }...),
-                "ContactAt": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.ContactAt}},
-                        }...),
-                "Hometown": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.Hometown}},
-                        }...),
-
-                "Github": notion.NewURLPropertyValue(tapp.Github),
-                "Visa": {
-                        Type: notion.PropertySelect,
-                        Select: &notion.SelectOption{
-                                Name: tapp.Visa,
-                        },
-                },
-
-                "Pic": notion.NewFilesPropertyValue(
-                        []*notion.File{
-                                {
-                                        Name: "speaker",
-                                        Type: "file_upload",
-                                        Upload: &notion.UploadFile{
-                                                ID: tapp.Pic,
-                                        },
-                                },
-                        }...),
-
-                "Org": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.Org}},
-                        }...),
-                "Sponsor": {
-                        Type: notion.PropertyCheckbox,
-                        Checkbox: &tapp.Sponsor,
-                },
-                "TalkTitle": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.TalkTitle}},
-                        }...),
-                "Description": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.Description}},
-                        }...),
-                "PresType": {
-                        Type: notion.PropertySelect,
-                        Select: &notion.SelectOption{
-                                Name: tapp.PresType,
-                        },
-                },
-                "TalkSetup": {
-                        Type: notion.PropertyCheckbox,
-                        Checkbox: &tapp.TalkSetup,
-                },
-                "DinnerRSVP": {
-                        Type: notion.PropertyCheckbox,
-                        Checkbox: &tapp.DinnerRSVP,
-                },
-                "Avails":  &notion.PropertyValue {
-                        Type: notion.PropertyMultiSelect,
-                        MultiSelect: &availability,
-                },
-
-                "DiscoveredVia": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: tapp.DiscoveredVia}},
-                        }...),
-                "Shirt": {
-                        Type: notion.PropertySelect,
-                        Select: &notion.SelectOption{
-                                Name: tapp.Shirt,
-                        },
-                },
-                "ScheduleFor": notion.NewRelationPropertyValue(
-                        []*notion.ObjectReference{{ID: tapp.ScheduleFor[0].Ref}}...,
-                ),
-
-                "FirstEvent": {
-                        Type: notion.PropertyCheckbox,
-                        Checkbox: &tapp.FirstEvent,
-                },
-
-        }
-
-        if tapp.Telegram != "" {
-                vals["Telegram"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.Telegram}},
-                        }...)
-        }
-
-        if tapp.Twitter.Handle != "" {
-                vals["Twitter"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.Twitter.Handle}},
-                        }...)
-        }
-
-        if tapp.Nostr != "" {
-                vals["npub"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.Nostr}},
-                        }...)
-        }
-
-        if tapp.Website!= "" {
-                vals["Website"] = notion.NewURLPropertyValue(tapp.Website)
-        }
-
-        if tapp.OrgTwitter.Handle != "" {
-                vals["OrgTwitter"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.OrgTwitter.Handle}},
-                        }...)
-        }
-
-        if tapp.OrgNostr != "" {
-                vals["OrgNostr"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.OrgNostr}},
-                        }...)
-        }
-
-        if tapp.OrgSite!= "" {
-                vals["OrgSite"] = notion.NewURLPropertyValue(tapp.OrgSite)
-        }
-
-        if tapp.OrgLogo != "" {
-                vals["OrgLogo"] = notion.NewFilesPropertyValue(
-                        []*notion.File{
-                                {
-                                        Name: "orglogospeaker",
-                                        Type: "file_upload",
-                                        Upload: &notion.UploadFile{
-                                                ID: tapp.OrgLogo,
-                                        },
-                                },
-                        }...)
-        }
-
-        if len(tapp.OtherEvents) != 0 {
-                vals["OtherEvents"] = &notion.PropertyValue{
-                        Type: notion.PropertyRelation,
-                        Relation: otherEvents,
-                }
-        }
-
-        if tapp.Comments != "" {
-                vals["Comments"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: tapp.Comments}},
-                        }...)
-        }
-
-        _, err := n.Client.CreatePage(context.Background(), parent, vals)
-
-	return err
-}
-
 
 func UploadFile(n *types.Notion, contentType, filename string, data []byte) (string, error) {
         upload, err := n.Client.CreateFileUpload(context.Background())

@@ -3,6 +3,7 @@ package getters
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -131,13 +132,22 @@ func richText(s string) []*notion.RichText {
 	}
 }
 
-func RegisterOrg(n *types.Notion, org *types.Org) error {
+func RegisterOrg(n *types.Notion, org *types.Org) (string, error) {
 	props := map[string]*notion.PropertyValue{
-		"Name":    notion.NewTitlePropertyValue(richText(org.Name)...),
-		"Twitter": notion.NewRichTextPropertyValue(richText(org.Twitter.Handle)...),
-		"Nostr":   notion.NewRichTextPropertyValue(richText(org.Nostr)...),
-		"Matrix":  notion.NewRichTextPropertyValue(richText(org.Matrix)...),
-		"Notes":   notion.NewRichTextPropertyValue(richText(org.Notes)...),
+		"Name": notion.NewTitlePropertyValue(richText(org.Name)...),
+	}
+
+	if org.Twitter.Handle != "" {
+		props["Twitter"] = notion.NewRichTextPropertyValue(richText(org.Twitter.Handle)...)
+	}
+	if org.Nostr != "" {
+		props["Nostr"] = notion.NewRichTextPropertyValue(richText(org.Nostr)...)
+	}
+	if org.Matrix != "" {
+		props["Matrix"] = notion.NewRichTextPropertyValue(richText(org.Matrix)...)
+	}
+	if org.Notes != "" {
+		props["Notes"] = notion.NewRichTextPropertyValue(richText(org.Notes)...)
 	}
 
 	if org.LogoLight != "" {
@@ -165,9 +175,91 @@ func RegisterOrg(n *types.Notion, org *types.Org) error {
 		props["Github"] = notion.NewURLPropertyValue(org.Github)
 	}
 
-	_, err := n.Client.CreatePage(context.Background(),
+	page, err := n.Client.CreatePage(context.Background(),
 		notion.NewDatabaseParent(n.Config.OrgDb), props)
+	if err != nil {
+		return "", err
+	}
+	return page.ID, nil
+}
+
+// OrgUpdate is a sparse fill-only update for an existing Org row. Empty
+// values are skipped.
+type OrgUpdate struct {
+	Website   string
+	Twitter   string // bare handle
+	Nostr     string
+	Github    string
+	LogoLight string // full Spaces URL
+	LogoDark  string
+}
+
+func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
+	props := map[string]*notion.PropertyValue{}
+	if up.Website != "" {
+		props["Website"] = notion.NewURLPropertyValue(up.Website)
+	}
+	if up.Twitter != "" {
+		props["Twitter"] = notion.NewRichTextPropertyValue(richText(up.Twitter)...)
+	}
+	if up.Nostr != "" {
+		props["Nostr"] = notion.NewRichTextPropertyValue(richText(up.Nostr)...)
+	}
+	if up.Github != "" {
+		props["Github"] = notion.NewURLPropertyValue(up.Github)
+	}
+	if up.LogoLight != "" {
+		props["LogoLight"] = notion.NewURLPropertyValue(up.LogoLight)
+	}
+	if up.LogoDark != "" {
+		props["LogoDark"] = notion.NewURLPropertyValue(up.LogoDark)
+	}
+	if len(props) == 0 {
+		return nil
+	}
+	_, err := n.Client.UpdatePageProperties(context.Background(), orgID, props)
 	return err
+}
+
+// FindOrg returns the first Org whose Website matches `website` (preferred),
+// or whose Name matches `name` (fallback). Both sides are normalized
+// (lowercase + trim, websites also strip trailing /). Returns nil, nil when
+// no match — letting callers decide whether to create a new Org.
+func FindOrg(n *types.Notion, website, name string) (*types.Org, error) {
+	wantSite := normalizeWebsite(website)
+	wantName := normalizeName(name)
+	if wantSite == "" && wantName == "" {
+		return nil, nil
+	}
+	orgs, err := ListOrgs(n)
+	if err != nil {
+		return nil, err
+	}
+	if wantSite != "" {
+		for _, o := range orgs {
+			if normalizeWebsite(o.Website) == wantSite {
+				return o, nil
+			}
+		}
+	}
+	if wantName != "" {
+		for _, o := range orgs {
+			if normalizeName(o.Name) == wantName {
+				return o, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+func normalizeWebsite(s string) string {
+	s = strings.TrimSpace(strings.ToLower(s))
+	s = strings.TrimSuffix(s, "/")
+	return s
+}
+
+func normalizeName(s string) string {
+	return strings.TrimSpace(strings.ToLower(s))
 }
 
 func RegisterSponsorship(n *types.Notion, sp *types.Sponsorship) error {

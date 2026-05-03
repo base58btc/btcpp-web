@@ -103,6 +103,7 @@ type SpeakerPage struct {
         DueDate   string
         RSVPFor   string
         PresentationType []types.CheckItem
+        RecordingOptions []types.CheckItem
         Year      uint
 }
 
@@ -202,9 +203,14 @@ type RegistrationsAdminPage struct {
         EmailCompose  *EmailComposeData
 }
 
-type TalkAppAdminPage struct {
+type ProposalAdminRow struct {
+        Proposal *types.Proposal
+        Speaker  *types.Speaker
+}
+
+type ProposalAdminPage struct {
         Conf         *types.Conf
-        Apps         []*types.TalkApp
+        Rows         []*ProposalAdminRow
         FlashMessage string
         Year         uint
         EmailCompose *EmailComposeData

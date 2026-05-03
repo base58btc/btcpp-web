@@ -17,7 +17,7 @@
             hx-post="/sponsor"
             class="mx-auto mt-16 max-w-xl sm:mt-20"
             hx-target="#post_result"
-            hx-swap="innerHTML"
+            hx-swap="innerHTML show:#post_result:top"
             hx-validate="true"
             hx-disabled-elt="find input[type='text'], find button"
             >
@@ -245,7 +245,7 @@
                     >Submit Application</button>
                 </div>
             </form>
-            <div id="post_result" name="hidden_stuffs" class="mt-5 mx-auto max-w-xl">
+            <div id="post_result" name="hidden_stuffs" class="mt-5 mx-auto max-w-xl scroll-mt-24">
             </div>
         </div>
     </section>

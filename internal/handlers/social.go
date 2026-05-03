@@ -132,12 +132,18 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		postedRefs = make(map[string]bool)
 	}
 
-	talks, err := getters.GetTalksFor(ctx, conf.Tag)
+	talks, err := getters.LoadTalksFromConfTalks(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/social/%s failed to get talks: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/admin/social/%s failed to get conf talks: %s", conf.Tag, err.Error())
 		return
 	}
+
+	// Kick off a card-refresh in the background. The OnTalksRefresh wiring
+	// only fires on Talks-DB updates, which won't happen for ConfTalk-sourced
+	// data — so we trigger it here. Hash and spaces.Exists checks make
+	// re-runs cheap when nothing's changed.
+	go RefreshTalkCards(ctx, talks)
 
 	// Build a map of speaker ID -> their talks
 	speakerTalks := make(map[string][]*types.Talk)
