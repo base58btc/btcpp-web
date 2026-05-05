@@ -517,65 +517,19 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func listTalksForEvent(ctx *config.AppContext, speakerMap map[string]*types.Speaker, eventTag string) ([]*types.Talk, error) {
-	var talks []*types.Talk
-	n := ctx.Notion
-
-	hasMore := true
-	nextCursor := ""
-	for hasMore {
-		var err error
-		var pages []*notion.Page
-
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.TalksDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-				Filter: &notion.Filter{
-					Property: "Event",
-					Select: &notion.SelectFilterCondition{
-						Equals: eventTag,
-					},
-				},
-			})
-
-		if err != nil {
-			return nil, err
-		}
-		for _, page := range pages {
-			talk := parseTalk(page.ID, page.Properties, speakerMap)
-			talks = append(talks, talk)
-		}
-	}
-
-	return talks, nil
-}
-
-func listTalks(ctx *config.AppContext, speakers []*types.Speaker) ([]*types.Talk, error) {
-	// Build speaker map for O(1) lookups during parsing
-	speakerMap := make(map[string]*types.Speaker)
-	for _, s := range speakers {
-		speakerMap[s.ID] = s
-	}
-
-	// Fetch talks per conference to stay under Notion's pagination limits
-	cachedConfs, err := FetchConfsCached(ctx)
+// listTalks loads every Talk-shaped row across all confs, sourced from the
+// ConfTalk → Proposal → SpeakerConf[] → Speaker[] chain. Talk.ID is the
+// ConfTalk page ID (the new canonical talk identifier).
+//
+// The `speakers` param is unused — kept on the signature to match the cache
+// job runner; SpeakerConf joins handle speaker resolution internally.
+func listTalks(ctx *config.AppContext, _ []*types.Speaker) ([]*types.Talk, error) {
+	talks, err := LoadTalksFromConfTalks(ctx, "")
 	if err != nil {
 		return nil, err
 	}
-
-	var allTalks []*types.Talk
-	for _, conf := range cachedConfs {
-		confTalks, err := listTalksForEvent(ctx, speakerMap, conf.Tag)
-		if err != nil {
-			ctx.Err.Printf("listTalks: failed for event %s: %s", conf.Tag, err)
-			continue
-		}
-		ctx.Infos.Printf("listTalks: loaded %d talks for %s", len(confTalks), conf.Tag)
-		allTalks = append(allTalks, confTalks...)
-	}
-
-	ctx.Infos.Printf("listTalks: total %d talks loaded across %d confs", len(allTalks), len(cachedConfs))
-	return allTalks, nil
+	ctx.Infos.Printf("listTalks: loaded %d talks from conf talks", len(talks))
+	return talks, nil
 }
 
 func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {

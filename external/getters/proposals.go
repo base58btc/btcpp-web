@@ -2,6 +2,7 @@ package getters
 
 import (
 	"context"
+	"fmt"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -24,12 +25,14 @@ type ProposalInput struct {
 	Status          string // initial value: "Applied"
 }
 
-// SpeakerProposalInput is the data needed to create a SpeakerProposal DB row.
-// The DB's title-typed property is "ComingFrom" — written directly from
-// in.ComingFrom.
-type SpeakerProposalInput struct {
+// SpeakerConfInput is the data needed to upsert a SpeakerConf DB row. The
+// DB's title-typed property is "ComingFrom" — written directly from
+// in.ComingFrom. The `talk` relation is multi-valued: one SpeakerConf row
+// covers every proposal a given speaker is delivering at a given conf.
+type SpeakerConfInput struct {
 	SpeakerID      string
-	ProposalID     string
+	ConfTag        string // conf the new ProposalID is scheduled for
+	ProposalID     string // proposal to attach to this speaker's row at this conf
 	OrgID          string // Orgs page ID, written to the "org" relation
 	Company        string // free-text affiliation captured from the form
 	OrgPhoto       string // bare filename in Spaces sponsors/ (e.g. "abc123.svg")
@@ -79,16 +82,44 @@ func CreateProposal(n *types.Notion, in ProposalInput) (string, error) {
 	return page.ID, nil
 }
 
-func CreateSpeakerProposal(n *types.Notion, in SpeakerProposalInput) (string, error) {
+// UpsertSpeakerConf finds the SpeakerConf row for (in.SpeakerID, in.ConfTag)
+// and appends in.ProposalID to its `talk` multi-relation, or creates a new
+// row if none exists. Returns the SpeakerConf page ID.
+//
+// Per-application fields (ComingFrom, Avails, etc.) are written only on
+// CREATE — they're not overwritten on append, since they belong to the
+// (speaker, conf) pair as a whole, not the individual proposal being added.
+func UpsertSpeakerConf(ctx *config.AppContext, in SpeakerConfInput) (string, error) {
+	n := ctx.Notion
+	if in.SpeakerID == "" {
+		return "", fmt.Errorf("UpsertSpeakerConf: SpeakerID required")
+	}
+
+	existingID, existingTalkIDs, err := findSpeakerConfForConf(ctx, in.SpeakerID, in.ConfTag)
+	if err != nil {
+		return "", fmt.Errorf("find speaker conf: %w", err)
+	}
+	if existingID != "" {
+		if in.ProposalID != "" && !containsString(existingTalkIDs, in.ProposalID) {
+			existingTalkIDs = append(existingTalkIDs, in.ProposalID)
+			_, err := n.Client.UpdatePageProperties(context.Background(), existingID,
+				map[string]*notion.PropertyValue{
+					"talk": relationValue(existingTalkIDs),
+				})
+			if err != nil {
+				return "", fmt.Errorf("append talk to %s: %w", existingID, err)
+			}
+		}
+		return existingID, nil
+	}
+
 	vals := map[string]*notion.PropertyValue{
 		"ComingFrom": titleValue(in.ComingFrom),
 		"FirstEvent": checkboxValue(in.FirstEvent),
 		"DinnerRSVP": checkboxValue(in.DinnerRSVP),
 		"Sponsor":    checkboxValue(in.Sponsor),
 	}
-	if in.SpeakerID != "" {
-		vals["speaker"] = relationValue([]string{in.SpeakerID})
-	}
+	vals["speaker"] = relationValue([]string{in.SpeakerID})
 	if in.ProposalID != "" {
 		vals["talk"] = relationValue([]string{in.ProposalID})
 	}
@@ -113,12 +144,62 @@ func CreateSpeakerProposal(n *types.Notion, in SpeakerProposalInput) (string, er
 	if len(in.OtherEventTags) > 0 {
 		vals["OtherEvents"] = multiSelectValue(in.OtherEventTags)
 	}
-	parent := notion.NewDatabaseParent(n.Config.SpeakerProposalDb)
+	parent := notion.NewDatabaseParent(n.Config.SpeakerConfDb)
 	page, err := n.Client.CreatePage(context.Background(), parent, vals)
 	if err != nil {
 		return "", err
 	}
 	return page.ID, nil
+}
+
+// findSpeakerConfForConf queries SpeakerConfDb for rows whose speaker
+// relation contains speakerID, then for each candidate checks whether any
+// proposal it links via `talk` has ScheduleFor == confTag. Returns the
+// matching page ID + its existing talk relation IDs, or empty when no match.
+func findSpeakerConfForConf(ctx *config.AppContext, speakerID, confTag string) (string, []string, error) {
+	if confTag == "" {
+		return "", nil, nil
+	}
+	n := ctx.Notion
+	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
+		n.Config.SpeakerConfDb, notion.QueryDatabaseParam{
+			Filter: &notion.Filter{
+				Property: "speaker",
+				Relation: &notion.RelationFilterCondition{
+					Contains: speakerID,
+				},
+			},
+		})
+	if err != nil {
+		return "", nil, err
+	}
+	for _, pg := range pages {
+		var talkIDs []string
+		for _, ref := range pg.Properties["talk"].Relation {
+			if ref != nil && ref.ID != "" {
+				talkIDs = append(talkIDs, ref.ID)
+			}
+		}
+		for _, pid := range talkIDs {
+			p, err := GetProposal(ctx, pid)
+			if err != nil {
+				continue
+			}
+			if p.ScheduleFor != nil && p.ScheduleFor.Tag == confTag {
+				return pg.ID, talkIDs, nil
+			}
+		}
+	}
+	return "", nil, nil
+}
+
+func containsString(slice []string, target string) bool {
+	for _, s := range slice {
+		if s == target {
+			return true
+		}
+	}
+	return false
 }
 
 // ConfTalkInput is the data needed to create a ConfTalk DB row at accept
@@ -132,7 +213,7 @@ type ConfTalkInput struct {
 func CreateConfTalk(n *types.Notion, in ConfTalkInput) (string, error) {
 	vals := map[string]*notion.PropertyValue{}
 	if in.ConfTag != "" {
-		vals["Conf"] = selectValue(in.ConfTag)
+		vals["Event"] = selectValue(in.ConfTag)
 	}
 	if in.ProposalID != "" {
 		vals["proposal"] = relationValue([]string{in.ProposalID})
@@ -176,24 +257,24 @@ func ListProposals(ctx *config.AppContext) ([]*types.Proposal, error) {
 	return out, nil
 }
 
-// ListSpeakerProposals fetches every SpeakerProposal page, resolving Speaker
-// and Proposal relations via the supplied maps. Pass nil for either map to
-// leave that side unresolved.
-func ListSpeakerProposals(ctx *config.AppContext, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) ([]*types.SpeakerProposal, error) {
+// ListSpeakerConfs fetches every SpeakerConf page, resolving Speaker and
+// Proposals (multi-relation `talk`) via the supplied maps. Pass nil for
+// either map to leave that side unresolved.
+func ListSpeakerConfs(ctx *config.AppContext, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) ([]*types.SpeakerConf, error) {
 	n := ctx.Notion
-	var out []*types.SpeakerProposal
+	var out []*types.SpeakerConf
 	hasMore := true
 	nextCursor := ""
 	for hasMore {
 		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
-			n.Config.SpeakerProposalDb, notion.QueryDatabaseParam{StartCursor: nextCursor})
+			n.Config.SpeakerConfDb, notion.QueryDatabaseParam{StartCursor: nextCursor})
 		if err != nil {
 			return nil, err
 		}
 		nextCursor = next
 		hasMore = more
 		for _, page := range pages {
-			out = append(out, parseSpeakerProposal(ctx, page.ID, page.Properties, speakerMap, proposalMap))
+			out = append(out, parseSpeakerConf(ctx, page.ID, page.Properties, speakerMap, proposalMap))
 		}
 	}
 	return out, nil
@@ -236,7 +317,7 @@ func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Tal
 	// Resolve the proposal by ID off the page directly.
 	proposalID := parseRef(page.Properties, "proposal")
 	if proposalID == "" {
-		return talkFromConfTalk(ct, nil, nil), nil
+		return talkFromConfTalk(ct, nil), nil
 	}
 	proposal, err := GetProposal(ctx, proposalID)
 	if err != nil {
@@ -252,22 +333,37 @@ func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Tal
 		speakerMap[sp.ID] = sp
 	}
 	proposalMap := map[string]*types.Proposal{proposalID: proposal}
-	sps, err := ListSpeakerProposals(ctx, speakerMap, proposalMap)
+	sps, err := ListSpeakerConfs(ctx, speakerMap, proposalMap)
 	if err != nil {
 		return nil, err
 	}
-	var linked []*types.SpeakerProposal
-	for _, sp := range sps {
-		if sp.Proposal != nil && sp.Proposal.ID == proposalID {
-			linked = append(linked, sp)
-		}
+	speakerConfMap := make(map[string]*types.SpeakerConf, len(sps))
+	for _, sc := range sps {
+		speakerConfMap[sc.ID] = sc
 	}
-	return talkFromConfTalk(ct, proposal, linked), nil
+	resolveProposalSpeakers(proposal, speakerConfMap)
+	return talkFromConfTalk(ct, proposal), nil
 }
 
-// talkFromConfTalk is the single denormalization point shared between the
-// list-by-conf and get-by-id loaders.
-func talkFromConfTalk(ct *types.ConfTalk, proposal *types.Proposal, sps []*types.SpeakerProposal) *types.Talk {
+// resolveProposalSpeakers fills in Proposal.Speakers from SpeakerConfRefs
+// using the supplied speakerConfMap. Unknown refs are silently skipped.
+func resolveProposalSpeakers(p *types.Proposal, speakerConfMap map[string]*types.SpeakerConf) {
+	if p == nil {
+		return
+	}
+	p.Speakers = p.Speakers[:0]
+	for _, ref := range p.SpeakerConfRefs {
+		if sc, ok := speakerConfMap[ref]; ok {
+			p.Speakers = append(p.Speakers, sc)
+		}
+	}
+}
+
+// talkFromConfTalk denormalizes a (ConfTalk, Proposal) pair plus the
+// proposal's resolved Speakers list into the legacy *types.Talk shape used
+// by templates / mediagen / social. Each speaker is a copy with Company /
+// OrgLogo overlaid from the per-conf SpeakerConf data.
+func talkFromConfTalk(ct *types.ConfTalk, proposal *types.Proposal) *types.Talk {
 	talk := &types.Talk{
 		ID:          ct.ID,
 		Clipart:     ct.Clipart,
@@ -287,23 +383,24 @@ func talkFromConfTalk(ct *types.ConfTalk, proposal *types.Proposal, sps []*types
 		talk.Name = proposal.Title
 		talk.Description = proposal.Description
 		talk.Type = proposal.TalkType
-	}
-	for _, sp := range sps {
-		if sp.Speaker == nil {
-			continue
+		for _, sc := range proposal.Speakers {
+			if sc == nil || sc.Speaker == nil {
+				continue
+			}
+			view := *sc.Speaker
+			view.Company = sc.Company
+			view.OrgLogo = sc.OrgPhoto
+			talk.Speakers = append(talk.Speakers, &view)
 		}
-		view := *sp.Speaker
-		view.Company = sp.Company
-		view.OrgLogo = sp.OrgPhoto
-		talk.Speakers = append(talk.Speakers, &view)
 	}
 	return talk
 }
 
 // LoadTalksFromConfTalks returns Talk-shaped values populated from the new
-// ConfTalk → Proposal → SpeakerProposal[] → Speaker[] chain for a given conf
-// tag. Each Speaker's Company and OrgPhoto come from the SpeakerProposal that
-// links them to the Proposal — Speaker.Company is no longer authoritative.
+// ConfTalk → Proposal → speakers (SpeakerConf[]) → Speaker[] chain for a
+// given conf tag. Pass an empty string to load talks for every conf at
+// once. Each Speaker's Company and OrgPhoto come from the SpeakerConf
+// row — Speaker.Company is no longer authoritative.
 //
 // Talk.ID is set to ConfTalk.ID so existing card-URL / file-key derivation
 // stays stable as Talks-DB usage is wound down.
@@ -323,6 +420,10 @@ func LoadTalksFromConfTalks(ctx *config.AppContext, confTag string) ([]*types.Ta
 	}
 	confTalks := make([]*types.ConfTalk, 0, len(allConfTalks))
 	for _, ct := range allConfTalks {
+		if confTag == "" {
+			confTalks = append(confTalks, ct)
+			continue
+		}
 		if ct.Conf != nil && ct.Conf.Tag == confTag {
 			confTalks = append(confTalks, ct)
 		}
@@ -340,29 +441,38 @@ func LoadTalksFromConfTalks(ctx *config.AppContext, confTag string) ([]*types.Ta
 		speakerMap[sp.ID] = sp
 	}
 
-	sps, err := ListSpeakerProposals(ctx, speakerMap, proposalMap)
+	sps, err := ListSpeakerConfs(ctx, speakerMap, proposalMap)
 	if err != nil {
 		return nil, err
 	}
-	// Group SpeakerProposals by Proposal.ID so we can find the speakers (and
-	// per-application Company/OrgPhoto) for any given Proposal.
-	spsByProposal := make(map[string][]*types.SpeakerProposal, len(proposalMap))
-	for _, sp := range sps {
-		if sp.Proposal == nil {
-			continue
-		}
-		spsByProposal[sp.Proposal.ID] = append(spsByProposal[sp.Proposal.ID], sp)
+	speakerConfMap := make(map[string]*types.SpeakerConf, len(sps))
+	for _, sc := range sps {
+		speakerConfMap[sc.ID] = sc
+	}
+
+	// Resolve each Proposal.Speakers from its SpeakerConfRefs (the
+	// "speakers" multi-relation written by the form-submit / accept flow).
+	for _, p := range proposalMap {
+		resolveProposalSpeakers(p, speakerConfMap)
 	}
 
 	talks := make([]*types.Talk, 0, len(confTalks))
 	for _, ct := range confTalks {
-		var linked []*types.SpeakerProposal
-		if ct.Proposal != nil {
-			linked = spsByProposal[ct.Proposal.ID]
-		}
-		talks = append(talks, talkFromConfTalk(ct, ct.Proposal, linked))
+		talks = append(talks, talkFromConfTalk(ct, ct.Proposal))
 	}
 	return talks, nil
+}
+
+// ConfTalkSetSocialCard writes the storage path of a generated talk-card
+// PNG onto ConfTalk.SocialCard (rich_text). The value stored is the path
+// portion only — e.g. "/riga/talks/abc-1080p.png" — not the full Spaces
+// public URL, so the rendering side can compose the host as it sees fit.
+func ConfTalkSetSocialCard(n *types.Notion, confTalkID, path string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), confTalkID,
+		map[string]*notion.PropertyValue{
+			"SocialCard": richTextValue(path),
+		})
+	return err
 }
 
 // UpdateProposalStatus mirrors UpdateTalkAppStatus for the new Proposal DB.

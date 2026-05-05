@@ -9,7 +9,6 @@ type (
 		Token        string
 		EmailDb      string
 		PurchasesDb  string
-		TalksDb      string
 		SpeakersDb   string
 		ConfsDb      string
 		ConfsTixDb   string
@@ -21,7 +20,7 @@ type (
 		VolunteerDb  string
 		JobTypeDb    string
                 ProposalDb   string
-                SpeakerProposalDb string
+                SpeakerConfDb string
                 ConfTalkDb   string
                 VolInfoDb    string
                 ShiftDb      string

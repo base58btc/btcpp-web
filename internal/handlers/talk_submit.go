@@ -19,11 +19,11 @@ type submitDeps struct {
 	findSpeakers          func(email string) ([]*types.Speaker, error)
 	createSpeaker         func(in getters.SpeakerInput) (string, error)
 	updateSpeaker         func(speakerID string, up getters.SpeakerUpdate) error
-	findOrg               func(website, name string) (*types.Org, error)
-	createOrg             func(org *types.Org) (string, error)
-	createProposal        func(in getters.ProposalInput) (string, error)
-	createSpeakerProposal func(in getters.SpeakerProposalInput) (string, error)
-	logf                  func(format string, args ...interface{})
+	findOrg            func(website, name string) (*types.Org, error)
+	createOrg          func(org *types.Org) (string, error)
+	createProposal     func(in getters.ProposalInput) (string, error)
+	upsertSpeakerConf  func(in getters.SpeakerConfInput) (string, error)
+	logf               func(format string, args ...interface{})
 }
 
 type submitPipeline struct {
@@ -32,12 +32,12 @@ type submitPipeline struct {
 
 // SubmitResult summarises what the pipeline did, for logging / future flash.
 type SubmitResult struct {
-	SpeakerID         string
-	SpeakerCreated    bool
-	OrgID             string
-	OrgCreated        bool
-	ProposalID        string
-	SpeakerProposalID string
+	SpeakerID      string
+	SpeakerCreated bool
+	OrgID          string
+	OrgCreated     bool
+	ProposalID     string
+	SpeakerConfID  string
 }
 
 func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
@@ -60,8 +60,8 @@ func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
 		createProposal: func(in getters.ProposalInput) (string, error) {
 			return getters.CreateProposal(ctx.Notion, in)
 		},
-		createSpeakerProposal: func(in getters.SpeakerProposalInput) (string, error) {
-			return getters.CreateSpeakerProposal(ctx.Notion, in)
+		upsertSpeakerConf: func(in getters.SpeakerConfInput) (string, error) {
+			return getters.UpsertSpeakerConf(ctx, in)
 		},
 		logf: ctx.Err.Printf,
 	}}
@@ -136,10 +136,14 @@ func (p submitPipeline) Submit(app *types.TalkApp) (SubmitResult, error) {
 	}
 	result.ProposalID = proposalID
 
-	// 4. Create SpeakerProposal linking Speaker, Proposal, and Org.
+	// 4. Upsert SpeakerConf for (Speaker, Conf), appending this proposal
+	// to its `talk` multi-relation. Per-application fields are written
+	// only on first create — re-submitting at the same conf appends a
+	// proposal without overwriting existing Hometown/Avails/etc.
 	otherEventTags := otherEventTags(app.OtherEvents)
-	spID, err := p.deps.createSpeakerProposal(getters.SpeakerProposalInput{
+	spID, err := p.deps.upsertSpeakerConf(getters.SpeakerConfInput{
 		SpeakerID:      result.SpeakerID,
+		ConfTag:        app.ScheduleFor.Tag,
 		ProposalID:     result.ProposalID,
 		OrgID:          result.OrgID,
 		Company:        app.Org,
@@ -154,9 +158,9 @@ func (p submitPipeline) Submit(app *types.TalkApp) (SubmitResult, error) {
 		Sponsor:        app.Sponsor,
 	})
 	if err != nil {
-		return result, fmt.Errorf("create speaker proposal: %w", err)
+		return result, fmt.Errorf("upsert speaker conf: %w", err)
 	}
-	result.SpeakerProposalID = spID
+	result.SpeakerConfID = spID
 
 	return result, nil
 }

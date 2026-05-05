@@ -19,7 +19,7 @@ type submitRecorder struct {
 	orgFindCalls     []string
 	orgsCreated      []*types.Org
 	proposalCreated  []getters.ProposalInput
-	speakerProposals []getters.SpeakerProposalInput
+	speakerProposals []getters.SpeakerConfInput
 }
 
 func makeSubmitApp(email, scheduleTag string, otherTags ...string) *types.TalkApp {
@@ -94,7 +94,7 @@ func newSubmitRecorder(t *testing.T, app *types.TalkApp, matches []*types.Speake
 			rec.proposalCreated = append(rec.proposalCreated, in)
 			return "prop-1", nil
 		},
-		createSpeakerProposal: func(in getters.SpeakerProposalInput) (string, error) {
+		upsertSpeakerConf: func(in getters.SpeakerConfInput) (string, error) {
 			rec.speakerProposals = append(rec.speakerProposals, in)
 			return "sp-prop-1", nil
 		},
@@ -117,7 +117,7 @@ func TestSubmit_NewSpeaker_OneConf(t *testing.T) {
 	if !res.SpeakerCreated {
 		t.Errorf("expected SpeakerCreated=true")
 	}
-	if res.SpeakerID != "sp-new" || res.ProposalID != "prop-1" || res.SpeakerProposalID != "sp-prop-1" {
+	if res.SpeakerID != "sp-new" || res.ProposalID != "prop-1" || res.SpeakerConfID != "sp-prop-1" {
 		t.Errorf("result IDs: %+v", res)
 	}
 	if len(rec.speakerCreated) != 1 {

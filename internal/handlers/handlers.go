@@ -4431,20 +4431,27 @@ func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*Propo
 		speakerMap[sp.ID] = sp
 	}
 
-	sps, err := getters.ListSpeakerProposals(ctx, speakerMap, proposalMap)
+	sps, err := getters.ListSpeakerConfs(ctx, speakerMap, proposalMap)
 	if err != nil {
-		return nil, fmt.Errorf("list speaker proposals: %w", err)
+		return nil, fmt.Errorf("list speaker confs: %w", err)
 	}
 
+	// Each SpeakerConf carries one or more Proposals (multi-relation `talk`).
+	// Build proposalID → first-Speaker for the admin row display.
 	speakerByProposal := make(map[string]*types.Speaker, len(proposalMap))
 	for _, sp := range sps {
-		if sp.Proposal == nil || sp.Speaker == nil {
+		if sp.Speaker == nil {
 			continue
 		}
-		if _, ok := speakerByProposal[sp.Proposal.ID]; ok {
-			continue
+		for _, p := range sp.Proposals {
+			if p == nil {
+				continue
+			}
+			if _, ok := speakerByProposal[p.ID]; ok {
+				continue
+			}
+			speakerByProposal[p.ID] = sp.Speaker
 		}
-		speakerByProposal[sp.Proposal.ID] = sp.Speaker
 	}
 
 	rows := make([]*ProposalAdminRow, 0, len(proposalMap))

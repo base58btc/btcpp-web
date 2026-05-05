@@ -179,6 +179,11 @@ func parseProposal(ctx *config.AppContext, pageID string, props map[string]notio
 	if tag := parseSelect("ScheduleFor", props); tag != "" {
 		prop.ScheduleFor = lookupConfByTag(ctx, tag)
 	}
+	for _, ref := range props["speakers"].Relation {
+		if ref != nil && ref.ID != "" {
+			prop.SpeakerConfRefs = append(prop.SpeakerConfRefs, ref.ID)
+		}
+	}
 	return prop
 }
 
@@ -206,7 +211,7 @@ func parseConfTalk(ctx *config.AppContext, pageID string, props map[string]notio
 		Venue:           parseSelect("Venue", props),
 		SocialCard:      parseRichText("SocialCard", props),
 	}
-	if tag := parseSelect("Conf", props); tag != "" {
+	if tag := parseSelect("Event", props); tag != "" {
 		ct.Conf = lookupConfByTag(ctx, tag)
 	}
 	if proposalMap != nil {
@@ -219,8 +224,8 @@ func parseConfTalk(ctx *config.AppContext, pageID string, props map[string]notio
 	return ct
 }
 
-func parseSpeakerProposal(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) *types.SpeakerProposal {
-	sp := &types.SpeakerProposal{
+func parseSpeakerConf(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) *types.SpeakerConf {
+	sp := &types.SpeakerConf{
 		ID:           pageID,
 		ComingFrom:   parseRichText("ComingFrom", props),
 		Availability: parseSelectList("Avails", props),
@@ -245,45 +250,18 @@ func parseSpeakerProposal(ctx *config.AppContext, pageID string, props map[strin
 		}
 	}
 	if proposalMap != nil {
-		if id := parseRef(props, "talk"); id != "" {
-			if proposal, ok := proposalMap[id]; ok {
-				sp.Proposal = proposal
+		// `talk` is a multi-relation: every proposal this speaker is
+		// delivering at this conf.
+		for _, ref := range props["talk"].Relation {
+			if ref == nil || ref.ID == "" {
+				continue
+			}
+			if proposal, ok := proposalMap[ref.ID]; ok {
+				sp.Proposals = append(sp.Proposals, proposal)
 			}
 		}
 	}
 	return sp
-}
-
-func parseTalk(pageID string, props map[string]notion.PropertyValue, speakerMap map[string]*types.Speaker) *types.Talk {
-
-	talk := &types.Talk{
-		ID:          pageID,
-		Name:        parseRichText("Talk Name", props),
-		Clipart:     parseRichText("Clipart", props),
-		Description: parseRichText("Description", props),
-		CalNotif:    parseRichText("CalNotif", props),
-		TalkCardURL: props["TalkCardURL"].URL,
-		Sched:       parseTimes("Talk Time", props),
-                Venue:       parseSelect("Venue", props),
-                Event:       parseSelect("Event", props),
-                Type:        parseSelect("Talk Type", props),
-                Section:     parseSelect("Section", props),
-	}
-
-	if talk.Sched != nil {
-		talk.TimeDesc = talk.Sched.Desc()
-	}
-
-	/* Find all speakers for this talk */
-	if speakerMap != nil {
-		for _, speakerRel := range props["speakers"].Relation {
-			if speaker, ok := speakerMap[speakerRel.ID]; ok {
-				talk.Speakers = append(talk.Speakers, speaker)
-			}
-		}
-	}
-
-	return talk
 }
 
 func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf {

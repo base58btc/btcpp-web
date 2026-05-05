@@ -113,15 +113,18 @@ func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk
 	}
 	cardHashesMu.Unlock()
 
-	// If already in Spaces, just record the hash without re-uploading
+	// If already in Spaces, just record the hash without re-uploading.
+	// Still set ConfTalk.SocialCard since we may have generated the file
+	// in a previous run that didn't write back the path (or it got cleared).
 	if spaces.Exists(key) {
 		cardHashesMu.Lock()
 		cardHashes[key] = hash
 		cardHashesMu.Unlock()
+		writeSocialCardPath(ctx, talk.ID, key, card)
 		return spaces.PublicURL(key), nil
 	}
 
-        ctx.Infos.Printf("generating talks media %s (%s)", key, hash)
+	ctx.Infos.Printf("generating talks media %s (%s)", key, hash)
 	png, err := helpers.MakeTalkPng(ctx, confTag, card, talk.ID)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate talk png %s/%s: %w", talk.Name, card, err)
@@ -135,9 +138,25 @@ func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk
 	cardHashesMu.Lock()
 	cardHashes[key] = hash
 	cardHashesMu.Unlock()
+	writeSocialCardPath(ctx, talk.ID, key, card)
 
 	ctx.Infos.Printf("media refresh: uploaded %s", key)
 	return url, nil
+}
+
+// writeSocialCardPath records the freshly-generated card's path on the
+// ConfTalk row's SocialCard rich_text field. We only do this for the
+// canonical 1080p card — the other sizes (insta, social) are speaker-only.
+// Path format: "/{conf}/talks/{shortID}-{card}.png" — i.e., the Spaces
+// key with a leading slash. No host included; the rendering side composes
+// the URL.
+func writeSocialCardPath(ctx *config.AppContext, talkID, key, card string) {
+	if card != "1080p" {
+		return
+	}
+	if err := getters.ConfTalkSetSocialCard(ctx.Notion, talkID, "/"+key); err != nil {
+		ctx.Err.Printf("ConfTalkSetSocialCard %s: %s", talkID, err)
+	}
 }
 
 func sponsorCardHash(sp *types.Sponsorship) string {
@@ -236,56 +255,62 @@ func RefreshSponsorCards(ctx *config.AppContext) {
 	}
 }
 
+// RefreshTalkCards is the periodic / on-demand refresher used by the live
+// server. It enforces the atomic-running guard (so OnTalksRefresh callbacks
+// don't pile up) and skips talks attached to inactive confs (which are past
+// events and don't need fresh cards).
 func RefreshTalkCards(ctx *config.AppContext, talks []*types.Talk) {
 	if !atomic.CompareAndSwapInt32(&refreshRunning, 0, 1) {
 		ctx.Infos.Printf("media refresh: skipping, already running")
 		return
 	}
 	defer atomic.StoreInt32(&refreshRunning, 0)
+	refreshTalkCards(ctx, talks, true)
+}
 
-        confs, _ := getters.FetchConfsCached(ctx)
-        confset := helpers.ConfTagSet(confs)
+// RefreshTalkCardsForce is the CLI-friendly variant. No atomic guard (one-
+// shot, single-process), and it does NOT skip talks on inactive confs —
+// useful for back-filling cards on past events (e.g., when migrating to a
+// new ConfTalk-keyed file layout).
+func RefreshTalkCardsForce(ctx *config.AppContext, talks []*types.Talk) {
+	refreshTalkCards(ctx, talks, false)
+}
 
-        card := "1080p"
-        for _, talk := range talks {
-                // Skip talks without a proper 'conf' attached
-                conf, ok := confset[talk.Event]
-                if !ok {
-                        continue
-                }
+func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive bool) {
+	confs, _ := getters.FetchConfsCached(ctx)
+	confset := helpers.ConfTagSet(confs)
 
-                // Skip nonactive conferences
-                if !conf.Active {
-                        continue
-                }
+	card := "1080p"
+	for _, talk := range talks {
+		conf, ok := confset[talk.Event]
+		if !ok {
+			continue
+		}
+		if requireActive && !conf.Active {
+			continue
+		}
+		if talk.Clipart == "" {
+			continue
+		}
 
-                // Skip talks without clipart
-                if talk.Clipart == "" {
-                        continue
-                }
+		if _, err := generateAndUploadTalkPng(ctx, talk.Event, card, talk); err != nil {
+			ctx.Err.Printf("media refresh talks: %s", err)
+		}
 
-                _, err := generateAndUploadTalkPng(ctx, talk.Event, card, talk)
-                if err != nil {
-                        ctx.Err.Printf("media refresh talks: %s", err)
-                }
+		for _, speaker := range talk.Speakers {
+			if speaker.Photo == "" {
+				continue
+			}
+			for _, cardtype := range []string{card, "insta", "social"} {
+				if _, err := generateAndUploadSpeakerPng(ctx, talk.Event, cardtype, speaker, talk); err != nil {
+					ctx.Err.Printf("media refresh speakers: %s", err)
+				}
+			}
+		}
+	}
 
-                for _, speaker := range talk.Speakers {
-                        // Skip speakers without a photo
-                        if speaker.Photo == "" {
-                                continue
-                        }
-                        for _, cardtype := range []string{card, "insta", "social"} {
-                                _, err := generateAndUploadSpeakerPng(ctx, talk.Event, cardtype, speaker, talk)
-                                if err != nil {
-                                        ctx.Err.Printf("media refresh speakers: %s", err)
-                                }
-                        }
-                }
-        }
+	ctx.Infos.Printf("media refresh talks: finished (%d talks, requireActive=%v)", len(talks), requireActive)
 
-        ctx.Infos.Printf("media refresh talks: finished (%d talks)", len(talks))
-
-	// Persist hash index to Spaces
 	cardHashesMu.Lock()
 	hashCopy := make(map[string]string, len(cardHashes))
 	for k, v := range cardHashes {
@@ -301,23 +326,30 @@ func RefreshSpeakerCards(ctx *config.AppContext, speakers []*types.Speaker) {
         ctx.Infos.Printf("skipping speaker cards")
 }
 
+// PreloadCardHashes pulls the persisted card-hash index from Spaces into the
+// in-memory dedup cache. CLI tools can call this before RefreshTalkCards to
+// get the same dedup behavior the prod server uses, without InitMediaRefresh's
+// callback wiring or full-cache refresh.
+func PreloadCardHashes(ctx *config.AppContext) {
+	hashes, err := spaces.LoadHashes()
+	if err != nil {
+		ctx.Err.Printf("PreloadCardHashes: failed to load hashes: %s", err)
+		return
+	}
+	cardHashesMu.Lock()
+	for k, v := range hashes {
+		cardHashes[k] = v
+	}
+	cardHashesMu.Unlock()
+	ctx.Infos.Printf("PreloadCardHashes: loaded %d hashes", len(hashes))
+}
+
 func InitMediaRefresh(ctx *config.AppContext) {
 	ctx.Infos.Println("InitMediaRefresh: starting...")
 
 	// Load existing hashes from S3 to avoid regenerating unchanged cards
 	ctx.Infos.Println("InitMediaRefresh: loading hashes from spaces...")
-	hashes, err := spaces.LoadHashes()
-	if err != nil {
-		ctx.Err.Printf("media refresh: failed to load hashes from spaces: %s", err)
-	} else {
-		ctx.Infos.Printf("media refresh: loaded %d existing hashes from spaces", len(hashes))
-		cardHashesMu.Lock()
-		for k, v := range hashes {
-			cardHashes[k] = v
-		}
-		cardHashesMu.Unlock()
-		ctx.Infos.Printf("lock completed")
-	}
+	PreloadCardHashes(ctx)
 
 	// Register callbacks so cards refresh when data changes
 	getters.OnTalksRefresh(func(ctx *config.AppContext, talks []*types.Talk) {

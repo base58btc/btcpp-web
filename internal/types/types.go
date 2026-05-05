@@ -140,14 +140,20 @@ type (
                 DesiredDuration int
                 AvailDuration   int
                 ScheduleFor *Conf
-                Speakers    []*SpeakerProposal
+                // SpeakerConfRefs is the raw page-ID list from the
+                // "speakers" multi-relation on Proposal. Resolution into
+                // *SpeakerConf objects happens at the consumer layer.
+                SpeakerConfRefs []string
+                Speakers        []*SpeakerConf
         }
 
-        SpeakerProposal struct {
-                ID string
+        SpeakerConf struct {
+                ID            string
                 ComingFrom    string
                 Speaker       *Speaker
-                Proposal      *Proposal
+                // Proposals is the multi-relation `talk` on SpeakerConf —
+                // every proposal this speaker is delivering at this conf.
+                Proposals     []*Proposal
                 Availability  []string
                 RecordOK      string
                 Visa          string

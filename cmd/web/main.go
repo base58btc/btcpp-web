@@ -63,7 +63,6 @@ func loadConfig() *types.EnvConfig {
 		config.Notion = types.NotionConfig{
 			Token:        os.Getenv("NOTION_TOKEN"),
 			PurchasesDb:  os.Getenv("NOTION_PURCHASES_DB"),
-			TalksDb:      os.Getenv("NOTION_TALKS_DB"),
 			SpeakersDb:   os.Getenv("NOTION_SPEAKERS_DB"),
 			ConfsDb:      os.Getenv("NOTION_CONFS_DB"),
 			ConfsTixDb:   os.Getenv("NOTION_CONFSTIX_DB"),
@@ -75,7 +74,7 @@ func loadConfig() *types.EnvConfig {
 			VolunteerDb:     os.Getenv("NOTION_VOLUNTEER_DB"),
 			JobTypeDb:     os.Getenv("NOTION_JOBTYPE_DB"),
 			ProposalDb:        os.Getenv("NOTION_PROPOSAL_DB"),
-			SpeakerProposalDb: os.Getenv("NOTION_SPEAKER_PROPOSAL_DB"),
+			SpeakerConfDb:     os.Getenv("NOTION_SPEAKER_CONF_DB"),
 			ConfTalkDb:        os.Getenv("NOTION_CONFTALK_DB"),
 			ShiftDb:     os.Getenv("NOTION_SHIFTS_DB"),
                         VolInfoDb:   os.Getenv("NOTION_VOLINFO_DB"),
