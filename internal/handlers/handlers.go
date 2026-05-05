@@ -1101,9 +1101,27 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
         switch r.Method {
         case http.MethodGet:
 
-                talksDue := 45
-                if conf.Tag == "nairobi" {
-                        talksDue = 35
+                // Optional magic-link auth — when present and valid, pre-fill the
+                // form with the speaker's existing data so they don't re-type
+                // contact info / pfp / shirt size / etc.
+                var knownSpeaker *types.Speaker
+                var encodedHMAC, encodedEmail string
+                var subscribed, returning bool
+                if email, h, err := validateVolEmail(r, ctx); err == nil {
+                        encodedHMAC = h
+                        encodedEmail = r.URL.Query().Get("em")
+                        speakers, lerr := getters.GetSpeakersByEmail(ctx.Notion, email)
+                        if lerr == nil && len(speakers) == 1 {
+                                knownSpeaker = speakers[0]
+                        }
+                        // Best-effort lookups: failures just leave the
+                        // checkbox visible. The form still works.
+                        if s, err := getters.IsSubscribedTo(ctx.Notion, email, "newsletter"); err == nil {
+                                subscribed = s
+                        }
+                        if reg, err := getters.EmailHasRegistration(ctx, email); err == nil {
+                                returning = reg
+                        }
                 }
 
                 daylist := conf.DaysList("days-", true)
@@ -1111,12 +1129,17 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                         Conf: conf,
                         Confs: confs,
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
-                        DueDate: conf.DateBeforeStart(talksDue),
+                        DueDate: conf.DateBeforeStart(conf.TalksDueDays()),
                         DaysList:  daylist[1:],
                         RSVPFor: daylist[0].ItemDesc,
                         PresentationType: helpers.GetPresentationTypes(),
                         RecordingOptions: helpers.GetRecordingOptions(),
-                        Year: helpers.CurrentYear(),
+                        KnownSpeaker:           knownSpeaker,
+                        HMAC:                   encodedHMAC,
+                        Email:                  encodedEmail,
+                        IsNewsletterSubscriber: subscribed,
+                        IsReturningAttendee:    returning,
+                        Year:                   helpers.CurrentYear(),
                 })
 
                 if err != nil {
@@ -1154,15 +1177,20 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
 
                 /* Read PicFile bytes (no Notion upload — cropped JPEG goes
-                   only to Spaces). */
+                   only to Spaces). Optional for returning speakers — when
+                   the form was rendered with KnownSpeaker, the upload field
+                   is hidden and Submit will keep the existing Photo. */
                 picRaw, picContentType, picExt, err := readMultipartFile(r, "PicFile")
-                if err != nil {
+                hasNewPic := err == nil && len(picRaw) > 0
+                if err != nil && err != http.ErrMissingFile {
                         ctx.Err.Printf("/talk/{conf} unable to read speaker profile pic %s", err)
                         w.Write([]byte(helpers.ErrSpeakerApp("Error uploading pfp.")))
                         return
                 }
-                picShortID := imgproc.ShortID(picRaw)
-                talkapp.NormPhoto = picShortID + picExt
+                if hasNewPic {
+                        picShortID := imgproc.ShortID(picRaw)
+                        talkapp.NormPhoto = picShortID + picExt
+                }
 
                 /* Read OrgLogoFile if present (optional). */
                 logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
@@ -1195,8 +1223,10 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                 }
 
                 /* Mirror photo to Spaces — fire-and-forget so we don't block
-                   the user behind ffmpeg encodes. */
-                go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+                   the user behind ffmpeg encodes. Skip when no new pic. */
+                if hasNewPic {
+                        go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+                }
                 if hasLogo {
                         go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
                 }

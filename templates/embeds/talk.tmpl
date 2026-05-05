@@ -24,11 +24,18 @@
             enctype="multipart/form-data"
             >
                 <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
+                    {{ if $.KnownSpeaker }}
+                    <input type="hidden" name="Name" value="{{ $.KnownSpeaker.Name }}" />
+                    <input type="hidden" name="Phone" value="{{ $.KnownSpeaker.Phone }}" />
+                    <input type="hidden" name="Email" value="{{ $.KnownSpeaker.Email }}" />
+                    <input type="hidden" name="Signal" value="{{ $.KnownSpeaker.Signal }}" />
+                    <input type="hidden" name="Telegram" value="{{ $.KnownSpeaker.Telegram }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
                         <div class="mt-2.5">
-                            <input id="Name" type="text" name="Name" 
-                            autocomplete="name" 
+                            <input id="Name" type="text" name="Name"
+                            autocomplete="name"
                             autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="Your Name"
                             required
@@ -38,7 +45,7 @@
                     <div class="sm:col-span-2">
                         <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
                         <div class="mt-2.5">
-                            <input id="Phone" type="tel" name="Phone" 
+                            <input id="Phone" type="tel" name="Phone"
                             autoComplete="home tel"
                             autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="+1 555-928-1900"
@@ -49,7 +56,7 @@
                     <div class="sm:col-span-2">
                         <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
                         <div class="mt-2.5">
-                            <input id="Email" type="Email" name="Email" 
+                            <input id="Email" type="Email" name="Email"
                             required
                             autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
                         </div>
@@ -57,8 +64,8 @@
                     <div class="sm:col-span-2">
                         <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number *</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Signal" id="Signal" type="text" 
+                            <input
+                            name="Signal" id="Signal" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="example.99"
                             required
@@ -68,13 +75,14 @@
                     <div class="sm:col-span-2">
                         <label for="Telegram" class="block text-sm/6 font-semibold text-gray-900">Telegram Username or Number</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Telegram" id="Telegram" type="text" 
+                            <input
+                            name="Telegram" id="Telegram" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="@niftynei"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
                     <div class="sm:col-span-2">
                         <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
                         <div class="mt-2.5">
@@ -103,13 +111,20 @@
                         </div>
                     </div>
 
+                    {{ if $.KnownSpeaker }}
+                    <input type="hidden" name="Twitter" value="{{ $.KnownSpeaker.Twitter.Handle }}" />
+                    <input type="hidden" name="Nostr" value="{{ $.KnownSpeaker.Nostr }}" />
+                    <input type="hidden" name="Github" value="{{ $.KnownSpeaker.Github }}" />
+                    <input type="hidden" name="Website" value="{{ $.KnownSpeaker.Website }}" />
+                    <input type="hidden" name="Shirt" value="{{ $.KnownSpeaker.TShirt }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Twitter" class="block text-sm/6 font-semibold text-gray-900">
                         X Account Username
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Twitter" id="Twitter" type="text" 
+                            <input
+                            name="Twitter" id="Twitter" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="@niftynei"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
@@ -120,8 +135,8 @@
                         Nostr Npub
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Nostr" id="Nostr" type="text" 
+                            <input
+                            name="Nostr" id="Nostr" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="npub1dwah..."
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
@@ -130,8 +145,8 @@
                     <div class="sm:col-span-2">
                         <label for="Github" class="block text-sm/6 font-semibold text-gray-900">Link to your Github profile *</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Github" id="Github" type="url" 
+                            <input
+                            name="Github" id="Github" type="url"
                             autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             required
                             placeholder="https://github.com/niftynei"
@@ -141,8 +156,8 @@
                     <div class="sm:col-span-2">
                         <label for="Website" class="block text-sm/6 font-semibold text-gray-900">Personal website</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Website" id="Website" type="url" 
+                            <input
+                            name="Website" id="Website" type="url"
                             autoComplete="link" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="https://basicbitch.software"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
@@ -180,9 +195,9 @@
                         Shirt Size *
                         </label>
                         <div class="mt-2.5">
-                            <select id="Shirt" name="Shirt" 
-                                autocomplete="off" 
-                                aria-label="Shirt Size" 
+                            <select id="Shirt" name="Shirt"
+                                autocomplete="off"
+                                aria-label="Shirt Size"
                                 required
                                 class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
                                 <option value="LS">Ladies Small</option>
@@ -197,6 +212,7 @@
                             </select>
                         </div>
                     </div>
+                    {{ end }}
 
                     <div class="sm:col-span-2">
                         <label for="Org" class="block text-sm/6 font-semibold text-gray-900">
@@ -360,6 +376,9 @@
                         </div>
                     </div>
 
+                    {{ if .IsReturningAttendee }}
+                    <input type="hidden" name="FirstEvent" value="false" />
+                    {{ else }}
                     <div class="flex gap-x-4 sm:col-span-2">
                         <div class="flex h-6 items-center">
                             <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
@@ -371,7 +390,11 @@
                         This is my first <span class="font-bitcoin">bitcoin++</span> event!
                         </label>
                     </div>
+                    {{ end }}
 
+                    {{ if .IsNewsletterSubscriber }}
+                    <input type="hidden" name="Subscribe" value="false" />
+                    {{ else }}
                     <div class="flex gap-x-4 sm:col-span-2">
                         <div class="flex h-6 items-center">
                             <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
@@ -383,6 +406,7 @@
                         Add me to the <span class="font-bitcoin">bitcoin++</span> newsletter!
                         </label>
                     </div>
+                    {{ end }}
 
                     <div class="sm:col-span-2">
                         <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">

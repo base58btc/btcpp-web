@@ -104,7 +104,17 @@ type SpeakerPage struct {
         RSVPFor   string
         PresentationType []types.CheckItem
         RecordingOptions []types.CheckItem
-        Year      uint
+
+        // Set when the apply form is rendered after a magic-link login. The
+        // template hides Speaker-personal fields (Name, Phone, Email, etc.)
+        // and submits them as hidden inputs from this Speaker's data.
+        KnownSpeaker         *types.Speaker
+        HMAC                 string // base64-encoded
+        Email                string // base64-encoded
+        IsNewsletterSubscriber bool   // hides the newsletter opt-in checkbox
+        IsReturningAttendee    bool   // hides the "first bitcoin++" checkbox
+
+        Year uint
 }
 
 type ApplicationStats struct {
