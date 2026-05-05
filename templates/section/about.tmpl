@@ -31,20 +31,21 @@
         <a href="https://x.com/btcplusplus" target="_blank">Follow us on X<span aria-hidden="true">&rarr;</span></a>
         <a href="https://www.youtube.com/@btcplusplus" target="_blank">Find us on YouTube<span aria-hidden="true">&rarr;</span></a>
       </div>
+      {{ $stats := siteStats }}
       <dl class="mt-16 grid grid-cols-1 gap-8 sm:mt-20 sm:grid-cols-2 lg:grid-cols-4">
         <div class="flex flex-col-reverse">
           <dt class="text-base leading-7 text-gray-300">Conferences Executed</dt>
-          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">14</dd>
+          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">{{ $stats.Confs }}</dd>
         </div>
 
         <div class="flex flex-col-reverse">
           <dt class="text-base leading-7 text-gray-300">Talks + Workshops Conducted</dt>
-          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">300+</dd>
+          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">{{ $stats.Talks }}</dd>
         </div>
 
         <div class="flex flex-col-reverse">
           <dt class="text-base leading-7 text-gray-300">Attendees</dt>
-          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">3.5k+</dd>
+          <dd class="text-2xl font-bold leading-9 tracking-tight text-white">{{ $stats.Attendees }}</dd>
         </div>
 
         <div class="flex flex-col-reverse">

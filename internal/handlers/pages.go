@@ -126,6 +126,82 @@ type VolShiftPage struct {
         Year      uint
 }
 
+type DashboardPage struct {
+        Name     string
+        Hometown string
+        Photo    string // Speaker.Photo filename, empty if none
+        Email    string // base64-encoded
+        HMAC     string // base64-encoded
+
+        // Speaker side, split by whether the linked conf has ended.
+        SpeakerConfs     []*types.SpeakerConf
+        PastSpeakerConfs []*types.SpeakerConf
+
+        // Volunteer side, same split.
+        VolApps     []*types.Volunteer
+        PastVolApps []*types.Volunteer
+        VolInfos    map[string]*types.VolInfo
+
+        Stats *DashboardStats
+        Confs []*types.Conf
+
+        // Confs the user could apply to speak at — Active, applications still
+        // open, no existing SpeakerConf for this user.
+        EligibleConfs []*types.Conf
+
+        // Active upcoming confs the user could buy a ticket for. Shown as
+        // a "Buy a ticket" section on the dashboard.
+        BuyableConfs []*types.Conf
+
+        // Tickets the user has purchased for upcoming/active confs, with
+        // their Conf resolved for header rendering. Past tickets are
+        // omitted (no point downloading a PDF for a conf that's over).
+        Tickets []*UserTicket
+
+        FlashMessage string
+
+        Year uint
+}
+
+type DashboardStats struct {
+        TalksApplied  int
+        TalksAccepted int
+        ShiftsApplied int
+        ShiftsBooked  int
+}
+
+// UserTicket bundles a Registration with its resolved Conf for
+// dashboard rendering.
+type UserTicket struct {
+        Reg  *types.Registration
+        Conf *types.Conf
+}
+
+type EditProposalPage struct {
+        Proposal   *types.Proposal
+        Conf       *types.Conf
+        HMAC       string
+        Email      string
+        Locked     bool
+        LockReason string
+        TalkTypes  []string
+        Durations  []int
+        Year       uint
+}
+
+type EditSpeakerConfPage struct {
+        SpeakerConf         *types.SpeakerConf
+        Conf                *types.Conf
+        HMAC                string
+        Email               string
+        Locked              bool
+        LockReason          string
+        DaysList            []types.CheckItem
+        RecordingOptions    []types.CheckItem
+        IsReturningAttendee bool // hides the "first bitcoin++" checkbox
+        Year                uint
+}
+
 type ShiftDisplay struct {
         Shift       *types.WorkShift
         IsAvailable bool   // Vol available on that day

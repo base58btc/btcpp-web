@@ -157,6 +157,31 @@ func ListSubscribersFor(n *types.Notion, newsletters []string) ([]*mtypes.Subscr
 	return subs, nil
 }
 
+// IsSubscribedTo reports whether email is in NewsletterDb with the named
+// subscription active. Used by the talk-apply form to hide the newsletter
+// opt-in checkbox for already-subscribed speakers.
+//
+// Returns (false, nil) when the email has no subscriber row at all (the
+// common case for first-time applicants).
+func IsSubscribedTo(n *types.Notion, email, newsletter string) (bool, error) {
+	if email == "" || newsletter == "" {
+		return false, nil
+	}
+	sub, err := FindSubscriber(n, email)
+	if err != nil {
+		return false, err
+	}
+	if sub == nil {
+		return false, nil
+	}
+	for _, s := range sub.Subs {
+		if s != nil && s.Name == newsletter {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func ListSubscribers(n *types.Notion, newsletter string) ([]*mtypes.Subscriber, error) {
 	letters := []string{newsletter}
 	return ListSubscribersFor(n, letters)

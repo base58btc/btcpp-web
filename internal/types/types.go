@@ -65,6 +65,16 @@ type (
 		Emoji         string
 	}
 
+        ConfSched struct {
+                ID       string
+                ConfRef  string
+                Day      int
+                Doors    Times
+                Breakfase Times
+                Lunch    Times
+                Coffee   Times
+        }
+
 	ConfTicket struct {
 		ID       string
 		ConfRef  string
@@ -145,6 +155,11 @@ type (
                 // *SpeakerConf objects happens at the consumer layer.
                 SpeakerConfRefs []string
                 Speakers        []*SpeakerConf
+
+                // Optional attachments populated by the dashboard enricher
+                // for the talk-card render. Nil unless explicitly fetched.
+                ConfTalk        *ConfTalk
+                Recording       *Recording
         }
 
         SpeakerConf struct {
@@ -166,7 +181,7 @@ type (
         }
 
         ConfTalk struct {
-                ID          string 
+                ID          string
                 Conf        *Conf
                 Proposal    *Proposal
 		Clipart     string
@@ -176,6 +191,15 @@ type (
                 Section     string
 		CalNotif    string
                 SocialCard  string
+        }
+
+        // Recording is a row in RecordingsDb — one per ConfTalk that has
+        // a YouTube link (and eventually other recording metadata).
+        Recording struct {
+                ID         string
+                ConfTalkID string
+                TalkName   string
+                YTLink     string
         }
 
 	Talk struct {
@@ -398,6 +422,14 @@ func (t *Talk) ClipartAvif() string {
 	return name + ".avif"
 }
 
+func (c *ConfTalk) ClipartAvif() string {
+	if c == nil || c.Clipart == "" {
+		return ""
+	}
+	name := strings.TrimSuffix(c.Clipart, filepath.Ext(c.Clipart))
+	return name + ".avif"
+}
+
 func (s *Session) TalkAvif() string {
 	name := strings.TrimSuffix(s.TalkPhoto, filepath.Ext(s.TalkPhoto))
 	return name + ".avif"
@@ -545,6 +577,55 @@ func (c *Conf) InFuture() bool {
 
 func (c *Conf) WithinTwoWeeks() bool {
         return time.Until(c.StartDate) <= 12 * 24 * time.Hour
+}
+
+// HasEnded reports whether the conf is over (EndDate is in the past).
+// Used by the dashboard to fold past confs into a collapsed section.
+func (c *Conf) HasEnded() bool {
+        if c.EndDate.IsZero() {
+                return false
+        }
+        return c.EndDate.Before(time.Now())
+}
+
+// CanInvite reports whether co-speaker invites are still meaningful for
+// this conf: the conf is Active and at least 4 days out from start. Inside
+// that window the schedule is locked and adding speakers creates more
+// problems than it solves.
+func (c *Conf) CanInvite() bool {
+        return c.Active && time.Until(c.StartDate) > 4*24*time.Hour
+}
+
+// TalksDueDays returns the number of days before StartDate at which talk
+// applications close. Most confs use 45; some shorter cycles use 35.
+//
+// Centralized here so dashboard, the apply form, and any deadline-checking
+// code stay in sync.
+func (c *Conf) TalksDueDays() int {
+        if c.Tag == "nairobi" {
+                return 35
+        }
+        return 45
+}
+
+// TalksDueDate returns the absolute time at which talk applications close.
+func (c *Conf) TalksDueDate() time.Time {
+        return c.StartDate.AddDate(0, 0, -c.TalksDueDays())
+}
+
+// TalksOpen reports whether talk applications are currently being accepted
+// for this conf — Active and before TalksDueDate.
+func (c *Conf) TalksOpen() bool {
+        return c.Active && time.Now().Before(c.TalksDueDate())
+}
+
+// EmojiOrDefault returns the conf's emoji, or a sparkles fallback when
+// the field is empty so the dashboard never renders a blank tile.
+func (c *Conf) EmojiOrDefault() string {
+        if c.Emoji == "" {
+                return "✨"
+        }
+        return c.Emoji
 }
 
 func (c *Conf) DateBeforeStart(daysbefore int) string {

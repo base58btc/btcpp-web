@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>your bitcoin++ dashboard</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
+</head>
+<body class="h-full">
+    {{ block "mainnav" . }} {{ end }}
+    <section id="dashboard-login">
+        <div class="flex flex-col">
+            <div class="pt-20 pb-20 sm:pt-20 grow-0">
+                <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                    <div class="max-w-2xl text-start">
+                        <h1 class="text-2xl font-bold text-gray-900 mb-2">Your dashboard</h1>
+                        <p class="text-sm text-gray-600 mb-6">Enter the email you used to apply (as a speaker or volunteer). We'll send you a magic-link to view your applications and shifts.</p>
+                        {{ if .FlashMessage }}
+                        <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+                            <p class="text-sm text-green-800">{{ .FlashMessage }}</p>
+                        </div>
+                        {{ end }}
+                        <form method="POST">
+                            <input id="Email"
+                                type="email"
+                                name="Email"
+                                autocomplete="email"
+                                placeholder="hello@example.com"
+                                required class="py-3 px-4 border-gray border-2 rounded-sm" />
+                            <button class="mt-4 bg-black text-white hover:text-white-400 px-4 py-2 rounded-md" type="submit">Email me a link</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {{ block "footer" . }} {{ end }}
+</body>
+</html>

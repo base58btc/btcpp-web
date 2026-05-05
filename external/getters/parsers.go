@@ -202,6 +202,21 @@ func lookupConfByTag(ctx *config.AppContext, tag string) *types.Conf {
 	return nil
 }
 
+func parseRecording(pageID string, props map[string]notion.PropertyValue) *types.Recording {
+	rec := &types.Recording{
+		ID:       pageID,
+		TalkName: parseRichText("TalkName", props),
+		YTLink:   props["YTLink"].URL,
+	}
+	for _, ref := range props["talk"].Relation {
+		if ref != nil && ref.ID != "" {
+			rec.ConfTalkID = ref.ID
+			break
+		}
+	}
+	return rec
+}
+
 func parseConfTalk(ctx *config.AppContext, pageID string, props map[string]notion.PropertyValue, proposalMap map[string]*types.Proposal) *types.ConfTalk {
 	ct := &types.ConfTalk{
 		ID:              pageID,

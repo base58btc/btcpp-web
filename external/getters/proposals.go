@@ -223,16 +223,14 @@ func CreateConfTalk(n *types.Notion, in ConfTalkInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	InvalidateConfTalksCache()
 	return page.ID, nil
 }
 
-// GetProposal loads a single Proposal page by ID.
+// GetProposal loads a single Proposal page by ID. Reads from the in-memory
+// cache when warm; only hits Notion on a cold miss.
 func GetProposal(ctx *config.AppContext, proposalID string) (*types.Proposal, error) {
-	page, err := ctx.Notion.Client.RetrievePage(context.Background(), proposalID)
-	if err != nil {
-		return nil, err
-	}
-	return parseProposal(ctx, page.ID, page.Properties), nil
+	return FetchProposalByID(ctx, proposalID)
 }
 
 // ListProposals fetches every Proposal page. Callers filter by conf in memory,
@@ -256,6 +254,107 @@ func ListProposals(ctx *config.AppContext) ([]*types.Proposal, error) {
 	}
 	return out, nil
 }
+
+// GetSpeakerConfsByEmail looks up Speaker(s) by email and returns every
+// SpeakerConf row linked to those speakers, fully resolved.
+//
+// Cache-driven on the hot path — when caches are warm this does zero
+// Notion calls and a couple of map lookups. Falls back to a live query
+// only when the cache hasn't been populated yet (e.g. just after boot
+// before WaitFetch finishes).
+func GetSpeakerConfsByEmail(ctx *config.AppContext, email string) ([]*types.Speaker, []*types.SpeakerConf, error) {
+	if email == "" {
+		return nil, nil, nil
+	}
+	speakers, err := GetSpeakersByEmail(ctx.Notion, email)
+	if err != nil {
+		return nil, nil, fmt.Errorf("speakers by email: %w", err)
+	}
+	if len(speakers) == 0 {
+		return nil, nil, nil
+	}
+
+	var allConfs []*types.SpeakerConf
+	for _, sp := range speakers {
+		allConfs = append(allConfs, FetchSpeakerConfsForSpeaker(ctx, sp.ID)...)
+	}
+	return speakers, allConfs, nil
+}
+
+// SpeakerConfFields is the editable subset of a SpeakerConf row written
+// from the dashboard editor. Speaker / conf / talk relations stay put — the
+// editor only touches per-attendance fields.
+type SpeakerConfFields struct {
+	Company      string
+	OrgID        string // Org page ID picked via autocomplete; empty = leave existing
+	OrgPhoto     string // bare filename in Spaces sponsors/; empty = leave existing
+	ComingFrom   string
+	Availability []string
+	RecordOK     string
+	Visa         string
+	FirstEvent   bool
+	DinnerRSVP   bool
+	Sponsor      bool
+}
+
+// UpdateSpeakerConf writes the editable subset to a SpeakerConf row.
+// All fields are written every time — the form always submits them all,
+// so partial-update semantics aren't needed here. OrgPhoto is the
+// exception: empty means "no new upload, keep the existing filename".
+func UpdateSpeakerConf(ctx *config.AppContext, speakerConfID string, in SpeakerConfFields) error {
+	vals := map[string]*notion.PropertyValue{
+		"ComingFrom": titleValue(in.ComingFrom),
+		"Company":    richTextValue(in.Company),
+		"FirstEvent": checkboxValue(in.FirstEvent),
+		"DinnerRSVP": checkboxValue(in.DinnerRSVP),
+		"Sponsor":    checkboxValue(in.Sponsor),
+	}
+	if in.RecordOK != "" {
+		vals["RecordOK"] = selectValue(in.RecordOK)
+	}
+	if in.Visa != "" {
+		vals["Visa"] = selectValue(in.Visa)
+	}
+	if in.Availability != nil {
+		vals["Avails"] = multiSelectValue(in.Availability)
+	}
+	if in.OrgPhoto != "" {
+		vals["OrgPhoto"] = richTextValue(in.OrgPhoto)
+	}
+	if in.OrgID != "" {
+		vals["org"] = relationValue([]string{in.OrgID})
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), speakerConfID, vals)
+	if err == nil {
+		InvalidateSpeakerConfsCache()
+	}
+	return err
+}
+
+// FetchSpeakerConfWithSpeaker reads a SpeakerConf by ID with its `speaker`
+// relation resolved. Cache-first — only the first request after boot (or
+// after invalidation) actually hits Notion.
+func FetchSpeakerConfWithSpeaker(ctx *config.AppContext, speakerConfID string) (*types.SpeakerConf, error) {
+	if sc := FetchSpeakerConfByID(speakerConfID); sc != nil {
+		return sc, nil
+	}
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), speakerConfID)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve speakerconf %s: %w", speakerConfID, err)
+	}
+	speakerID := parseRef(page.Properties, "speaker")
+	if speakerID == "" {
+		return nil, nil
+	}
+	spPage, err := ctx.Notion.Client.RetrievePage(context.Background(), speakerID)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve speaker %s: %w", speakerID, err)
+	}
+	speaker := parseSpeaker(spPage.ID, spPage.Properties)
+	speakerMap := map[string]*types.Speaker{speakerID: speaker}
+	return parseSpeakerConf(ctx, page.ID, page.Properties, speakerMap, nil), nil
+}
+
 
 // ListSpeakerConfs fetches every SpeakerConf page, resolving Speaker and
 // Proposals (multi-relation `talk`) via the supplied maps. Pass nil for
@@ -475,6 +574,123 @@ func ConfTalkSetSocialCard(n *types.Notion, confTalkID, path string) error {
 	return err
 }
 
+// UpdateProposal applies a partial update to a Proposal page — only fields
+// set on `in` are written. Used by the speaker-side proposal editor on the
+// dashboard.
+func UpdateProposal(ctx *config.AppContext, proposalID string, in ProposalInput) error {
+	vals := map[string]*notion.PropertyValue{}
+	if in.Title != "" {
+		vals["Title"] = titleValue(in.Title)
+	}
+	if in.Description != "" {
+		vals["Desc"] = richTextValue(in.Description)
+	}
+	if in.Setup != "" {
+		vals["Setup"] = richTextValue(in.Setup)
+	}
+	if in.Comments != "" {
+		vals["Comments"] = richTextValue(in.Comments)
+	}
+	if in.TalkType != "" {
+		vals["TalkType"] = selectValue(in.TalkType)
+	}
+	if in.DesiredDuration > 0 {
+		vals["DesiredDuration"] = numberValue(float64(in.DesiredDuration))
+	}
+	if in.AvailDuration > 0 {
+		vals["AvailDuration"] = numberValue(float64(in.AvailDuration))
+	}
+	if len(vals) == 0 {
+		return nil
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID, vals)
+	return err
+}
+
+// ListRecordings fetches every row in RecordingsDb. Used by the warm-cache
+// bootstrap; callers should normally read from cacheRecordings instead.
+func ListRecordings(ctx *config.AppContext) ([]*types.Recording, error) {
+	n := ctx.Notion
+	if n.Config.RecordingsDb == "" {
+		return nil, nil
+	}
+	var out []*types.Recording
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
+			n.Config.RecordingsDb, notion.QueryDatabaseParam{StartCursor: nextCursor})
+		if err != nil {
+			return nil, err
+		}
+		nextCursor = next
+		hasMore = more
+		for _, page := range pages {
+			out = append(out, parseRecording(page.ID, page.Properties))
+		}
+	}
+	return out, nil
+}
+
+// GetRecordingByConfTalk fetches the Recording row whose `talk` relation
+// points at confTalkID. Cache-first — when warm, a missing entry means
+// "no recording exists" and we return nil without re-querying Notion.
+func GetRecordingByConfTalk(ctx *config.AppContext, confTalkID string) (*types.Recording, error) {
+	if r := FetchRecordingByConfTalk(confTalkID); r != nil {
+		return r, nil
+	}
+	if cacheRecordingsWarm() {
+		return nil, nil
+	}
+	n := ctx.Notion
+	if n.Config.RecordingsDb == "" {
+		return nil, nil
+	}
+	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
+		n.Config.RecordingsDb, notion.QueryDatabaseParam{
+			Filter: &notion.Filter{
+				Property: "talk",
+				Relation: &notion.RelationFilterCondition{Contains: confTalkID},
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+	if len(pages) == 0 {
+		return nil, nil
+	}
+	return parseRecording(pages[0].ID, pages[0].Properties), nil
+}
+
+// GetConfTalkByProposal looks up the ConfTalk linked to a proposal via its
+// `proposal` relation. Cache-first — when the ConfTalks cache is warm,
+// a missing entry is authoritative ("no ConfTalk exists yet") and we
+// return nil without falling through to Notion. Live query is reserved
+// for the cold-cache path (boot before WaitFetch completes).
+func GetConfTalkByProposal(ctx *config.AppContext, proposalID string) (*types.ConfTalk, error) {
+	if ct := FetchConfTalkByProposal(proposalID); ct != nil {
+		return ct, nil
+	}
+	if cacheConfTalksWarm() {
+		return nil, nil
+	}
+	n := ctx.Notion
+	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
+		n.Config.ConfTalkDb, notion.QueryDatabaseParam{
+			Filter: &notion.Filter{
+				Property: "proposal",
+				Relation: &notion.RelationFilterCondition{Contains: proposalID},
+			},
+		})
+	if err != nil {
+		return nil, err
+	}
+	if len(pages) == 0 {
+		return nil, nil
+	}
+	return parseConfTalk(ctx, pages[0].ID, pages[0].Properties, nil), nil
+}
+
 // UpdateProposalStatus mirrors UpdateTalkAppStatus for the new Proposal DB.
 // Used by the Accept/Invite/Decline admin actions (future work).
 func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) error {
@@ -482,7 +698,39 @@ func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) err
 		map[string]*notion.PropertyValue{
 			"Status": selectValue(status),
 		})
+	if err == nil {
+		InvalidateProposalsCache()
+		InvalidateSpeakerConfsCache()
+	}
 	return err
+}
+
+// RemoveProposalFromSpeakerConf drops one proposal from a SpeakerConf's `talk`
+// multi-relation. Used when a panelist withdraws — the proposal stays alive
+// (other panelists still linked) but this speaker no longer participates.
+//
+// No-op if the proposal isn't currently in the relation.
+func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, proposalID string) error {
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), speakerConfID)
+	if err != nil {
+		return fmt.Errorf("retrieve speakerconf %s: %w", speakerConfID, err)
+	}
+	var remaining []string
+	for _, ref := range page.Properties["talk"].Relation {
+		if ref == nil || ref.ID == "" || ref.ID == proposalID {
+			continue
+		}
+		remaining = append(remaining, ref.ID)
+	}
+	_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), speakerConfID,
+		map[string]*notion.PropertyValue{
+			"talk": relationValue(remaining),
+		})
+	if err != nil {
+		return fmt.Errorf("update speakerconf %s: %w", speakerConfID, err)
+	}
+	InvalidateSpeakerConfsCache()
+	return nil
 }
 
 // --- internal property-builder helpers shared by accept.go ---

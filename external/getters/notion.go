@@ -36,6 +36,48 @@ var lastShiftFetch time.Time
 var orgs []*types.Org
 var lastOrgFetch time.Time
 
+// New-DB caches for the dashboard hot path. Each is paired with a by-ID map
+// so handlers can do O(1) lookups instead of point reads against Notion.
+// Maps are rebuilt fully on every refresh (cheap) and protected by a single
+// mutex per kind because the slice may be replaced atomically.
+var (
+	cacheProposals   []*types.Proposal
+	proposalByID     map[string]*types.Proposal
+	lastProposalFetch time.Time
+	proposalCacheMu  sync.RWMutex
+
+	cacheSpeakerConfs   []*types.SpeakerConf
+	speakerConfByID     map[string]*types.SpeakerConf
+	speakerConfBySpkID  map[string][]*types.SpeakerConf // indexed by Speaker.ID
+	lastSpeakerConfFetch time.Time
+	speakerConfCacheMu  sync.RWMutex
+
+	cacheConfTalks      []*types.ConfTalk
+	confTalkByProposal  map[string]*types.ConfTalk
+	lastConfTalkFetch   time.Time
+	confTalkCacheMu     sync.RWMutex
+
+	cacheRecordings    []*types.Recording
+	recordingByConfTalk map[string]*types.Recording
+	lastRecordingFetch  time.Time
+	recordingCacheMu    sync.RWMutex
+
+	// Site-wide aggregate stats for the about page. Recomputed from the
+	// other warm caches + one paginated PurchasesDb scan; refreshed via
+	// the worker pool on TTL.
+	siteStats          SiteStatsValues
+	lastSiteStatsFetch time.Time
+	siteStatsMu        sync.RWMutex
+)
+
+// SiteStatsValues holds the raw counts behind the about-page numbers.
+// Format-for-display is left to callers.
+type SiteStatsValues struct {
+	PastConfs int // count of confs where EndDate is in the past
+	PastTalks int // count of Accepted ConfTalks at past confs
+	Attendees int // total rows in PurchasesDb (rough total attendees)
+}
+
 type (
 	JobType int
 )
@@ -49,9 +91,30 @@ const (
 	JobJobs
 	JobShifts
 	JobOrgs
+	JobProposals
+	JobSpeakerConfs
+	JobConfTalks
+	JobRecordings
+	JobSiteStats
 )
 
-var taskChan chan JobType = make(chan JobType)
+// Buffered so concurrent FetchXxxCached callers don't block each other when
+// the worker is busy. queueRefresh drops sends that would overflow the
+// buffer — the cache stays stale for one more TTL cycle, but no handler
+// freezes.
+var taskChan chan JobType = make(chan JobType, 32)
+
+// queueRefresh attempts to enqueue a cache-refresh job without blocking.
+// Returns true if queued, false if the buffer was full (in which case
+// another caller's refresh is already in flight or queued).
+func queueRefresh(j JobType) bool {
+	select {
+	case taskChan <- j:
+		return true
+	default:
+		return false
+	}
+}
 var cacheTTL time.Duration
 
 type TalksCallback func(ctx *config.AppContext, talks []*types.Talk)
@@ -123,34 +186,62 @@ func WaitFetch(ctx *config.AppContext) {
 		EnableDiskCache()
 	}
 
-	// Try loading from disk cache only on the very first run (dev only).
+	// Try the disk cache for legacy types (confs / speakers / talks /
+	// discounts / hotels / jobs / shifts / orgs) on the first boot. The
+	// new-DB caches (proposals / speakerconfs / conftalks / recordings)
+	// have no disk persistence and are always fetched fresh below.
+	loadedFromDisk := false
 	if !diskCacheBootstrapped && diskCacheEnabled && loadFromCache() {
-		diskCacheBootstrapped = true
-		ctx.Infos.Printf("Loaded all data from disk cache!")
-		return
+		ctx.Infos.Printf("Loaded legacy data from disk cache!")
+		loadedFromDisk = true
 	}
-	// Mark bootstrap done even if the disk cache was missing/incomplete —
-	// the next WaitFetch should skip the disk cache regardless.
 	diskCacheBootstrapped = true
 
-	ctx.Infos.Printf("Fetching from Notion...")
+	if !loadedFromDisk {
+		ctx.Infos.Printf("Fetching legacy types from Notion...")
+		// Phase 1: independent legacy types
+		var wg sync.WaitGroup
+		wg.Add(6)
+		go func() { defer wg.Done(); runJob(ctx, JobConfs); lastConfsFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobSpeakers); lastSpeakerFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobDiscounts); lastDiscountFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobHotels); lastHotelFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobJobs); lastJobTypeFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobOrgs); lastOrgFetch = time.Now() }()
+		wg.Wait()
 
-	// Phase 1: fetch all independent data in parallel
+		// Phase 2 (legacy): depends on Speakers / Confs from phase 1
+		wg.Add(2)
+		go func() { defer wg.Done(); runJob(ctx, JobTalks); lastTalksFetch = time.Now() }()
+		go func() { defer wg.Done(); runJob(ctx, JobShifts); lastShiftFetch = time.Now() }()
+		wg.Wait()
+	}
+
+	// New-DB types — always fetched, even when the legacy disk cache hit,
+	// since they have no on-disk copy and the dashboard depends on them.
+	ctx.Infos.Printf("Fetching new-DB types from Notion...")
+
+	// Phase A: independent. Proposals + Recordings have no inter-deps.
 	var wg sync.WaitGroup
-	wg.Add(6)
-	go func() { defer wg.Done(); runJob(ctx, JobConfs); lastConfsFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobSpeakers); lastSpeakerFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobDiscounts); lastDiscountFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobHotels); lastHotelFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobJobs); lastJobTypeFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobOrgs); lastOrgFetch = time.Now() }()
+	wg.Add(2)
+	go func() { defer wg.Done(); runJob(ctx, JobProposals); lastProposalFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobRecordings); lastRecordingFetch = time.Now() }()
 	wg.Wait()
 
-	// Phase 2: fetch data that depends on phase 1
+	// Phase B: ConfTalks need Proposals (resolves ct.Proposal pointer);
+	// SpeakerConfs need Proposals + Speakers. Both can now run in parallel.
 	wg.Add(2)
-	go func() { defer wg.Done(); runJob(ctx, JobTalks); lastTalksFetch = time.Now() }()
-	go func() { defer wg.Done(); runJob(ctx, JobShifts); lastShiftFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobConfTalks); lastConfTalkFetch = time.Now() }()
+	go func() { defer wg.Done(); runJob(ctx, JobSpeakerConfs); lastSpeakerConfFetch = time.Now() }()
 	wg.Wait()
+
+	// Site stats run async — they're only used by the about page so
+	// they can warm up after WaitFetch returns. Don't block boot on the
+	// PurchasesDb scan, which can be 30+ paginated calls.
+	go func() {
+		runJob(ctx, JobSiteStats)
+		lastSiteStatsFetch = time.Now()
+	}()
 }
 
 func runJob(ctx *config.AppContext, job JobType) {
@@ -171,6 +262,16 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getShifts(ctx)
 	case JobOrgs:
 		getOrgs(ctx)
+	case JobProposals:
+		getProposals(ctx)
+	case JobSpeakerConfs:
+		getSpeakerConfs(ctx)
+	case JobConfTalks:
+		getConfTalks(ctx)
+	case JobRecordings:
+		getRecordings(ctx)
+	case JobSiteStats:
+		getSiteStats(ctx)
 	}
 }
 
@@ -179,6 +280,328 @@ func workers(ctx *config.AppContext, id int, c chan JobType) {
 		ctx.Infos.Printf("%d starting job type %d", id, job)
 		runJob(ctx, job)
 		ctx.Infos.Printf("%d finished job type %d", id, job)
+	}
+}
+
+// getProposals refreshes the in-memory Proposal cache + by-ID map.
+func getProposals(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting proposals...")
+	props, err := ListProposals(ctx)
+	if err != nil {
+		ctx.Err.Printf("error fetching proposals %s", err)
+		return
+	}
+	idx := make(map[string]*types.Proposal, len(props))
+	for _, p := range props {
+		if p != nil {
+			idx[p.ID] = p
+		}
+	}
+	proposalCacheMu.Lock()
+	cacheProposals = props
+	proposalByID = idx
+	proposalCacheMu.Unlock()
+	ctx.Infos.Printf("Loaded %d proposals!", len(props))
+}
+
+// FetchProposalsCached returns the cached proposal slice. May trigger an
+// async refresh if the TTL has elapsed; the returned data may be stale by
+// up to one refresh cycle.
+func FetchProposalsCached(ctx *config.AppContext) ([]*types.Proposal, error) {
+	deadline := time.Now().Add(-cacheTTL)
+	proposalCacheMu.RLock()
+	stale := cacheProposals == nil || lastProposalFetch.Before(deadline)
+	out := cacheProposals
+	proposalCacheMu.RUnlock()
+	if stale {
+		lastProposalFetch = time.Now()
+		queueRefresh(JobProposals)
+	}
+	return out, nil
+}
+
+// FetchProposalByID is the hot-path lookup used by per-proposal handlers
+// (GetProposal, dashboard auth, etc.). O(1) map read; falls back to
+// Notion only if the cache is empty (first request after boot).
+func FetchProposalByID(ctx *config.AppContext, id string) (*types.Proposal, error) {
+	proposalCacheMu.RLock()
+	p := proposalByID[id]
+	proposalCacheMu.RUnlock()
+	if p != nil {
+		return p, nil
+	}
+	// Cache miss — fall back to a direct read so we don't wait for the
+	// full DB refresh. Caller can decide how to handle nil.
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	return parseProposal(ctx, page.ID, page.Properties), nil
+}
+
+// InvalidateProposalsCache forces the next FetchProposalsCached / Fetch
+// ProposalByID to refresh from Notion. Call after a write that changed
+// proposal data (status flip, edit, etc.).
+func InvalidateProposalsCache() {
+	proposalCacheMu.Lock()
+	lastProposalFetch = time.Time{}
+	proposalCacheMu.Unlock()
+}
+
+// getSpeakerConfs refreshes the SpeakerConf cache. Depends on Speakers and
+// Proposals being already cached so parseSpeakerConf can resolve relations.
+func getSpeakerConfs(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting speaker confs...")
+	// Build the per-call resolution maps from the existing caches.
+	speakerMap := make(map[string]*types.Speaker, len(cacheSpeakers))
+	for _, s := range cacheSpeakers {
+		if s != nil {
+			speakerMap[s.ID] = s
+		}
+	}
+	proposalCacheMu.RLock()
+	pmap := make(map[string]*types.Proposal, len(proposalByID))
+	for k, v := range proposalByID {
+		pmap[k] = v
+	}
+	proposalCacheMu.RUnlock()
+
+	scs, err := ListSpeakerConfs(ctx, speakerMap, pmap)
+	if err != nil {
+		ctx.Err.Printf("error fetching speakerconfs %s", err)
+		return
+	}
+	idx := make(map[string]*types.SpeakerConf, len(scs))
+	bySpk := make(map[string][]*types.SpeakerConf)
+	for _, sc := range scs {
+		if sc == nil {
+			continue
+		}
+		idx[sc.ID] = sc
+		if sc.Speaker != nil {
+			bySpk[sc.Speaker.ID] = append(bySpk[sc.Speaker.ID], sc)
+		}
+	}
+	speakerConfCacheMu.Lock()
+	cacheSpeakerConfs = scs
+	speakerConfByID = idx
+	speakerConfBySpkID = bySpk
+	speakerConfCacheMu.Unlock()
+	ctx.Infos.Printf("Loaded %d speaker confs!", len(scs))
+}
+
+// FetchSpeakerConfsForSpeaker returns the cached SpeakerConf rows linked to
+// speakerID. Triggers an async refresh on TTL expiry but returns stale
+// data immediately rather than blocking.
+func FetchSpeakerConfsForSpeaker(ctx *config.AppContext, speakerID string) []*types.SpeakerConf {
+	deadline := time.Now().Add(-cacheTTL)
+	speakerConfCacheMu.RLock()
+	stale := cacheSpeakerConfs == nil || lastSpeakerConfFetch.Before(deadline)
+	out := append([]*types.SpeakerConf(nil), speakerConfBySpkID[speakerID]...)
+	speakerConfCacheMu.RUnlock()
+	if stale {
+		lastSpeakerConfFetch = time.Now()
+		queueRefresh(JobSpeakerConfs)
+	}
+	return out
+}
+
+// FetchSpeakerConfByID returns the cached SpeakerConf for the given page
+// ID, or nil if not in cache.
+func FetchSpeakerConfByID(id string) *types.SpeakerConf {
+	speakerConfCacheMu.RLock()
+	defer speakerConfCacheMu.RUnlock()
+	return speakerConfByID[id]
+}
+
+func InvalidateSpeakerConfsCache() {
+	speakerConfCacheMu.Lock()
+	lastSpeakerConfFetch = time.Time{}
+	speakerConfCacheMu.Unlock()
+}
+
+// getConfTalks refreshes the ConfTalk cache. Depends on Proposals being
+// cached so parseConfTalk can attach the linked Proposal pointer.
+func getConfTalks(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting conftalks...")
+	proposalCacheMu.RLock()
+	pmap := make(map[string]*types.Proposal, len(proposalByID))
+	for k, v := range proposalByID {
+		pmap[k] = v
+	}
+	proposalCacheMu.RUnlock()
+
+	cts, err := ListConfTalks(ctx, pmap)
+	if err != nil {
+		ctx.Err.Printf("error fetching conftalks %s", err)
+		return
+	}
+	byProp := make(map[string]*types.ConfTalk, len(cts))
+	for _, ct := range cts {
+		if ct != nil && ct.Proposal != nil {
+			byProp[ct.Proposal.ID] = ct
+		}
+	}
+	confTalkCacheMu.Lock()
+	cacheConfTalks = cts
+	confTalkByProposal = byProp
+	confTalkCacheMu.Unlock()
+	ctx.Infos.Printf("Loaded %d conftalks!", len(cts))
+}
+
+// FetchConfTalkByProposal returns the cached ConfTalk for proposalID, or
+// nil if no ConfTalk exists yet (or if the cache is empty).
+func FetchConfTalkByProposal(proposalID string) *types.ConfTalk {
+	confTalkCacheMu.RLock()
+	defer confTalkCacheMu.RUnlock()
+	return confTalkByProposal[proposalID]
+}
+
+func InvalidateConfTalksCache() {
+	confTalkCacheMu.Lock()
+	lastConfTalkFetch = time.Time{}
+	confTalkCacheMu.Unlock()
+}
+
+// getRecordings refreshes the Recording cache + by-ConfTalk index.
+func getRecordings(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting recordings...")
+	recs, err := ListRecordings(ctx)
+	if err != nil {
+		ctx.Err.Printf("error fetching recordings %s", err)
+		return
+	}
+	byCT := make(map[string]*types.Recording, len(recs))
+	for _, r := range recs {
+		if r != nil && r.ConfTalkID != "" {
+			byCT[r.ConfTalkID] = r
+		}
+	}
+	recordingCacheMu.Lock()
+	cacheRecordings = recs
+	recordingByConfTalk = byCT
+	recordingCacheMu.Unlock()
+	ctx.Infos.Printf("Loaded %d recordings!", len(recs))
+}
+
+// FetchRecordingByConfTalk returns the cached Recording linked to
+// confTalkID, or nil if none.
+func FetchRecordingByConfTalk(confTalkID string) *types.Recording {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	return recordingByConfTalk[confTalkID]
+}
+
+func cacheRecordingsWarm() bool {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	return cacheRecordings != nil
+}
+
+func cacheConfTalksWarm() bool {
+	confTalkCacheMu.RLock()
+	defer confTalkCacheMu.RUnlock()
+	return cacheConfTalks != nil
+}
+
+func InvalidateRecordingsCache() {
+	recordingCacheMu.Lock()
+	lastRecordingFetch = time.Time{}
+	recordingCacheMu.Unlock()
+}
+
+// getSiteStats recomputes the about-page aggregate counters from the
+// already-warm Confs / ConfTalks caches + one paginated PurchasesDb
+// scan. Idempotent and safe to run on a TTL refresh.
+func getSiteStats(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting site stats...")
+	var s SiteStatsValues
+
+	// Past confs from the in-memory cache.
+	for _, c := range confs {
+		if c != nil && c.HasEnded() {
+			s.PastConfs++
+		}
+	}
+
+	// Accepted talks at past confs — read the ConfTalks cache.
+	confTalkCacheMu.RLock()
+	for _, ct := range cacheConfTalks {
+		if ct == nil || ct.Conf == nil || !ct.Conf.HasEnded() {
+			continue
+		}
+		if ct.Proposal != nil && ct.Proposal.Status == "Accepted" {
+			s.PastTalks++
+		}
+	}
+	confTalkCacheMu.RUnlock()
+
+	// Attendees: total rows in PurchasesDb. Slight over-count (test rows,
+	// upcoming-conf purchases) but rounded down to the nearest 50 in
+	// display, so the imprecision is invisible.
+	if db := ctx.Notion.Config.PurchasesDb; db != "" {
+		hasMore := true
+		nextCursor := ""
+		for hasMore {
+			pages, next, more, err := ctx.Notion.Client.QueryDatabase(context.Background(),
+				db, notion.QueryDatabaseParam{StartCursor: nextCursor})
+			if err != nil {
+				ctx.Err.Printf("site stats purchases scan: %s", err)
+				break
+			}
+			nextCursor = next
+			hasMore = more
+			s.Attendees += len(pages)
+		}
+	}
+
+	siteStatsMu.Lock()
+	siteStats = s
+	siteStatsMu.Unlock()
+	ctx.Infos.Printf("Loaded site stats: confs=%d talks=%d attendees=%d",
+		s.PastConfs, s.PastTalks, s.Attendees)
+}
+
+// FetchSiteStats returns the cached about-page counters and queues a
+// background refresh on TTL expiry.
+func FetchSiteStats(ctx *config.AppContext) SiteStatsValues {
+	siteStatsMu.RLock()
+	s := siteStats
+	stale := lastSiteStatsFetch.Before(time.Now().Add(-cacheTTL))
+	siteStatsMu.RUnlock()
+	if stale {
+		lastSiteStatsFetch = time.Now()
+		queueRefresh(JobSiteStats)
+	}
+	return s
+}
+
+// CacheStats reports the current row counts in each warm cache. Used by
+// the /api/cache-stats debug endpoint to verify bootstrap completed.
+func CacheStats() map[string]int {
+	proposalCacheMu.RLock()
+	nProp := len(proposalByID)
+	proposalCacheMu.RUnlock()
+	speakerConfCacheMu.RLock()
+	nSC := len(speakerConfByID)
+	nBySpk := len(speakerConfBySpkID)
+	speakerConfCacheMu.RUnlock()
+	confTalkCacheMu.RLock()
+	nCT := len(confTalkByProposal)
+	confTalkCacheMu.RUnlock()
+	recordingCacheMu.RLock()
+	nRec := len(recordingByConfTalk)
+	recordingCacheMu.RUnlock()
+	return map[string]int{
+		"proposals":              nProp,
+		"speakerconfs":           nSC,
+		"speakerconfs_by_spkid":  nBySpk,
+		"conftalks_by_proposal":  nCT,
+		"recordings_by_conftalk": nRec,
+		"confs":                  len(confs),
+		"speakers":               len(cacheSpeakers),
+		"orgs":                   len(orgs),
+		"notion_calls_total":     int(types.NotionCallCount()),
 	}
 }
 
@@ -200,7 +623,7 @@ func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
 	deadline := now.Add(-cacheTTL)
 	if confs == nil || lastConfsFetch.Before(deadline) {
 		lastConfsFetch = time.Now()
-		taskChan <- JobConfs
+		queueRefresh(JobConfs)
 	}
 
 	return confs, nil
@@ -230,7 +653,7 @@ func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
 	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
 		/* Set last fetch to now even if there's errors */
 		lastSpeakerFetch = time.Now()
-		taskChan <- JobSpeakers
+		queueRefresh(JobSpeakers)
 	}
 
 	return cacheSpeakers, nil
@@ -259,7 +682,7 @@ func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
 	if talks == nil || lastTalksFetch.Before(deadline) {
 		/* Set last fetch to now even if fails */
 		lastTalksFetch = time.Now()
-		taskChan <- JobTalks
+		queueRefresh(JobTalks)
 	}
 
 	return talks, nil
@@ -285,7 +708,7 @@ func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error)
 	if discounts == nil || lastDiscountFetch.Before(deadline) {
 		/* Set last fetch to now even if there's errors */
 		lastDiscountFetch = time.Now()
-		taskChan <- JobDiscounts
+		queueRefresh(JobDiscounts)
 	}
 
 	return discounts, nil
@@ -310,7 +733,7 @@ func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
 	deadline := now.Add(-cacheTTL)
 	if hotels == nil || lastHotelFetch.Before(deadline) {
 		lastHotelFetch = time.Now()
-		taskChan <- JobHotels
+		queueRefresh(JobHotels)
 	}
 
 	return hotels, nil
@@ -335,7 +758,7 @@ func FetchJobsCached(ctx *config.AppContext) ([]*types.JobType, error) {
 	deadline := now.Add(-cacheTTL)
 	if jobs == nil || lastJobTypeFetch.Before(deadline) {
 		lastJobTypeFetch = time.Now()
-		taskChan <- JobJobs
+		queueRefresh(JobJobs)
 	}
 
 	return jobs, nil
@@ -360,7 +783,7 @@ func FetchShiftsCached(ctx *config.AppContext) ([]*types.WorkShift, error) {
 	deadline := now.Add(-cacheTTL)
 	if shifts == nil || lastShiftFetch.Before(deadline) {
 		lastShiftFetch = time.Now()
-		taskChan <- JobShifts
+		queueRefresh(JobShifts)
 	}
 
 	return shifts, nil
@@ -385,7 +808,7 @@ func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
 	deadline := now.Add(-cacheTTL)
 	if orgs == nil || lastOrgFetch.Before(deadline) {
 		lastOrgFetch = time.Now()
-		taskChan <- JobOrgs
+		queueRefresh(JobOrgs)
 	}
 
 	return orgs, nil
@@ -1303,6 +1726,49 @@ func FetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Regist
 	}
 
 	return regis, nil
+}
+
+// ListRegistrationsByEmail returns every PurchasesDb row for this email.
+// Used by the dashboard to render "your tickets" and the apply-form
+// "returning attendee" check.
+func ListRegistrationsByEmail(ctx *config.AppContext, email string) ([]*types.Registration, error) {
+	if email == "" {
+		return nil, nil
+	}
+	n := ctx.Notion
+	var out []*types.Registration
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
+			n.Config.PurchasesDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+				Filter: &notion.Filter{
+					Property: "Email",
+					Text:     &notion.TextFilterCondition{Equals: email},
+				},
+			})
+		if err != nil {
+			return nil, err
+		}
+		nextCursor = next
+		hasMore = more
+		for _, page := range pages {
+			out = append(out, parseRegistration(page.Properties))
+		}
+	}
+	return out, nil
+}
+
+// EmailHasRegistration reports whether the email appears at all in
+// PurchasesDb — used by the talk-apply form to hide the "first bitcoin++"
+// checkbox for returning attendees.
+func EmailHasRegistration(ctx *config.AppContext, email string) (bool, error) {
+	regs, err := ListRegistrationsByEmail(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	return len(regs) > 0, nil
 }
 
 func ticketMatch(tickets []string, rez *types.Registration) bool {

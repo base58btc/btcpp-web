@@ -2,6 +2,7 @@ package getters
 
 import (
 	"context"
+	"strings"
 
 	"btcpp-web/internal/types"
 
@@ -52,7 +53,19 @@ type SpeakerUpdate struct {
 // GetSpeakersByEmail returns every Speaker page whose Email property matches
 // `email` exactly. Caller is responsible for deciding what to do when 0, 1,
 // or many are returned.
+// GetSpeakersByEmail returns every Speaker page whose Email matches.
+// Reads from cacheSpeakers when warm; falls back to a live query only on
+// a cold cache (first request after boot before WaitFetch completes).
 func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error) {
+	if cached := cacheSpeakers; len(cached) > 0 {
+		var hits []*types.Speaker
+		for _, s := range cached {
+			if s != nil && strings.EqualFold(s.Email, email) {
+				hits = append(hits, s)
+			}
+		}
+		return hits, nil
+	}
 	var speakers []*types.Speaker
 	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
 		n.Config.SpeakersDb, notion.QueryDatabaseParam{

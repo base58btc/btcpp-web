@@ -78,11 +78,23 @@ func makeJobKeyRep(email string, letter *mtypes.Letter) string {
 }
 
 
-func OnlyForVolLogin(ctx *config.AppContext, email string) ([]byte, error) {
+// OnlyForLogin sends a magic-link email pointing at /dashboard. Reuses the
+// existing "vollogin" Notion letter (its template field is named
+// VolShiftLink for historical reasons; the URL it produces is now the
+// unified dashboard).
+//
+// Outside production, the link is also written to the info log so devs can
+// grab it without waiting for a real email. NEVER do this in prod — anyone
+// with log access could log in as anyone.
+func OnlyForLogin(ctx *config.AppContext, email string) ([]byte, error) {
         onlyFor := "vollogin"
+        link := helpers.EmailLink(ctx, email, "/dashboard")
+        if !ctx.InProduction {
+                ctx.Infos.Printf("[dev] dashboard login link for %s: %s", email, link)
+        }
         tmplData := &VolLogin{
-                Email: email,
-                VolShiftLink: helpers.EmailLink(ctx, email, "/vols/shift"),
+                Email:        email,
+                VolShiftLink: link,
 	}
 
         return execOnlyFor(ctx, email, onlyFor, tmplData)

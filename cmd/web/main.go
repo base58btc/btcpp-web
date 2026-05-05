@@ -76,6 +76,7 @@ func loadConfig() *types.EnvConfig {
 			ProposalDb:        os.Getenv("NOTION_PROPOSAL_DB"),
 			SpeakerConfDb:     os.Getenv("NOTION_SPEAKER_CONF_DB"),
 			ConfTalkDb:        os.Getenv("NOTION_CONFTALK_DB"),
+			RecordingsDb:      os.Getenv("NOTION_RECORDINGS_DB"),
 			ShiftDb:     os.Getenv("NOTION_SHIFTS_DB"),
                         VolInfoDb:   os.Getenv("NOTION_VOLINFO_DB"),
 			OrgDb:         os.Getenv("NOTION_ORG_DB"),
@@ -217,6 +218,10 @@ func run(env *types.EnvConfig) error {
 
 	app.Notion = &types.Notion{Config: &env.Notion}
 	app.Notion.Setup(env.Notion.Token)
+
+	// Per-request Notion timing → app log. Stays off in CLIs that build
+	// their own ad-hoc Notion clients without calling SetNotionRequestLogger.
+	types.SetNotionRequestLogger(app.Infos.Printf)
 
 	return nil
 }

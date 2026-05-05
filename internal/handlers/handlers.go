@@ -141,6 +141,17 @@ func loadTemplates(ctx *config.AppContext) error {
 		"add": func(a, b int) int {
 			return a + b
 		},
+		"inSlice": func(needle string, haystack []string) bool {
+			for _, s := range haystack {
+				if s == needle {
+					return true
+				}
+			}
+			return false
+		},
+		"siteStats": func() siteStatsView {
+			return formatSiteStats(getters.FetchSiteStats(ctx))
+		},
 		"ge": func(a, b int) bool {
 			return a >= b
 		},
@@ -319,6 +330,69 @@ func findMaxTix(conf *types.Conf) *types.ConfTicket {
 }
 
 // Routes sets up the routes for the application
+// siteStatsView is the about-page-friendly shape of the cached site
+// stats, exposed to templates via the {{ siteStats }} function.
+type siteStatsView struct {
+	Confs     int    // raw integer — no rounding (e.g. "14")
+	Talks     string // rounded down to nearest 50 with "+" suffix (e.g. "400+")
+	Attendees string // same, formatted as "X.Yk+" once over 1000 (e.g. "3.2k+")
+}
+
+func formatSiteStats(s getters.SiteStatsValues) siteStatsView {
+	return siteStatsView{
+		Confs:     s.PastConfs,
+		Talks:     formatRoundedDownPlus(s.PastTalks),
+		Attendees: formatRoundedDownPlus(s.Attendees),
+	}
+}
+
+// formatRoundedDownPlus floors n to the nearest 50, then renders with a
+// "+" suffix. Above 1000 it switches to "X.Yk+" (one decimal, trailing
+// zero trimmed).
+func formatRoundedDownPlus(n int) string {
+	if n < 50 {
+		return strconv.Itoa(n)
+	}
+	r := (n / 50) * 50
+	if r >= 1000 {
+		whole := r / 1000
+		hundreds := (r % 1000) / 100
+		if hundreds == 0 {
+			return fmt.Sprintf("%dk+", whole)
+		}
+		return fmt.Sprintf("%d.%dk+", whole, hundreds)
+	}
+	return fmt.Sprintf("%d+", r)
+}
+
+// statusRecorder wraps http.ResponseWriter so requestLog can read the
+// final status code after the handler returns. WriteHeader stores the
+// code and forwards; if the handler never calls WriteHeader explicitly,
+// we default to 200 (matching net/http's behavior).
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusRecorder) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
+// requestLog is a middleware that logs each incoming request's start
+// and completion (method, path, status, duration). Combined with the
+// per-Notion-call timing emitted by the rate-limited transport, this
+// gives a full timeline for any slow request.
+func requestLog(ctx *config.AppContext, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		ctx.Infos.Printf("→ %s %s", r.Method, r.URL.Path)
+		sr := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		h.ServeHTTP(sr, r)
+		ctx.Infos.Printf("← %s %s [%d] %s", r.Method, r.URL.Path, sr.status, time.Since(start))
+	})
+}
+
 func Routes(app *config.AppContext) (http.Handler, error) {
 	r := mux.NewRouter()
 
@@ -494,6 +568,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		Ticket(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/ticket/{ticket}/pdf", func(w http.ResponseWriter, r *http.Request) {
+		TicketPDF(w, r, app)
+	}).Methods("GET")
+
 	/* Register routes for newsletters */
 	missives.RegisterNewsletterHandlers(r, app)
 	emails.RegisterEndpoints(r, app)
@@ -587,8 +665,47 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
+	r.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		Dashboard(w, r, app)
+	}).Methods("GET", "POST")
+
+	r.HandleFunc("/dashboard/conf/{confTag}/edit", func(w http.ResponseWriter, r *http.Request) {
+		DashboardEditSpeakerConf(w, r, app)
+	}).Methods("GET", "POST")
+
+	r.HandleFunc("/api/orgs/search", func(w http.ResponseWriter, r *http.Request) {
+		OrgSearch(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		out := map[string]interface{}{
+			"caches":       getters.CacheStats(),
+			"recent_calls": types.RecentNotionCalls(),
+		}
+		json.NewEncoder(w).Encode(out)
+	}).Methods("GET")
+
+	r.HandleFunc("/dashboard/talks/{proposalID}/edit", func(w http.ResponseWriter, r *http.Request) {
+		DashboardEditProposal(w, r, app)
+	}).Methods("GET", "POST")
+
+	r.HandleFunc("/dashboard/talks/{proposalID}/withdraw", func(w http.ResponseWriter, r *http.Request) {
+		DashboardWithdraw(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/dashboard/talks/{proposalID}/accept", func(w http.ResponseWriter, r *http.Request) {
+		DashboardAcceptInvite(w, r, app)
+	}).Methods("POST")
+
+	// Backwards compat: existing magic-link emails point at /vols/shift.
+	// Forward them to /dashboard, preserving the HMAC + email query params.
 	r.HandleFunc("/vols/shift", func(w http.ResponseWriter, r *http.Request) {
-		VolunteerShift(w, r, app)
+		target := "/dashboard"
+		if raw := r.URL.RawQuery; raw != "" {
+			target += "?" + raw
+		}
+		http.Redirect(w, r, target, http.StatusFound)
 	}).Methods("GET", "POST")
 
 	r.HandleFunc("/vols/shift/{conf}", func(w http.ResponseWriter, r *http.Request) {
@@ -709,7 +826,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
-	return r, err
+	return requestLog(app, r), nil
 }
 
 func getFaviconHandler(name string) func(http.ResponseWriter, *http.Request) {
@@ -982,7 +1099,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
         confs := listConfs(w, ctx)
 
         switch r.Method {
-        case http.MethodGet: 
+        case http.MethodGet:
 
                 talksDue := 45
                 if conf.Tag == "nairobi" {
@@ -1598,6 +1715,62 @@ func Ticket(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Infos.Printf("/ticket-pdf ExecuteTemplate failed ! %s", err.Error())
 	}
+}
+
+// TicketPDF renders the same ticket HTML view as /ticket/{ref} but pipes
+// it through headless Chrome to produce a downloadable PDF. Used by the
+// dashboard "Download ticket" button so users get a saveable file
+// instead of a browser tab they have to print themselves.
+func TicketPDF(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	ticket := mux.Vars(r)["ticket"]
+	tixType := r.URL.Query().Get("type")
+	confRef := r.URL.Query().Get("conf")
+
+	// Build the internal URL chrome will fetch — same URL pattern as the
+	// HTML view, just with auto-print disabled (the HTML page is public,
+	// no auth needed).
+	q := url.Values{}
+	if tixType != "" {
+		q.Set("type", tixType)
+	}
+	if confRef != "" {
+		q.Set("conf", confRef)
+	}
+	internalURL := fmt.Sprintf("%s/ticket/%s?%s", ctx.Env.GetURI(), ticket, q.Encode())
+
+	pdfBytes, err := helpers.BuildChromePdf(ctx, &helpers.PDFPage{
+		URL:    internalURL,
+		Width:  8.5,
+		Height: 11,
+	})
+	if err != nil {
+		http.Error(w, "Could not generate ticket PDF", http.StatusInternalServerError)
+		ctx.Err.Printf("/ticket/%s/pdf chromedp failed: %s", ticket, err)
+		return
+	}
+
+	// Friendly filename: ticket-{conf-tag}-{first8ofref}.pdf
+	confName := "btcpp"
+	if confRef != "" {
+		if confs, _ := getters.FetchConfsCached(ctx); confs != nil {
+			for _, c := range confs {
+				if c != nil && c.Ref == confRef && c.Tag != "" {
+					confName = c.Tag
+					break
+				}
+			}
+		}
+	}
+	shortRef := ticket
+	if len(shortRef) > 8 {
+		shortRef = shortRef[:8]
+	}
+	filename := fmt.Sprintf("ticket-%s-%s.pdf", confName, shortRef)
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfBytes)))
+	w.Write(pdfBytes)
 }
 
 func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -2314,7 +2487,7 @@ func RenderFindShift(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 			return
 		}
 
-                _, err = emails.OnlyForVolLogin(ctx, form.Email)
+                _, err = emails.OnlyForLogin(ctx, form.Email)
                 if err != nil {
                         http.Error(w, "Unable to send login link via email", http.StatusInternalServerError)
                         ctx.Err.Printf("/volunteers/findshift onlyforvollogin failed ! %s", err.Error())

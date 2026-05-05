@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -69,6 +71,64 @@ func ListOrgs(n *types.Notion) ([]*types.Org, error) {
 	}
 
 	return orgs, nil
+}
+
+// orgListCache memoizes ListOrgs for the autocomplete endpoint, which can
+// fire several times per second as the user types. The TTL is short
+// enough that admin-side org additions show up promptly.
+var (
+	orgListCacheMu  sync.Mutex
+	orgListCached   []*types.Org
+	orgListCachedAt time.Time
+)
+
+const orgListCacheTTL = 5 * time.Minute
+
+func listOrgsCached(n *types.Notion) ([]*types.Org, error) {
+	orgListCacheMu.Lock()
+	if orgListCached != nil && time.Since(orgListCachedAt) < orgListCacheTTL {
+		out := orgListCached
+		orgListCacheMu.Unlock()
+		return out, nil
+	}
+	orgListCacheMu.Unlock()
+	orgs, err := ListOrgs(n)
+	if err != nil {
+		return nil, err
+	}
+	orgListCacheMu.Lock()
+	orgListCached = orgs
+	orgListCachedAt = time.Now()
+	orgListCacheMu.Unlock()
+	return orgs, nil
+}
+
+// SearchOrgsByName returns up to limit orgs whose name contains q
+// (case-insensitive substring). Used by the autocomplete on the speaker
+// info editor. Backed by listOrgsCached so rapid keystrokes don't hammer
+// Notion.
+func SearchOrgsByName(n *types.Notion, q string, limit int) ([]*types.Org, error) {
+	q = strings.TrimSpace(strings.ToLower(q))
+	if q == "" {
+		return nil, nil
+	}
+	orgs, err := listOrgsCached(n)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*types.Org, 0, limit)
+	for _, o := range orgs {
+		if o == nil || o.Name == "" {
+			continue
+		}
+		if strings.Contains(strings.ToLower(o.Name), q) {
+			out = append(out, o)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out, nil
 }
 
 func GetOrg(n *types.Notion, ref string) (*types.Org, error) {
