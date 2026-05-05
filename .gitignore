@@ -12,3 +12,8 @@ chat
 
 /media/*/
 credentials.json
+
+# one-shot migration CLI binaries + their state files (output of cmd/migrate-*)
+/migrate-*
+/refresh-cards
+/check-speaker
