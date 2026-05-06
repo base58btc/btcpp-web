@@ -1,4 +1,5 @@
 {{ define "mainnav" }}
+{{ $nav := navConfs }}
 <header class="relative isolate z-20 bg-white sticky top-0 z-40">
   <nav class="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8" aria-label="Global">
     <div class="flex lg:flex-1">
@@ -13,30 +14,20 @@
       </button>
     </div>
     <div class="hidden lg:flex lg:gap-x-12">
-      <div>
-      <!-- other topline items? 
-      <a href="#" class="text-sm font-semibold leading-6 text-gray-900">Features</a>
-      <a href="#" class="text-sm font-semibold leading-6 text-gray-900">Marketplace</a>
-      <a href="#" class="text-sm font-semibold leading-6 text-gray-900">Company</a>
-      -->
-    </div>
-    <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-        <button onclick="toggleNavFlyout(this)" type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-900" aria-expanded="false">
-          Events
+      <div></div>
+      <div class="hidden lg:flex lg:flex-1 lg:items-center lg:justify-end lg:gap-x-8">
+        <button onclick="toggleNavFlyout(this, 'nav-flyout-upcoming')" type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-900" aria-expanded="false">
+          Upcoming
           <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
           </svg>
         </button>
-        <!--
-          'Product' flyout menu, show/hide based on flyout menu state.
-
-          Entering: "transition ease-out duration-200"
-            From: "opacity-0 -translate-y-1"
-            To: "opacity-100 translate-y-0"
-          Leaving: "transition ease-in duration-150"
-            From: "opacity-100 translate-y-0"
-            To: "opacity-0 -translate-y-1"
-        -->
+        <button onclick="toggleNavFlyout(this, 'nav-flyout-past')" type="button" class="flex items-center gap-x-1 text-sm font-semibold leading-6 text-gray-900" aria-expanded="false">
+          Past
+          <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+          </svg>
+        </button>
         <style>
           .transition-in {
             transition-property: opacity transform;
@@ -50,433 +41,62 @@
             transition-duration: 250ms;
           }
         </style>
-        <div role="nav-flyout" class="absolute inset-x-0 top-0 -z-20 bg-white pt-14 shadow-lg ring-1 ring-gray-900/5" style="transform: translateY(-100%); opacity: 0;">
-          <div class="flex-row-reverse mx-auto grid max-w-7xl grid-cols-4 gap-x-4 px-6 py-10 lg:px-8 xl:gap-x-8">
-          <!-- NOTE: In opposite order from how they appear, add new confs to bottom -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" version="1.0" xmlns="http://www.w3.org/2000/svg"
-                 height="26.000000pt" viewBox="0 0 1536.000000 1152.000000"
-                 preserveAspectRatio="xMidYMid meet" stroke="currentColor" aria-hidden="true">
-                  <g transform="translate(0.000000,1152.000000) scale(0.100000,-0.100000)"
-                  fill="currentColor" stroke="none">
-                    <path d="M6965 10386 c-155 -25 -281 -73 -389 -150 -72 -51 -272 -256 -369
-                    -376 -37 -46 -102 -134 -144 -195 -42 -60 -116 -167 -165 -236 l-89 -126 -337
-                    -107 c-777 -249 -1145 -407 -1540 -663 -1053 -681 -1718 -1914 -1867 -3458
-                    -25 -257 -35 -612 -25 -871 9 -210 15 -298 36 -509 14 -149 153 -477 310 -733
-                    578 -945 1673 -1584 3059 -1786 520 -76 659 -73 1054 25 326 81 686 226 871
-                    352 108 74 791 611 1215 956 608 494 1039 858 2420 2041 1390 1191 1751 1497
-                    2282 1935 127 105 238 202 247 217 75 124 -98 280 -472 425 -139 53 -283 97
-                    -423 127 l-105 23 -235 175 c-240 179 -888 654 -1108 813 -67 49 -125 96 -128
-                    104 -92 271 -303 693 -570 1136 -145 239 -155 252 -217 280 -223 98 -1429 381
-                    -2168 509 -198 35 -513 78 -693 96 -125 13 -354 10 -450 -4z m510 -236 c383
-                    -33 833 -113 1484 -265 174 -41 386 -90 471 -110 85 -20 164 -39 174 -42 13
-                    -3 -19 -17 -90 -38 -343 -101 -666 -261 -1049 -519 -187 -126 -353 -250 -715
-                    -537 -435 -345 -603 -465 -796 -572 -446 -248 -804 -242 -1170 19 -91 65 -219
-                    187 -238 228 -37 78 -11 165 96 321 102 150 705 949 811 1077 156 185 308 340
-                    364 370 127 69 358 93 658 68z m2738 -691 c320 -564 523 -1034 631 -1464 60
-                    -239 128 -645 166 -990 6 -55 13 -112 16 -126 5 -24 -4 -33 -103 -100 -422
-                    -287 -807 -586 -1093 -851 -265 -245 -576 -578 -754 -809 l-59 -77 -101 -11
-                    c-1257 -145 -1585 -160 -2016 -95 -466 70 -956 291 -1299 587 -506 437 -686
-                    1109 -496 1855 48 189 123 389 216 574 l50 100 54 -59 c129 -143 423 -292 690
-                    -349 124 -26 379 -24 515 5 137 29 232 61 358 121 247 118 419 242 917 664
-                    110 94 258 216 328 272 596 474 1131 729 1764 838 76 14 142 23 147 22 5 -1
-                    36 -49 69 -107z m-4763 -627 c-19 -15 -63 -53 -97 -84 -34 -32 -69 -58 -77
-                    -58 -28 0 -251 -71 -366 -117 -63 -25 -181 -78 -261 -118 -1023 -510 -1766
-                    -1477 -2140 -2784 -43 -151 -49 -185 -38 -192 35 -22 46 -9 99 114 79 183 298
-                    624 385 777 270 472 558 828 910 1124 386 325 750 537 1164 677 62 22 117 39
-                    122 39 4 0 -17 -53 -47 -117 -329 -699 -524 -1428 -524 -1954 0 -711 245
-                    -1256 733 -1627 327 -249 896 -469 1522 -588 266 -51 614 -43 1170 26 132 17
-                    265 34 295 39 30 5 57 8 58 6 6 -5 -83 -224 -160 -395 -149 -332 -370 -728
-                    -706 -1265 -167 -267 -244 -369 -376 -501 -244 -245 -485 -354 -901 -410 -463
-                    -61 -1335 85 -1918 321 -726 293 -1369 788 -1732 1330 -140 209 -193 333 -249
-                    585 -95 429 -101 964 -15 1505 90 569 296 1271 471 1605 386 736 906 1302
-                    1541 1674 237 139 504 240 1007 380 158 44 177 45 130 8z m5940 -1075 c187
-                    -124 618 -462 606 -474 -2 -3 -44 -13 -93 -24 -132 -29 -264 -75 -400 -139
-                    -104 -49 -123 -56 -127 -42 -25 85 -186 771 -186 791 0 15 53 -15 200 -112z
-                    m1455 -815 c144 -31 306 -96 370 -146 20 -16 19 -17 -21 -54 -354 -320 -1451
-                    -1239 -3259 -2732 -475 -392 -857 -707 -1955 -1610 -272 -224 -308 -252 -298
-                    -234 3 5 40 70 83 144 43 74 109 187 145 250 248 426 494 883 770 1425 323
-                    634 491 889 835 1269 294 326 1105 949 1635 1256 422 245 785 386 1135 441
-                    156 24 424 20 560 -9z"/>
-                    <path d="M9244 8679 c-174 -36 -447 -147 -581 -235 -78 -52 -282 -252 -409
-                    -400 -182 -213 -547 -715 -531 -730 3 -3 74 56 159 133 428 386 822 666 1229
-                    873 203 103 462 202 622 237 21 4 39 13 40 18 2 20 -99 86 -162 105 -83 26
-                    -241 26 -367 -1z"/>
-                  </g>
-                </svg>
-              </div>
-              <a href="https://www.youtube.com/watch?v=gI6CeAGhFjE&list=PLHhfnB1Uefkolyc9z03BKsWsnzvZoKYKf" class="mt-6 block font-semibold text-gray-900" target="_blank">
-                Austin | Jun 2022
-                <span class="absolute inset-0"></span>
+
+        {{/* Upcoming flyout */}}
+        <div id="nav-flyout-upcoming" role="nav-flyout" class="absolute inset-x-0 top-0 -z-20 bg-white pt-14 shadow-lg ring-1 ring-gray-900/5" style="transform: translateY(-100%); opacity: 0;">
+          <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8 max-h-[80vh] overflow-y-auto">
+            {{ if $nav.Upcoming }}
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
+              {{ range $nav.Upcoming }}
+              {{ template "nav_conf_card" . }}
+              {{ end }}
+            </div>
+            {{ else }}
+            <p class="text-sm text-gray-500">No upcoming events on the books — stay tuned.</p>
+            {{ end }}
+          </div>
+        </div>
+
+        {{/* Past flyout */}}
+        <div id="nav-flyout-past" role="nav-flyout" class="absolute inset-x-0 top-0 -z-20 bg-white pt-14 shadow-lg ring-1 ring-gray-900/5" style="transform: translateY(-100%); opacity: 0;">
+          <div class="mx-auto max-w-7xl px-6 py-10 lg:px-8 max-h-[80vh] overflow-y-auto">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
+              {{ range $nav.Past }}
+              {{ template "nav_conf_card" . }}
+              {{ end }}
+              {{/* Pre-Notion archive links — original 2022 events live as
+                   YouTube playlists rather than full /conf/ pages. */}}
+              <a href="https://www.youtube.com/watch?v=kCON4wuecOw&list=PLHhfnB1Uefkor98E-ikci_sUtUKKYYSDA"
+                 target="_blank" rel="noopener noreferrer"
+                 class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white text-lg">&#129399;</div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold text-gray-900 truncate">CDMX | Dec 2022</div>
+                  <p class="mt-0.5 text-xs text-gray-600 truncate">Onchain Privacy</p>
+                </div>
               </a>
-              <p class="mt-1 text-gray-600">Bootstrapping Bitcoin Dev</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" version="1.0" xmlns="http://www.w3.org/2000/svg"
-                 height="24pt" viewBox="0 0 200.000000 200.000000" preserveAspectRatio="xMidYMid meet">
-                  <g transform="translate(0.000000,200.000000) scale(0.100000,-0.100000)"
-                  fill="currentColor" stroke="none">
-                    <path d="M900 1780 c-268 -37 -455 -229 -501 -513 -23 -149 9 -411 77 -629
-                    105 -334 324 -506 595 -468 94 14 167 50 244 122 109 102 179 234 229 434 79
-                    311 75 566 -9 736 -77 152 -219 268 -375 306 -68 16 -187 21 -260 12z m166
-                    -109 c83 -38 118 -144 76 -227 -11 -21 -23 -54 -27 -71 -3 -18 -11 -36 -17
-                    -39 -16 -10 -157 -13 -163 -4 -3 5 -14 6 -25 3 -15 -4 -20 1 -25 23 -3 16 -17
-                    52 -31 80 -39 82 -28 149 33 207 52 48 113 58 179 28z m-495 -378 c21 -105 96
-                    -129 201 -64 27 17 51 31 53 31 2 0 11 -24 21 -52 23 -71 39 -101 75 -143 27
-                    -30 37 -35 74 -35 35 0 49 6 73 29 31 31 79 125 89 172 3 16 7 29 9 29 3 0 22
-                    -11 44 -25 58 -36 122 -52 155 -37 34 16 65 84 65 145 0 68 18 57 57 -35 85
-                    -197 60 -402 -59 -489 -44 -31 -123 -59 -171 -59 -28 0 -29 -1 -15 -22 25 -39
-                    29 -75 14 -113 l-15 -35 33 -14 c91 -38 87 -145 -7 -200 -75 -44 -156 -59
-                    -297 -53 -143 5 -214 23 -265 68 -68 60 -67 128 5 177 21 14 34 30 32 40 -13
-                    64 -13 84 2 113 9 18 16 33 16 34 0 1 -22 5 -50 8 -109 13 -194 77 -230 174
-                    -41 111 -21 285 48 418 26 49 27 49 29 20 2 -16 8 -53 14 -82z"/>
-                    <path d="M895 1537 c-26 -20 -16 -61 16 -65 29 -3 54 20 46 42 -10 25 -42 37
-                    -62 23z"/>
-                    <path d="M1055 1536 c-25 -18 -16 -60 14 -64 31 -5 54 23 41 48 -13 24 -35 31
-                    -55 16z"/>
-                    <path d="M977 1447 c-28 -43 -23 -59 20 -55 45 4 51 18 20 53 l-23 27 -17 -25z"/>
-                    <path d="M655 1019 c-83 -20 -108 -81 -52 -123 41 -31 183 -31 224 0 31 24 41
-                    58 22 80 -33 40 -124 60 -194 43z"/>
-                    <path d="M1215 1016 c-47 -13 -85 -45 -85 -70 2 -64 163 -101 250 -56 121 62
-                    -16 166 -165 126z"/>
-                    <path d="M954 865 c-29 -29 -63 -100 -64 -131 0 -68 135 -99 190 -44 38 38 13
-                    133 -46 179 -35 27 -49 26 -80 -4z"/>
-                    <path d="M925 514 c-16 -2 -49 -7 -71 -9 -23 -3 -50 -12 -60 -20 -18 -13 -17
-                    -15 21 -31 49 -22 285 -25 353 -6 89 26 30 56 -128 65 -47 3 -98 3 -115 1z"/>
-                  </g>
-                </svg>
-              </div>
-              <a href="https://www.youtube.com/watch?v=kCON4wuecOw&list=PLHhfnB1Uefkor98E-ikci_sUtUKKYYSDA" class="mt-6 block font-semibold text-gray-900" target="_blank">
-                CDMX | Dec 2022
-                <span class="absolute inset-0"></span>
+              <a href="https://www.youtube.com/watch?v=gI6CeAGhFjE&list=PLHhfnB1Uefkolyc9z03BKsWsnzvZoKYKf"
+                 target="_blank" rel="noopener noreferrer"
+                 class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
+                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white text-lg">&#129432;</div>
+                <div class="min-w-0 flex-1">
+                  <div class="font-semibold text-gray-900 truncate">Austin | Jun 2022</div>
+                  <p class="mt-0.5 text-xs text-gray-600 truncate">Bootstrapping Bitcoin Dev</p>
+                </div>
               </a>
-              <p class="mt-1 text-gray-600">Onchain Privacy</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" version="1.0" xmlns="http://www.w3.org/2000/svg"
-                 height="24.000000pt" viewBox="0 0 170.000000 170.000000"
-                 preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-                  <g transform="translate(0.000000,170.000000) scale(0.100000,-0.100000)"
-                  fill="currentColor" stroke="none">
-                    <path d="M1213 1571 c-59 -20 -112 -57 -148 -105 -19 -25 -31 -32 -48 -29 -48
-                    9 -110 -17 -160 -68 l-47 -49 -68 0 -67 0 -120 -142 c-66 -78 -175 -207 -242
-                    -286 l-123 -143 0 -320 c0 -175 3 -319 8 -319 4 0 230 40 502 89 272 49 566
-                    101 653 117 l157 28 0 323 c0 312 -1 325 -22 371 -39 84 -142 168 -261 211
-                    -15 6 -30 19 -33 28 -18 57 -31 79 -62 109 l-36 34 20 27 c29 39 117 84 177
-                    92 44 5 52 9 55 29 3 20 -1 22 -40 22 -24 -1 -66 -9 -95 -19z m-201 -211 c-4
-                    -26 -1 -30 18 -30 13 0 24 8 27 20 7 28 16 25 51 -15 57 -64 51 -147 -13 -204
-                    -98 -86 -235 -20 -235 112 0 73 68 147 136 147 17 0 20 -5 16 -30z m-202 -129
-                    c0 -77 41 -138 115 -172 56 -26 103 -23 166 9 45 22 58 36 79 79 14 28 31 52
-                    39 52 24 1 131 -61 171 -100 22 -21 48 -56 60 -78 l20 -41 -22 -5 c-33 -8
-                    -1153 -203 -1155 -201 -2 1 80 99 313 374 l104 122 55 0 55 0 0 -39z m648
-                    -476 c-2 -2 -268 -51 -593 -110 -324 -58 -598 -108 -608 -111 -16 -5 -18 2
-                    -15 88 l3 93 160 27 c88 16 360 63 605 106 l445 78 3 -84 c2 -47 2 -86 0 -87z
-                    m2 -110 c0 -30 -2 -55 -6 -55 -37 0 -621 -115 -626 -123 -4 -7 -2 -18 6 -25
-                    10 -10 64 -3 292 38 153 27 291 53 307 56 l27 6 0 -81 c0 -72 -2 -81 -18 -81
-                    -10 0 -283 -47 -606 -105 -323 -58 -589 -105 -592 -105 -2 0 -4 33 -4 74 0 73
-                    0 75 27 80 16 3 81 15 146 27 116 21 145 35 120 60 -9 9 -165 -12 -270 -36
-                    -22 -5 -23 -2 -23 49 l0 55 38 7 c156 31 1151 212 1165 213 14 1 17 -8 17 -54z"/>
-                    <path d="M607 1086 c-86 -103 -100 -126 -73 -126 18 0 186 194 186 214 0 35
-                    -30 11 -113 -88z"/>
-                    <path d="M445 895 c-21 -28 -25 -39 -15 -48 9 -9 18 -4 41 21 17 19 28 39 26
-                    45 -7 23 -25 17 -52 -18z"/>
-                    <path d="M655 446 c-32 -7 -51 -17 -53 -28 -5 -26 15 -30 88 -17 81 14 95 21
-                    87 43 -7 19 -48 20 -122 2z"/>
-                  </g>
-                </svg>
-              </div>
-              <a href="/static/atx23" class="mt-6 block font-semibold text-gray-900">
-                Austin | Apr 2023
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Layer 2s</p>
-            </div>
-           <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" viewBox="0 0 24 24" version="1.1" fill="none" stroke="currentColor" aria-hidden="true">
-                  <path d="M3.5 8l6.3-6.3c0.4-0.4 1-0.7 1.7-0.7s1.3 0.3 1.8 0.7c1 1 1 2.6 0 3.5l-2.8 2.8h1.4l2-2c1.4-1.4 1.4-3.6 0-4.9-0.7-0.7-1.6-1-2.5-1s-1.7 0.2-2.4 0.9l-6.3 6.4c-0.3 0.2-0.5 0.5-0.7 0.9 0.5-0.2 1-0.3 1.5-0.3z"></path>
-                  <path d="M7.3 5.6l-2.4 2.4h4.7z"></path>
-                  <path d="M12.5 9h-9c-1.9 0-3.5 1.6-3.5 3.5s1.6 3.5 3.5 3.5h9c1.9 0 3.5-1.6 3.5-3.5s-1.6-3.5-3.5-3.5zM12.5 15h-4.5v-4h-4.5c-1.1 0-2 0.6-2.5 1.2 0.2-1.2 1.2-2.2 2.5-2.2h9c1.4 0 2.5 1.1 2.5 2.5s-1.1 2.5-2.5 2.5z"></path>
-                </svg>
-              </div>
-              <a href="/conf/berlin23" class="mt-6 block font-semibold text-gray-900">
-                Berlin | Oct 2023
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">nix-bitcoin</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg id="emoji" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
-                  <g id="color"/>
-                  <g id="skin">
-                    <g id="skin-a">
-                      <path fill="#ffffff" d="M62.622,40.338c.96,3.25-1.109,5.983-4.435,5.392.443,3.249-2.735,6.13-6.579,4.283,1.478,3.766-1.997,5.908-4.731,4.283,1.403,1.6985-.813,7.46-9.387,1.994l-1.6426-.9033L16.5088,44.7522,15.05,43.95s-7.133-5.822-8.537-8.259c-4.392-7.595.9489-19.79,10.44-21.82l7.9426-1.4243,5.2391,7.9469,13.0738,6.0043L56,33.58l3.6854,3.7675Z"/>
-                    </g>
-                    <g id="skin-b">
-                      <path fill="#ffffff" d="M62.622,40.338c6.721-4.585,5.041-19.03-.0988-25.36-9.287-1.459-11-2.362-20.98-3.943l-13.53-.6185a3.9934,3.9934,0,0,0-4.779,2.533,32.8568,32.8568,0,0,1-3.599,8.378,3.5387,3.5387,0,0,0,1.872,4.588c1.908.4767,2.78-.386,4.46-1.686a25.9541,25.9541,0,0,0,3.805-4.575l13.64,6.204,12.72,7.164c2.514,1.698,5.012,5.844,6.51,7.321"/>
-                      <path fill="#ffffff" d="M31.51,54.15a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101A3.27,3.27,0,0,1,29.7,57.2424l1.81-3.094Z"/>
-                      <path fill="#ffffff" d="M25.84,50.98a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                      <path fill="#ffffff" d="M20.18,47.82a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                      <path fill="#ffffff" d="M14.53,44.65a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                    </g>
-                  </g>
-                  <g id="line">
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.05,43.95s-7.133-5.822-8.537-8.259c-4.392-7.595.9489-19.79,10.44-21.82"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M38.71,42.99,51.6,50.011"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M33.87,47.79l13,6.498"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M58.18,45.72l-5.1-4.358-8.279-4.335"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m29.772 19.654 13.64 6.204 12.72 7.164c2.514 1.698 5.012 5.844 6.51 7.321"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M37.49,56.29c8.574,5.466,10.79-.2955,9.387-1.994,2.734,1.625,6.209-.517,4.731-4.283,3.844,1.847,7.022-1.034,6.579-4.283,3.326.591,5.395-2.142,4.435-5.392,6.721-4.585,5.041-19.03-.0988-25.36-9.287-1.459-11-2.362-20.98-3.943l-13.53-.6185a3.9934,3.9934,0,0,0-4.779,2.533,32.8568,32.8568,0,0,1-3.599,8.378,3.5387,3.5387,0,0,0,1.872,4.588c1.908.4767,2.78-.386,4.46-1.686a25.9541,25.9541,0,0,0,3.805-4.575"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M31.51,54.15a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101A3.27,3.27,0,0,1,29.7,57.2424l1.81-3.094Z"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M25.84,50.98a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.18,47.82a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                    <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.53,44.65a3.0218,3.0218,0,0,1,4.144-.9c1.405.8125,2.439,2.362,1.478,4.063l-1.774,3.101a3.27,3.27,0,0,1-5.658-3.1713l1.81-3.094Z"/>
-                  </g>
-                </svg>
-              </div>
-              <a href="/conf/ba24" class="mt-6 block font-semibold text-gray-900">
-                Buenos Aires | Feb 2024
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Payments</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-gray-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg id="emoji" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
-                  <g id="color">
-                    <rect x="15.0229" y="16.2834" width="41.9541" height="40.9771" fill="#fff" stroke="none"/>
-                    <polyline fill="#fff" stroke="none" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2" points="16,55.7479 11,55.9479 11,60.9896 61,60.9896 61,53.9479 56,54.1479"/>
-                    <polyline fill="#fff" stroke="none" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2" points="56,16.2834 61,16.0834 61,11.0417 11,11.0417 11,18.0834 16,17.8834"/>
-                  </g>
-                  <g id="hair"/>
-                  <g id="skin"/>
-                  <g id="skin-shadow"/>
-                  <g id="line">
-                    <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2" points="16,55.7479 11,55.9479 11,60.9896 61,60.9896 61,53.9479 56,54.1479"/>
-                    <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2" points="56,16.2834 61,16.0834 61,11.0417 11,11.0417 11,18.0834 16,17.8834"/>
-                    <polyline fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2" points="56,16.2834 34.6258,17.1383 16,17.8834"/>
-                    <line x1="16" x2="56" y1="55.7479" y2="54.1479" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="16" x2="16" y1="22.0023" y2="50.0603" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="56" x2="56" y1="22.0023" y2="50.0603" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="20.8523" x2="31.8614" y1="24.9034" y2="24.9034" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="20.8523" x2="52.019" y1="30.1515" y2="30.1515" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="20.8523" x2="52.019" y1="35.3997" y2="35.3997" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="20.8523" x2="52.019" y1="40.6479" y2="40.6479" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                    <line x1="20.8523" x2="52.019" y1="45.896" y2="45.896" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="2"/>
-                  </g>
-                </svg>
-              </div>
-              <a href="/conf/atx24" class="mt-6 block font-semibold text-gray-900">
-                Austin | May 2024
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Script</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <svg id="ninja-emoji" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
-		<g fill="currentColor">
-		<path d="M316.618,333.836c1.882-14.32,59.388-41.114,59.388-105.066c0-38.835,0-91.372,0-132.486
-			c0-59.388,35.41-100.501-130.192-95.937c-61.65,1.7-130.2,36.55-130.2,95.937c0,41.114,0,93.651,0,132.486
-			c0,63.952,57.506,90.746,59.388,105.066c5.712,43.4-138.19,34.263-143.902,178.164h214.714H460.52
-			C454.817,368.098,310.906,377.236,316.618,333.836z M245.815,203.644c0,0-52.537,18.274-68.525,11.415
-			c-15.988-6.851-29.699-45.686-13.71-86.792c0,0,34.262,6.852,82.236,6.852c47.964,0,82.227-6.852,82.227-6.852
-			c15.988,41.106,2.287,79.941-13.701,86.792C298.344,221.919,245.815,203.644,245.815,203.644z"/>
-		<path d="M467.965,260.383c-11.234-8.411-24.482-9.509-29.69-2.559l-72.454,96.886
-			c13.066,6.538,28.741,14.486,44.126,25.448l68.847-92.05c1.42-1.873,2.104-4.201,2.104-6.718
-			C480.899,274.679,476.103,266.458,467.965,260.383z"/>
-		</g>
-		</svg>
-              </div>
-              <a href="/conf/berlin24" class="mt-6 block font-semibold text-gray-900">
-                Berlin | Oct 2024
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">e-cash</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/palm.svg" class="h-6 w-6 grayscale text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/floripa" class="mt-6 block font-semibold text-gray-900">
-                Floripa, Brasil | Feb 2025
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">hack + sun</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/pool.svg" class="h-6 w-6 grayscale text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/atx25" class="mt-6 block font-semibold text-gray-900">
-                Austin | May 2025
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">pools (mempools+mining)</p>
-            </div>
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/church_26ea.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/riga" class="mt-6 block font-semibold text-gray-900">
-                Riga | Aug 2025
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Privacy</p>
-            </div>
-	    <!-- istanbul -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/bridge-at-night_1f309.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/istanbul" class="mt-6 block font-semibold text-gray-900">
-                Istanbul | Sept 2025
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Scaling</p>
-            </div>
-	    <!-- berlin/lightning++ -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/high-voltage_26a1.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/berlin25" class="mt-6 block font-semibold text-gray-900">
-                Berlin | Oct 2025
-                <span class="absolute inset-0"></span>
-              </a> 
-              <p class="mt-1 text-gray-600">Lightning++</p>
-            </div>
-	    <!-- durham -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/durham" class="mt-6 block font-semibold text-gray-900">
-                Durham | Nov 2025
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">A Local Edition</p>
             </div>
           </div>
-	    <!-- taipei -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/firecracker_1f9e8.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/taipei" class="mt-6 block font-semibold text-gray-900">
-                Taipei | Dec 2025
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Sovereignty</p>
-            </div>
-	    <!-- floripa26 -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/floripa26" class="mt-6 block font-semibold text-gray-900">
-                Floripa | Feb 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Exploits</p>
-            </div>
-	    <!-- vegas -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/vegas" class="mt-6 block font-semibold text-gray-900">
-                Las Vegas | Apr 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Villains</p>
-            </div>
-	    <!-- vienna -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/vienna" class="mt-6 block font-semibold text-gray-900">
-                Vienna | May 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Economics</p>
-            </div>
-	    <!-- nairobi -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/nairobi" class="mt-6 block font-semibold text-gray-900">
-                Nairobi | Jun 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Open Source</p>
-            </div>
-	    <!-- toronto -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/toronto" class="mt-6 block font-semibold text-gray-900">
-                Toronto | Jul 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Consensus</p>
-            </div>
-	    <!-- berlin26 -->
-            <div class="group relative rounded-lg p-6 text-sm leading-6 hover:bg-orange-50" style="direction: ltr">
-              <div class="flex h-11 w-11 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white">
-                <img src="/static/img/sparkles_2728.png" class="h-6 w-6 text-gray-600 group-hover:text-bitcoin" />
-              </div>
-              <a href="/conf/berlin26" class="mt-6 block font-semibold text-gray-900">
-                Berlin | Nov 2026
-                <span class="absolute inset-0"></span>
-              </a>
-              <p class="mt-1 text-gray-600">Payments</p>
-            </div>
-          <!-- cool https://tailwindui.com/components/marketing/elements/headers#component-9b3074c76a13e5151c82c2be12e52a6c -->
-          <!-- 
-          <div class="bg-gray-50">
-            <div class="mx-auto max-w-7xl px-6 lg:px-8">
-              <div class="grid grid-cols-3 divide-x divide-gray-900/5 border-x border-gray-900/5">
-                <a href="#" class="flex items-center justify-center gap-x-2.5 p-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
-                  <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M2 10a8 8 0 1116 0 8 8 0 01-16 0zm6.39-2.908a.75.75 0 01.766.027l3.5 2.25a.75.75 0 010 1.262l-3.5 2.25A.75.75 0 018 12.25v-4.5a.75.75 0 01.39-.658z" clip-rule="evenodd" />
-                  </svg>
-                  Watch demo
-                </a>
-                <a href="#" class="flex items-center justify-center gap-x-2.5 p-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
-                  <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M2 3.5A1.5 1.5 0 013.5 2h1.148a1.5 1.5 0 011.465 1.175l.716 3.223a1.5 1.5 0 01-1.052 1.767l-.933.267c-.41.117-.643.555-.48.95a11.542 11.542 0 006.254 6.254c.395.163.833-.07.95-.48l.267-.933a1.5 1.5 0 011.767-1.052l3.223.716A1.5 1.5 0 0118 15.352V16.5a1.5 1.5 0 01-1.5 1.5H15c-1.149 0-2.263-.15-3.326-.43A13.022 13.022 0 012.43 8.326 13.019 13.019 0 012 5V3.5z" clip-rule="evenodd" />
-                  </svg>
-                  Contact sales
-                </a>
-                <a href="#" class="flex items-center justify-center gap-x-2.5 p-3 text-sm font-semibold leading-6 text-gray-900 hover:bg-gray-100">
-                  <svg class="h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fill-rule="evenodd" d="M2.5 3A1.5 1.5 0 001 4.5v4A1.5 1.5 0 002.5 10h6A1.5 1.5 0 0010 8.5v-4A1.5 1.5 0 008.5 3h-6zm11 2A1.5 1.5 0 0012 6.5v7a1.5 1.5 0 001.5 1.5h4a1.5 1.5 0 001.5-1.5v-7A1.5 1.5 0 0017.5 5h-4zm-10 7A1.5 1.5 0 002 13.5v2A1.5 1.5 0 003.5 17h6a1.5 1.5 0 001.5-1.5v-2A1.5 1.5 0 009.5 12h-6z" clip-rule="evenodd" />
-                  </svg>
-                  View all products
-                </a>
-              </div>
-            </div>
-          </div> -->
         </div>
       </div>
     </div>
   </nav>
   <!-- Mobile menu, show/hide based on menu open state. -->
   <div class="hidden lg:hidden" role="nav-dialog" aria-modal="true">
-    <!-- Background backdrop, show/hide based on slide-over state. -->
     <div class="fixed inset-0 z-20"></div>
     <div class="fixed inset-y-0 right-0 z-20 w-full overflow-y-auto bg-white px-6 py-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
       <div class="flex items-center justify-between">
         <a href="/" class="-m-1.5 p-1.5"><span class="sr-only">bitcoin++</span> <img class="h-8 w-auto" src="/static/img/btcpp.svg" alt=""></a>
-	      <button type="button" onclick="closeMenu(this)" class="-m-2.5 rounded-md p-2.5 text-gray-700">
+        <button type="button" onclick="closeMenu(this)" class="-m-2.5 rounded-md p-2.5 text-gray-700">
           <span class="sr-only">Close menu</span>
           <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -486,61 +106,67 @@
       <div class="mt-6 flow-root">
         <div class="-my-6 divide-y divide-gray-500/10">
           <div class="space-y-2 py-6">
-            <div class="">
+            <div>
+              {{ if $nav.Upcoming }}
               <button type="button" onclick="toggleMobileFlyout(this, 'current')" class="flex w-full items-center justify-between rounded-lg py-2 pl-3 pr-3.5 text-base leading-7 text-gray-900 hover:bg-gray-50" aria-controls="disclosure-1" aria-expanded="false">
                 Upcoming Events
-                <!--
-                  Expand/collapse icon, toggle classes based on menu open state.
-
-                  Open: "rotate-180", Closed: ""
-                -->
                 <svg class="h-5 w-5 flex-none rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" role="nav-caret-current">
                   <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                 </svg>
               </button>
-              <!-- 'Product' sub-menu, show/hide based on menu state. -->
               <div class="mt-2 space-y-2" role="mobile-flyout-current">
-                <a onclick="toggleMenu(this)" href="/conf/floripa26" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Floripa | Feb 2026</a>
-                <a onclick="toggleMenu(this)" href="/conf/vegas" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Las Vegas | Apr 2026</a>
-                <a onclick="toggleMenu(this)" href="/conf/vienna" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Vienna | May 2026</a>
-                <a onclick="toggleMenu(this)" href="/conf/nairobi" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Nairobi | Jun 2026</a>
-                <a onclick="toggleMenu(this)" href="/conf/toronto" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Toronto | Jul 2026</a>
-                <a onclick="toggleMenu(this)" href="/conf/berlin26" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Berlin | Nov 2026</a>
-	      </div>
+                {{ range $nav.Upcoming }}
+                <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">
+                  <span class="text-lg leading-none">{{ .EmojiOrDefault }}</span>
+                  <span>{{ .Desc }} | {{ .DateDesc }}</span>
+                </a>
+                {{ end }}
+              </div>
+              {{ end }}
               <button type="button" onclick="toggleMobileFlyout(this, 'past')" class="flex w-full items-center justify-between rounded-lg py-2 pl-3 pr-3.5 text-base leading-7 text-gray-900 hover:bg-gray-50" aria-controls="disclosure-1" aria-expanded="false">
                 Past Events
-                <!--
-                  Expand/collapse icon, toggle classes based on menu open state.
-
-                  Open: "rotate-180", Closed: ""
-                -->
-                <svg class="h-5 w-5 flex-none rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" role="nav-caret-past">
+                <svg class="h-5 w-5 flex-none" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" role="nav-caret-past">
                   <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
                 </svg>
               </button>
-              <div class="mt-2 space-y-2" role="mobile-flyout-past">
-                <a onclick="toggleMenu(this)" href="/conf/taipei" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Taipei | Dec 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/durham" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">Durham | Nov 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/berlin25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Berlin | Oct 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/istanbul" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Istanbul | Sept 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/riga" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Riga | Aug 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/atx25" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | May 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/floripa" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Floripa, Brasil | Feb 2025</a>
-                <a onclick="toggleMenu(this)" href="/conf/berlin24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Berlin | Oct 2024</a>
-                <a onclick="toggleMenu(this)" href="/conf/atx24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | May 2024</a>
-                <a onclick="toggleMenu(this)" href="/conf/ba24" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Buenos Aires | Feb 2024</a>
-                <a onclick="toggleMenu(this)" href="/conf/berlin23" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Berlin | Oct 2023</a>
-                <a onclick="toggleMenu(this)" href="/static/atx23" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | Apr 2023</a>
-                <a href="https://www.youtube.com/watch?v=kCON4wuecOw&list=PLHhfnB1Uefkor98E-ikci_sUtUKKYYSDA" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">CDMX | Dec 2022</a>
-                <a href="https://www.youtube.com/watch?v=gI6CeAGhFjE&list=PLHhfnB1Uefkolyc9z03BKsWsnzvZoKYKf" class="block rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">Austin | Jun 2022</a>
+              <div class="hidden mt-2 space-y-2" role="mobile-flyout-past">
+                {{ range $nav.Past }}
+                <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">
+                  <span class="text-lg leading-none">{{ .EmojiOrDefault }}</span>
+                  <span>{{ .Desc }} | {{ .DateDesc }}</span>
+                </a>
+                {{ end }}
+                <a href="https://www.youtube.com/watch?v=kCON4wuecOw&list=PLHhfnB1Uefkor98E-ikci_sUtUKKYYSDA" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">
+                  <span class="text-lg leading-none">&#129399;</span>
+                  <span>CDMX | Dec 2022</span>
+                </a>
+                <a href="https://www.youtube.com/watch?v=gI6CeAGhFjE&list=PLHhfnB1Uefkolyc9z03BKsWsnzvZoKYKf" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">
+                  <span class="text-lg leading-none">&#129432;</span>
+                  <span>Austin | Jun 2022</span>
+                </a>
               </div>
             </div>
-            <!-- Other links..? -->
-            <a href="//base58.school" target="_blank" class="font-arial -mx-3 block rounded-lg px-3 py-2 text-base leading-7 text-gray-900 hover:bg-gray-50">Base58⛓️🔓</a>
           </div>
         </div>
       </div>
     </div>
   </div>
 </header>
+{{ end }}
+
+{{/*
+  nav_conf_card — one tile in the desktop "Events" flyout. Compact
+  layout (emoji + title + tagline) so the flyout fits ~20+ confs in a
+  4-column grid without scrolling.
+*/}}
+{{ define "nav_conf_card" }}
+<a href="/conf/{{ .Tag }}" class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
+  <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white text-lg">
+    {{ .EmojiOrDefault }}
+  </div>
+  <div class="min-w-0 flex-1">
+    <div class="font-semibold text-gray-900 truncate">{{ .Desc }} | {{ .DateDesc }}</div>
+    {{ if .Tagline }}<p class="mt-0.5 text-xs text-gray-600 truncate">{{ .Tagline }}</p>{{ end }}
+  </div>
+</a>
 {{ end }}

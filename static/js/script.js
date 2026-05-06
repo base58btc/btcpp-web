@@ -62,18 +62,29 @@ window.addEventListener("pageshow", function () {
 	if (overlay) overlay.classList.remove("active");
 });
 
-function toggleNavFlyout(el) {
-	document.querySelectorAll('[role="nav-flyout"]').forEach(function (el){
-		if (el.classList.contains("transition-in")) {
-			el.classList.remove("transition-in");
-			el.classList.add("transition-out");
-			el.style.transform = "translateY(-100%)";
-			el.style.opacity = 0;
+function toggleNavFlyout(el, targetId) {
+	// When called with a targetId, toggle just that flyout — and close
+	// any siblings so two flyouts can't be open at once. Without an ID
+	// we keep the legacy "toggle all" behaviour.
+	var nodes = document.querySelectorAll('[role="nav-flyout"]');
+	nodes.forEach(function (node) {
+		if (targetId && node.id !== targetId) {
+			node.classList.remove("transition-in");
+			node.classList.add("transition-out");
+			node.style.transform = "translateY(-100%)";
+			node.style.opacity = 0;
+			return;
+		}
+		if (node.classList.contains("transition-in")) {
+			node.classList.remove("transition-in");
+			node.classList.add("transition-out");
+			node.style.transform = "translateY(-100%)";
+			node.style.opacity = 0;
 		} else {
-			el.classList.remove("transition-out");
-			el.classList.add("transition-in");
-			el.style.transform = "translateY(0%)";
-			el.style.opacity = 1;
+			node.classList.remove("transition-out");
+			node.classList.add("transition-in");
+			node.style.transform = "translateY(0%)";
+			node.style.opacity = 1;
 		}
 	});
 

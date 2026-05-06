@@ -8,6 +8,7 @@ import (
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
+	"btcpp-web/internal/emails"
 	"btcpp-web/internal/types"
 )
 
@@ -351,6 +352,34 @@ func otherEventTags(confs []*types.Conf) []string {
 		out = append(out, c.Tag)
 	}
 	return out
+}
+
+// sendTalkAppLetter fires the "talkapp" OnlyFor letter as the
+// application-received ack. Loads the freshly-created proposal from
+// Notion, falls back to populating SpeakerConfRefs from the Submit
+// result when Notion's eventual consistency hasn't caught up to the
+// just-written inverse relation. Errors are logged, never fatal —
+// missing the ack shouldn't break the submit flow.
+func sendTalkAppLetter(ctx *config.AppContext, conf *types.Conf, res SubmitResult, applicantEmail string) {
+	if res.ProposalID == "" || conf == nil {
+		return
+	}
+	proposal, err := getters.GetProposal(ctx, res.ProposalID)
+	if err != nil || proposal == nil {
+		ctx.Err.Printf("/talk %s: load proposal %s for talkapp letter: %s", applicantEmail, res.ProposalID, err)
+		return
+	}
+	if len(proposal.SpeakerConfRefs) == 0 && res.SpeakerConfID != "" {
+		// Notion auto-populates `speakers` on the Proposal from the
+		// SpeakerConf side, but with eventual consistency the just-
+		// created relation may not be visible on a re-read. Patch in
+		// the SpeakerConf ID we already have so the OnlyFor pipeline
+		// has at least one recipient.
+		proposal.SpeakerConfRefs = []string{res.SpeakerConfID}
+	}
+	if err := emails.SendOnlyForProposal(ctx, "talkapp", proposal, conf); err != nil {
+		ctx.Err.Printf("/talk %s: SendOnlyForProposal talkapp: %s", applicantEmail, err)
+	}
 }
 
 // durationFromPresType pulls the leading integer out of a PresType ID whose

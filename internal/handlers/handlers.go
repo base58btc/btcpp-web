@@ -220,6 +220,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"formatHourMin":   FormatHourMin,
 		"hourLabels":      HourLabels,
 		"venueChipClass":  VenueChipClasses,
+		"navConfs": func() NavConfList {
+			return buildNavConfList(ctx)
+		},
 		"speakerPhoto": func(photo string) string {
 			if photo == "" {
 				return spaces.PublicURL("speakers/default.avif")
@@ -1276,7 +1279,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
                 ctx.Infos.Printf("parsed talkapp: %v", talkapp)
 
-                _, err = newSubmitPipeline(ctx).Submit(&talkapp)
+                submitResult, err := newSubmitPipeline(ctx).Submit(&talkapp)
                 if err != nil {
                         ctx.Err.Printf("/talk/{conf} submit pipeline failed %s", err)
                         if errors.Is(err, ErrDuplicateSpeakerEmail) {
@@ -1296,14 +1299,20 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
                         go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
                 }
 
-                /* Register to mailing lists :) */
-                /* Note: this also sends pre-saved missives for the talkapp list(s)! */
+                /* Subscribe the applicant to the talkapp + per-conf
+                   talkapp lists (and the general newsletter when they
+                   opted in). We bypass NewSubs here so the
+                   subscription is recorded without firing the legacy
+                   list-welcome missives — the OnlyFor "talkapp"
+                   letter below is what they actually get. */
                 newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
-                err = missives.NewSubs(ctx, talkapp.Email, newslist)
-
-                if err != nil {
+                if _, err := getters.SubscribeEmailList(ctx.Notion, talkapp.Email, newslist); err != nil {
                         ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
                 }
+
+                /* Send the application-received ack via the OnlyFor
+                   "talkapp" letter. */
+                sendTalkAppLetter(ctx, conf, submitResult, talkapp.Email)
 
                 /* When the form was submitted from a magic-link-authed
                    context (the dashboard's "Propose another talk" link

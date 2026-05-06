@@ -2,7 +2,9 @@ package types
 
 import (
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -145,6 +147,20 @@ func (r *rateLimitedTransport) RoundTrip(req *http.Request) (*http.Response, err
 		return nil, err
 	}
 	wait := time.Since(waitStart)
+	// For database-query POSTs, log the JSON payload so dev can see
+	// what filter / sort / page-size we're shipping. The Notion stdlib
+	// sets req.GetBody for bytes.Reader-backed bodies, so we can read
+	// without consuming the body that's about to be sent.
+	if notionRequestLogger != nil && req.Method == http.MethodPost &&
+		strings.HasSuffix(req.URL.Path, "/query") && req.GetBody != nil {
+		if body, gerr := req.GetBody(); gerr == nil {
+			buf, _ := io.ReadAll(body)
+			body.Close()
+			if len(buf) > 0 {
+				notionRequestLogger("notion POST %s payload: %s", req.URL.Path, string(buf))
+			}
+		}
+	}
 	rtStart := time.Now()
 	resp, err := r.base.RoundTrip(req)
 	atomic.AddUint64(&notionCallCount, 1)
