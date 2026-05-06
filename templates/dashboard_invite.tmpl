@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invite a co-speaker | bitcoin++</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#10024;</text></svg>">
+</head>
+<body class="h-full bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+    <div class="mb-6">
+      <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to dashboard</a>
+    </div>
+
+    {{ if .Conf }}{{ template "conf_hero" .Conf }}{{ end }}
+
+    <h1 class="mt-6 text-2xl font-bold text-gray-900">Invite a co-speaker</h1>
+    <p class="mt-2 text-sm text-gray-600">
+      Share this link with the person you want to add to <span class="font-semibold">"{{ .Proposal.Title }}"</span>.
+      They'll fill in their own name and email, and they'll show up as a speaker on this talk.
+    </p>
+
+    <div class="mt-8 bg-white shadow rounded-lg p-6">
+      <label for="invite-link" class="block text-sm font-semibold text-gray-900">Invite link</label>
+      <div class="mt-2 flex gap-2">
+        <input id="invite-link" type="text" readonly
+               value="{{ .InviteURL }}"
+               class="block w-full rounded-md bg-gray-50 px-3.5 py-2 text-sm text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 font-mono"
+               onclick="this.select()" />
+        <button type="button"
+                onclick="navigator.clipboard.writeText(document.getElementById('invite-link').value).then(()=>{this.textContent='Copied!';setTimeout(()=>{this.textContent='Copy'},1500)})"
+                class="shrink-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+          Copy
+        </button>
+      </div>
+      <p class="mt-3 text-xs text-gray-500">
+        Anyone with this link can add themselves as a co-speaker on this talk, so only share it with the person you want to invite.
+        If the link gets out of hand, email <a href="mailto:hello@btcpp.dev" class="text-indigo-600 hover:text-indigo-700">hello@btcpp.dev</a> and we'll revoke it.
+      </p>
+    </div>
+
+    <div class="mt-6">
+      <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-gray-500 hover:text-gray-700">Done</a>
+    </div>
+  </div>
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>

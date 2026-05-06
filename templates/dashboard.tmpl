@@ -65,428 +65,438 @@
         </div>
       </section>
 
-      {{ if .EligibleConfs }}
-      <section id="apply" class="mt-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Apply to speak</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {{ range .EligibleConfs }}
-          <a href="/talk/{{ .Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-             class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-indigo-50 hover:shadow-md transition">
-            <div class="text-2xl">{{ .EmojiOrDefault }}</div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
-              <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
-            </div>
-            <span class="text-sm font-medium text-indigo-600 group-hover:text-indigo-700">Apply &rarr;</span>
-          </a>
-          {{ end }}
-        </div>
-      </section>
-      {{ end }}
-
-      {{ if and (not .SpeakerConfs) (not .VolApps) }}
-      <section id="empty" class="mt-8">
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <div class="px-4 py-5 sm:p-6 text-center">
-            <h3 class="text-base font-semibold text-gray-900">Nothing here yet</h3>
-            <p class="mt-2 text-sm text-gray-600">We don't have any talk applications or volunteer signups for this email. Want to get involved?</p>
-            <div class="mt-4 flex justify-center gap-3 flex-wrap">
-              <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Pick a conf</a>
-            </div>
+{{/*
+  Per-event blocks: one section per conf the user has any relationship
+  with (speaker, volunteer, ticket-holder). All applicable subsections
+  render inside the block — talks, vol shift status, tickets, plus
+  CTAs to buy more / apply / propose another.
+*/}}
+{{ if .ActiveBlocks }}
+<section id="events" class="mt-8 space-y-6">
+  {{ range .ActiveBlocks }}
+  {{ $eb := . }}
+  {{ $conf := .Conf }}
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    {{/* Hero band — uses the conf's leading image with a gradient
+         scrim so the title text stays legible on any photo. Anchor
+         takes the user to the public conf page. */}}
+    <a href="/conf/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
+      <picture>
+        <source srcset="/static/img/{{ $conf.Tag }}/leading.avif" type="image/avif" />
+        <img src="/static/img/{{ $conf.Tag }}/leading.png" alt="{{ $conf.Desc }}"
+             class="absolute inset-0 w-full h-full object-cover" />
+      </picture>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+      <div class="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 flex items-end justify-between gap-3 text-white">
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">{{ $conf.EmojiOrDefault }}</span>
+            <h2 class="text-lg sm:text-xl font-bold truncate">{{ $conf.Desc }}</h2>
           </div>
+          <p class="mt-0.5 text-xs sm:text-sm opacity-90">{{ $conf.DateDesc }} · {{ $conf.Location }}</p>
         </div>
-      </section>
+        <span class="shrink-0 text-xs opacity-80 group-hover:opacity-100 hidden sm:inline">View conf &rarr;</span>
+      </div>
+    </a>
+
+    <div class="px-4 py-5 sm:p-6">
+      {{ if and $eb.SpeakerConf $conf.CanInvite }}
+      <div class="flex justify-end -mt-2 mb-2">
+        <a href="/dashboard/conf/{{ $conf.Tag }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
+           class="text-xs font-medium text-gray-600 hover:text-gray-900">
+          Edit speaker info &rarr;
+        </a>
+      </div>
       {{ end }}
 
-      {{ if .SpeakerConfs }}
-      <section id="talks" class="mt-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Your talks</h2>
-        <div class="space-y-4">
-          {{ range .SpeakerConfs }}
-          {{ $sc := . }}
-          {{ $conf := "" }}
-          {{ if .Proposals }}{{ $conf = (index .Proposals 0).ScheduleFor }}{{ end }}
-          <div class="bg-white shadow rounded-lg overflow-hidden">
-            <div class="px-4 py-5 sm:p-6">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                  {{ if $conf }}
-                  <div class="text-3xl">{{ $conf.EmojiOrDefault }}</div>
-                  <div>
-                    <h3 class="text-sm font-medium text-gray-900">{{ $conf.Desc }}</h3>
-                    <p class="text-sm text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>
-                  </div>
-                  {{ else }}
-                  <div>
-                    <h3 class="text-sm font-medium text-gray-900">Talk submission</h3>
-                  </div>
-                  {{ end }}
-                </div>
-                {{ if $conf }}
-                <a href="/dashboard/conf/{{ $conf.Tag }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
-                   class="text-xs font-medium text-gray-600 hover:text-gray-900">
-                  Edit speaker info &rarr;
-                </a>
-                {{ end }}
-              </div>
-
-              <div class="mt-4 border-t border-gray-200 pt-4 space-y-3">
-                {{ range $sc.Proposals }}
-                <article class="flex items-stretch gap-3 rounded-md border border-gray-100 bg-gray-50/50 p-3">
-                  {{ if and .ConfTalk .ConfTalk.Clipart }}
-                  <div class="shrink-0">
-                    <picture>
-                      <source srcset="/static/img/talks/{{ .ConfTalk.ClipartAvif }}" type="image/avif" />
-                      <img src="/static/img/talks/{{ .ConfTalk.Clipart }}" alt=""
-                           class="size-16 rounded-md object-cover bg-gray-100 ring-1 ring-gray-200" />
-                    </picture>
-                  </div>
-                  {{ end }}
-
-                  <div class="min-w-0 flex-1 flex flex-col">
-                    <div class="flex items-start justify-between gap-2">
-                      <div class="min-w-0">
-                        <p class="text-sm font-semibold text-gray-900 truncate">{{ .Title }}</p>
-                        <p class="mt-0.5 text-xs text-gray-500">
-                          {{ if .TalkType }}{{ .TalkType }}{{ end }}
-                          {{ if .DesiredDuration }} &middot; {{ .DesiredDuration }} min{{ end }}
-                        </p>
-                      </div>
-                      <div class="flex items-center gap-2 shrink-0">
-                        {{ if and .Recording .Recording.YTLink }}
-                        <a href="{{ .Recording.YTLink }}" target="_blank" rel="noopener noreferrer"
-                           title="Watch recording"
-                           class="inline-flex items-center justify-center size-7 rounded-full bg-red-600 text-white hover:bg-red-700">
-                          <svg viewBox="0 0 24 24" fill="currentColor" class="size-4"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-                        </a>
-                        {{ end }}
-                        {{ if eq .Status "Applied" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Applied</span>
-                        {{ else if eq .Status "InReview" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">In review</span>
-                        {{ else if eq .Status "Waitlisted" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlisted</span>
-                        {{ else if eq .Status "Invited" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Invited</span>
-                        {{ else if eq .Status "Accepted" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
-                        {{ else if eq .Status "TheyDecline" }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Declined</span>
-                        {{ else if or (eq .Status "WeDecline") (eq .Status "Rejected") }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not selected</span>
-                        {{ else }}
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
-                        {{ end }}
-                      </div>
-                    </div>
-
-                    {{ if .Speakers }}
-                    <div class="mt-2 flex items-center gap-2">
-                      <div class="flex -space-x-2">
-                        {{ range .Speakers }}
-                        {{ if .Speaker }}
-                        <img src="{{ if .Speaker.Photo }}{{ speakerPhoto .Speaker.Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
-                             alt="{{ .Speaker.Name }}"
-                             title="{{ .Speaker.Name }}"
-                             class="size-7 rounded-full ring-2 ring-white object-cover bg-gray-100" />
-                        {{ end }}
-                        {{ end }}
-                      </div>
-                      <span class="text-xs text-gray-500 truncate">
-                        {{ range $i, $s := .Speakers }}{{ if $s.Speaker }}{{ if $i }}, {{ end }}{{ $s.Speaker.Name }}{{ end }}{{ end }}
-                      </span>
-                    </div>
-                    {{ end }}
-
-                    <div class="mt-2 flex flex-wrap items-center gap-3">
-                      {{ if not (or (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected")) }}
-                      <a href="/dashboard/talks/{{ .ID }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
-                         class="inline-flex items-center text-xs font-medium text-gray-600 hover:text-gray-900">
-                        Edit talk &rarr;
-                      </a>
-                      {{ end }}
-                      {{ if and $conf $conf.CanInvite }}
-                      <a href="/dashboard/invite/{{ .ID }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                         class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-700">
-                        Invite a co-speaker &rarr;
-                      </a>
-                      {{ end }}
-                      {{ if eq .Status "Invited" }}
-                      <form method="POST" action="/dashboard/talks/{{ .ID }}/accept?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
-                        <button type="submit"
-                                class="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
-                                onclick="return confirm('Accept this invitation? Your talk will be added to the program and you''ll be on the public agenda.');">
-                          Accept invitation
-                        </button>
-                      </form>
-                      {{ end }}
-                      {{ if not (or (eq .Status "Accepted") (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected")) }}
-                      <form method="POST" action="/dashboard/talks/{{ .ID }}/withdraw?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
-                        <button type="submit"
-                                class="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
-                                onclick="return confirm('Withdraw this talk? {{ if eq .TalkType "panel" }}You''ll be removed from the panel; the talk continues with the other speakers.{{ else }}This will withdraw the whole talk.{{ end }}');">
-                          Withdraw
-                        </button>
-                      </form>
-                      {{ end }}
-                    </div>
-                  </div>
-                </article>
-                {{ end }}
-              </div>
+      {{/* ---- Talks ---- */}}
+      {{ if $eb.SpeakerConf }}
+      <div class="mt-5">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Talks</h3>
+        <div class="space-y-3">
+          {{ range $eb.SpeakerConf.Proposals }}
+          <article class="flex items-stretch gap-3 rounded-md border border-gray-100 bg-gray-50/50 p-3">
+            {{ if and .ConfTalk .ConfTalk.Clipart }}
+            <div class="shrink-0">
+              <picture>
+                <source srcset="/static/img/talks/{{ .ConfTalk.ClipartAvif }}" type="image/avif" />
+                <img src="/static/img/talks/{{ .ConfTalk.Clipart }}" alt=""
+                     class="size-16 rounded-md object-cover bg-gray-100 ring-1 ring-gray-200" />
+              </picture>
             </div>
-          </div>
-          {{ end }}
-        </div>
-      </section>
-      {{ end }}
+            {{ end }}
 
-      {{ if .VolApps }}
-      <section id="shifts" class="mt-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Your volunteer applications</h2>
-        <div class="space-y-4">
-          {{ range .VolApps }}
-          {{ $conf := index .ScheduleFor 0 }}
-          <div class="bg-white shadow rounded-lg overflow-hidden">
-            <div class="px-4 py-5 sm:p-6">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-4">
-                  <div class="text-3xl">{{ $conf.EmojiOrDefault }}</div>
-                  <div>
-                    <h3 class="text-sm font-medium text-gray-900">{{ $conf.Desc }}</h3>
-                    <p class="text-sm text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>
-                  </div>
+            <div class="min-w-0 flex-1 flex flex-col">
+              <div class="flex items-start justify-between gap-2">
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-900 truncate">{{ .Title }}</p>
+                  <p class="mt-0.5 text-xs text-gray-500">
+                    {{ if .TalkType }}{{ .TalkType }}{{ end }}
+                    {{ if .DesiredDuration }} &middot; {{ .DesiredDuration }} min{{ end }}
+                  </p>
                 </div>
-                <div class="flex items-center space-x-4">
-                  {{ if eq .Status "Waitlist" }}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlist</span>
+                <div class="flex items-center gap-2 shrink-0">
+                  {{ if and .Recording .Recording.YTLink }}
+                  <a href="{{ .Recording.YTLink }}" target="_blank" rel="noopener noreferrer"
+                     title="Watch recording"
+                     class="inline-flex items-center justify-center size-7 rounded-full bg-red-600 text-white hover:bg-red-700">
+                    <svg viewBox="0 0 24 24" fill="currentColor" class="size-4"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                  </a>
+                  {{ end }}
+                  {{ if eq .Status "Applied" }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Applied</span>
+                  {{ else if eq .Status "InReview" }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">In review</span>
+                  {{ else if eq .Status "Waitlisted" }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlisted</span>
+                  {{ else if eq .Status "Invited" }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Invited</span>
                   {{ else if eq .Status "Accepted" }}
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
-                  {{ else if eq .Status "PendingShifts" }}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Select shifts</span>
-                  {{ else if eq .Status "Scheduled" }}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Scheduled</span>
-                  {{ else if eq .Status "Declined" }}
-                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Declined</span>
+                  {{ else if eq .Status "TheyDecline" }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Declined</span>
+                  {{ else if or (eq .Status "WeDecline") (eq .Status "Rejected") }}
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not selected</span>
                   {{ else }}
                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
                   {{ end }}
                 </div>
               </div>
 
-              {{ if eq .Status "Scheduled" }}
-              {{ $vinfo := index $.VolInfos $conf.Tag }}
-              {{ if $vinfo }}
-              <div class="mt-4 border-t border-gray-200 pt-4">
-                <div class="rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-4">
-                  <div class="flex items-start justify-between">
-                    <div>
-                      <h4 class="text-sm font-semibold text-indigo-900">Volunteer Orientation</h4>
-                      {{ if $vinfo.OrientTimes }}
-                      <p class="mt-1 text-sm text-indigo-800">{{ $vinfo.OrientTimes.FmtRange }}</p>
-                      {{ else }}
-                      <p class="mt-1 text-sm text-indigo-700">Time TBD - check back soon!</p>
-                      {{ end }}
-                      {{ if $vinfo.Notes }}
-                      <p class="mt-1 text-xs text-indigo-700">{{ $vinfo.Notes }}</p>
-                      {{ end }}
-                    </div>
-                    {{ if $vinfo.OrientLink }}
-                    <a href="{{ $vinfo.OrientLink }}" target="_blank" rel="noopener noreferrer"
-                       class="ml-4 shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
-                      Join Orientation
-                    </a>
-                    {{ end }}
-                  </div>
+              {{ if .Speakers }}
+              <div class="mt-2 flex items-center gap-2">
+                <div class="flex -space-x-2">
+                  {{ range .Speakers }}
+                  {{ if .Speaker }}
+                  <img src="{{ if .Speaker.Photo }}{{ speakerPhoto .Speaker.Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+                       alt="{{ .Speaker.Name }}"
+                       title="{{ .Speaker.Name }}"
+                       class="size-7 rounded-full ring-2 ring-white object-cover bg-gray-100" />
+                  {{ end }}
+                  {{ end }}
                 </div>
-              </div>
-              {{ end }}
-              {{ end }}
-
-              {{ if and .WorkShifts (ne .Status "Declined") }}
-              <div class="mt-4 border-t border-gray-200 pt-4">
-                <h4 class="text-sm font-medium text-gray-900 mb-3">Your scheduled shifts</h4>
-                <div class="overflow-hidden rounded-lg border border-gray-200">
-                  <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                      <tr>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-                      </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                      {{ range .WorkShifts }}
-                      <tr>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ .DayOfDesc }}</td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .TimeDesc }}</td>
-                        <td class="px-4 py-2 text-sm text-gray-900">
-                          {{ .Name }}
-                          {{ if .Type }}
-                          <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ .Type.Title }}</span>
-                          {{ end }}
-                        </td>
-                      </tr>
-                      {{ end }}
-                    </tbody>
-                  </table>
-                </div>
+                <span class="text-xs text-gray-500 truncate">
+                  {{ range $i, $s := .Speakers }}{{ if $s.Speaker }}{{ if $i }}, {{ end }}{{ $s.Speaker.Name }}{{ end }}{{ end }}
+                </span>
               </div>
               {{ end }}
 
-              <div class="mt-4">
-                <div class="flex flex-wrap items-center gap-3">
-                  {{ if eq .Status "PendingShifts" }}
-                  <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                     class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Select your shifts</a>
-                  {{ else if eq .Status "Scheduled" }}
-                  <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                     class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">View/edit shifts</a>
-                  <a href="/ticket/{{ .TicketRef }}/pdf?type=volunteer&conf={{ $conf.Ref }}"
-                     class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-orange-700 bg-orange-100 hover:bg-orange-200">Download ticket</a>
-                  {{ else if eq .Status "Applied" }}
-                  <p class="text-sm text-gray-600">Your application has been received! Shift selection will open soon.</p>
-                  {{ else if eq .Status "Waitlist" }}
-                  <p class="text-sm text-gray-600">We're currently out of available shifts. We'll email you if a spot opens up.</p>
-                  {{ else if eq .Status "Declined" }}
-                  <p class="text-sm text-gray-600">You've let us know you can't attend. Thanks for letting us know!</p>
-                  {{ else }}
-                  <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-                     class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">Sign up for shifts</a>
-                  {{ end }}
-
-                  {{ if ne .Status "Declined" }}
-                  {{ if and (eq .Status "Scheduled") $conf.WithinTwoWeeks }}
-                  <p class="text-sm text-gray-600">You're scheduled and we're within two weeks of the conference. If you can no longer attend, please reach out: <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>.</p>
-                  {{ end }}
-                  <form method="POST" action="/vols/shift/{{ $conf.Tag }}/decline?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
-                    <button type="submit"
-                            class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
-                            onclick="return confirm('Let us know you can no longer attend? This will release any shifts you signed up for.')">Can't attend</button>
-                  </form>
-                  {{ end }}
-                </div>
+              <div class="mt-2 flex flex-wrap items-center gap-3">
+                {{ if not (or (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected")) }}
+                <a href="/dashboard/talks/{{ .ID }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
+                   class="inline-flex items-center text-xs font-medium text-gray-600 hover:text-gray-900">
+                  Edit talk &rarr;
+                </a>
+                {{ end }}
+                {{ if and (and $conf $conf.CanInvite) (not (or (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected"))) }}
+                <a href="/dashboard/invite/{{ .ID }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+                   class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                  Invite a co-speaker &rarr;
+                </a>
+                {{ end }}
+                {{ if eq .Status "Invited" }}
+                <form method="POST" action="/dashboard/talks/{{ .ID }}/accept?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+                  <button type="submit"
+                          class="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded text-white bg-green-600 hover:bg-green-700"
+                          onclick="return confirm('Accept this invitation? Your talk will be added to the program and you''ll be on the public agenda.');">
+                    Accept invitation
+                  </button>
+                </form>
+                {{ end }}
+                {{ if not (or (eq .Status "Accepted") (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected")) }}
+                <form method="POST" action="/dashboard/talks/{{ .ID }}/withdraw?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+                  <button type="submit"
+                          class="inline-flex items-center px-2.5 py-1 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                          onclick="return confirm('Withdraw this talk? {{ if eq .TalkType "panel" }}You''ll be removed from the panel; the talk continues with the other speakers.{{ else }}This will withdraw the whole talk.{{ end }}');">
+                    Withdraw
+                  </button>
+                </form>
+                {{ end }}
               </div>
             </div>
-          </div>
+          </article>
           {{ end }}
         </div>
-      </section>
-      {{ end }}
-
-      {{ if .Tickets }}
-      <section id="tickets" class="mt-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Your tickets</h2>
-        <div class="space-y-3">
-          {{ range .Tickets }}
-          <div class="flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3">
-            <div class="text-2xl">{{ .Conf.EmojiOrDefault }}</div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ .Conf.Desc }}</p>
-              <p class="text-xs text-gray-500">{{ .Conf.DateDesc }} - {{ .Conf.Location }}</p>
-              {{ if .Reg.Type }}<p class="text-xs text-gray-400 mt-0.5">{{ .Reg.Type }} ticket</p>{{ end }}
-            </div>
-            <a href="/ticket/{{ .Reg.RefID }}/pdf?type={{ .Reg.Type }}&conf={{ .Reg.ConfRef }}"
-               class="shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200">
-              Download ticket
-            </a>
-          </div>
-          {{ end }}
-        </div>
-      </section>
-      {{ end }}
-
-      {{ if .BuyableConfs }}
-      <section id="buy-tickets" class="mt-8">
-        <h2 class="text-lg font-semibold text-gray-900 mb-4">Get a ticket</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {{ range .BuyableConfs }}
-          <a href="/conf/{{ .Tag }}#tickets"
-             class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-orange-50 hover:shadow-md transition">
-            <div class="text-2xl">{{ .EmojiOrDefault }}</div>
-            <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
-              <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
-            </div>
-            <span class="text-sm font-medium text-orange-600 group-hover:text-orange-700">Buy ticket &rarr;</span>
+        {{ if $conf.TalksOpen }}
+        <div class="mt-3 text-right">
+          <a href="/talk/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+             class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-700">
+            + Propose another talk
           </a>
+        </div>
+        {{ end }}
+      </div>
+      {{ else if $conf.TalksOpen }}
+      <div class="mt-5">
+        <a href="/talk/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+           class="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-700">
+          + Propose a talk for {{ $conf.Desc }}
+        </a>
+      </div>
+      {{ end }}
+
+      {{/* ---- Volunteer ---- */}}
+      {{ if $eb.VolApp }}
+      {{ $vol := $eb.VolApp }}
+      <div class="mt-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">Volunteer</h3>
+          {{ if eq $vol.Status "Waitlist" }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlist</span>
+          {{ else if eq $vol.Status "Accepted" }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
+          {{ else if eq $vol.Status "PendingShifts" }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Select shifts</span>
+          {{ else if eq $vol.Status "Scheduled" }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Scheduled</span>
+          {{ else if eq $vol.Status "Declined" }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Declined</span>
+          {{ else }}
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ $vol.Status }}</span>
           {{ end }}
         </div>
-      </section>
-      {{ end }}
 
-      {{ if or .PastSpeakerConfs .PastVolApps }}
-      <section id="past" class="mt-8">
-        <details class="bg-white shadow rounded-lg overflow-hidden">
-          <summary class="cursor-pointer px-4 py-3 sm:px-6 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-between">
-            <span>Past conferences ({{ add (len .PastSpeakerConfs) (len .PastVolApps) }})</span>
-            <span class="text-xs text-gray-400">click to expand</span>
-          </summary>
-          <div class="border-t border-gray-200 divide-y divide-gray-100">
-            {{ range .PastSpeakerConfs }}
-            {{ $conf := "" }}
-            {{ if .Proposals }}{{ $conf = (index .Proposals 0).ScheduleFor }}{{ end }}
-            <div class="px-4 py-4 sm:px-6">
-              <div class="flex items-start justify-between gap-4">
-                <div class="flex items-start space-x-3 min-w-0">
-                  {{ if $conf }}<div class="text-2xl">{{ $conf.EmojiOrDefault }}</div>{{ end }}
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium text-gray-900">{{ if $conf }}{{ $conf.Desc }}{{ else }}Talk submission{{ end }}</p>
-                    {{ if $conf }}<p class="text-xs text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>{{ end }}
-                    <ul class="mt-2 space-y-1">
-                      {{ range .Proposals }}
-                      <li class="text-xs text-gray-600">
-                        <span class="font-medium text-gray-800">{{ .Title }}</span>
-                        {{ if eq .Status "Accepted" }}
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
-                        {{ else if eq .Status "TheyDecline" }}
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Declined</span>
-                        {{ else if or (eq .Status "WeDecline") (eq .Status "Rejected") }}
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not selected</span>
-                        {{ else }}
-                        <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
-                        {{ end }}
-                      </li>
-                      {{ end }}
-                    </ul>
-                  </div>
-                </div>
-                <span class="shrink-0 text-xs text-gray-400">speaker</span>
-              </div>
+        {{ if and (eq $vol.Status "Scheduled") $eb.VolInfo }}
+        {{ $vinfo := $eb.VolInfo }}
+        <div class="rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-4 mb-3">
+          <div class="flex items-start justify-between">
+            <div>
+              <h4 class="text-sm font-semibold text-indigo-900">Volunteer Orientation</h4>
+              {{ if $vinfo.OrientTimes }}
+              <p class="mt-1 text-sm text-indigo-800">{{ $vinfo.OrientTimes.FmtRange }}</p>
+              {{ else }}
+              <p class="mt-1 text-sm text-indigo-700">Time TBD - check back soon!</p>
+              {{ end }}
+              {{ if $vinfo.Notes }}
+              <p class="mt-1 text-xs text-indigo-700">{{ $vinfo.Notes }}</p>
+              {{ end }}
             </div>
+            {{ if $vinfo.OrientLink }}
+            <a href="{{ $vinfo.OrientLink }}" target="_blank" rel="noopener noreferrer"
+               class="ml-4 shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
+              Join Orientation
+            </a>
             {{ end }}
-            {{ range .PastVolApps }}
-            {{ $conf := index .ScheduleFor 0 }}
-            <div class="px-4 py-4 sm:px-6">
-              <div class="flex items-start justify-between gap-4">
-                <div class="flex items-start space-x-3 min-w-0">
-                  <div class="text-2xl">{{ $conf.EmojiOrDefault }}</div>
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium text-gray-900">{{ $conf.Desc }}</p>
-                    <p class="text-xs text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>
-                    <span class="mt-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
-                  </div>
-                </div>
-                <span class="shrink-0 text-xs text-gray-400">volunteer</span>
-              </div>
-            </div>
-            {{ end }}
-          </div>
-        </details>
-      </section>
-      {{ end }}
-
-      <section id="contact" class="mt-8 mb-12">
-        <div class="bg-white shadow rounded-lg overflow-hidden">
-          <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-sm font-medium text-gray-900">Need help?</h3>
-            <p class="mt-1 text-sm text-gray-600">
-              Talk-related questions: <a href="mailto:hello@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">hello@btcpp.dev</a><br>
-              Volunteer questions: <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>
-            </p>
           </div>
         </div>
-      </section>
+        {{ end }}
+
+        {{ if and $vol.WorkShifts (ne $vol.Status "Declined") }}
+        <div class="overflow-hidden rounded-lg border border-gray-200 mb-3">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              {{ range $vol.WorkShifts }}
+              <tr>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{{ .DayOfDesc }}</td>
+                <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{{ .TimeDesc }}</td>
+                <td class="px-4 py-2 text-sm text-gray-900">
+                  {{ .Name }}
+                  {{ if .Type }}
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ .Type.Title }}</span>
+                  {{ end }}
+                </td>
+              </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+        {{ end }}
+
+        <div class="flex flex-wrap items-center gap-3">
+          {{ if eq $vol.Status "PendingShifts" }}
+          <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+             class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Select your shifts</a>
+          {{ else if eq $vol.Status "Scheduled" }}
+          <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+             class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">View/edit shifts</a>
+          <a href="/ticket/{{ $vol.TicketRef }}/pdf?type=volunteer&conf={{ $conf.Ref }}"
+             class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-orange-700 bg-orange-100 hover:bg-orange-200">Download volunteer ticket</a>
+          {{ else if eq $vol.Status "Applied" }}
+          <p class="text-sm text-gray-600">Your application has been received! Shift selection will open soon.</p>
+          {{ else if eq $vol.Status "Waitlist" }}
+          <p class="text-sm text-gray-600">We're currently out of available shifts. We'll email you if a spot opens up.</p>
+          {{ else if eq $vol.Status "Declined" }}
+          <p class="text-sm text-gray-600">You've let us know you can't attend. Thanks for letting us know!</p>
+          {{ else }}
+          <a href="/vols/shift/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+             class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">Sign up for shifts</a>
+          {{ end }}
+
+          {{ if ne $vol.Status "Declined" }}
+          <form method="POST" action="/vols/shift/{{ $conf.Tag }}/decline?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-red-700 bg-red-100 hover:bg-red-200"
+                    onclick="return confirm('Let us know you can no longer attend? This will release any shifts you signed up for.')">Can't attend</button>
+          </form>
+          {{ end }}
+        </div>
+        {{ if and (eq $vol.Status "Scheduled") $conf.WithinTwoWeeks }}
+        <p class="mt-2 text-xs text-gray-500">You're scheduled and we're within two weeks of the conference. If you can no longer attend, please reach out: <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>.</p>
+        {{ end }}
+      </div>
+      {{ end }}
+
+      {{/* ---- Tickets ---- */}}
+      {{ if $eb.Tickets }}
+      <div class="mt-5">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Tickets</h3>
+        <ul class="space-y-2">
+          {{ range $eb.Tickets }}
+          <li class="flex items-center justify-between gap-3 rounded-md bg-gray-50/50 border border-gray-100 px-3 py-2">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">{{ if .Type }}{{ .Type }} ticket{{ else }}Ticket{{ end }}</p>
+            </div>
+            <a href="/ticket/{{ .RefID }}/pdf?type={{ .Type }}&conf={{ .ConfRef }}"
+               class="shrink-0 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-orange-700 bg-orange-100 hover:bg-orange-200">
+              Download
+            </a>
+          </li>
+          {{ end }}
+        </ul>
+      </div>
+      {{ end }}
+
+      {{/* ---- Buy more / get a ticket CTA ---- */}}
+      {{ if $eb.CanBuy }}
+      <div class="mt-5">
+        <a href="/conf/{{ $conf.Tag }}#tickets"
+           class="inline-flex items-center text-sm font-medium text-orange-600 hover:text-orange-700">
+          {{ if $eb.Tickets }}+ Buy another ticket{{ else }}+ Get a ticket{{ end }} for {{ $conf.Desc }} &rarr;
+        </a>
+      </div>
+      {{ end }}
+
+    </div>
+  </div>
+  {{ end }}
+</section>
+{{ end }}
+
+{{/* ---- Empty state ---- */}}
+{{ if and (not .ActiveBlocks) (not .EligibleConfs) (not .BuyableConfs) }}
+<section id="empty" class="mt-8">
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="px-4 py-5 sm:p-6 text-center">
+      <h3 class="text-base font-semibold text-gray-900">Nothing here yet</h3>
+      <p class="mt-2 text-sm text-gray-600">We don't have any talk applications, volunteer signups, or tickets for this email. Want to get involved?</p>
+      <div class="mt-4 flex justify-center gap-3 flex-wrap">
+        <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">Pick a conf</a>
+      </div>
+    </div>
+  </div>
+</section>
+{{ end }}
+
+{{/* ---- Discover: apply to speak elsewhere ---- */}}
+{{ if .EligibleConfs }}
+<section id="discover-apply" class="mt-8">
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Apply to speak at another conf</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {{ range .EligibleConfs }}
+    <a href="/talk/{{ .Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+       class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-indigo-50 hover:shadow-md transition">
+      <div class="text-2xl">{{ .EmojiOrDefault }}</div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
+        <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
+      </div>
+      <span class="text-sm font-medium text-indigo-600 group-hover:text-indigo-700">Apply &rarr;</span>
+    </a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+{{/* ---- Discover: buy a ticket elsewhere ---- */}}
+{{ if .BuyableConfs }}
+<section id="discover-tickets" class="mt-8">
+  <h2 class="text-lg font-semibold text-gray-900 mb-4">Get a ticket for another conf</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    {{ range .BuyableConfs }}
+    <a href="/conf/{{ .Tag }}#tickets"
+       class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-orange-50 hover:shadow-md transition">
+      <div class="text-2xl">{{ .EmojiOrDefault }}</div>
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
+        <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
+      </div>
+      <span class="text-sm font-medium text-orange-600 group-hover:text-orange-700">Buy ticket &rarr;</span>
+    </a>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+{{/* ---- Past conferences ---- */}}
+{{ if .PastBlocks }}
+<section id="past" class="mt-8">
+  <details class="bg-white shadow rounded-lg overflow-hidden">
+    <summary class="cursor-pointer px-4 py-3 sm:px-6 text-sm font-semibold text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+      <span>Past conferences ({{ len .PastBlocks }})</span>
+      <span class="text-xs text-gray-400">click to expand</span>
+    </summary>
+    <div class="border-t border-gray-200 divide-y divide-gray-100">
+      {{ range .PastBlocks }}
+      {{ $eb := . }}
+      {{ $conf := .Conf }}
+      <div class="px-4 py-4 sm:px-6">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-start space-x-3 min-w-0">
+            <div class="text-2xl">{{ $conf.EmojiOrDefault }}</div>
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900">{{ $conf.Desc }}</p>
+              <p class="text-xs text-gray-500">{{ $conf.DateDesc }} - {{ $conf.Location }}</p>
+              {{ if $eb.SpeakerConf }}
+              <ul class="mt-2 space-y-1">
+                {{ range $eb.SpeakerConf.Proposals }}
+                <li class="text-xs text-gray-600">
+                  <span class="font-medium text-gray-800">{{ .Title }}</span>
+                  {{ if eq .Status "Accepted" }}
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
+                  {{ else if eq .Status "TheyDecline" }}
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Declined</span>
+                  {{ else if or (eq .Status "WeDecline") (eq .Status "Rejected") }}
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not selected</span>
+                  {{ else }}
+                  <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
+                  {{ end }}
+                </li>
+                {{ end }}
+              </ul>
+              {{ end }}
+            </div>
+          </div>
+          <div class="shrink-0 flex flex-col items-end gap-1 text-xs text-gray-400">
+            {{ if $eb.SpeakerConf }}<span>speaker</span>{{ end }}
+            {{ if $eb.VolApp }}<span>volunteer</span>{{ end }}
+            {{ if $eb.Tickets }}<span>{{ len $eb.Tickets }} ticket{{ if gt (len $eb.Tickets) 1 }}s{{ end }}</span>{{ end }}
+          </div>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </details>
+</section>
+{{ end }}
+
+<section id="contact" class="mt-8 mb-12">
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="px-4 py-5 sm:p-6">
+      <h3 class="text-sm font-medium text-gray-900">Need help?</h3>
+      <p class="mt-1 text-sm text-gray-600">
+        Talk-related questions: <a href="mailto:hello@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">hello@btcpp.dev</a><br>
+        Volunteer questions: <a href="mailto:volunteer@btcpp.dev" class="text-indigo-600 hover:text-indigo-500">volunteer@btcpp.dev</a>
+      </p>
+    </div>
+  </div>
+</section>
 
     </div>
   </div>

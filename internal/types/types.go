@@ -164,6 +164,12 @@ type (
                 SpeakerConfRefs []string
                 Speakers        []*SpeakerConf
 
+                // InviteToken authenticates the public co-speaker invite
+                // link. Empty means "no active invitation"; admins clear
+                // or rotate the field in Notion to revoke an outstanding
+                // share link.
+                InviteToken     string
+
                 // Optional attachments populated by the dashboard enricher
                 // for the talk-card render. Nil unless explicitly fetched.
                 ConfTalk        *ConfTalk
@@ -417,6 +423,16 @@ var DayTimeChars = map[string]DayTime{
 	"+": Morning,
 	"=": Afternoon,
 	"-": Evening,
+}
+
+// Desc is a template-friendly alias for the Description field —
+// matches the Notion column name (which is "Desc") and lets letter
+// templates use the same name they see in the schema.
+func (p *Proposal) Desc() string {
+	if p == nil {
+		return ""
+	}
+	return p.Description
 }
 
 func (t *Talk) AnchorTag() string {

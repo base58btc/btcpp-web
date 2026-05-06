@@ -12,10 +12,9 @@
       <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-indigo-600 hover:text-indigo-700">&larr; Back to dashboard</a>
     </div>
 
-    <h1 class="text-2xl font-bold text-gray-900">Edit speaker info</h1>
-    {{ if .Conf }}
-    <p class="text-sm text-gray-600 mt-1">{{ .Conf.EmojiOrDefault }} {{ .Conf.Desc }} &middot; {{ .Conf.DateDesc }}</p>
-    {{ end }}
+    {{ if .Conf }}{{ template "conf_hero" .Conf }}{{ end }}
+
+    <h1 class="mt-6 text-2xl font-bold text-gray-900">Edit speaker info</h1>
     <p class="text-xs text-gray-500 mt-1">These apply across all your talks at this conference.</p>
 
     {{ if .Locked }}

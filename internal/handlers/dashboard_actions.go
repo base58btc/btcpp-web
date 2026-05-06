@@ -1,17 +1,21 @@
 package handlers
 
 import (
+	"crypto/subtle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/imgproc"
+	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
 
 	"github.com/gorilla/mux"
@@ -208,11 +212,14 @@ func DashboardEditSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *confi
 		return
 	}
 
+	// Same gate the dashboard template uses to hide the "Edit speaker
+	// info" link — keep them aligned so a link the user can see is
+	// always backed by a form they can actually submit.
 	locked := false
 	lockReason := ""
-	if conf != nil && time.Until(conf.StartDate) <= 7*24*time.Hour {
+	if conf == nil || !conf.CanInvite() {
 		locked = true
-		lockReason = "the conference is within 7 days — speaker info is locked"
+		lockReason = "the conference is within 4 days (or no longer active) — speaker info is locked"
 	}
 
 	if r.Method == http.MethodPost {
@@ -333,6 +340,35 @@ func DashboardWithdraw(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
 }
 
+// DashboardConfirmTalk is the GET-friendly one-click variant of
+// DashboardAcceptInvite — clicked from the talkinvited email's
+// "Confirm Attendance" button. Validates the magic-link, runs the
+// accept pipeline, redirects to /dashboard with a flash. Idempotent
+// against re-clicks (already-accepted talks just flash a "thanks,
+// already done" message).
+func DashboardConfirmTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	proposal, _, encHMAC, encEmail, err := dashboardAuthForProposal(w, r, ctx, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard confirm: %s", err)
+		return
+	}
+	if proposal.Status == StatusAccepted {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Already confirmed — thanks!"), http.StatusSeeOther)
+		return
+	}
+	if isTerminalProposalStatus(proposal.Status) {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "This talk is no longer pending — please reach out if that's a surprise."), http.StatusSeeOther)
+		return
+	}
+	if _, err := newAcceptPipeline(ctx).AcceptProposal(proposalID); err != nil {
+		ctx.Err.Printf("/dashboard confirm pipeline: %s", err)
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Something went wrong confirming — please use the Accept button on your dashboard."), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Talk confirmed! We'll be in touch with scheduling details."), http.StatusSeeOther)
+}
+
 // DashboardAcceptInvite promotes an Invited proposal to Accepted, creating
 // the ConfTalk row via the existing acceptPipeline. First speaker to click
 // promotes the whole talk; subsequent clicks short-circuit because
@@ -359,6 +395,236 @@ func DashboardAcceptInvite(w http.ResponseWriter, r *http.Request, ctx *config.A
 		flash = "Talk was already accepted."
 	}
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
+}
+
+// DashboardInviteCoSpeaker renders the inviter-side "share a link"
+// page: confirms which talk the invite is for and shows the URL the
+// existing speaker copies to send their co-speaker.
+//
+// The recipient hits InviteSpeaker (a different handler, public, token-
+// authed) which is where the speaker-side fields actually get written.
+// This page just mints the URL.
+//
+// Refuses to mint links for terminal proposals or confs already inside
+// the CanInvite window — same gates the dashboard template uses to
+// decide whether to show the entry-point link in the first place.
+func DashboardInviteCoSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	proposal, _, encHMAC, encEmail, err := dashboardAuthForProposal(w, r, ctx, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard invite: %s", err)
+		return
+	}
+	conf := proposal.ScheduleFor
+
+	if isTerminalProposalStatus(proposal.Status) {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "This talk is finalized — co-speakers can't be added."), http.StatusSeeOther)
+		return
+	}
+	if conf == nil || !conf.CanInvite() {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "It's too close to the conference — contact us to add a co-speaker."), http.StatusSeeOther)
+		return
+	}
+
+	// Lazy-mint a token on first invite. Persist it on the proposal so
+	// the public invite-speaker handler can validate inbound URLs by
+	// equality, and admins can revoke a leaked link by rotating or
+	// clearing the field in Notion.
+	if proposal.InviteToken == "" {
+		token := helpers.MintInviteToken()
+		if err := getters.SetProposalInviteToken(ctx, proposalID, token); err != nil {
+			ctx.Err.Printf("/dashboard invite mint token: %s", err)
+			http.Error(w, "Could not create invite link — please try again.", http.StatusInternalServerError)
+			return
+		}
+		proposal.InviteToken = token
+	}
+
+	page := &InviteCoSpeakerPage{
+		Proposal:  proposal,
+		Conf:      conf,
+		HMAC:      encHMAC,
+		Email:     encEmail,
+		InviteURL: helpers.InviteLink(ctx, proposalID, proposal.InviteToken),
+		Year:      helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_invite.tmpl", page); err != nil {
+		ctx.Err.Printf("/dashboard invite render: %s", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+// InviteSpeaker is the public landing page the invited co-speaker
+// hits via the shareable link. GET renders the same form the apply
+// flow uses (embeds/talk.tmpl with InviteMode=true), with talk-content
+// fields hidden — the proposal already exists. POST collects the full
+// SpeakerConf payload (hometown / availability / org / dinner /
+// recording opt-in / etc.) and runs it through JoinProposal, which
+// upserts Speaker + Org and links the new SpeakerConf to the existing
+// proposal.
+//
+// The token in the URL is matched against proposal.InviteToken — a
+// random value stored on the Notion row. Admins revoke a leaked link
+// by clearing or rotating the field in Notion; the next request 403s.
+// Anyone with the link can submit — that's the point. The proposal
+// can't be mutated beyond "add a speaker" via this path, so the blast
+// radius of a leaked link is bounded.
+func InviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	token := r.URL.Query().Get("t")
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		http.Error(w, "Talk not found.", http.StatusNotFound)
+		return
+	}
+	if token == "" || proposal.InviteToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(proposal.InviteToken)) != 1 {
+		http.Error(w, "Invalid or revoked invite link.", http.StatusForbidden)
+		return
+	}
+	conf := proposal.ScheduleFor
+	if isTerminalProposalStatus(proposal.Status) {
+		http.Error(w, "This talk is finalized — no new speakers can be added.", http.StatusGone)
+		return
+	}
+	if conf == nil || !conf.CanInvite() {
+		http.Error(w, "It's too close to the conference to add a co-speaker.", http.StatusGone)
+		return
+	}
+
+	confs := listConfs(w, ctx)
+
+	if r.Method == http.MethodPost {
+		handleInviteSpeakerPOST(w, r, ctx, proposal, conf, confs)
+		return
+	}
+
+	daylist := conf.DaysList("days-", true)
+	page := &SpeakerPage{
+		Conf:             conf,
+		Confs:            confs,
+		ConfItems:        helpers.GetOtherConfs(confs, *conf),
+		DaysList:         daylist[1:],
+		RSVPFor:          daylist[0].ItemDesc,
+		PresentationType: helpers.GetPresentationTypes(),
+		RecordingOptions: helpers.GetRecordingOptions(),
+		InviteMode:       true,
+		InviteToken:      token,
+		Proposal:         proposal,
+		Year:             helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", page); err != nil {
+		ctx.Err.Printf("/invite-speaker render: %s", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+// handleInviteSpeakerPOST mirrors the multipart-form handling in
+// RenderSpeakerConf's POST branch but routes through JoinProposal
+// (no new Proposal, attach to the inviter's existing one). The submit
+// pipeline returns ErrSpeakerApp-shaped responses on failure so HTMX
+// renders the inline error block in the form.
+func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, confs []*types.Conf) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		ctx.Err.Printf("/invite-speaker parseform: %s", err)
+		w.Write([]byte(helpers.ErrSpeakerApp("Error parsing form.")))
+		return
+	}
+	dec := newFormDecoder()
+	var talkapp types.TalkApp
+	if err := dec.Decode(&talkapp, r.PostForm); err != nil {
+		ctx.Err.Printf("/invite-speaker decode: %s", err)
+		w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
+		return
+	}
+	talkapp.ParseAvailability("days-", r.PostForm)
+	talkapp.DinnerRSVP = r.PostForm.Get("DinnerOpt") == "Yes"
+	talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+	talkapp.ScheduleFor = conf
+
+	if alreadyOnProposal(proposal, talkapp.Email) {
+		w.Write([]byte(helpers.ErrSpeakerApp("You're already a speaker on this talk.")))
+		return
+	}
+
+	picRaw, picContentType, picExt, err := readMultipartFile(r, "PicFile")
+	hasNewPic := err == nil && len(picRaw) > 0
+	if err != nil && err != http.ErrMissingFile {
+		ctx.Err.Printf("/invite-speaker read pic: %s", err)
+		w.Write([]byte(helpers.ErrSpeakerApp("Error uploading pfp.")))
+		return
+	}
+	if hasNewPic {
+		talkapp.NormPhoto = imgproc.ShortID(picRaw) + picExt
+	}
+
+	logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
+	hasLogo := logoErr == nil && len(logoRaw) > 0
+	if logoErr != nil && logoErr != http.ErrMissingFile {
+		ctx.Err.Printf("/invite-speaker read logo: %s", logoErr)
+		w.Write([]byte(helpers.ErrSpeakerApp("Error uploading org logo.")))
+		return
+	}
+	if hasLogo {
+		talkapp.OrgLogo = imgproc.ShortID(logoRaw) + logoExt
+	}
+
+	res, err := newSubmitPipeline(ctx).JoinProposal(&talkapp, proposal.ID)
+	if err != nil {
+		ctx.Err.Printf("/invite-speaker join pipeline: %s", err)
+		if errors.Is(err, ErrDuplicateSpeakerEmail) {
+			w.Write([]byte(helpers.ErrSpeakerApp("That email already has multiple speaker records — please contact us to resolve.")))
+		} else {
+			w.Write([]byte(helpers.ErrSpeakerApp("Unable to add you as a co-speaker.")))
+		}
+		return
+	}
+
+	// Mirror the inverse Proposal → SpeakerConf relation. Non-fatal —
+	// JoinProposal already wrote the canonical edge.
+	if err := getters.AddSpeakerConfToProposal(ctx, proposal.ID, res.SpeakerConfID); err != nil {
+		ctx.Err.Printf("/invite-speaker mirror to proposal (continuing): %s", err)
+	}
+
+	// Fire-and-forget Spaces uploads, same as the apply form.
+	if hasNewPic {
+		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+	}
+	if hasLogo {
+		go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
+	}
+
+	// Newsletter subscription mirrors the apply form's "talkapp" list
+	// for this conf — the new speaker gets the same conf-specific
+	// updates as someone who applied directly.
+	newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
+	if err := missives.NewSubs(ctx, talkapp.Email, newslist); err != nil {
+		ctx.Err.Printf("/invite-speaker newsletter sub (continuing): %s", err)
+	}
+
+	// HTMX swaps innerHTML of #result with this content; we render a
+	// success message that includes a link to the dashboard so the
+	// user can keep going.
+	dashURL := helpers.EmailLink(ctx, talkapp.Email, "/dashboard")
+	w.Write([]byte(helpers.SuccessApp(fmt.Sprintf(
+		`You've been added to "%s"! <a href="%s" class="underline font-semibold">Open your dashboard &rarr;</a>`,
+		proposal.Title, dashURL,
+	))))
+}
+
+// alreadyOnProposal reports whether the email is already linked to this
+// proposal via one of its existing speakers. Case-insensitive match —
+// Notion stores email as text and casing varies.
+func alreadyOnProposal(p *types.Proposal, email string) bool {
+	for _, sc := range p.Speakers {
+		if sc == nil || sc.Speaker == nil {
+			continue
+		}
+		if strings.EqualFold(sc.Speaker.Email, email) {
+			return true
+		}
+	}
+	return false
 }
 
 // isTerminalProposalStatus returns true for statuses where the speaker has

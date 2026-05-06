@@ -120,6 +120,15 @@ type SpeakerPage struct {
         IsNewsletterSubscriber bool   // hides the newsletter opt-in checkbox
         IsReturningAttendee    bool   // hides the "first bitcoin++" checkbox
 
+        // InviteMode flips the form into co-speaker-invite mode: the
+        // talk-content fields (Title / Description / Setup / PresType /
+        // Captcha / OtherEvents) are hidden and the form posts to
+        // /invite-speaker/{Proposal.ID}?t={InviteToken} instead of
+        // /talk/{Conf.Tag}.
+        InviteMode  bool
+        InviteToken string
+        Proposal    *types.Proposal
+
         Year uint
 }
 
@@ -174,9 +183,32 @@ type DashboardPage struct {
         // omitted (no point downloading a PDF for a conf that's over).
         Tickets []*UserTicket
 
+        // ActiveBlocks is the per-event view: one entry for each conf
+        // the user has any kind of relationship with (speaker, volunteer,
+        // or ticket-holder). Replaces the old activity-typed sections —
+        // talks / volunteer / tickets are nested inside each block.
+        ActiveBlocks []*EventBlock
+        PastBlocks   []*EventBlock
+
         FlashMessage string
 
         Year uint
+}
+
+// EventBlock collects every relationship the dashboard's user has with
+// a single conference. Any non-empty field renders its own subsection
+// on the dashboard; empty fields are skipped.
+type EventBlock struct {
+        Conf        *types.Conf
+        SpeakerConf *types.SpeakerConf // nil = not a speaker at this conf
+        VolApp      *types.Volunteer   // nil = not a volunteer at this conf
+        VolInfo     *types.VolInfo     // orientation info (when VolApp != nil)
+        Tickets     []*types.Registration
+        // CanBuy when the conf is still selling tickets (Active +
+        // future). Used to show a "Buy more tickets" / "Get a ticket"
+        // CTA inside the block alongside any tickets the user already
+        // has.
+        CanBuy bool
 }
 
 type DashboardStats struct {
@@ -203,6 +235,18 @@ type EditProposalPage struct {
         TalkTypes  []string
         Durations  []int
         Year       uint
+}
+
+// InviteCoSpeakerPage is the inviter-side share-a-link page on the
+// dashboard. Renders the talk + conf header so the speaker can confirm
+// what they're inviting onto, plus a copyable URL.
+type InviteCoSpeakerPage struct {
+        Proposal  *types.Proposal
+        Conf      *types.Conf
+        HMAC      string
+        Email     string
+        InviteURL string
+        Year      uint
 }
 
 type EditSpeakerConfPage struct {

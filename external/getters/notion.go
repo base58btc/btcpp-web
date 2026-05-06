@@ -420,6 +420,92 @@ func InvalidateSpeakerConfsCache() {
 	speakerConfCacheMu.Unlock()
 }
 
+// CacheSpeakerInsert appends a Speaker to the in-memory speakers cache.
+// Used after CreateSpeaker so the just-written row is findable by
+// GetSpeakersByEmail without waiting for the periodic refresh tick —
+// which can otherwise leave a freshly-invited co-speaker staring at an
+// empty dashboard.
+//
+// No mutex on cacheSpeakers — readers (e.g. GetSpeakersByEmail) snapshot
+// the slice via a single assignment. We follow the same pattern by
+// rewriting the slice header atomically with append.
+func CacheSpeakerInsert(s *types.Speaker) {
+	if s == nil {
+		return
+	}
+	cacheSpeakers = append(cacheSpeakers, s)
+}
+
+// CacheSpeakerConfInsert adds a fresh SpeakerConf to the in-memory
+// caches (slice + by-ID + by-speakerID indexes) so the next
+// FetchSpeakerConfsForSpeaker call sees it. Used after a successful
+// UpsertSpeakerConf create.
+//
+// Idempotent on ID — calling twice with the same row replaces the
+// previous entry rather than duplicating it.
+func CacheSpeakerConfInsert(sc *types.SpeakerConf) {
+	if sc == nil {
+		return
+	}
+	speakerConfCacheMu.Lock()
+	defer speakerConfCacheMu.Unlock()
+
+	if speakerConfByID == nil {
+		speakerConfByID = make(map[string]*types.SpeakerConf)
+	}
+	if speakerConfBySpkID == nil {
+		speakerConfBySpkID = make(map[string][]*types.SpeakerConf)
+	}
+
+	if existing, ok := speakerConfByID[sc.ID]; ok {
+		// Replace the existing pointer in the by-spkID slice too. Look
+		// up the speaker via the existing entry — the new one might
+		// have a different (or nil) Speaker pointer if the caller
+		// constructed it sparsely.
+		if existing.Speaker != nil {
+			list := speakerConfBySpkID[existing.Speaker.ID]
+			for i, e := range list {
+				if e != nil && e.ID == sc.ID {
+					list[i] = sc
+					break
+				}
+			}
+		}
+	} else {
+		cacheSpeakerConfs = append(cacheSpeakerConfs, sc)
+	}
+	speakerConfByID[sc.ID] = sc
+	if sc.Speaker != nil {
+		// Avoid duplicate entry in the by-spkID list when this is a
+		// replace path that's already linked.
+		list := speakerConfBySpkID[sc.Speaker.ID]
+		seen := false
+		for _, e := range list {
+			if e != nil && e.ID == sc.ID {
+				seen = true
+				break
+			}
+		}
+		if !seen {
+			speakerConfBySpkID[sc.Speaker.ID] = append(list, sc)
+		}
+	}
+}
+
+// CacheSpeakerByID looks up a Speaker pointer in the warm cache for
+// callers that need to attach it to a fresh SpeakerConf before
+// inserting. Returns nil when the cache doesn't have it (e.g. the
+// speaker was created in another process and we haven't refreshed
+// since).
+func CacheSpeakerByID(id string) *types.Speaker {
+	for _, s := range cacheSpeakers {
+		if s != nil && s.ID == id {
+			return s
+		}
+	}
+	return nil
+}
+
 // getConfTalks refreshes the ConfTalk cache. Depends on Proposals being
 // cached so parseConfTalk can attach the linked Proposal pointer.
 func getConfTalks(ctx *config.AppContext) {

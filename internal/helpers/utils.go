@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
@@ -308,6 +309,38 @@ func CreateEmailHMAC(ctx *config.AppContext, email string) string {
 	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
 	mac.Write([]byte(email))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// MintInviteToken returns a fresh URL-safe random token for a co-speaker
+// invite link. Stored on the proposal so the link can be revoked by
+// rotating the field. 16 bytes → 22 chars base64url, plenty of entropy
+// for an unguessable share link.
+func MintInviteToken() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// crypto/rand failure on a healthy box is exceptional; log and
+		// surface rather than silently issue a weak token.
+		panic(fmt.Sprintf("MintInviteToken: rand.Read: %s", err))
+	}
+	return base64.RawURLEncoding.EncodeToString(b[:])
+}
+
+// InviteLink builds the full shareable URL for a proposal's current
+// InviteToken. Returns "" when the proposal has no token (i.e., link
+// has been revoked).
+func InviteLink(ctx *config.AppContext, proposalID, inviteToken string) string {
+	if inviteToken == "" {
+		return ""
+	}
+	u, err := url.Parse(ctx.Env.GetURI())
+	if err != nil {
+		return ""
+	}
+	u.Path = "/invite-speaker/" + proposalID
+	q := u.Query()
+	q.Set("t", inviteToken)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 func VolShiftLink(ctx *config.AppContext, vol *types.Volunteer) string {

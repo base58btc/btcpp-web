@@ -109,15 +109,29 @@ func UpsertSpeakerConf(ctx *config.AppContext, in SpeakerConfInput) (string, err
 			if err != nil {
 				return "", fmt.Errorf("append talk to %s: %w", existingID, err)
 			}
+			// Append the proposal pointer to the cached SpeakerConf so
+			// the dashboard sees it on the very next request rather
+			// than waiting for the next cache refresh.
+			if cached := FetchSpeakerConfByID(existingID); cached != nil {
+				if p, _ := GetProposal(ctx, in.ProposalID); p != nil {
+					cached.Proposals = append(cached.Proposals, p)
+				}
+			}
 		}
 		return existingID, nil
 	}
 
 	vals := map[string]*notion.PropertyValue{
-		"ComingFrom": titleValue(in.ComingFrom),
 		"FirstEvent": checkboxValue(in.FirstEvent),
 		"DinnerRSVP": checkboxValue(in.DinnerRSVP),
 		"Sponsor":    checkboxValue(in.Sponsor),
+	}
+	// ComingFrom is the page Title — Notion rejects writes that include
+	// the property but leave its `title` array empty/undefined. Skip the
+	// key entirely on empty input (the page just lands untitled, which
+	// the apply form / dashboard editor will populate later).
+	if in.ComingFrom != "" {
+		vals["ComingFrom"] = titleValue(in.ComingFrom)
 	}
 	vals["speaker"] = relationValue([]string{in.SpeakerID})
 	if in.ProposalID != "" {
@@ -149,6 +163,28 @@ func UpsertSpeakerConf(ctx *config.AppContext, in SpeakerConfInput) (string, err
 	if err != nil {
 		return "", err
 	}
+	// Eagerly insert into the warm cache so dashboard reads immediately
+	// after invite-flow submits don't return "no SpeakerConfs for this
+	// email" until the next periodic refresh tick.
+	sc := &types.SpeakerConf{
+		ID:           page.ID,
+		ComingFrom:   in.ComingFrom,
+		Speaker:      CacheSpeakerByID(in.SpeakerID),
+		Availability: in.Availability,
+		RecordOK:     in.RecordOK,
+		Visa:         in.Visa,
+		FirstEvent:   in.FirstEvent,
+		DinnerRSVP:   in.DinnerRSVP,
+		Sponsor:      in.Sponsor,
+		Company:      in.Company,
+		OrgPhoto:     in.OrgPhoto,
+	}
+	if in.ProposalID != "" {
+		if p, _ := GetProposal(ctx, in.ProposalID); p != nil {
+			sc.Proposals = append(sc.Proposals, p)
+		}
+	}
+	CacheSpeakerConfInsert(sc)
 	return page.ID, nil
 }
 
@@ -303,11 +339,19 @@ type SpeakerConfFields struct {
 // exception: empty means "no new upload, keep the existing filename".
 func UpdateSpeakerConf(ctx *config.AppContext, speakerConfID string, in SpeakerConfFields) error {
 	vals := map[string]*notion.PropertyValue{
-		"ComingFrom": titleValue(in.ComingFrom),
-		"Company":    richTextValue(in.Company),
 		"FirstEvent": checkboxValue(in.FirstEvent),
 		"DinnerRSVP": checkboxValue(in.DinnerRSVP),
 		"Sponsor":    checkboxValue(in.Sponsor),
+	}
+	// Title (ComingFrom) and rich_text (Company) properties must be
+	// omitted when empty — Notion rejects writes that include the key
+	// with no type-specific body. To clear an existing value, write
+	// it from the dashboard form which always submits a value.
+	if in.ComingFrom != "" {
+		vals["ComingFrom"] = titleValue(in.ComingFrom)
+	}
+	if in.Company != "" {
+		vals["Company"] = richTextValue(in.Company)
 	}
 	if in.RecordOK != "" {
 		vals["RecordOK"] = selectValue(in.RecordOK)
@@ -692,7 +736,12 @@ func GetConfTalkByProposal(ctx *config.AppContext, proposalID string) (*types.Co
 }
 
 // UpdateProposalStatus mirrors UpdateTalkAppStatus for the new Proposal DB.
-// Used by the Accept/Invite/Decline admin actions (future work).
+// Used by the dashboard withdraw / accept-invite flows.
+//
+// After a successful write we also patch the cached *Proposal in place
+// — the cache invalidation only resets the staleness timer, so without
+// the eager mutation the dashboard's immediate redirect-back would
+// still render the old status until the next periodic refresh tick.
 func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) error {
 	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID,
 		map[string]*notion.PropertyValue{
@@ -701,6 +750,11 @@ func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) err
 	if err == nil {
 		InvalidateProposalsCache()
 		InvalidateSpeakerConfsCache()
+		proposalCacheMu.Lock()
+		if p := proposalByID[proposalID]; p != nil {
+			p.Status = status
+		}
+		proposalCacheMu.Unlock()
 	}
 	return err
 }
@@ -730,6 +784,65 @@ func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, propos
 		return fmt.Errorf("update speakerconf %s: %w", speakerConfID, err)
 	}
 	InvalidateSpeakerConfsCache()
+	return nil
+}
+
+// SetProposalInviteToken writes the InviteToken rich_text field on a
+// proposal. Used by the share-a-link invite flow to mint a token on
+// first invite, or to rotate one (admin-side, via this endpoint or
+// directly in Notion) to revoke any outstanding share links.
+//
+// Empty token isn't supported here — the go-notion library's omitempty
+// drops zero-length rich_text arrays from the JSON, which Notion
+// rejects. To clear a token, admins edit the field in Notion's UI.
+func SetProposalInviteToken(ctx *config.AppContext, proposalID, token string) error {
+	if token == "" {
+		return fmt.Errorf("SetProposalInviteToken: empty token (clear via Notion UI)")
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID,
+		map[string]*notion.PropertyValue{
+			"InviteToken": richTextValue(token),
+		})
+	if err != nil {
+		return fmt.Errorf("set invite token on %s: %w", proposalID, err)
+	}
+	InvalidateProposalsCache()
+	return nil
+}
+
+// AddSpeakerConfToProposal appends speakerConfID to a Proposal's `speakers`
+// multi-relation. Idempotent — no-op when the SpeakerConf is already in
+// the relation.
+//
+// Used by the co-speaker invite flow alongside UpsertSpeakerConf, which
+// only writes the SpeakerConf → Proposal direction. Notion's two-way
+// relations should keep these in sync, but writing both sides
+// explicitly defends against schema drift and keeps the in-memory cache
+// consistent on the next refresh.
+func AddSpeakerConfToProposal(ctx *config.AppContext, proposalID, speakerConfID string) error {
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), proposalID)
+	if err != nil {
+		return fmt.Errorf("retrieve proposal %s: %w", proposalID, err)
+	}
+	existing := make([]string, 0, len(page.Properties["speakers"].Relation)+1)
+	for _, ref := range page.Properties["speakers"].Relation {
+		if ref == nil || ref.ID == "" {
+			continue
+		}
+		if ref.ID == speakerConfID {
+			return nil
+		}
+		existing = append(existing, ref.ID)
+	}
+	existing = append(existing, speakerConfID)
+	_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID,
+		map[string]*notion.PropertyValue{
+			"speakers": relationValue(existing),
+		})
+	if err != nil {
+		return fmt.Errorf("update proposal %s: %w", proposalID, err)
+	}
+	InvalidateProposalsCache()
 	return nil
 }
 

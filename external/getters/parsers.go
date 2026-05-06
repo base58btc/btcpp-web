@@ -176,6 +176,7 @@ func parseProposal(ctx *config.AppContext, pageID string, props map[string]notio
 		Status:          parseSelect("Status", props),
 		DesiredDuration: int(props["DesiredDuration"].Number),
 		AvailDuration:   int(props["AvailDuration"].Number),
+		InviteToken:     parseRichText("InviteToken", props),
 	}
 	if tag := parseSelect("ScheduleFor", props); tag != "" {
 		prop.ScheduleFor = lookupConfByTag(ctx, tag)

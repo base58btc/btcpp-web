@@ -165,6 +165,92 @@ func (p submitPipeline) Submit(app *types.TalkApp) (SubmitResult, error) {
 	return result, nil
 }
 
+// JoinProposal is Submit minus step 3 (create Proposal). Used by the
+// co-speaker invite flow: an existing proposal ID is supplied, and the
+// pipeline upserts Speaker / Org / SpeakerConf, appending the existing
+// proposal to the SpeakerConf's `talk` relation.
+//
+// Mirrors Submit's behaviour for everything else — duplicate-email
+// detection, Speaker create-vs-update, Org dedup, per-conf SpeakerConf
+// upsert. The only difference is which proposal ID gets attached to
+// the SpeakerConf at the end.
+func (p submitPipeline) JoinProposal(app *types.TalkApp, proposalID string) (SubmitResult, error) {
+	var result SubmitResult
+
+	if app.Email == "" {
+		return result, errors.New("email is required")
+	}
+	if app.ScheduleFor == nil {
+		return result, errors.New("ScheduleFor conf is required")
+	}
+	if proposalID == "" {
+		return result, errors.New("proposalID is required")
+	}
+
+	// 1. Upsert Speaker by email — same logic as Submit.
+	matches, err := p.deps.findSpeakers(app.Email)
+	if err != nil {
+		return result, fmt.Errorf("find speakers by email: %w", err)
+	}
+	if len(matches) > 1 {
+		return result, fmt.Errorf("%w: %d matches for %s", ErrDuplicateSpeakerEmail, len(matches), app.Email)
+	}
+	if len(matches) == 0 {
+		speakerID, err := p.deps.createSpeaker(speakerInputFromTalkApp(app))
+		if err != nil {
+			return result, fmt.Errorf("create speaker: %w", err)
+		}
+		result.SpeakerID = speakerID
+		result.SpeakerCreated = true
+	} else {
+		existing := matches[0]
+		result.SpeakerID = existing.ID
+		update := buildSpeakerUpdateFromForm(existing, app)
+		if err := p.deps.updateSpeaker(existing.ID, update); err != nil {
+			return result, fmt.Errorf("update speaker %s: %w", existing.ID, err)
+		}
+	}
+
+	// 2. Upsert Org — same logic as Submit.
+	if app.OrgSite != "" || app.Org != "" {
+		orgID, created, err := p.upsertOrg(app)
+		if err != nil {
+			return result, fmt.Errorf("upsert org: %w", err)
+		}
+		result.OrgID = orgID
+		result.OrgCreated = created
+	}
+
+	// 3. (Skipped — Submit creates a Proposal here; we reuse the one
+	// the inviter shared.)
+	result.ProposalID = proposalID
+
+	// 4. Upsert SpeakerConf — same as Submit, with the existing proposal.
+	otherEventTags := otherEventTags(app.OtherEvents)
+	spID, err := p.deps.upsertSpeakerConf(getters.SpeakerConfInput{
+		SpeakerID:      result.SpeakerID,
+		ConfTag:        app.ScheduleFor.Tag,
+		ProposalID:     proposalID,
+		OrgID:          result.OrgID,
+		Company:        app.Org,
+		OrgPhoto:       app.OrgLogo,
+		ComingFrom:     app.Hometown,
+		Availability:   app.Availability,
+		RecordOK:       defaultRecording(app.Recording),
+		Visa:           app.Visa,
+		FirstEvent:     app.FirstEvent,
+		OtherEventTags: otherEventTags,
+		DinnerRSVP:     app.DinnerRSVP,
+		Sponsor:        app.Sponsor,
+	})
+	if err != nil {
+		return result, fmt.Errorf("upsert speaker conf: %w", err)
+	}
+	result.SpeakerConfID = spID
+
+	return result, nil
+}
+
 // upsertOrg looks up an existing Org by Website (preferred) or Name; creates
 // a new one only when the form supplies org data beyond name + logo (i.e.,
 // at least one of OrgSite / OrgTwitter / OrgNostr is set). Submissions that

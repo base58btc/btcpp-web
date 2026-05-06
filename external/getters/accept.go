@@ -50,13 +50,31 @@ type SpeakerUpdate struct {
 	TShirt    string
 }
 
-// GetSpeakersByEmail returns every Speaker page whose Email property matches
-// `email` exactly. Caller is responsible for deciding what to do when 0, 1,
-// or many are returned.
-// GetSpeakersByEmail returns every Speaker page whose Email matches.
-// Reads from cacheSpeakers when warm; falls back to a live query only on
-// a cold cache (first request after boot before WaitFetch completes).
+// GetSpeakersByEmail returns every Speaker page whose Email property
+// matches `email`. Caller is responsible for deciding what to do when 0,
+// 1, or many are returned.
+//
+// The cache is the fast path, but on a cache miss for a specific email
+// we ALSO fall through to a live Notion query before declaring "no
+// such speaker." That's deliberate:
+//
+//   - the cache is rebuilt from a paginated ListSpeakers at boot, and
+//     speakers created in the last few seconds may not show up in
+//     Notion's index yet (eventual consistency);
+//   - dev with `air` cycles the binary on every save, so a Speaker
+//     created in process A may simply not be in process B's freshly
+//     loaded cache;
+//   - any caller that's about to *create* a speaker (Submit /
+//     JoinProposal) needs an authoritative "does this email already
+//     exist?" answer or it'll mint duplicates.
+//
+// The live query runs only when the cache says zero — for the common
+// case (existing speaker), we still take the cache hit and skip the
+// Notion call.
 func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error) {
+	if email == "" {
+		return nil, nil
+	}
 	if cached := cacheSpeakers; len(cached) > 0 {
 		var hits []*types.Speaker
 		for _, s := range cached {
@@ -64,7 +82,10 @@ func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error)
 				hits = append(hits, s)
 			}
 		}
-		return hits, nil
+		if len(hits) > 0 {
+			return hits, nil
+		}
+		// fall through to live query — cache may be stale.
 	}
 	var speakers []*types.Speaker
 	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
@@ -91,7 +112,39 @@ func CreateSpeaker(n *types.Notion, in SpeakerInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Eagerly insert into the warm cache so an immediately-following
+	// GetSpeakersByEmail (e.g. from the dashboard the just-invited
+	// speaker is about to land on) finds the row without waiting for
+	// the periodic refresh.
+	CacheSpeakerInsert(speakerFromInput(page.ID, in))
 	return page.ID, nil
+}
+
+// speakerFromInput builds a *types.Speaker from a SpeakerInput + page ID
+// for cache insertion. The fields mirror parseSpeaker — anything not
+// in SpeakerInput stays zero-valued and gets overwritten on the next
+// full cache refresh.
+func speakerFromInput(pageID string, in SpeakerInput) *types.Speaker {
+	return &types.Speaker{
+		ID:            pageID,
+		Name:          in.Name,
+		Email:         in.Email,
+		Photo:         in.Photo,
+		Phone:         in.Phone,
+		Signal:        in.Signal,
+		Telegram:      in.Telegram,
+		Twitter:       types.ParseTwitter(in.Twitter),
+		Nostr:         in.Nostr,
+		Github:        in.Github,
+		Instagram:     in.Instagram,
+		LinkedIn:      in.LinkedIn,
+		Website:       in.Website,
+		Company:       in.Company,
+		OrgLogo:       in.OrgLogo,
+		AvailToHire:   in.AvailToHire,
+		LookingToHire: in.LookingToHire,
+		TShirt:        in.TShirt,
+	}
 }
 
 func UpdateSpeaker(n *types.Notion, speakerID string, up SpeakerUpdate) error {
@@ -229,10 +282,13 @@ func richTextValue(content string) *notion.PropertyValue {
 }
 
 // richTextChunks turns a string into one or more *notion.RichText entries.
-// Empty input → empty slice (Notion rejects rich_text entries with absent
-// content; an empty array is fine). Long input is split at rune boundaries
-// at the per-block limit (notionRichTextLimit) so no single entry exceeds
-// what the API will accept.
+// Empty input → nil slice; callers should skip the property entirely in
+// that case rather than writing an empty value (the go-notion struct
+// uses `omitempty` on title/rich_text, so an empty array gets dropped
+// and Notion rejects the resulting "title undefined" payload).
+//
+// Long input is split at rune boundaries at the per-block limit
+// (notionRichTextLimit) so no single entry exceeds what the API accepts.
 func richTextChunks(content string) []*notion.RichText {
 	if content == "" {
 		return nil

@@ -10,12 +10,24 @@
     <section id="form">
         <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
+                {{ if .InviteMode }}
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Co-speaker Invitation</h2>
+                <p class="mt-2 text-lg/8 text-gray-600">You've been invited to co-present <span class="font-semibold">"{{ .Proposal.Title }}"</span>{{ if .Conf }} at {{ .Conf.Desc }}{{ end }}.</p>
+                <p class="mt-2 text-lg/8 text-gray-600">Fill in your details below to be added to the talk.</p>
+                {{ else }}
                 <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Speaker Application</h2>
                 <p class="mt-2 text-lg/8 text-gray-600">Apply to talk or present at {{ .Conf.Desc }}.</p>
                 <p class="mt-2 text-lg/8 text-gray-600">Applications are due at 12:00 midnight on {{ .DueDate }}</p>
+                {{ end }}
             </div>
-            <form action="#" 
+            <form action="#"
+            {{ if .InviteMode }}
+            hx-post="/invite-speaker/{{ .Proposal.ID }}?t={{ .InviteToken }}"
+            {{ else if .HMAC }}
+            hx-post="/talk/{{ .Conf.Tag }}?hr={{ .HMAC }}&em={{ .Email }}"
+            {{ else }}
             hx-post="/talk/{{ .Conf.Tag }}"
+            {{ end }}
             class="mx-auto mt-16 max-w-xl sm:mt-20"
             hx-validate="true"
             hx-target="#result"
@@ -254,14 +266,15 @@
                         </div>
                     </div>
 
+                    {{ if not .InviteMode }}
                     <div class="sm:col-span-2">
                         <label for="TalkTitle" class="block text-sm/6 font-semibold text-gray-900">
                         Talk/Workshop Title *
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="TalkTitle" id="TalkTitle" type="text" 
-                            autoComplete="off" autoCorrect="off" 
+                            <input
+                            name="TalkTitle" id="TalkTitle" type="text"
+                            autoComplete="off" autoCorrect="off"
                             autoCapitalize="off" spellCheck="false"
                             placeholder="Lightning at the edges..."
                             required
@@ -274,11 +287,11 @@
                         Talk/Workshop Description *
                         </label>
                         <div class="mt-2.5">
-                            <textarea 
+                            <textarea
                             name="Description" id="Description"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="This talk will..."
-                            rows="3" 
+                            rows="3"
                             required
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
                         </div>
@@ -294,6 +307,7 @@
                         {{ end }}
                         </div>
                     </fieldset>
+                    {{ end }}
 
                     <fieldset class="sm:col-span-2">
                         <legend class="block text-sm/6 font-semibold text-gray-900">
@@ -306,6 +320,7 @@
                         </div>
                     </fieldset>
 
+                    {{ if not .InviteMode }}
                     <div class="sm:col-span-2">
                         <label for="Setup" class="block text-sm/6 font-semibold text-gray-900">
                         Workshop / talk setup notes
@@ -322,6 +337,7 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
                         </div>
                     </div>
+                    {{ end }}
 
                     <fieldset class="sm:col-span-2">
                         <legend class="block text-sm/6 font-semibold text-gray-900">
@@ -351,6 +367,7 @@
                     </div>
 
 
+                    {{ if not .InviteMode }}
                     <fieldset class="sm:col-span-2">
                         <legend class="block text-sm/6 font-semibold text-gray-900">
                         Other Events I'm Interested in Presenting At
@@ -367,14 +384,15 @@
                         Additional Comments
                         </label>
                         <div class="mt-2.5">
-                            <textarea 
+                            <textarea
                             name="Comments" id="Comments"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="Excited about..."
-                            rows="3" 
+                            rows="3"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
                         </div>
                     </div>
+                    {{ end }}
 
                     {{ if .IsReturningAttendee }}
                     <input type="hidden" name="FirstEvent" value="false" />
@@ -408,19 +426,23 @@
                     </div>
                     {{ end }}
 
+                    {{ if not .InviteMode }}
                     <div class="sm:col-span-2">
                         <label for="Captcha" class="block text-sm/6 font-semibold text-gray-900">
                         What is ten divided by two? *
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Captcha" id="Captcha" type="number" 
+                            <input
+                            name="Captcha" id="Captcha" type="number"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="5"
                             required
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ else }}
+                    <input type="hidden" name="Captcha" value="5" />
+                    {{ end }}
 
 
                 </div>
@@ -431,7 +453,7 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                         </svg>
-                        <span class="submit-label-idle">Submit Application</span>
+                        <span class="submit-label-idle">{{ if .InviteMode }}Add me as a co-speaker{{ else }}Submit Application{{ end }}</span>
                         <span class="submit-label-busy">Submitting…</span>
                     </button>
                 </div>
@@ -440,9 +462,11 @@
             </div>
         </div>
     </section>
+    {{ if not .InviteMode }}
     <section id="about">
     {{ block "about" . }} {{ end }}
     </section>
+    {{ end }}
     {{ block "footer" . }} {{ end }}
 
     <link rel="stylesheet" href="/static/css/cropper-1.6.2.min.css" />

@@ -69,6 +69,29 @@ type (
                 Talks   []*types.Talk
                 Email   string
         }
+
+        // OnlyForProposal is the data shape passed to the per-proposal
+        // status emails (talkinvited / talkconfirmed / talkdeclined /
+        // talkwaitlisted / talkrejected). The template can reach all
+        // co-speakers via .SpeakerConfs / .Speakers; .Speaker / .Email
+        // identify the recipient of *this particular* render so the
+        // letter can address them by name.
+        //
+        // TalkConfirmLink is the magic-link URL the recipient clicks
+        // to one-click-accept the talk. DashboardLink is their general
+        // self-service URL. Both are speaker-scoped magic links — the
+        // HMAC encodes the recipient's email so each speaker on a
+        // multi-speaker proposal gets their own pair of links.
+        OnlyForProposal struct {
+                Proposal        *types.Proposal
+                SpeakerConfs    []*types.SpeakerConf
+                Speakers        []*types.Speaker
+                Conf            *types.Conf
+                Speaker         *types.Speaker
+                Email           string
+                TalkConfirmLink string
+                DashboardLink   string
+        }
 )
 
 
@@ -159,6 +182,75 @@ func OnlyForVolShift(ctx *config.AppContext, volinfo *types.VolInfo, vol *types.
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
+}
+
+// SendOnlyForProposal fans out one rendered onlyfor letter per speaker
+// attached to the proposal. Each render gets the same proposal/conf/
+// peers data, with .Speaker / .Email swapped to the current recipient
+// so the template can address them by name.
+//
+// Best-effort across recipients: a failed send for one speaker is
+// logged via ctx.Err and skipped; siblings still get their email. The
+// returned error is non-nil only when *every* send failed (or the
+// proposal had no speakers at all to send to).
+//
+// onlyFor is one of: talkinvited, talkconfirmed, talkdeclined,
+// talkwaitlisted, talkrejected.
+func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types.Proposal, conf *types.Conf) error {
+        if proposal == nil {
+                return fmt.Errorf("SendOnlyForProposal: nil proposal")
+        }
+
+        // Resolve all SpeakerConfs (and their Speakers) for the proposal.
+        // proposal.Speakers is populated by the dashboard enricher but
+        // may be empty in admin paths — fall back to FetchSpeakerConfByID
+        // on the cached lookup.
+        scs := make([]*types.SpeakerConf, 0, len(proposal.SpeakerConfRefs))
+        speakers := make([]*types.Speaker, 0, len(proposal.SpeakerConfRefs))
+        for _, ref := range proposal.SpeakerConfRefs {
+                sc := getters.FetchSpeakerConfByID(ref)
+                if sc == nil {
+                        ctx.Err.Printf("SendOnlyForProposal: SpeakerConf %s not in cache — skip", ref)
+                        continue
+                }
+                scs = append(scs, sc)
+                if sc.Speaker != nil {
+                        speakers = append(speakers, sc.Speaker)
+                }
+        }
+        if len(speakers) == 0 {
+                return fmt.Errorf("SendOnlyForProposal: no speakers resolved for proposal %s", proposal.ID)
+        }
+
+        sentAny := false
+        var firstErr error
+        for _, sp := range speakers {
+                if sp == nil || sp.Email == "" {
+                        continue
+                }
+                data := &OnlyForProposal{
+                        Proposal:        proposal,
+                        SpeakerConfs:    scs,
+                        Speakers:        speakers,
+                        Conf:            conf,
+                        Speaker:         sp,
+                        Email:           sp.Email,
+                        TalkConfirmLink: helpers.EmailLink(ctx, sp.Email, "/dashboard/talks/"+proposal.ID+"/confirm"),
+                        DashboardLink:   helpers.EmailLink(ctx, sp.Email, "/dashboard"),
+                }
+                if _, err := execOnlyFor(ctx, sp.Email, onlyFor, data); err != nil {
+                        ctx.Err.Printf("SendOnlyForProposal %s → %s: %s", onlyFor, sp.Email, err)
+                        if firstErr == nil {
+                                firstErr = err
+                        }
+                        continue
+                }
+                sentAny = true
+        }
+        if !sentAny {
+                return firstErr
+        }
+        return nil
 }
 
 func templatizeTitle(title string, tmplData interface{}) string {

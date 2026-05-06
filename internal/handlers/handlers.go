@@ -697,6 +697,17 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/dashboard/talks/{proposalID}/accept", func(w http.ResponseWriter, r *http.Request) {
 		DashboardAcceptInvite(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/dashboard/talks/{proposalID}/confirm", func(w http.ResponseWriter, r *http.Request) {
+		DashboardConfirmTalk(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/dashboard/invite/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
+		DashboardInviteCoSpeaker(w, r, app)
+	}).Methods("GET")
+
+	r.HandleFunc("/invite-speaker/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
+		InviteSpeaker(w, r, app)
+	}).Methods("GET", "POST")
 
 	// Backwards compat: existing magic-link emails point at /vols/shift.
 	// Forward them to /dashboard, preserving the HMAC + email query params.
@@ -1238,6 +1249,21 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
                 if err != nil {
                         ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
+                }
+
+                /* When the form was submitted from a magic-link-authed
+                   context (the dashboard's "Propose another talk" link
+                   sets ?hr= & ?em= on the form action), bounce the user
+                   back to the dashboard rather than dropping them on a
+                   standalone success page. HTMX consumes HX-Redirect to
+                   navigate the whole page. */
+                if encHMAC := r.URL.Query().Get("hr"); encHMAC != "" {
+                        encEmail := r.URL.Query().Get("em")
+                        flash := url.QueryEscape("Thanks — your talk proposal is in.")
+                        w.Header().Set("HX-Redirect",
+                                fmt.Sprintf("/dashboard?hr=%s&em=%s&flash=%s", encHMAC, encEmail, flash))
+                        w.WriteHeader(http.StatusOK)
+                        return
                 }
 
                 w.Write([]byte(helpers.SuccessApp("Your speaker application has been submitted! We'll be in touch.")))
