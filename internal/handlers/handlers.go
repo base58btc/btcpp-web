@@ -1388,6 +1388,17 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
+	// Per-day schedule strip data (doors / lunch / coffee). Best-effort
+	// — a fetch failure leaves AgendaDays without time strips, which the
+	// template handles by collapsing to chrono-only.
+	var infosByDay map[int]*types.ConfInfo
+	if cis, err := getters.ListConfInfos(ctx, conf.Tag); err != nil {
+		ctx.Err.Printf("/%s ListConfInfos failed (continuing): %s", conf.Tag, err)
+	} else {
+		infosByDay = confInfosByDay(cis)
+	}
+	agendaDays := buildAgendaDays(conf, talks, infosByDay)
+
 	confHotels := helpers.HotelsForConf(ctx, conf)
 
 	currTix := findCurrTix(conf, soldCount)
@@ -1411,6 +1422,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		EventSpeakers: evSpeakers,
 		Buckets:       buckets,
 		Days:          days,
+		AgendaDays:    agendaDays,
 		Year:          helpers.CurrentYear(),
 	})
 	if err != nil {

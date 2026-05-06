@@ -1,0 +1,190 @@
+{{/*
+  Shared agenda + schedule rendering blocks. Conf templates call
+  agenda_active or agenda_past with their *ConfPage data; the blocks
+  handle day headers, time strips from ConfInfo, and the responsive
+  A-on-mobile / C-on-desktop session layout.
+*/}}
+
+{{/*
+  agenda_active — for upcoming/in-progress confs with talks
+  scheduled. Receives *ConfPage. Renders one block per AgendaDay with
+  ConfInfo time strips between buckets. Mobile = compact rows;
+  desktop = bucketed 3-col card grids.
+*/}}
+{{ define "agenda_active" }}
+  {{ range .AgendaDays }}
+    <h3 class="mt-16 text-xl font-semibold tracking-tight text-gray-900 sm:text-xl">{{ .Date.Format "Mon, Jan 2" }}</h3>
+
+    {{ if and .Info .Info.Doors }}
+      {{ if .Info.Breakfast }}
+        {{ template "agenda_strip" (printf "Check-in Opens + Breakfast, %s" .Info.Doors.HourRange) }}
+      {{ else }}
+        {{ template "agenda_strip" (printf "Check-in Opens, %s" .Info.Doors.HourRange) }}
+      {{ end }}
+    {{ end }}
+
+    {{ if .Morning }}
+      {{ template "agenda_bucket" .Morning }}
+    {{ end }}
+
+    {{ if and .Info .Info.Lunch }}
+      {{ template "agenda_strip" (printf "Lunch, %s" .Info.Lunch.HourRange) }}
+    {{ end }}
+
+    {{ if .Afternoon }}
+      {{ template "agenda_bucket" .Afternoon }}
+    {{ end }}
+
+    {{ if and .Info .Info.Coffee }}
+      {{ template "agenda_strip" (printf "Coffee Break, %s" .Info.Coffee.HourRange) }}
+    {{ end }}
+
+    {{ if .Evening }}
+      {{ template "agenda_bucket" .Evening }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{/*
+  agenda_past — for confs that have ended. Same break-divided
+  structure as agenda_active (separate list per Morning / Afternoon /
+  Evening bucket, divider strips between), but no desktop card view.
+  Receives *ConfPage.
+*/}}
+{{ define "agenda_past" }}
+  {{ range .AgendaDays }}
+    <h3 class="mt-16 text-xl font-semibold tracking-tight text-gray-900 sm:text-xl">Day {{ .Idx }} · {{ .Date.Format "Mon, Jan 2" }}</h3>
+
+    {{ if and .Info .Info.Doors }}
+      {{ if .Info.Breakfast }}
+        {{ template "agenda_strip" (printf "Check-in Opens + Breakfast, %s" .Info.Doors.HourRange) }}
+      {{ else }}
+        {{ template "agenda_strip" (printf "Check-in Opens, %s" .Info.Doors.HourRange) }}
+      {{ end }}
+    {{ end }}
+
+    {{ if .Morning }}
+      {{ template "session_list" .Morning }}
+    {{ end }}
+
+    {{ if and .Info .Info.Lunch }}
+      {{ template "agenda_strip" (printf "Lunch, %s" .Info.Lunch.HourRange) }}
+    {{ end }}
+
+    {{ if .Afternoon }}
+      {{ template "session_list" .Afternoon }}
+    {{ end }}
+
+    {{ if and .Info .Info.Coffee }}
+      {{ template "agenda_strip" (printf "Coffee Break, %s" .Info.Coffee.HourRange) }}
+    {{ end }}
+
+    {{ if .Evening }}
+      {{ template "session_list" .Evening }}
+    {{ end }}
+  {{ end }}
+{{ end }}
+
+{{/*
+  agenda_strip — the horizontal divider with label text used between
+  agenda buckets. Takes a string (the label).
+*/}}
+{{ define "agenda_strip" }}
+<div class="mt-10 relative">
+  <div class="absolute inset-0 flex items-center" aria-hidden="true">
+    <div class="w-full border-t border-gray-300"></div>
+  </div>
+  <div class="relative flex justify-center">
+    <span class="bg-white px-3 text-sm text-gray-500">{{ . }}</span>
+  </div>
+</div>
+{{ end }}
+
+{{/*
+  agenda_bucket — one bucket of sessions (Morning / Afternoon /
+  Evening) for an active conf. Receives []*Session. Mobile gets the
+  compact list, desktop gets the 3-col card grid.
+*/}}
+{{ define "agenda_bucket" }}
+  <div class="md:hidden">
+    {{ template "session_list" . }}
+  </div>
+  <div class="hidden md:grid mx-auto mt-12 max-w-2xl auto-rows-fr grid-cols-1 gap-8 lg:mx-0 lg:max-w-none lg:grid-cols-3">
+    {{ range . }}
+      {{ template "session" . }}
+    {{ end }}
+  </div>
+{{ end }}
+
+{{/*
+  session_list — compact <ul> of session rows. Used by agenda_past
+  unconditionally and by agenda_bucket's mobile half. Receives
+  []*Session.
+*/}}
+{{ define "session_list" }}
+<ul role="list" class="mt-6 divide-y divide-gray-100 rounded-md ring-1 ring-gray-200 bg-white text-left">
+  {{ range . }}
+    {{ template "session_row" . }}
+  {{ end }}
+</ul>
+{{ end }}
+
+{{/*
+  session_row — compact list rendering of one Session. Title is the
+  primary clickable anchor (deep-links to the talk page); the optional
+  "Watch recording" button is its own anchor when a Recording row
+  exists. Avoiding nested <a> means the row container is a plain
+  flex <li> rather than wrapping anchor.
+*/}}
+{{ define "session_row" }}
+<li class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50">
+  <div class="shrink-0 w-16 text-xs font-medium text-gray-700 pt-0.5 tabular-nums">
+    {{ if .Sched }}{{ .Sched.Start.Format "3:04 pm" }}{{ end }}
+  </div>
+  <div class="min-w-0 flex-1">
+    <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" class="text-sm font-semibold text-gray-900 hover:text-gray-700 block truncate">{{ .Name }}</a>
+    {{ if .Speakers }}
+    <div class="mt-1 flex items-center gap-2">
+      <div class="flex -space-x-1.5 shrink-0">
+        {{ range .Speakers }}
+        <img src="{{ if .Photo }}{{ speakerPhoto .Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+             alt="{{ .Name }}"
+             title="{{ .Name }}"
+             class="size-6 rounded-full ring-2 ring-white object-cover bg-gray-100" />
+        {{ end }}
+      </div>
+      <span class="text-xs text-gray-500 truncate">
+        {{ range $i, $s := .Speakers }}{{ if $i }}, {{ end }}{{ $s.Name }}{{ end }}
+      </span>
+    </div>
+    {{ end }}
+  </div>
+  <div class="shrink-0 flex items-center gap-2">
+    {{ template "venue_chip" . }}
+    {{ if .YTLink }}
+    <a href="{{ .YTLink }}" target="_blank" rel="noopener noreferrer"
+       title="Watch recording"
+       class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-600 text-white hover:bg-red-700">
+      <svg viewBox="0 0 24 24" fill="currentColor" class="size-3.5"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+      <span class="hidden sm:inline">Watch</span>
+    </a>
+    {{ end }}
+  </div>
+</li>
+{{ end }}
+
+{{/*
+  venue_chip — tiny color-coded venue label used in session_row.
+  Canonical mapping (one→Main, two→Talks, three→Workshops, four→Lounge).
+*/}}
+{{ define "venue_chip" }}
+  {{ if eq .Venue "one" }}
+  <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">Main</span>
+  {{ else if eq .Venue "two" }}
+  <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-lime-100 text-lime-800">Talks</span>
+  {{ else if eq .Venue "three" }}
+  <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-pink-100 text-pink-800">Workshops</span>
+  {{ else if eq .Venue "four" }}
+  <span class="shrink-0 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-800">Lounge</span>
+  {{ end }}
+{{ end }}

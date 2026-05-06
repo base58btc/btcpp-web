@@ -492,6 +492,39 @@ func FetchRecordingByConfTalk(confTalkID string) *types.Recording {
 	return recordingByConfTalk[confTalkID]
 }
 
+// FetchYTLinkForTalk bridges the legacy Talks-DB renderer (which uses
+// Talk.ID = Talks-DB page ID) to the new Recording cache (keyed by
+// ConfTalk.ID). Until GetTalksFor is fully replaced by
+// LoadTalksFromConfTalks, this lookup matches on the (conf tag, talk
+// title) pair which is unique within a conf — both ConfTalks and
+// Recordings carry the title.
+//
+// Returns "" when no matching ConfTalk or no Recording exists.
+func FetchYTLinkForTalk(confTag, name string) string {
+	if confTag == "" || name == "" {
+		return ""
+	}
+	confTalkCacheMu.RLock()
+	var matchID string
+	for _, ct := range cacheConfTalks {
+		if ct == nil || ct.Conf == nil || ct.Proposal == nil {
+			continue
+		}
+		if ct.Conf.Tag == confTag && ct.Proposal.Title == name {
+			matchID = ct.ID
+			break
+		}
+	}
+	confTalkCacheMu.RUnlock()
+	if matchID == "" {
+		return ""
+	}
+	if rec := FetchRecordingByConfTalk(matchID); rec != nil {
+		return rec.YTLink
+	}
+	return ""
+}
+
 func cacheRecordingsWarm() bool {
 	recordingCacheMu.RLock()
 	defer recordingCacheMu.RUnlock()

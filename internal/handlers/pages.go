@@ -49,7 +49,13 @@ type ConfPage struct {
 	EventSpeakers []*types.Speaker
 	Buckets       map[string]types.SessionTime
 	Days          []*Day
-	Year          uint
+
+	// AgendaDays drives the post-section-letter agenda rendering: per-day
+	// bucketed talks + ConfInfo time strip. Empty when the conf has no
+	// scheduled talks yet.
+	AgendaDays []*AgendaDay
+
+	Year uint
 }
 
 type SuccessPage struct {

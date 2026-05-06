@@ -238,6 +238,7 @@ type (
 		Venue     string
 		AnchorTag string
 		ConfTag   string
+		YTLink    string // populated when a Recording row exists for this talk
 	}
 
 	Ticket struct {
@@ -535,6 +536,18 @@ func (t *Times) DateDesc() string {
 func (t *Times) StartTime() string {
 	// 10 am
 	return fmt.Sprintf("%s - %s", t.Start.Format("3:04 pm"), t.End.Format("3:04 pm"))
+}
+
+// HourRange formats the start (and end, when set) as "3:04 pm" or
+// "3:04 pm - 4:00 pm". Safe to call on a *Times whose End is nil — the
+// Doors / Breakfast columns of ConfInfo can legitimately be a single
+// instant rather than a range.
+func (t *Times) HourRange() string {
+	s := t.Start.Format("3:04 pm")
+	if t.End == nil {
+		return s
+	}
+	return s + " - " + t.End.Format("3:04 pm")
 }
 
 func (t *Times) Day() string {

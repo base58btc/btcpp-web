@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"unicode"
 
+	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 )
@@ -139,6 +140,15 @@ func talkToSession(talk *types.Talk, conf *types.Conf) *types.Session {
 	if talk.Sched != nil {
 		sesh.Len = talk.Sched.LenStr()
 		sesh.StartTime = talk.Sched.StartTime()
+	}
+
+	// First try a direct ConfTalk.ID lookup (cheap when talks come from
+	// LoadTalksFromConfTalks); fall back to the (tag, title) bridge for
+	// the legacy Talks-DB renderer where talk.ID is a Talks-DB page ID.
+	if rec := getters.FetchRecordingByConfTalk(talk.ID); rec != nil {
+		sesh.YTLink = rec.YTLink
+	} else {
+		sesh.YTLink = getters.FetchYTLinkForTalk(conf.Tag, talk.Name)
 	}
 
 	return sesh
