@@ -87,6 +87,39 @@ func dashboardAuthForProposal(w http.ResponseWriter, r *http.Request, ctx *confi
 	return nil, nil, "", "", fmt.Errorf("email %s not on proposal %s", email, proposalID)
 }
 
+// DashboardTalkDetails renders a read-only summary of a proposal —
+// surfaced from the dashboard for talks in a terminal status
+// (TheyDecline / WeDecline / Rejected) where editing is no longer
+// applicable but the user may still want to look back at what they
+// submitted: title / type / duration / description / setup notes /
+// comments / fellow speakers / scheduled time (if any).
+func DashboardTalkDetails(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	proposal, _, encHMAC, encEmail, err := dashboardAuthForProposal(w, r, ctx, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard details: %s", err)
+		return
+	}
+	// Attach ConfTalk + Recording for accepted-but-then-canceled cases —
+	// if a talk got scheduled before being declined, the details page
+	// should still show the time.
+	if ct, err := getters.GetConfTalkByProposal(ctx, proposalID); err == nil && ct != nil {
+		proposal.ConfTalk = ct
+	}
+	page := &TalkDetailsPage{
+		Proposal: proposal,
+		Conf:     proposal.ScheduleFor,
+		Speakers: resolveProposalSpeakers(proposal),
+		HMAC:     encHMAC,
+		Email:    encEmail,
+		Year:     helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_talk_details.tmpl", page); err != nil {
+		ctx.Err.Printf("/dashboard details render: %s", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
 // DashboardEditProposal renders / handles the speaker-side proposal editor.
 //
 // GET: load the proposal, check the edit-lock, render the edit form.
@@ -279,6 +312,15 @@ func DashboardEditSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *confi
 		returning = reg
 	}
 
+	// DaysList[0] is the setup day (one before StartDate) — this is
+	// when the speakers' dinner happens, so it's what we surface in
+	// the RSVP label. Mirrors the apply form's RSVPFor wiring.
+	rsvpDayList := conf.DaysList("", true)
+	rsvpFor := ""
+	if len(rsvpDayList) > 0 {
+		rsvpFor = rsvpDayList[0].ItemDesc
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speakerconf.tmpl", &EditSpeakerConfPage{
 		SpeakerConf:         target,
 		Conf:                conf,
@@ -293,12 +335,210 @@ func DashboardEditSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *confi
 		DaysList:            conf.DaysList("", false),
 		RecordingOptions:    helpers.GetRecordingOptions(),
 		IsReturningAttendee: returning,
+		RSVPFor:             rsvpFor,
 		Year:                helpers.CurrentYear(),
 	})
 	if err != nil {
 		ctx.Err.Printf("/dashboard edit-conf render: %s", err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
+}
+
+// DashboardEditSpeaker renders / handles the user's row in the
+// Speakers DB. Auth is by magic-link email — the user can only edit
+// the speaker row whose email matches the authed identity.
+//
+// Mode is "edit" when GetSpeakersByEmail returns at least one row; in
+// that case the form's POST patches the existing row via UpdateSpeaker.
+// Mode is "create" when there's no row yet — common for volunteer-
+// or ticket-only contacts who want to add themselves to the speakers
+// DB. The POST creates a new row via CreateSpeaker.
+func DashboardEditSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	email, encHMAC, err := validateVolEmail(r, ctx)
+	if err != nil {
+		ctx.Infos.Printf("/dashboard/speaker auth: %s", err)
+		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
+		return
+	}
+	encEmail := r.URL.Query().Get("em")
+
+	speakers, err := getters.GetSpeakersByEmail(ctx.Notion, email)
+	if err != nil {
+		ctx.Err.Printf("/dashboard/speaker lookup %s: %s", email, err)
+		http.Error(w, "lookup failed", http.StatusInternalServerError)
+		return
+	}
+	var sp *types.Speaker
+	if len(speakers) > 0 {
+		sp = speakers[0]
+	}
+
+	if r.Method == http.MethodPost {
+		if err := r.ParseMultipartForm(8 << 20); err != nil {
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "bad form", http.StatusBadRequest)
+				return
+			}
+		}
+		if sp == nil {
+			handleCreateSpeakerPOST(w, r, ctx, email, encHMAC, encEmail)
+			return
+		}
+		handleUpdateSpeakerPOST(w, r, ctx, sp, encHMAC, encEmail)
+		return
+	}
+
+	mode := "create"
+	if sp != nil {
+		mode = "edit"
+	}
+	page := &EditSpeakerPage{
+		Speaker:      sp,
+		HMAC:         encHMAC,
+		Email:        encEmail,
+		EmailPlain:   email,
+		Mode:         mode,
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speaker.tmpl", page); err != nil {
+		ctx.Err.Printf("/dashboard/speaker render: %s", err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+// handleUpdateSpeakerPOST applies the form fields to the existing
+// Speaker row via the sparse SpeakerUpdate API. Empty fields are
+// passed through, but the Notion library treats them as no-ops via
+// speakerUpdateProps which builds the property map from non-empty
+// strings + booleans.
+func handleUpdateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, sp *types.Speaker, encHMAC, encEmail string) {
+	picRaw, picContentType, picExt, picErr := readMultipartFile(r, "PicFile")
+	hasNewPic := picErr == nil && len(picRaw) > 0
+	if picErr != nil && picErr != http.ErrMissingFile {
+		ctx.Err.Printf("/dashboard/speaker read pic: %s", picErr)
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape("Photo upload failed.")),
+			http.StatusSeeOther)
+		return
+	}
+	up := getters.SpeakerUpdate{
+		Phone:     strings.TrimSpace(r.FormValue("Phone")),
+		Signal:    strings.TrimSpace(r.FormValue("Signal")),
+		Telegram:  strings.TrimSpace(r.FormValue("Telegram")),
+		Twitter:   strings.TrimSpace(r.FormValue("Twitter")),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
+		TShirt:    validShirtCode(strings.TrimSpace(r.FormValue("TShirt"))),
+	}
+	if hasNewPic {
+		up.Photo = imgproc.ShortID(picRaw) + picExt
+	}
+	if err := getters.UpdateSpeaker(ctx.Notion, sp.ID, up); err != nil {
+		ctx.Err.Printf("/dashboard/speaker update %s: %s", sp.ID, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape("Update failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+	if hasNewPic {
+		// Patch the cached Speaker so the dashboard's next render
+		// reflects the new photo without waiting for a periodic
+		// refresh, then fire-and-forget the Spaces upload.
+		sp.Photo = up.Photo
+		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Speaker info updated."), http.StatusSeeOther)
+}
+
+// handleCreateSpeakerPOST mints a new Speakers row for an
+// authenticated user who didn't have one yet. The email is forced to
+// the magic-link-authed value so a user can't create a profile with
+// someone else's email.
+func handleCreateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, email, encHMAC, encEmail string) {
+	name := strings.TrimSpace(r.FormValue("Name"))
+	if name == "" {
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape("Name is required.")),
+			http.StatusSeeOther)
+		return
+	}
+	picRaw, picContentType, picExt, picErr := readMultipartFile(r, "PicFile")
+	hasNewPic := picErr == nil && len(picRaw) > 0
+	if picErr != nil && picErr != http.ErrMissingFile {
+		ctx.Err.Printf("/dashboard/speaker (create) read pic: %s", picErr)
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape("Photo upload failed.")),
+			http.StatusSeeOther)
+		return
+	}
+	// Mirror the talk-application form's required set: Name (already
+	// checked above), Phone, Signal, Github, and a profile photo. The
+	// browser-side `required` attrs gate normal submissions; this is
+	// the server-side backstop for handcrafted POSTs.
+	in := getters.SpeakerInput{
+		Name:      name,
+		Email:     email,
+		Phone:     strings.TrimSpace(r.FormValue("Phone")),
+		Signal:    strings.TrimSpace(r.FormValue("Signal")),
+		Telegram:  strings.TrimSpace(r.FormValue("Telegram")),
+		Twitter:   strings.TrimSpace(r.FormValue("Twitter")),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
+		TShirt:    validShirtCode(strings.TrimSpace(r.FormValue("TShirt"))),
+	}
+	if missing := firstMissingProfileField(in.Phone, in.Signal, in.Github, hasNewPic); missing != "" {
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape(missing+" is required.")),
+			http.StatusSeeOther)
+		return
+	}
+	if hasNewPic {
+		in.Photo = imgproc.ShortID(picRaw) + picExt
+	}
+	if _, err := getters.CreateSpeaker(ctx.Notion, in); err != nil {
+		ctx.Err.Printf("/dashboard/speaker create %s: %s", email, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
+				encHMAC, encEmail, url.QueryEscape("Create failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+	if hasNewPic {
+		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Profile created."), http.StatusSeeOther)
+}
+
+// firstMissingProfileField returns the user-facing label of the first
+// required profile field that's empty, or "" when all are filled.
+// hasPhoto is the boolean form because the photo lives outside the
+// form's text values (multipart blob).
+func firstMissingProfileField(phone, signal, github string, hasPhoto bool) string {
+	if phone == "" {
+		return "Phone"
+	}
+	if signal == "" {
+		return "Signal"
+	}
+	if github == "" {
+		return "Github"
+	}
+	if !hasPhoto {
+		return "Photo"
+	}
+	return ""
 }
 
 // DashboardWithdraw lets a logged-in speaker withdraw from a proposal.
@@ -338,6 +578,63 @@ func DashboardWithdraw(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		flash = "Your talk has been withdrawn."
 	}
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
+}
+
+// DashboardRemoveCoSpeaker drops one co-speaker from a talk's speakers
+// list. Called from the × button on each non-self speaker pill on the
+// dashboard.
+//
+// Removing yourself goes through DashboardWithdraw instead (which has
+// the panel-vs-talk logic for what to do with the proposal). Refuses
+// to remove the last speaker (would orphan the proposal — better to
+// withdraw the talk outright). Refuses on terminal proposals and
+// outside the conf's CanInvite window so the speaker list can't be
+// edited after the program is locked in.
+func DashboardRemoveCoSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	vars := mux.Vars(r)
+	proposalID := vars["proposalID"]
+	targetSpeakerConfID := vars["speakerConfID"]
+
+	proposal, requestingSC, encHMAC, encEmail, err := dashboardAuthForProposal(w, r, ctx, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard remove co-speaker: %s", err)
+		return
+	}
+	if targetSpeakerConfID == requestingSC.ID {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Use Withdraw to remove yourself from a talk."), http.StatusSeeOther)
+		return
+	}
+	if isTerminalProposalStatus(proposal.Status) {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "This talk is finalized — co-speakers can't be removed."), http.StatusSeeOther)
+		return
+	}
+	if proposal.ScheduleFor == nil || !proposal.ScheduleFor.CanInvite() {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "It's too close to the conference — contact us to remove a co-speaker."), http.StatusSeeOther)
+		return
+	}
+	if len(proposal.SpeakerConfRefs) <= 1 {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Can't remove the last speaker — withdraw the talk instead."), http.StatusSeeOther)
+		return
+	}
+	// Defend against tampered IDs: target must actually be on this proposal.
+	onProposal := false
+	for _, ref := range proposal.SpeakerConfRefs {
+		if ref == targetSpeakerConfID {
+			onProposal = true
+			break
+		}
+	}
+	if !onProposal {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "That speaker isn't on this talk."), http.StatusSeeOther)
+		return
+	}
+
+	if err := getters.RemoveProposalFromSpeakerConf(ctx, targetSpeakerConfID, proposalID); err != nil {
+		ctx.Err.Printf("/dashboard remove co-speaker %s from %s: %s", targetSpeakerConfID, proposalID, err)
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Couldn't remove co-speaker — please try again."), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Co-speaker removed."), http.StatusSeeOther)
 }
 
 // DashboardConfirmTalk is the GET-friendly one-click variant of

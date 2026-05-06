@@ -160,6 +160,13 @@ type DashboardPage struct {
         Email    string // base64-encoded
         HMAC     string // base64-encoded
 
+        // Speaker is the user's row in the Speakers DB (looked up by
+        // email). Nil means the user is volunteer- or ticket-only and
+        // hasn't added themselves to the speakers DB yet — the
+        // dashboard renders a "Create speaker profile" CTA in that
+        // case.
+        Speaker          *types.Speaker
+
         // Speaker side, split by whether the linked conf has ended.
         SpeakerConfs     []*types.SpeakerConf
         PastSpeakerConfs []*types.SpeakerConf
@@ -191,6 +198,12 @@ type DashboardPage struct {
         // talks / volunteer / tickets are nested inside each block.
         ActiveBlocks []*EventBlock
         PastBlocks   []*EventBlock
+
+        // HasUpcomingTalk / HasUpcomingVol gate the per-channel "Need
+        // help?" block in the footer. True when at least one
+        // ActiveBlock has a SpeakerConf / VolApp respectively.
+        HasUpcomingTalk bool
+        HasUpcomingVol  bool
 
         FlashMessage string
 
@@ -330,6 +343,20 @@ type EditProposalPage struct {
         Year       uint
 }
 
+// TalkDetailsPage drives the read-only proposal summary view at
+// /dashboard/talks/{id}/details — surfaced from the dashboard for
+// proposals in a terminal status (TheyDecline / WeDecline / Rejected)
+// where editing is no longer applicable but the user may still want
+// to look back at what they submitted.
+type TalkDetailsPage struct {
+        Proposal *types.Proposal
+        Conf     *types.Conf
+        Speakers []*types.SpeakerConf
+        HMAC     string
+        Email    string
+        Year     uint
+}
+
 // InviteCoSpeakerPage is the inviter-side share-a-link page on the
 // dashboard. Renders the talk + conf header so the speaker can confirm
 // what they're inviting onto, plus a copyable URL.
@@ -342,6 +369,20 @@ type InviteCoSpeakerPage struct {
         Year      uint
 }
 
+// EditSpeakerPage drives /dashboard/speaker — the single-row Speakers
+// editor. Mode is "edit" when the user already has a Speaker record
+// (Speaker non-nil) and "create" when they don't yet (volunteer- or
+// ticket-only contacts who want to add themselves to the speakers DB).
+type EditSpeakerPage struct {
+        Speaker      *types.Speaker
+        HMAC         string
+        Email        string
+        EmailPlain   string // not base64 — used as the value for the create-mode email field
+        Mode         string // "edit" | "create"
+        FlashMessage string
+        Year         uint
+}
+
 type EditSpeakerConfPage struct {
         SpeakerConf         *types.SpeakerConf
         Conf                *types.Conf
@@ -352,6 +393,10 @@ type EditSpeakerConfPage struct {
         DaysList            []types.CheckItem
         RecordingOptions    []types.CheckItem
         IsReturningAttendee bool // hides the "first bitcoin++" checkbox
+        // RSVPFor is the speakers'-dinner date label ("Mon. Jan 5, 2026"),
+        // shown next to the DinnerRSVP toggle so the user knows which day
+        // they're agreeing to attend. Set from conf.DaysList()[0].
+        RSVPFor             string
         Year                uint
 }
 

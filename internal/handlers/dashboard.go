@@ -185,12 +185,29 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		len(activeBlocks), len(pastBlocks), len(eligible), len(buyable))
 
 	tRender := time.Now()
+	var topSpeaker *types.Speaker
+	if len(speakers) > 0 {
+		topSpeaker = speakers[0]
+	}
+	var hasUpTalk, hasUpVol bool
+	for _, b := range activeBlocks {
+		if b == nil {
+			continue
+		}
+		if b.SpeakerConf != nil {
+			hasUpTalk = true
+		}
+		if b.VolApp != nil {
+			hasUpVol = true
+		}
+	}
 	err = ctx.TemplateCache.ExecuteTemplate(w, "dashboard.tmpl", &DashboardPage{
 		Name:             name,
 		Hometown:         hometown,
 		Photo:            photo,
 		Email:            encodedEmail,
 		HMAC:             encodedHMAC,
+		Speaker:          topSpeaker,
 		SpeakerConfs:     activeSC,
 		PastSpeakerConfs: pastSC,
 		VolApps:          activeVol,
@@ -203,6 +220,8 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		Tickets:          tickets,
 		ActiveBlocks:     activeBlocks,
 		PastBlocks:       pastBlocks,
+		HasUpcomingTalk:  hasUpTalk,
+		HasUpcomingVol:   hasUpVol,
 		FlashMessage:     r.URL.Query().Get("flash"),
 		Year:             helpers.CurrentYear(),
 	})

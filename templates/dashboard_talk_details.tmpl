@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Talk details · bitcoin++</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128221;</text></svg>">
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+    <div class="mb-6">
+      <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-indigo-600 hover:text-indigo-700">&larr; Back to dashboard</a>
+    </div>
+
+    {{ if .Conf }}{{ template "conf_hero" .Conf }}{{ end }}
+
+    {{ $p := .Proposal }}
+    <article class="mt-6 bg-white shadow rounded-lg overflow-hidden">
+      <header class="px-6 py-5 border-b border-gray-100">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-wider text-gray-500">Talk proposal</p>
+            <h1 class="mt-1 text-2xl font-bold text-gray-900">{{ $p.Title }}</h1>
+            <p class="mt-1 text-xs text-gray-500">
+              {{ if $p.TalkType }}{{ $p.TalkType }}{{ end }}
+              {{ if $p.DesiredDuration }} &middot; {{ $p.DesiredDuration }} min{{ end }}
+            </p>
+          </div>
+          <div class="shrink-0">
+            {{ if eq $p.Status "Applied" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Applied</span>
+            {{ else if eq $p.Status "InReview" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">In review</span>
+            {{ else if eq $p.Status "Waitlisted" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Waitlisted</span>
+            {{ else if eq $p.Status "Invited" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">Invited</span>
+            {{ else if eq $p.Status "Accepted" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Accepted</span>
+            {{ else if eq $p.Status "TheyDecline" }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Declined</span>
+            {{ else if or (eq $p.Status "WeDecline") (eq $p.Status "Rejected") }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">Not selected</span>
+            {{ else }}
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ $p.Status }}</span>
+            {{ end }}
+          </div>
+        </div>
+      </header>
+
+      {{ if .Speakers }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+          {{ if eq (len .Speakers) 1 }}Speaker{{ else }}Speakers ({{ len .Speakers }}){{ end }}
+        </h2>
+        <div class="space-y-3">
+          {{ range .Speakers }}
+          {{ $sc := . }}
+          {{ $sp := .Speaker }}
+          <div class="flex items-start gap-3">
+            {{ if and $sp $sp.Photo }}
+            <img src="{{ speakerPhoto $sp.Photo }}" alt="{{ $sp.Name }}"
+                 class="size-10 rounded-full object-cover bg-gray-50 ring-1 ring-gray-200 shrink-0" />
+            {{ else }}
+            <div class="size-10 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+              <span class="text-base">&#128100;</span>
+            </div>
+            {{ end }}
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900">{{ if $sp }}{{ $sp.Name }}{{ else }}(unknown speaker){{ end }}</p>
+              {{ if and $sc.ComingFrom (ne $sc.ComingFrom "unknown") }}
+              <p class="text-xs text-gray-500">From {{ $sc.ComingFrom }}</p>
+              {{ end }}
+              {{ if $sc.Company }}
+              <p class="text-xs text-gray-500">{{ $sc.Company }}</p>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ if and $p.ConfTalk $p.ConfTalk.Sched }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Scheduled time</h2>
+        <p class="text-sm text-gray-800">
+          {{ $p.ConfTalk.Sched.Start.Format "Mon Jan 2, 3:04 PM" }}
+          {{ if $p.ConfTalk.Sched.End }} – {{ $p.ConfTalk.Sched.End.Format "3:04 PM" }}{{ end }}
+          {{ if $p.ConfTalk.Venue }} <span class="text-gray-500">({{ $p.ConfTalk.Venue }})</span>{{ end }}
+        </p>
+      </div>
+      {{ end }}
+
+      {{ if $p.Description }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Description</h2>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Description }}</p>
+      </div>
+      {{ end }}
+
+      {{ if $p.Setup }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Setup notes</h2>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Setup }}</p>
+      </div>
+      {{ end }}
+
+      {{ if $p.Comments }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Comments</h2>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Comments }}</p>
+      </div>
+      {{ end }}
+
+      <div class="px-6 py-4 bg-gray-50 text-xs text-gray-500">
+        This is a read-only view. Questions about this talk? Email <a href="mailto:speak@btcpp.dev" class="underline">speak@btcpp.dev</a>.
+      </div>
+    </article>
+  </div>
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>

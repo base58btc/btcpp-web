@@ -43,7 +43,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "about", "press", "vegas25" }
+var pages []string = []string{"index", "vegas25"}
 
 func fieldGroup(name string, v interface{}, isRange bool) EmailFieldGroup {
 	fields := getStructFields(v)
@@ -693,6 +693,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		DashboardEditProposal(w, r, app)
 	}).Methods("GET", "POST")
 
+	r.HandleFunc("/dashboard/talks/{proposalID}/details", func(w http.ResponseWriter, r *http.Request) {
+		DashboardTalkDetails(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/dashboard/talks/{proposalID}/withdraw", func(w http.ResponseWriter, r *http.Request) {
 		DashboardWithdraw(w, r, app)
 	}).Methods("POST")
@@ -707,6 +711,12 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/dashboard/invite/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
 		DashboardInviteCoSpeaker(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/dashboard/talks/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
+		DashboardRemoveCoSpeaker(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/dashboard/speaker", func(w http.ResponseWriter, r *http.Request) {
+		DashboardEditSpeaker(w, r, app)
+	}).Methods("GET", "POST")
 
 	r.HandleFunc("/invite-speaker/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
 		InviteSpeaker(w, r, app)

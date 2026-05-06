@@ -904,6 +904,18 @@ func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, propos
 		return fmt.Errorf("update speakerconf %s: %w", speakerConfID, err)
 	}
 	InvalidateSpeakerConfsCache()
+	// Eagerly drop the proposal pointer from the cached SpeakerConf so
+	// the dashboard's next render after the redirect doesn't still
+	// show the just-removed talk waiting for a periodic refresh.
+	if cached := FetchSpeakerConfByID(speakerConfID); cached != nil {
+		out := cached.Proposals[:0]
+		for _, p := range cached.Proposals {
+			if p != nil && p.ID != proposalID {
+				out = append(out, p)
+			}
+		}
+		cached.Proposals = out
+	}
 	return nil
 }
 
