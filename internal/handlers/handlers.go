@@ -828,6 +828,12 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/conf/{conf}/review/{proposalID}/{action}", func(w http.ResponseWriter, r *http.Request) {
 		ReviewProposalAction(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/proposal/{proposalID}/invite", func(w http.ResponseWriter, r *http.Request) {
+		AdminProposalInviteLink(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/proposal/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
+		AdminProposalRemoveSpeaker(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/admin/conf/{conf}/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleConf(w, r, app)

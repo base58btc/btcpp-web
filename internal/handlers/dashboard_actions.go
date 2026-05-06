@@ -658,12 +658,19 @@ func DashboardConfirmTalk(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "This talk is no longer pending — please reach out if that's a surprise."), http.StatusSeeOther)
 		return
 	}
-	if _, err := newAcceptPipeline(ctx).AcceptProposal(proposalID); err != nil {
+	res, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
+	if err != nil {
 		ctx.Err.Printf("/dashboard confirm pipeline: %s", err)
 		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Something went wrong confirming — please use the Accept button on your dashboard."), http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Talk confirmed! We'll be in touch with scheduling details."), http.StatusSeeOther)
+	// Side effects only on the fresh-accept path — re-clicks of the
+	// email link have AlreadyAccepted=true and shouldn't re-send the
+	// letter or re-issue tickets.
+	if !res.AlreadyAccepted {
+		fanoutAcceptedProposal(ctx, proposal, proposal.ScheduleFor)
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Talk confirmed! Your speaker ticket is on the way."), http.StatusSeeOther)
 }
 
 // DashboardAcceptInvite promotes an Invited proposal to Accepted, creating
@@ -687,9 +694,11 @@ func DashboardAcceptInvite(w http.ResponseWriter, r *http.Request, ctx *config.A
 		http.Error(w, "accept failed", http.StatusInternalServerError)
 		return
 	}
-	flash := "Talk accepted! We'll be in touch with scheduling details."
+	flash := "Talk accepted! Your speaker ticket is on the way."
 	if res.AlreadyAccepted {
 		flash = "Talk was already accepted."
+	} else {
+		fanoutAcceptedProposal(ctx, proposal, proposal.ScheduleFor)
 	}
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
 }

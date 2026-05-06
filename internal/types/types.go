@@ -721,6 +721,14 @@ func (vol *Volunteer) RegisID() (string) {
         return RegistrationHash("volreg", conf.Ref, vol.Email)
 }
 
+// SpeakerRegisID is the deterministic ID for a speaker's
+// complimentary ticket at a conf — derived from a "spkreg" hash so a
+// second self-confirm or admin Mark Confirmed click upserts the same
+// row instead of duplicating tickets.
+func SpeakerRegisID(confRef, email string) string {
+        return RegistrationHash("spkreg", confRef, email)
+}
+
 func (vol *Volunteer) TicketRef() (string) {
         tixID := vol.RegisID()
 	return UniqueID(vol.Email, tixID, int32(0))

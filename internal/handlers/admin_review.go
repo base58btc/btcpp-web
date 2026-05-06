@@ -31,8 +31,8 @@ var pendingReviewStatuses = map[string]bool{
 // status that gets written to Notion + the onlyfor letter that gets
 // fanned out to every speaker on the proposal.
 var reviewActions = []reviewAction{
-	{Label: "Invite to Confirm", Status: "Invited", Letter: "talkinvited", Style: "indigo"},
-	{Label: "Mark Confirmed", Status: StatusAccepted, Letter: "talkconfirmed", Style: "green", RunAcceptPipeline: true},
+	{Label: "Invite to Confirm", Status: "Invited", Letter: "talkinvited", Style: "green"},
+	{Label: "Mark Confirmed", Status: StatusAccepted, Letter: "talkconfirmed", Style: "link", RunAcceptPipeline: true},
 	{Label: "Waitlist", Status: "Waitlisted", Letter: "talkwaitlisted", Style: "yellow"},
 	{Label: "Decline", Status: "WeDecline", Letter: "talkdeclined", Style: "gray"},
 	{Label: "Reject", Status: "Rejected", Letter: "talkrejected", Style: "red"},
@@ -159,12 +159,15 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		return
 	}
 
+	freshAccept := false
 	if action.RunAcceptPipeline {
-		if _, err := newAcceptPipeline(ctx).AcceptProposal(proposalID); err != nil {
+		res, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
+		if err != nil {
 			ctx.Err.Printf("/admin/conf/%s/review accept pipeline: %s", conf.Tag, err)
 			redirectReview(w, r, conf, proposalID, "Accept failed: "+err.Error())
 			return
 		}
+		freshAccept = !res.AlreadyAccepted
 	} else {
 		if err := getters.UpdateProposalStatus(ctx, proposalID, action.Status); err != nil {
 			ctx.Err.Printf("/admin/conf/%s/review update status %q: %s", conf.Tag, action.Status, err)
@@ -173,21 +176,38 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		}
 	}
 
-	// Fan out the onlyfor letter to every speaker on the proposal.
-	// Best-effort: if the email send fails we still log success on the
-	// status change — the admin can re-fire the letter from the email
-	// composer later.
-	if err := emails.SendOnlyForProposal(ctx, action.Letter, proposal, conf); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/review send %s (continuing): %s", conf.Tag, action.Letter, err)
+	if freshAccept {
+		// Mark Confirmed: fanoutAcceptedProposal already sends
+		// talkconfirmed AND issues complimentary speaker tickets to
+		// every speaker on the proposal. Skip the separate letter
+		// send below to avoid double-emailing.
+		fanoutAcceptedProposal(ctx, proposal, conf)
+	} else {
+		// Every other status change (Invite / Waitlist / Decline /
+		// Reject) fires its own letter. Best-effort — admin can
+		// re-fire from the email composer if the send blips.
+		if err := emails.SendOnlyForProposal(ctx, action.Letter, proposal, conf); err != nil {
+			ctx.Err.Printf("/admin/conf/%s/review send %s (continuing): %s", conf.Tag, action.Letter, err)
+		}
 	}
 
-	// Refresh the pending list so we can advance to the next un-actioned
-	// proposal. The cache invalidation in UpdateProposalStatus + the
-	// in-place mutation we wired earlier means the next call sees this
-	// proposal's new status and skips it.
+	flash := fmt.Sprintf("%s — letter %q queued.", action.Label, action.Letter)
+
+	// When the action came from the applicants table (or any other
+	// page that wants to stay in place), the form supplies a
+	// ?return=<path> query param. Bounce there with a flash instead
+	// of advancing through the review queue.
+	if dest := safeReturnTo(r.URL.Query().Get("return")); dest != "" {
+		http.Redirect(w, r, appendFlash(dest, flash), http.StatusSeeOther)
+		return
+	}
+
+	// Default: advance to the next un-actioned proposal in the
+	// review queue. The cache invalidation in UpdateProposalStatus +
+	// the in-place mutation we wired earlier means the next call
+	// sees this proposal's new status and skips it.
 	pending, _ := splitProposalsByPending(loadConfProposals(ctx, conf))
 	next := nextProposalAfter(pending, proposalID)
-	flash := fmt.Sprintf("%s — letter %q queued.", action.Label, action.Letter)
 	if next != nil {
 		http.Redirect(w, r,
 			fmt.Sprintf("/admin/conf/%s/review?id=%s&flash=%s",
@@ -199,6 +219,86 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	http.Redirect(w, r,
 		fmt.Sprintf("/admin/conf/%s/?flash=%s", conf.Tag, url.QueryEscape(flash+" Queue is now empty.")),
 		http.StatusSeeOther)
+}
+
+// AdminProposalInviteLink mints (if needed) the share-a-link
+// InviteToken on a proposal and renders a small page showing the URL
+// for the admin to copy. Mirrors DashboardInviteCoSpeaker but
+// PIN-authed and with NO CanInvite gate — admins can invite right up
+// to (and after) the conf, so they can patch in last-minute speaker
+// substitutions.
+//
+// Path: GET /admin/conf/{tag}/proposal/{proposalID}/invite
+func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	proposalID := mux.Vars(r)["proposalID"]
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		http.Error(w, "proposal not found", http.StatusNotFound)
+		return
+	}
+	if proposal.InviteToken == "" {
+		token := helpers.MintInviteToken()
+		if err := getters.SetProposalInviteToken(ctx, proposalID, token); err != nil {
+			ctx.Err.Printf("/admin/conf/%s/proposal/%s/invite mint: %s", conf.Tag, proposalID, err)
+			redirectReview(w, r, conf, proposalID, "Couldn't mint invite link: "+err.Error())
+			return
+		}
+		proposal.InviteToken = token
+	}
+	// Reuse the speaker-side template — the data shape is identical
+	// (proposal title + share URL + back link). HMAC/Email aren't
+	// meaningful for an admin-authed view but the template uses them
+	// only to build a "back to dashboard" link, which we override to
+	// the review page via a flash redirect path.
+	page := &InviteCoSpeakerPage{
+		Proposal:  proposal,
+		Conf:      conf,
+		HMAC:      "",
+		Email:     "",
+		InviteURL: helpers.InviteLink(ctx, proposalID, proposal.InviteToken),
+		Year:      helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/proposal_invite.tmpl", page); err != nil {
+		ctx.Err.Printf("/admin/conf/%s/proposal/%s/invite render: %s", conf.Tag, proposalID, err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+// AdminProposalRemoveSpeaker removes a SpeakerConf from a proposal's
+// speakers list. Mirrors DashboardRemoveCoSpeaker but PIN-authed and
+// without the CanInvite / "can't remove the last speaker" /
+// terminal-status gates — admins are trusted to know when to override.
+//
+// Path: POST /admin/conf/{tag}/proposal/{proposalID}/speakers/{speakerConfID}/remove
+func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	vars := mux.Vars(r)
+	proposalID := vars["proposalID"]
+	speakerConfID := vars["speakerConfID"]
+
+	if err := getters.RemoveProposalFromSpeakerConf(ctx, speakerConfID, proposalID); err != nil {
+		ctx.Err.Printf("/admin/conf/%s/proposal/%s remove speaker %s: %s", conf.Tag, proposalID, speakerConfID, err)
+		redirectReview(w, r, conf, proposalID, "Remove failed: "+err.Error())
+		return
+	}
+	redirectReview(w, r, conf, proposalID, "Speaker removed from proposal.")
 }
 
 // loadConfProposals returns every Proposal whose ScheduleFor matches
@@ -320,7 +420,9 @@ func (a reviewAction) actionKey() string {
 }
 
 // ButtonClasses returns the tailwind color classes for the action
-// button. Centralized here so the template stays terse.
+// button. Centralized here so the template stays terse. The "link"
+// style intentionally returns no background — the template wraps it
+// to render as small grey text instead of a filled button.
 func (a reviewAction) ButtonClasses() string {
 	switch a.Style {
 	case "indigo":
@@ -333,9 +435,16 @@ func (a reviewAction) ButtonClasses() string {
 		return "bg-gray-600 hover:bg-gray-700 text-white"
 	case "red":
 		return "bg-red-600 hover:bg-red-700 text-white"
+	case "link":
+		return "text-xs text-gray-500 hover:text-gray-800 underline"
 	}
 	return "bg-gray-600 hover:bg-gray-700 text-white"
 }
+
+// IsLink reports whether the action renders as a text-link rather
+// than a filled button. Templates use this to drop the button-like
+// padding/border so a "link" action sits inline like a hyperlink.
+func (a reviewAction) IsLink() bool { return a.Style == "link" }
 
 // ActionKey is the public accessor templates use to build form action
 // URLs.

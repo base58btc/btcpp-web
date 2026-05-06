@@ -46,11 +46,17 @@
         <h2 class="mt-1 text-2xl font-bold text-gray-900">{{ $p.Title }}</h2>
       </div>
 
-      {{ if .Speakers }}
       <div class="px-6 py-5 border-b border-gray-100">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
-          {{ if eq (len .Speakers) 1 }}Speaker{{ else }}Speakers ({{ len .Speakers }}){{ end }}
-        </h3>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500">
+            {{ if eq (len .Speakers) 0 }}Speakers{{ else if eq (len .Speakers) 1 }}Speaker{{ else }}Speakers ({{ len .Speakers }}){{ end }}
+          </h3>
+          <a href="/admin/conf/{{ .Conf.Tag }}/proposal/{{ $p.ID }}/invite"
+             class="text-xs font-semibold text-indigo-700 hover:text-indigo-900">+ Add speaker (share link)</a>
+        </div>
+        {{ if not .Speakers }}
+        <p class="text-xs text-gray-400">No speakers attached yet.</p>
+        {{ end }}
         <div class="space-y-4">
           {{ range .Speakers }}
           {{ $sc := . }}
@@ -65,7 +71,17 @@
             </div>
             {{ end }}
             <div class="min-w-0 flex-1">
-              <p class="text-sm font-semibold text-gray-900">{{ if $sp }}{{ $sp.Name }}{{ else }}(unknown speaker){{ end }}</p>
+              <div class="flex items-start justify-between gap-2">
+                <p class="text-sm font-semibold text-gray-900">{{ if $sp }}{{ $sp.Name }}{{ else }}(unknown speaker){{ end }}</p>
+                <form method="POST" action="/admin/conf/{{ $.Conf.Tag }}/proposal/{{ $p.ID }}/speakers/{{ $sc.ID }}/remove" class="inline-flex shrink-0">
+                  <button type="submit"
+                          title="Remove from this proposal"
+                          onclick="return confirm('Remove {{ if $sp }}{{ $sp.Name }}{{ else }}this speaker{{ end }} from {{ $p.Title }}?');"
+                          class="inline-flex items-center justify-center size-5 rounded-full text-gray-400 hover:text-red-700 hover:bg-red-100 leading-none text-sm">
+                    &times;
+                  </button>
+                </form>
+              </div>
               {{ if and $sc.ComingFrom (ne $sc.ComingFrom "unknown") }}
               <p class="text-xs text-gray-500">From {{ $sc.ComingFrom }}</p>
               {{ end }}
@@ -85,7 +101,7 @@
               </div>
               {{ if and $sc.Company $sc.OrgPhoto }}
               <div class="mt-3 flex items-center gap-2">
-                <img src="/static/img/sponsors/{{ $sc.OrgPhoto }}" alt="{{ $sc.Company }} logo"
+                <img src="{{ spacesURL (printf "sponsors/%s" $sc.OrgPhoto) }}" alt="{{ $sc.Company }} logo"
                      class="h-8 w-auto object-contain bg-white rounded ring-1 ring-gray-200 px-1" />
                 <span class="text-xs text-gray-500">{{ $sc.Company }}</span>
               </div>
@@ -102,7 +118,6 @@
           {{ end }}
         </div>
       </div>
-      {{ end }}
 
       {{ if $p.Description }}
       <div class="px-6 py-5 border-b border-gray-100">
@@ -127,14 +142,22 @@
 
       <div class="px-6 py-5 bg-gray-50">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Decide</h3>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           {{ range .Actions }}
           <form method="POST" action="/admin/conf/{{ $.Conf.Tag }}/review/{{ $p.ID }}/{{ .ActionKey }}" class="inline">
+            {{ if .IsLink }}
+            <button type="submit"
+                    class="{{ .ButtonClasses }} bg-transparent border-0 p-0"
+                    onclick="return confirm('{{ .Label }} this proposal? This will email all attached speakers.');">
+              {{ .Label }}
+            </button>
+            {{ else }}
             <button type="submit"
                     class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm {{ .ButtonClasses }}"
                     onclick="return confirm('{{ .Label }} this proposal? This will email all attached speakers.');">
               {{ .Label }}
             </button>
+            {{ end }}
           </form>
           {{ end }}
         </div>

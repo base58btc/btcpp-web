@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
+	"btcpp-web/internal/emails"
+	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
 )
 
@@ -73,6 +76,64 @@ func (p acceptPipeline) AcceptProposal(proposalID string) (AcceptResult, error) 
 	}
 
 	return result, nil
+}
+
+// fanoutAcceptedProposal handles the side effects that should fire
+// once a proposal flips to Accepted: send the talkconfirmed letter to
+// every speaker on the proposal and issue each one a complimentary
+// "speaker"-type ticket. Mirrors the volunteer-ticket flow in
+// `scheduledFlow` (handlers.go) — same Entry shape, same AddTickets +
+// NewTicketSub plumbing, just a "speaker" tixType and a "spkreg"
+// registration hash.
+//
+// Errors are logged, never fatal — a flaky email send or ticket-DB
+// write shouldn't block the proposal status change. Idempotency:
+// AddTickets / NewTicketSub use the deterministic SpeakerRegisID, so
+// re-runs (admin double-click, speaker re-clicking the email link)
+// upsert rather than duplicate.
+func fanoutAcceptedProposal(ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf) {
+	if proposal == nil || conf == nil {
+		return
+	}
+	if err := emails.SendOnlyForProposal(ctx, "talkconfirmed", proposal, conf); err != nil {
+		ctx.Err.Printf("fanoutAcceptedProposal %s: send talkconfirmed: %s", proposal.ID, err)
+	}
+	for _, ref := range proposal.SpeakerConfRefs {
+		sc := getters.FetchSpeakerConfByID(ref)
+		if sc == nil || sc.Speaker == nil || sc.Speaker.Email == "" {
+			continue
+		}
+		issueSpeakerTicket(ctx, sc.Speaker.Email, conf)
+	}
+}
+
+// issueSpeakerTicket creates a complimentary "speaker"-type ticket
+// for one speaker at a conf and subscribes them to the conf's
+// post-purchase mailing lists. Errors are logged, not returned —
+// callers fan this out across multiple speakers and don't want one
+// failure to abort the rest.
+func issueSpeakerTicket(ctx *config.AppContext, email string, conf *types.Conf) {
+	if email == "" || conf == nil {
+		return
+	}
+	tixType := "speaker"
+	entry := types.Entry{
+		ID:       types.SpeakerRegisID(conf.Ref, email),
+		ConfRef:  conf.Ref,
+		Currency: "USD",
+		Created:  time.Now(),
+		Email:    email,
+		Items: []types.Item{
+			{Total: 1, Desc: conf.Desc, Type: tixType},
+		},
+	}
+	if err := getters.AddTickets(ctx.Notion, &entry, "spkreg"); err != nil {
+		ctx.Err.Printf("issueSpeakerTicket add %s for %s: %s", email, conf.Tag, err)
+		return
+	}
+	if err := missives.NewTicketSub(ctx, email, conf.Tag, tixType, false); err != nil {
+		ctx.Err.Printf("issueSpeakerTicket newsletter %s for %s: %s", email, conf.Tag, err)
+	}
 }
 
 // avif400Name converts a TalkApp NormPhoto value (e.g. "abc123def456.jpg")

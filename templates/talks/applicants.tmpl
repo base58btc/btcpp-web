@@ -57,18 +57,34 @@
                                     {{ if or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
                                     <span class="text-xs text-gray-400">—</span>
                                     {{ else }}
-                                    <span class="inline-flex gap-2">
+                                    <span class="inline-flex items-center gap-2">
+                                        {{ if ne .Proposal.Status "Invited" }}
                                         <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/invite"
-                                            formmethod="POST"
-                                            class="inline-flex items-center rounded-md bg-purple-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-purple-700">
-                                            Extend Invite
-                                        </button>
-                                        <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/confirm"
+                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/invite?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
                                             formmethod="POST"
                                             class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                                            Mark Accepted
+                                            Invite
+                                        </button>
+                                        {{ end }}
+                                        {{ if and (ne .Proposal.Status "Waitlisted") (ne .Proposal.Status "Invited") }}
+                                        <button type="submit"
+                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/waitlist?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formmethod="POST"
+                                            class="inline-flex items-center rounded-md bg-yellow-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600">
+                                            Waitlist
+                                        </button>
+                                        {{ end }}
+                                        <button type="submit"
+                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/decline?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formmethod="POST"
+                                            class="inline-flex items-center rounded-md bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700">
+                                            Decline
+                                        </button>
+                                        <button type="submit"
+                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/confirm?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formmethod="POST"
+                                            class="text-xs text-gray-500 hover:text-gray-800 underline bg-transparent border-0 p-0">
+                                            Mark Confirmed
                                         </button>
                                     </span>
                                     {{ end }}
