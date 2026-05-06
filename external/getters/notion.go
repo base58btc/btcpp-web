@@ -2125,6 +2125,82 @@ func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
         return vmap, nil
 }
 
+// ListConfInfos fetches every row in ConfInfoDb, optionally filtered to a
+// single conf by Tag. Each row is resolved against the cached confs
+// slice so the returned *Times carry the conf's timezone.
+//
+// The Conf column stores a tag string (not a relation), so the confTag
+// filter is applied client-side after fetch — the DB is small enough
+// that a full scan is cheaper than maintaining two filter codepaths
+// (select vs rich_text).
+//
+// Rows whose tag can't be matched in the confs cache come back with
+// empty time fields rather than dropping out — useful for admin tools
+// that want to surface orphan rows.
+func ListConfInfos(ctx *config.AppContext, confTag string) ([]*types.ConfInfo, error) {
+        confs, err := FetchConfsCached(ctx)
+        if err != nil {
+                return nil, err
+        }
+        confByTag := make(map[string]*types.Conf, len(confs))
+        for _, c := range confs {
+                if c != nil && c.Tag != "" {
+                        confByTag[c.Tag] = c
+                }
+        }
+
+        n := ctx.Notion
+        db := ctx.Env.Notion.ConfInfoDb
+        if db == "" {
+                return nil, nil
+        }
+
+        var out []*types.ConfInfo
+        hasMore := true
+        nextCursor := ""
+        for hasMore {
+                pages, next, more, err := n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
+                        StartCursor: nextCursor,
+                })
+                if err != nil {
+                        return nil, err
+                }
+                nextCursor = next
+                hasMore = more
+                for _, page := range pages {
+                        ci := parseConfInfo(page.ID, page.Properties, confByTag)
+                        if confTag != "" && ci.ConfTag != confTag {
+                                continue
+                        }
+                        out = append(out, ci)
+                }
+        }
+        return out, nil
+}
+
+// GetConfInfoMap returns a Tag → []*ConfInfo map, sorted by Day within
+// each conf. Convenient for templates that want "the schedule strip for
+// this conf" without sifting by tag manually.
+func GetConfInfoMap(ctx *config.AppContext) (map[string][]*types.ConfInfo, error) {
+        infos, err := ListConfInfos(ctx, "")
+        if err != nil {
+                return nil, err
+        }
+        out := make(map[string][]*types.ConfInfo)
+        for _, ci := range infos {
+                if ci.ConfTag == "" {
+                        continue
+                }
+                out[ci.ConfTag] = append(out[ci.ConfTag], ci)
+        }
+        for tag := range out {
+                sort.Slice(out[tag], func(i, j int) bool {
+                        return out[tag][i].Day < out[tag][j].Day
+                })
+        }
+        return out, nil
+}
+
 func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
 	var vis []*types.VolInfo
 	hasMore := true

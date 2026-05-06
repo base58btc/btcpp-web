@@ -30,6 +30,7 @@ type (
                 SpeakerConfDb  string
                 ConfTalkDb     string
                 RecordingsDb   string
+                ConfInfoDb     string
                 VolInfoDb    string
                 ShiftDb      string
                 OrgDb        string

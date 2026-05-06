@@ -1,6 +1,7 @@
 package getters
 
 import (
+	"strconv"
 	"strings"
         "time"
 
@@ -461,6 +462,87 @@ func parseVolunteer(ctx *config.AppContext, pageID string, props map[string]noti
 	}
 
 	return vol
+}
+
+// parseHHMM parses "HH:MM" military-time text and combines it with day's
+// year/month/day/location to produce a fully-qualified time.Time. Returns
+// false on any parse failure so callers can skip the field rather than
+// poison the row.
+func parseHHMM(s string, day time.Time) (time.Time, bool) {
+        s = strings.TrimSpace(s)
+        parts := strings.Split(s, ":")
+        if len(parts) != 2 {
+                return time.Time{}, false
+        }
+        h, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+        if err != nil || h < 0 || h > 23 {
+                return time.Time{}, false
+        }
+        m, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+        if err != nil || m < 0 || m > 59 {
+                return time.Time{}, false
+        }
+        return time.Date(day.Year(), day.Month(), day.Day(), h, m, 0, 0, day.Location()), true
+}
+
+// parseTimesRange reads a rich-text field formatted as "HH:MM,HH:MM"
+// (military-time start,end) and resolves it against day to produce a
+// *Times. day's date + location anchor both endpoints. Returns nil if
+// the field is empty or malformed; if only the start parses, End stays
+// nil so callers see a half-open range rather than garbage.
+func parseTimesRange(field string, props map[string]notion.PropertyValue, day time.Time) *types.Times {
+        raw := strings.TrimSpace(parseRichText(field, props))
+        if raw == "" {
+                return nil
+        }
+        parts := strings.SplitN(raw, ",", 2)
+        start, ok := parseHHMM(parts[0], day)
+        if !ok {
+                return nil
+        }
+        if len(parts) < 2 {
+                return &types.Times{Start: start}
+        }
+        end, ok := parseHHMM(parts[1], day)
+        if !ok {
+                return &types.Times{Start: start}
+        }
+        return &types.Times{Start: start, End: &end}
+}
+
+// parseConfInfo parses a row from the ConfInfoDb. The "Conf" column
+// holds the conf's Tag (e.g. "atx25") rather than a Notion relation —
+// try select first (the natural fit for an enum-shaped tag) and fall
+// back to rich_text so either schema choice round-trips. Day is
+// combined with the resolved Conf.StartDate so the returned *Times
+// values carry the conf's timezone.
+//
+// When the tag can't be matched in confByTag, the row still comes back
+// with ConfTag and Day populated but empty time fields — useful for
+// admin tooling that lists "orphan" rows.
+func parseConfInfo(pageID string, props map[string]notion.PropertyValue, confByTag map[string]*types.Conf) *types.ConfInfo {
+        tag := parseSelect("Conf", props)
+        if tag == "" {
+                tag = parseRichText("Conf", props)
+        }
+        day := int(props["Day"].Number)
+        ci := &types.ConfInfo{
+                ID:      pageID,
+                ConfTag: tag,
+                Day:     day,
+        }
+        conf := confByTag[tag]
+        if conf == nil || day < 1 {
+                return ci
+        }
+        // Day 1 = StartDate. Day N is StartDate + (N-1) days, in the
+        // conf's own timezone.
+        anchor := conf.StartDate.AddDate(0, 0, day-1)
+        ci.Doors = parseTimesRange("Doors", props, anchor)
+        ci.Breakfast = parseTimesRange("Breakfast", props, anchor)
+        ci.Lunch = parseTimesRange("Lunch", props, anchor)
+        ci.Coffee = parseTimesRange("Coffee", props, anchor)
+        return ci
 }
 
 func parseVolInfo(pageID string, props map[string]notion.PropertyValue) *types.VolInfo {

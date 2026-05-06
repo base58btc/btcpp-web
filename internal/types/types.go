@@ -65,14 +65,22 @@ type (
 		Emoji         string
 	}
 
-        ConfSched struct {
-                ID       string
-                ConfRef  string
-                Day      int
-                Doors    Times
-                Breakfase Times
-                Lunch    Times
-                Coffee   Times
+        // ConfInfo is the per-day schedule strip for a conference: when
+        // doors open, when meals are served, when the coffee break is.
+        // One row per conference-day; resolved against Conf.StartDate so
+        // the times carry the conf's timezone.
+        //
+        // The Notion-side row identifies its conf by Tag string (e.g.
+        // "atx25") rather than a relation, so ConfTag holds the tag and
+        // resolution is a Tag → *Conf lookup at parse time.
+        ConfInfo struct {
+                ID        string
+                ConfTag   string
+                Day       int    // 1-indexed day-of-conference (Day 1 = StartDate)
+                Doors     *Times
+                Breakfast *Times
+                Lunch     *Times
+                Coffee    *Times
         }
 
 	ConfTicket struct {

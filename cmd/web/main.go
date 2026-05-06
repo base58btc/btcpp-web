@@ -77,6 +77,7 @@ func loadConfig() *types.EnvConfig {
 			SpeakerConfDb:     os.Getenv("NOTION_SPEAKER_CONF_DB"),
 			ConfTalkDb:        os.Getenv("NOTION_CONFTALK_DB"),
 			RecordingsDb:      os.Getenv("NOTION_RECORDINGS_DB"),
+			ConfInfoDb:        os.Getenv("NOTION_CONFINFO_DB"),
 			ShiftDb:     os.Getenv("NOTION_SHIFTS_DB"),
                         VolInfoDb:   os.Getenv("NOTION_VOLINFO_DB"),
 			OrgDb:         os.Getenv("NOTION_ORG_DB"),
