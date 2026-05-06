@@ -531,6 +531,7 @@ func parseConfInfo(pageID string, props map[string]notion.PropertyValue, confByT
                 ID:      pageID,
                 ConfTag: tag,
                 Day:     day,
+                Venues:  parseSelectList("Venues", props),
         }
         conf := confByTag[tag]
         if conf == nil || day < 1 {

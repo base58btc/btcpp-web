@@ -217,6 +217,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"spacesURL": func(key string) string {
 			return spaces.PublicURL(key)
 		},
+		"formatHourMin":   FormatHourMin,
+		"hourLabels":      HourLabels,
+		"venueChipClass":  VenueChipClasses,
 		"speakerPhoto": func(photo string) string {
 			if photo == "" {
 				return spaces.PublicURL("speakers/default.avif")
@@ -814,6 +817,25 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 	r.HandleFunc("/admin/conf/{conf}/review/{proposalID}/{action}", func(w http.ResponseWriter, r *http.Request) {
 		ReviewProposalAction(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/admin/conf/{conf}/schedule", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleConf(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/schedule/place", func(w http.ResponseWriter, r *http.Request) {
+		SchedulePlace(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/schedule/unplace", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleUnplace(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/schedule/resize", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleResize(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/schedule/add-hackathon", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleAddHackathon(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/schedule/add-talk", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleAddTalk(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/admin/applicants/{conf}/email", func(w http.ResponseWriter, r *http.Request) {

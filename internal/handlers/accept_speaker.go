@@ -21,7 +21,6 @@ var ErrDuplicateSpeakerEmail = errors.New("duplicate speaker emails")
 // Production wires these to the getters package; tests pass fakes.
 type acceptDeps struct {
 	loadProposal         func(proposalID string) (*types.Proposal, error)
-	createConfTalk       func(in getters.ConfTalkInput) (string, error)
 	updateProposalStatus func(proposalID, status string) error
 	logf                 func(format string, args ...interface{})
 }
@@ -34,7 +33,6 @@ type acceptPipeline struct {
 // messages.
 type AcceptResult struct {
 	ProposalID      string
-	ConfTalkID      string
 	AlreadyAccepted bool
 }
 
@@ -43,9 +41,6 @@ func newAcceptPipeline(ctx *config.AppContext) acceptPipeline {
 		loadProposal: func(id string) (*types.Proposal, error) {
 			return getters.GetProposal(ctx, id)
 		},
-		createConfTalk: func(in getters.ConfTalkInput) (string, error) {
-			return getters.CreateConfTalk(ctx.Notion, in)
-		},
 		updateProposalStatus: func(id, s string) error {
 			return getters.UpdateProposalStatus(ctx, id, s)
 		},
@@ -53,9 +48,9 @@ func newAcceptPipeline(ctx *config.AppContext) acceptPipeline {
 	}}
 }
 
-// AcceptProposal promotes a Proposal into a ConfTalk row and flips the
-// proposal's Status to "Accepted". The Status flip is the LAST step so any
-// partial failure leaves the proposal in its prior state and re-runs are safe.
+// AcceptProposal flips the proposal's Status to "Accepted". A ConfTalk
+// row is NOT created here — ConfTalks now represent "scheduled" state
+// and are minted/destroyed by the schedule tool, not by acceptance.
 func (p acceptPipeline) AcceptProposal(proposalID string) (AcceptResult, error) {
 	result := AcceptResult{ProposalID: proposalID}
 
@@ -70,17 +65,8 @@ func (p acceptPipeline) AcceptProposal(proposalID string) (AcceptResult, error) 
 	}
 
 	if proposal.ScheduleFor == nil || proposal.ScheduleFor.Tag == "" {
-		return result, errors.New("proposal has no scheduled conference; nothing to promote")
+		return result, errors.New("proposal has no scheduled conference; nothing to accept")
 	}
-
-	confTalkID, err := p.deps.createConfTalk(getters.ConfTalkInput{
-		ConfTag:    proposal.ScheduleFor.Tag,
-		ProposalID: proposalID,
-	})
-	if err != nil {
-		return result, fmt.Errorf("create conf talk: %w", err)
-	}
-	result.ConfTalkID = confTalkID
 
 	if err := p.deps.updateProposalStatus(proposalID, StatusAccepted); err != nil {
 		return result, fmt.Errorf("update proposal status: %w", err)

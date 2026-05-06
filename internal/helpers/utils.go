@@ -87,8 +87,8 @@ func GetPresentationTypes() ([]types.CheckItem) {
                 },
                 types.CheckItem{
                         Group: "PresType",
-                        ItemID: "45talk",
-                        ItemDesc: "45m talk",
+                        ItemID: "30talk",
+                        ItemDesc: "30m talk",
                 },
                 types.CheckItem{
                         Group: "PresType",

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Schedule · {{ .Conf.Desc }}</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128197;</text></svg>">
+  <style>
+    .schedule-row-marker { border-top: 1px dashed rgb(229 231 235); }
+    .schedule-row-marker.major { border-top-style: solid; }
+    .schedule-talk { box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .schedule-talk.dragging { opacity: 0.4; }
+    .schedule-venue.over { background-color: rgb(238 242 255); }
+    .schedule-sidebar.over { background-color: rgb(254 242 242); outline: 2px dashed rgb(252 165 165); }
+  </style>
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-8"
+       data-conf-tag="{{ .Conf.Tag }}"
+       data-px-per-min="{{ .PxPerMin }}"
+       data-snap-min="{{ .SnapMin }}">
+    <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+    <div class="mt-1 flex items-start justify-between gap-4">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">Schedule</h1>
+        <p class="text-sm text-gray-500">Drag a talk from the sidebar onto a venue column to schedule it. Drag back to the sidebar to remove.</p>
+      </div>
+      <div class="flex shrink-0 items-start gap-2">
+        <details class="relative">
+          <summary class="list-none cursor-pointer inline-flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-900 hover:bg-indigo-100 select-none">
+            + Add talk
+          </summary>
+          <form method="POST" action="/admin/conf/{{ .Conf.Tag }}/schedule/add-talk"
+                class="absolute right-0 mt-2 w-72 z-20 bg-white border border-gray-200 rounded-lg shadow-lg p-3 space-y-2">
+            <label class="block text-[11px] font-semibold text-gray-700">Title
+              <input type="text" name="Title" required maxlength="160"
+                     class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label class="block text-[11px] font-semibold text-gray-700">Type
+                <select name="TalkType" required
+                        class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-sm">
+                  <option value="talk">talk</option>
+                  <option value="panel">panel</option>
+                  <option value="keynote">keynote</option>
+                  <option value="workshop">workshop</option>
+                </select>
+              </label>
+              <label class="block text-[11px] font-semibold text-gray-700">Min
+                <input type="number" name="DesiredDuration" min="5" step="5" value="30" required
+                       class="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-sm" />
+              </label>
+            </div>
+            <button type="submit"
+                    class="w-full rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold py-1.5">
+              Add to sidebar
+            </button>
+          </form>
+        </details>
+        <form method="POST" action="/admin/conf/{{ .Conf.Tag }}/schedule/add-hackathon">
+          <button type="submit"
+                  class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                  onclick="return confirm('Add five hackathon proposals (Kickoff / Hacking Time / Expo / Finals / Awards) to this conf? They&#39;ll appear in the sidebar as Accepted, ready to drop on the grid.');">
+            + Add hackathon
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {{ if .FlashMessage }}
+    <div class="mt-4 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+      <p class="text-sm text-green-800">{{ .FlashMessage }}</p>
+    </div>
+    {{ end }}
+
+    {{ if not .Days }}
+    <div class="mt-8 bg-white shadow rounded-lg p-8 text-center text-gray-500">
+      No <code class="font-mono text-gray-700">ConfInfo</code> rows for this conf yet — add at least one (with Day, Doors, and Venues filled in) to enable scheduling.
+    </div>
+    {{ else }}
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
+
+      {{/* ---- Sidebar: unscheduled talks ---- */}}
+      <aside id="schedule-sidebar"
+             class="schedule-sidebar bg-white shadow rounded-lg p-4 self-start sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+          Unscheduled <span class="text-gray-400">({{ len .Unscheduled }})</span>
+        </h2>
+        <div class="space-y-2">
+          {{ range .Unscheduled }}
+          {{ template "schedule_card" . }}
+          {{ else }}
+          <p class="text-sm text-gray-400">All scheduled. Drag a placed talk back here to remove.</p>
+          {{ end }}
+        </div>
+      </aside>
+
+      {{/* ---- Day grids ---- */}}
+      <main>
+        {{ range .Days }}
+        {{ $day := . }}
+        <section class="mb-8 bg-white shadow rounded-lg overflow-hidden">
+          <header class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 class="text-base font-semibold text-gray-900">Day {{ .Idx }} &middot; {{ .Date.Format "Mon, Jan 2" }}</h2>
+              <p class="text-xs text-gray-500">
+                {{ formatHourMin .OpensMin }} – {{ formatHourMin .ClosesMin }}
+                {{ if not .Venues }}<span class="ml-2 text-red-600">⚠ no venues set in ConfInfo</span>{{ end }}
+              </p>
+            </div>
+          </header>
+
+          {{ if .Venues }}
+          <div class="flex">
+            {{/* Time rail */}}
+            <div class="shrink-0 w-14 border-r border-gray-100 relative" style="height: {{ .HeightPx }}px;">
+              {{ range hourLabels .OpensMin .ClosesMin }}
+              <div class="absolute -translate-y-1/2 right-2 text-[10px] text-gray-500 tabular-nums"
+                   style="top: {{ mul (sub . $day.OpensMin) $.PxPerMin }}px;">
+                {{ formatHourMin . }}
+              </div>
+              {{ end }}
+            </div>
+
+            {{/* Venue columns */}}
+            <div class="flex-1 grid relative" style="grid-template-columns: repeat({{ len .Venues }}, minmax(0, 1fr));">
+              {{ range .Venues }}
+              {{ $venue := . }}
+              <div class="schedule-venue border-r border-gray-100 relative"
+                   data-day="{{ $day.Idx }}"
+                   data-venue="{{ $venue }}"
+                   data-opens-min="{{ $day.OpensMin }}"
+                   data-closes-min="{{ $day.ClosesMin }}"
+                   style="height: {{ $day.HeightPx }}px;">
+                <div class="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded {{ venueChipClass $venue }}">{{ $venue }}</span>
+                </div>
+                {{/* Hour gridlines */}}
+                {{ range hourLabels $day.OpensMin $day.ClosesMin }}
+                <div class="schedule-row-marker absolute inset-x-0"
+                     style="top: {{ mul (sub . $day.OpensMin) $.PxPerMin }}px; {{ if eq (mod . 60) 0 }}{{ end }}"></div>
+                {{ end }}
+
+                {{/* Break overlays — lunch / coffee. pointer-events:none
+                     so drag events still hit the venue underneath; the
+                     server still rejects placements that overlap. */}}
+                {{ range $day.Breaks }}
+                <div class="schedule-break absolute inset-x-0 bg-gray-200/80 border-y border-gray-300 flex items-center justify-center text-[10px] font-semibold uppercase tracking-wider text-gray-600 pointer-events-none"
+                     style="top: {{ .TopPx }}px; height: {{ .HeightPx }}px; background-image: repeating-linear-gradient(45deg, transparent, transparent 6px, rgba(156,163,175,0.18) 6px, rgba(156,163,175,0.18) 12px);">
+                  {{ .Label }}
+                </div>
+                {{ end }}
+
+                {{/* Already-placed talks */}}
+                {{ range index $day.Placed $venue }}
+                {{ template "schedule_placed" . }}
+                {{ end }}
+              </div>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </section>
+        {{ end }}
+      </main>
+    </div>
+    {{ end }}
+  </div>
+
+  <script src="/static/js/schedule.js" defer></script>
+</body>
+</html>
+
+{{/*
+  schedule_card — renders an unscheduled talk in the sidebar. Dictionary
+  carries .Talk (*ScheduleProposal) and .PxPerMin so we can size the
+  card by duration so admins eyeball relative talk lengths.
+*/}}
+{{ define "schedule_card" }}
+{{ $sp := . }}
+{{ $p := $sp.Proposal }}
+<div class="schedule-talk rounded-md border border-gray-200 bg-white p-2 cursor-grab"
+     draggable="true"
+     data-proposal-id="{{ $p.ID }}"
+     data-desired-min="{{ $sp.DesiredMin }}"
+     data-actual-min="{{ $sp.ActualMin }}"
+     style="min-height: {{ $sp.HeightPx }}px;">
+  <div class="flex items-start justify-between gap-1">
+    <p class="text-xs font-semibold text-gray-900 leading-tight">{{ $p.Title }}</p>
+    {{ template "schedule_status_pill" $p.Status }}
+  </div>
+  {{ if $sp.Speakers }}
+  <p class="mt-1 text-[11px] text-gray-500 truncate">
+    {{ range $i, $sc := $sp.Speakers }}{{ if $sc.Speaker }}{{ if $i }}, {{ end }}{{ $sc.Speaker.Name }}{{ end }}{{ end }}
+  </p>
+  {{ end }}
+  <p class="mt-0.5 text-[10px] text-gray-400">desired {{ $sp.DesiredMin }} min{{ if $p.TalkType }} · {{ $p.TalkType }}{{ end }}</p>
+  {{ template "schedule_avail" $sp }}
+</div>
+{{ end }}
+
+{{/*
+  schedule_placed — same data shape as schedule_card but rendered with
+  absolute positioning inside a venue column.
+*/}}
+{{ define "schedule_placed" }}
+{{ $sp := . }}
+{{ $p := $sp.Proposal }}
+<div class="schedule-talk absolute left-1 right-1 rounded-md border border-indigo-200 bg-indigo-50/80 p-2 cursor-grab overflow-hidden"
+     draggable="true"
+     data-proposal-id="{{ $p.ID }}"
+     data-desired-min="{{ $sp.DesiredMin }}"
+     data-actual-min="{{ $sp.ActualMin }}"
+     data-conftalk-id="{{ $sp.ConfTalkID }}"
+     style="top: {{ $sp.TopPx }}px; height: {{ $sp.HeightPx }}px;">
+  <div class="flex items-start justify-between gap-1">
+    <p class="text-xs font-semibold text-gray-900 leading-tight">{{ $p.Title }}</p>
+    {{ template "schedule_status_pill" $p.Status }}
+  </div>
+  {{ if $sp.Speakers }}
+  <p class="mt-1 text-[11px] text-gray-500 truncate">
+    {{ range $i, $sc := $sp.Speakers }}{{ if $sc.Speaker }}{{ if $i }}, {{ end }}{{ $sc.Speaker.Name }}{{ end }}{{ end }}
+  </p>
+  {{ end }}
+  <p class="mt-0.5 text-[10px] text-gray-400">
+    <span class="schedule-actual-label">{{ $sp.ActualMin }}</span> min
+    {{ if ne $sp.ActualMin $sp.DesiredMin }}<span class="text-gray-400">(desired {{ $sp.DesiredMin }})</span>{{ end }}
+  </p>
+  {{ template "schedule_avail" $sp }}
+  {{/* Resize grip — drag to change ActualMin. Mousedown handler in
+       schedule.js hijacks the event so the parent's drag-to-move
+       isn't triggered. */}}
+  <div class="schedule-resize-handle absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize bg-indigo-300/0 hover:bg-indigo-400/60 transition-colors"
+       title="Drag to resize"></div>
+</div>
+{{ end }}
+
+{{/*
+  schedule_avail — renders the joint-availability chip on a schedule
+  card. Shows the days every speaker on the proposal can attend, or a
+  red NOAVAIL pill when the speakers' availabilities don't overlap.
+  Suppressed entirely when no speaker has availability data.
+*/}}
+{{ define "schedule_avail" }}
+{{ if .NoAvail }}
+<p class="mt-1"><span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-800">NOAVAIL</span></p>
+{{ else if .AvailDays }}
+<p class="mt-1 flex flex-wrap gap-1">
+  {{ range .AvailDays }}
+  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">{{ . }}</span>
+  {{ end }}
+</p>
+{{ end }}
+{{ end }}
+
+{{/*
+  schedule_status_pill — small status chip used inside schedule cards.
+  Receives the status string.
+*/}}
+{{ define "schedule_status_pill" }}
+{{ if eq . "Accepted" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800">Accepted</span>
+{{ else if eq . "Invited" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-800">Invited</span>
+{{ else if eq . "Waitlisted" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800">Waitlist</span>
+{{ else if eq . "InReview" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-800">In&nbsp;review</span>
+{{ else if eq . "Applied" }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">Applied</span>
+{{ else if . }}
+<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-700">{{ . }}</span>
+{{ end }}
+{{ end }}

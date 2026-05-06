@@ -1,8 +1,12 @@
 package getters
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -259,8 +263,124 @@ func CreateConfTalk(n *types.Notion, in ConfTalkInput) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	InvalidateConfTalksCache()
+
+	// Eagerly insert the new row into the warm cache. Without this,
+	// a follow-up FetchConfTalkByProposal (which reads the map
+	// directly with no staleness check) returns nil, so the next
+	// schedule drop creates a duplicate ConfTalk instead of
+	// updating the existing one.
+	ct := &types.ConfTalk{ID: page.ID}
+	if in.ProposalID != "" {
+		proposalCacheMu.RLock()
+		ct.Proposal = proposalByID[in.ProposalID]
+		proposalCacheMu.RUnlock()
+	}
+	confTalkCacheMu.Lock()
+	cacheConfTalks = append(cacheConfTalks, ct)
+	if confTalkByProposal == nil {
+		confTalkByProposal = make(map[string]*types.ConfTalk)
+	}
+	if in.ProposalID != "" {
+		confTalkByProposal[in.ProposalID] = ct
+	}
+	lastConfTalkFetch = time.Time{}
+	confTalkCacheMu.Unlock()
+
 	return page.ID, nil
+}
+
+// UpdateConfTalkSchedule writes the TalkTime (date range) + Venue
+// (select) on a ConfTalk row. Used by the schedule tool when a talk
+// gets dragged onto / repositioned within the grid.
+//
+// `start` and `end` should already be in the conf's timezone. Notion's
+// API encodes them as ISO 8601 with offset; matching consumers (e.g.
+// the agenda renderer) compare wall-clock minutes anyway, so the
+// stored offset is informational.
+//
+// Patches the cached ConfTalk in place so the next page render picks
+// up the new schedule without waiting for a periodic refresh.
+func UpdateConfTalkSchedule(ctx *config.AppContext, confTalkID, venue string, start, end time.Time) error {
+	endCopy := end
+	props := map[string]*notion.PropertyValue{
+		"TalkTime": notion.NewDatePropertyValue(&notion.Date{
+			Start: start,
+			End:   &endCopy,
+		}),
+	}
+	if venue != "" {
+		props["Venue"] = selectValue(venue)
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), confTalkID, props)
+	if err != nil {
+		return fmt.Errorf("update conftalk %s schedule: %w", confTalkID, err)
+	}
+
+	confTalkCacheMu.Lock()
+	for _, ct := range cacheConfTalks {
+		if ct == nil || ct.ID != confTalkID {
+			continue
+		}
+		ct.Sched = &types.Times{Start: start, End: &endCopy}
+		ct.Venue = venue
+	}
+	lastConfTalkFetch = time.Time{}
+	confTalkCacheMu.Unlock()
+	return nil
+}
+
+// DeleteConfTalk archives the ConfTalk page in Notion (Notion's "delete"
+// is a soft archive — the row is hidden from queries but recoverable
+// from the page trash for 30 days). Used when a talk is dragged off the
+// schedule grid.
+//
+// Goes via raw HTTP PATCH because the go-notion library doesn't expose
+// the `archived` flag on its UpdatePageProperties wrapper. Mirrors the
+// pattern already used by clearRelationProperty.
+func DeleteConfTalk(ctx *config.AppContext, confTalkID string) error {
+	body, err := json.Marshal(map[string]interface{}{"archived": true})
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequest("PATCH",
+		"https://api.notion.com/v1/pages/"+confTalkID,
+		bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+ctx.Notion.Config.Token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Notion-Version", "2022-06-28")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		var errResp map[string]interface{}
+		_ = json.NewDecoder(resp.Body).Decode(&errResp)
+		return fmt.Errorf("notion archive %s: %v", confTalkID, errResp)
+	}
+
+	// Eagerly drop the entry from the warm cache so the next render
+	// doesn't keep showing the just-deleted ConfTalk.
+	confTalkCacheMu.Lock()
+	for proposalID, ct := range confTalkByProposal {
+		if ct != nil && ct.ID == confTalkID {
+			delete(confTalkByProposal, proposalID)
+		}
+	}
+	out := cacheConfTalks[:0]
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.ID != confTalkID {
+			out = append(out, ct)
+		}
+	}
+	cacheConfTalks = out
+	lastConfTalkFetch = time.Time{}
+	confTalkCacheMu.Unlock()
+	return nil
 }
 
 // GetProposal loads a single Proposal page by ID. Reads from the in-memory

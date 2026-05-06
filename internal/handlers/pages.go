@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"time"
+
 	"btcpp-web/internal/mtypes"
 	"btcpp-web/internal/types"
 )
@@ -218,6 +220,72 @@ type ReviewProposalPage struct {
         Actions      []reviewAction
         FlashMessage string
         Year         uint
+}
+
+// AdminSchedulePage drives /admin/conf/{tag}/schedule — the drag-and-drop
+// schedule editor.
+type AdminSchedulePage struct {
+        Conf         *types.Conf
+        Days         []*ScheduleDay
+        Unscheduled  []*ScheduleProposal
+        PxPerMin     int    // vertical scale for the grid + sidebar
+        SnapMin      int    // drop-position rounding step (e.g. 5min)
+        FlashMessage string
+        Year         uint
+}
+
+// ScheduleDay is one day's grid: venue columns, time bounds, and the
+// ScheduleProposals already placed in each venue.
+type ScheduleDay struct {
+        Idx       int
+        Date      time.Time
+        Info      *types.ConfInfo
+        Venues    []string
+        OpensMin  int // minute-of-day, top of grid
+        ClosesMin int // minute-of-day, bottom of grid
+        HeightPx  int
+        // Placed is venue → talks placed in that venue for this day.
+        Placed map[string][]*ScheduleProposal
+        // Breaks are time bands (lunch / coffee) where talks can't be
+        // scheduled. Rendered as a striped overlay over every venue
+        // column; the place / resize handlers reject overlapping
+        // placements server-side.
+        Breaks []*ScheduleBreak
+}
+
+// ScheduleBreak is one no-go time band on a day's grid.
+type ScheduleBreak struct {
+        Label    string
+        StartMin int
+        EndMin   int
+        TopPx    int
+        HeightPx int
+}
+
+// ScheduleProposal is the per-talk render shape: identity + size +
+// (optional) placement coordinates.
+//
+// DesiredMin is the speaker's stated desired length — read-only on
+// the schedule UI; reflects the form they submitted. ActualMin is
+// what's currently scheduled, derived from ConfTalk.Sched.End - .Start
+// when placed; defaults to DesiredMin in the sidebar so the card has
+// a sensible size before its first drop. Resize updates ActualMin
+// only.
+type ScheduleProposal struct {
+        Proposal    *types.Proposal
+        Speakers    []*types.SpeakerConf
+        ConfTalkID  string // "" when not yet placed
+        StartMin    int    // minute-of-day, 0 when unscheduled
+        DesiredMin  int
+        ActualMin   int
+        TopPx       int // grid Y when placed
+        HeightPx    int
+        // AvailDays is the intersection of every speaker's Availability
+        // (short labels like "Sat", "Sun"). Empty + NoAvail=true means
+        // speakers don't share a single day. Empty + NoAvail=false
+        // means we couldn't resolve any availability data at all.
+        AvailDays   []string
+        NoAvail     bool
 }
 
 // EventBlock collects every relationship the dashboard's user has with

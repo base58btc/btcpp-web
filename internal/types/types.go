@@ -81,6 +81,10 @@ type (
                 Breakfast *Times
                 Lunch     *Times
                 Coffee    *Times
+                // Venues is the multiselect on the Notion ConfInfo row
+                // — the rooms/stages a talk can be scheduled into for
+                // this day. Drives the columns of the schedule grid.
+                Venues    []string
         }
 
 	ConfTicket struct {
