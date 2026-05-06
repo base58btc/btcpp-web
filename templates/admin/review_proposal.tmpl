@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Review · {{ .Conf.Desc }}</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128221;</text></svg>">
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+        <h1 class="mt-1 text-xl font-bold text-gray-900">Review applications</h1>
+      </div>
+      {{ if .Total }}
+      <p class="text-sm text-gray-500 tabular-nums">{{ .Index }} / {{ .Total }} pending</p>
+      {{ end }}
+    </div>
+
+    {{ if .FlashMessage }}
+    <div class="mt-6 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+      <p class="text-sm text-green-800">{{ .FlashMessage }}</p>
+    </div>
+    {{ end }}
+
+    {{ if not .Current }}
+    <div class="mt-10 bg-white shadow rounded-lg p-8 text-center">
+      <p class="text-3xl">&#127881;</p>
+      <h2 class="mt-3 text-lg font-semibold text-gray-900">All caught up</h2>
+      <p class="mt-1 text-sm text-gray-500">No proposals waiting for review on {{ .Conf.Desc }}.</p>
+      <a href="/admin/conf/{{ .Conf.Tag }}"
+         class="mt-6 inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+        Back to dashboard
+      </a>
+    </div>
+    {{ else }}
+    {{ $p := .Current }}
+    <article class="mt-6 bg-white shadow rounded-lg overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">
+          {{ if $p.TalkType }}{{ $p.TalkType }}{{ else }}talk{{ end }}
+          {{ if $p.DesiredDuration }} &middot; {{ $p.DesiredDuration }} min{{ end }}
+        </p>
+        <h2 class="mt-1 text-2xl font-bold text-gray-900">{{ $p.Title }}</h2>
+      </div>
+
+      {{ if .Speakers }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+          {{ if eq (len .Speakers) 1 }}Speaker{{ else }}Speakers ({{ len .Speakers }}){{ end }}
+        </h3>
+        <div class="space-y-4">
+          {{ range .Speakers }}
+          {{ $sc := . }}
+          {{ $sp := .Speaker }}
+          <div class="flex items-start gap-4">
+            {{ if and $sp $sp.Photo }}
+            <img src="{{ speakerPhoto $sp.Photo }}" alt="{{ $sp.Name }}"
+                 class="size-16 rounded-full object-cover bg-gray-100 ring-2 ring-white shadow shrink-0" />
+            {{ else }}
+            <div class="size-16 rounded-full bg-gray-100 flex items-center justify-center shrink-0">
+              <span class="text-2xl">&#128100;</span>
+            </div>
+            {{ end }}
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-semibold text-gray-900">{{ if $sp }}{{ $sp.Name }}{{ else }}(unknown speaker){{ end }}</p>
+              {{ if and $sc.ComingFrom (ne $sc.ComingFrom "unknown") }}
+              <p class="text-xs text-gray-500">From {{ $sc.ComingFrom }}</p>
+              {{ end }}
+              <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {{ if and $sp $sp.Github }}
+                <a href="{{ $sp.Github }}" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-900">Github &rarr;</a>
+                {{ end }}
+                {{ if and $sp $sp.Website }}
+                <a href="{{ $sp.Website }}" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-900">Website &rarr;</a>
+                {{ end }}
+                {{ if and $sp $sp.Twitter.Handle }}
+                <a href="https://x.com/{{ $sp.Twitter.Handle }}" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-900">@{{ $sp.Twitter.Handle }} &rarr;</a>
+                {{ end }}
+                {{ if and $sp $sp.Email }}
+                <a href="mailto:{{ $sp.Email }}" class="text-gray-600 hover:text-gray-900">{{ $sp.Email }}</a>
+                {{ end }}
+              </div>
+              {{ if and $sc.Company $sc.OrgPhoto }}
+              <div class="mt-3 flex items-center gap-2">
+                <img src="/static/img/sponsors/{{ $sc.OrgPhoto }}" alt="{{ $sc.Company }} logo"
+                     class="h-8 w-auto object-contain bg-white rounded ring-1 ring-gray-200 px-1" />
+                <span class="text-xs text-gray-500">{{ $sc.Company }}</span>
+              </div>
+              {{ else if $sc.Company }}
+              <p class="mt-2 text-xs text-gray-500">{{ $sc.Company }}</p>
+              {{ end }}
+              {{ if $sc.Availability }}
+              <p class="mt-2 text-xs text-gray-500">
+                Available: {{ range $i, $d := $sc.Availability }}{{ if $i }}, {{ end }}{{ $d }}{{ end }}
+              </p>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{ if $p.Description }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Description</h3>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Description }}</p>
+      </div>
+      {{ end }}
+
+      {{ if $p.Setup }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Setup notes</h3>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Setup }}</p>
+      </div>
+      {{ end }}
+
+      {{ if $p.Comments }}
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-2">Applicant comments</h3>
+        <p class="text-sm text-gray-800 whitespace-pre-wrap">{{ $p.Comments }}</p>
+      </div>
+      {{ end }}
+
+      <div class="px-6 py-5 bg-gray-50">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Decide</h3>
+        <div class="flex flex-wrap gap-2">
+          {{ range .Actions }}
+          <form method="POST" action="/admin/conf/{{ $.Conf.Tag }}/review/{{ $p.ID }}/{{ .ActionKey }}" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm {{ .ButtonClasses }}"
+                    onclick="return confirm('{{ .Label }} this proposal? This will email all attached speakers.');">
+              {{ .Label }}
+            </button>
+          </form>
+          {{ end }}
+        </div>
+        <p class="mt-3 text-xs text-gray-500">Each action sends a pre-formatted email (onlyfor letter <code class="font-mono text-gray-600">talkinvited</code> / <code class="font-mono text-gray-600">talkconfirmed</code> / <code class="font-mono text-gray-600">talkwaitlisted</code> / <code class="font-mono text-gray-600">talkdeclined</code> / <code class="font-mono text-gray-600">talkrejected</code>) to every speaker on the proposal.</p>
+      </div>
+    </article>
+
+    <div class="mt-4 flex items-center justify-between">
+      <a href="/admin/conf/{{ .Conf.Tag }}" class="text-sm text-gray-500 hover:text-gray-700">&larr; Back to dashboard</a>
+      {{ if .NextID }}
+      <a href="/admin/conf/{{ .Conf.Tag }}/review?id={{ .NextID }}"
+         class="text-sm text-gray-500 hover:text-gray-700">Skip &rarr;</a>
+      {{ end }}
+    </div>
+    {{ end }}
+  </div>
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>

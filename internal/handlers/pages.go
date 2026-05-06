@@ -195,6 +195,31 @@ type DashboardPage struct {
         Year uint
 }
 
+// OrganizerDashboardPage drives /admin/conf/{tag}/ — the per-event
+// organizer landing.
+type OrganizerDashboardPage struct {
+        Conf            *types.Conf
+        PendingCount    int
+        DecisionedCount int
+        FlashMessage    string
+        Year            uint
+}
+
+// ReviewProposalPage drives /admin/conf/{tag}/review — the
+// walkthrough page for individual proposal decisions. Current is nil
+// when the queue is empty (template renders an empty state).
+type ReviewProposalPage struct {
+        Conf         *types.Conf
+        Current      *types.Proposal
+        Speakers     []*types.SpeakerConf // resolved for Current
+        Total        int                  // total pending in the queue
+        Index        int                  // 1-based position of Current
+        NextID       string                // pre-computed "advance to next" ID, "" at end
+        Actions      []reviewAction
+        FlashMessage string
+        Year         uint
+}
+
 // EventBlock collects every relationship the dashboard's user has with
 // a single conference. Any non-empty field renders its own subsection
 // on the dashboard; empty fields are skipped.

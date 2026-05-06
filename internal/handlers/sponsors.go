@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
@@ -21,6 +23,15 @@ type OrgListPage struct {
 type OrgDetailPage struct {
 	Org          *types.Org
 	IsNew        bool
+	FlashMessage string
+	Year         uint
+}
+
+type OrgNewPage struct {
+	// ReturnTo is a same-site relative path the form re-submits as a
+	// hidden field; OrgCreate redirects there after a successful save
+	// so the admin lands back on the page they came from.
+	ReturnTo     string
 	FlashMessage string
 	Year         uint
 }
@@ -100,6 +111,26 @@ func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 }
 
+// OrgNew renders the GET form for creating a new Org. Optional `return`
+// query param (caller-supplied URL, must be relative to the site) tells
+// OrgCreate where to redirect after a successful create — we round-trip
+// it as a hidden form field so the POST handler can consume it.
+func OrgNew(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+	page := &OrgNewPage{
+		ReturnTo:     safeReturnTo(r.URL.Query().Get("return")),
+		FlashMessage: r.URL.Query().Get("flash"),
+		Year:         helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "sponsors/org_new.tmpl", page); err != nil {
+		ctx.Err.Printf("/admin/orgs/new render: %s", err)
+		http.Error(w, "Unable to load page", http.StatusInternalServerError)
+	}
+}
+
 func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if ok := helpers.CheckPin(w, r, ctx); !ok {
 		helpers.Render401(w, r, ctx)
@@ -110,6 +141,7 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 
 	org := &types.Org{
 		Name:      r.FormValue("Name"),
+		Tagline:   r.FormValue("Tagline"),
 		Email:     r.FormValue("Email"),
 		Website:   r.FormValue("Website"),
 		Twitter:   types.ParseTwitter(r.FormValue("Twitter")),
@@ -118,8 +150,11 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		LinkedIn:  r.FormValue("LinkedIn"),
 		Instagram: r.FormValue("Instagram"),
 		Youtube:   r.FormValue("Youtube"),
-		Github:      r.FormValue("Github"),
-		Notes:       r.FormValue("Notes"),
+		Github:    r.FormValue("Github"),
+		LogoLight: r.FormValue("LogoLight"),
+		LogoDark:  r.FormValue("LogoDark"),
+		Hiring:    r.FormValue("Hiring") == "on",
+		Notes:     r.FormValue("Notes"),
 	}
 
 	if org.Name == "" {
@@ -134,7 +169,38 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	http.Redirect(w, r, "/admin/orgs?flash=Org+created", http.StatusFound)
+	dest := safeReturnTo(r.FormValue("return"))
+	if dest == "" {
+		dest = "/admin/orgs"
+	}
+	dest = appendFlash(dest, "Org "+org.Name+" created")
+	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+// safeReturnTo accepts only same-site relative paths so the redirect
+// can't be hijacked into an open-redirect against another origin.
+func safeReturnTo(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	// Must start with / and not //, must not contain a scheme.
+	if !strings.HasPrefix(raw, "/") || strings.HasPrefix(raw, "//") {
+		return ""
+	}
+	if strings.Contains(raw, ":") {
+		return ""
+	}
+	return raw
+}
+
+// appendFlash adds a ?flash=… param to a URL, preserving any existing
+// query string. Used so the redirect target's flash banner picks up.
+func appendFlash(rawURL, msg string) string {
+	sep := "?"
+	if strings.Contains(rawURL, "?") {
+		sep = "&"
+	}
+	return rawURL + sep + "flash=" + url.QueryEscape(msg)
 }
 
 func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

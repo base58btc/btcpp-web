@@ -197,12 +197,16 @@ func RegisterOrg(n *types.Notion, org *types.Org) (string, error) {
 		"Name": notion.NewTitlePropertyValue(richText(org.Name)...),
 	}
 
+	if org.Tagline != "" {
+		props["Tagline"] = notion.NewRichTextPropertyValue(richText(org.Tagline)...)
+	}
 	if org.Twitter.Handle != "" {
 		props["Twitter"] = notion.NewRichTextPropertyValue(richText(org.Twitter.Handle)...)
 	}
 	if org.Nostr != "" {
 		props["Nostr"] = notion.NewRichTextPropertyValue(richText(org.Nostr)...)
 	}
+	props["Hiring"] = checkboxValue(org.Hiring)
 	if org.Matrix != "" {
 		props["Matrix"] = notion.NewRichTextPropertyValue(richText(org.Matrix)...)
 	}

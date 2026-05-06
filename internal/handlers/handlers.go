@@ -757,6 +757,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	r.HandleFunc("/admin/orgs/new", func(w http.ResponseWriter, r *http.Request) {
+		OrgNew(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/orgs/new", func(w http.ResponseWriter, r *http.Request) {
 		OrgCreate(w, r, app)
 	}).Methods("POST")
 
@@ -799,6 +802,19 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/applicants/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdmin(w, r, app)
 	}).Methods("GET")
+
+	r.HandleFunc("/admin/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		OrganizerDashboard(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/", func(w http.ResponseWriter, r *http.Request) {
+		OrganizerDashboard(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/review", func(w http.ResponseWriter, r *http.Request) {
+		ReviewProposals(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/review/{proposalID}/{action}", func(w http.ResponseWriter, r *http.Request) {
+		ReviewProposalAction(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/admin/applicants/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdminBulkEmail(w, r, app)
