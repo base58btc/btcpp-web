@@ -317,13 +317,17 @@ type (
 	DayTime int
 
 	Hotel struct {
-		ID       string
-		ConfRef  string
-		Name     string
-		URL      string
-		PhotoURL string
-		Type     string
-		Desc     string
+		ID      string
+		ConfRef string
+		Name    string
+		URL     string
+		// Img is the Spaces object path (e.g.
+		// "atx25/hotels/abc123.jpg") — no domain. Templates
+		// resolve via {{ spacesURL .Img }}. Hotels with empty
+		// Img are skipped at render time.
+		Img  string
+		Type string
+		Desc string
 	}
 
         VolInfo struct {

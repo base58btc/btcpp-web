@@ -128,14 +128,13 @@ func parseConfRef(props map[string]notion.PropertyValue) string {
 
 func parseHotel(pageID string, props map[string]notion.PropertyValue) *types.Hotel {
 	hotel := &types.Hotel{
-		ID:       pageID,
-		Name:     parseRichText("Name", props),
-		URL:      props["URL"].URL,
-		PhotoURL: fileGetURL(props["PhotoURL"].Files),
-		Type:     parseRichText("Type", props),
-		Desc:     parseRichText("Desc", props),
+		ID:   pageID,
+		Name: parseRichText("Name", props),
+		URL:  props["URL"].URL,
+		Img:  parseRichText("Img", props),
+		Type: parseRichText("Type", props),
+		Desc: parseRichText("Desc", props),
 	}
-
 	hotel.ConfRef = parseConfRef(props)
 	return hotel
 }
