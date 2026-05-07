@@ -223,6 +223,18 @@ func loadTemplates(ctx *config.AppContext) error {
 		"navConfs": func() NavConfList {
 			return buildNavConfList(ctx)
 		},
+		"sponsorTiers": func(conf *types.Conf) []*SponsorTier {
+			if conf == nil {
+				return nil
+			}
+			return SponsorTiersForConf(ctx, conf.Ref)
+		},
+		"sponsorBanner": func(conf *types.Conf) []*types.Sponsorship {
+			if conf == nil {
+				return nil
+			}
+			return SponsorBannerForConf(ctx, conf.Ref)
+		},
 		"speakerPhoto": func(photo string) string {
 			if photo == "" {
 				return spaces.PublicURL("speakers/default.avif")
@@ -471,14 +483,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	r.HandleFunc("/exploits", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
-	}).Methods("GET")
-
-	r.HandleFunc("/floripa", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
-	}).Methods("GET")
-
-	r.HandleFunc("/conf/floripa", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
 	}).Methods("GET")
 
@@ -864,7 +868,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/applicants/{conf}/accept", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdminAccept(w, r, app)
 	}).Methods("POST")
-
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		/* Check for verified */
 		if ok := helpers.CheckPin(w, r, app); !ok {

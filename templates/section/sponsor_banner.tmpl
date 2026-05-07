@@ -1,0 +1,79 @@
+{{/*
+  sponsor_banner — horizontal marquee strip showing top-tier
+  sponsors (Title / Diamond / Workshop). Sits under the conf intro
+  to surface high-value sponsors above the fold.
+
+  Implementation: two side-by-side copies of the sponsor list inside
+  a flex track that scrolls left via @keyframes. The duplicate makes
+  the loop seamless — when track reaches -50% (one full copy width),
+  it resets to 0% with no visible jump. CSS-only; no JS needed.
+
+  Expects context: a *types.Conf in `.Conf`. Renders nothing when
+  the banner set is empty.
+*/}}
+{{ define "sponsor_banner" }}
+{{ $sponsors := sponsorBanner .Conf }}
+{{ if $sponsors }}
+<section id="sponsor-banner" class="bg-white border-y border-gray-100 py-6 overflow-hidden">
+  <p class="mx-auto max-w-7xl px-6 lg:px-8 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">
+    Supported by
+  </p>
+  <div class="sponsor-marquee relative">
+    {{/* Track contains exactly 2 copies of the sponsor list so
+         translateX(-50%) lands the second copy where the first
+         started — the loop is seamless. Spacing lives on each
+         item's margin-right (not a flex gap) so every item
+         contributes a uniform amount of width including the last
+         in each copy. With a flex gap, the last item has no
+         trailing space and the -50% reset lands inside a gap,
+         producing a visible jump. */}}
+    <div class="sponsor-marquee-track flex items-center">
+      {{ range $sponsors }}{{ template "sponsor_marquee_item" . }}{{ end }}
+      {{ range $sponsors }}{{ template "sponsor_marquee_item" . }}{{ end }}
+    </div>
+  </div>
+</section>
+<style>
+  @keyframes sponsor-marquee-scroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+  .sponsor-marquee-track {
+    width: max-content;
+    animation: sponsor-marquee-scroll 40s linear infinite;
+  }
+  .sponsor-marquee-track img {
+    filter: grayscale(100%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sponsor-marquee-track {
+      animation: none;
+    }
+  }
+</style>
+{{ end }}
+{{ end }}
+
+{{/*
+  sponsor_marquee_item — single logo tile inside the marquee track.
+  Defined separately so the {{ range }} can call it twice (once per
+  copy) without duplicating markup. Receives a *types.Sponsorship.
+*/}}
+{{ define "sponsor_marquee_item" }}
+{{ $org := .Org }}
+{{ if $org }}
+<a href="{{ if $org.Website }}{{ $org.Website }}{{ else }}#{{ end }}"
+   {{ if $org.Website }}target="_blank" rel="noopener noreferrer"{{ end }}
+   class="shrink-0 flex items-center justify-center px-4 mr-12 sm:mr-16">
+  {{ if $org.LogoLight }}
+  <img src="{{ $org.LogoLight }}" alt="{{ $org.Name }}"
+       class="h-20 w-auto max-w-[10rem] object-contain object-center" />
+  {{ else if $org.LogoDark }}
+  <img src="{{ $org.LogoDark }}" alt="{{ $org.Name }}"
+       class="h-20 w-auto max-w-[10rem] object-contain object-center" />
+  {{ else }}
+  <span class="text-sm font-semibold text-gray-700 whitespace-nowrap">{{ $org.Name }}</span>
+  {{ end }}
+</a>
+{{ end }}
+{{ end }}

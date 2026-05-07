@@ -37,6 +37,7 @@ func parseSponsorship(ctx *config.AppContext, pageID string, props map[string]no
 	sp := &types.Sponsorship{
 		Ref:           pageID,
 		Level:         parseSelect("Level", props),
+		Label:         parseRichText("Label", props),
 		Status:        parseSelect("Status", props),
 		IsVendor:      parseCheckbox(props["IsVendor"].Checkbox),
 		Notes:         parseRichText("Notes", props),
@@ -142,6 +143,66 @@ func GetOrg(n *types.Notion, ref string) (*types.Org, error) {
 		}
 	}
 	return nil, fmt.Errorf("org %s not found", ref)
+}
+
+// sponsorshipsCache memoizes ListSponsorships across requests so the
+// public conf page doesn't re-query Notion on every hit. We fetch the
+// full Sponsorships DB once, bucket by conf.Ref, and serve from the
+// in-memory map until TTL. TTL is short enough that admin-side
+// sponsor edits land within a few minutes.
+var (
+	sponsorshipsCacheMu  sync.Mutex
+	sponsorshipsByConf   map[string][]*types.Sponsorship
+	sponsorshipsFetchedAt time.Time
+)
+
+const sponsorshipsCacheTTL = 5 * time.Minute
+
+// FetchSponsorshipsForConfCached returns the Sponsorship rows for a
+// given conf.Ref, served from a 5-min memoized cache. The first call
+// (or first call after the TTL) fetches every Sponsorship row from
+// Notion and buckets by conf; subsequent calls within TTL hit the
+// in-memory map.
+func FetchSponsorshipsForConfCached(ctx *config.AppContext, confRef string) ([]*types.Sponsorship, error) {
+	sponsorshipsCacheMu.Lock()
+	if sponsorshipsByConf != nil && time.Since(sponsorshipsFetchedAt) < sponsorshipsCacheTTL {
+		out := sponsorshipsByConf[confRef]
+		sponsorshipsCacheMu.Unlock()
+		return out, nil
+	}
+	sponsorshipsCacheMu.Unlock()
+
+	all, err := ListSponsorships(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	byConf := map[string][]*types.Sponsorship{}
+	for _, sp := range all {
+		if sp == nil {
+			continue
+		}
+		for _, c := range sp.Confs {
+			if c == nil {
+				continue
+			}
+			byConf[c.Ref] = append(byConf[c.Ref], sp)
+		}
+	}
+	sponsorshipsCacheMu.Lock()
+	sponsorshipsByConf = byConf
+	sponsorshipsFetchedAt = time.Now()
+	sponsorshipsCacheMu.Unlock()
+	return byConf[confRef], nil
+}
+
+// InvalidateSponsorshipsCache forces the next FetchSponsorshipsForConfCached
+// call to refresh from Notion. Wire this into any admin-side write
+// path that mutates Sponsorships (RegisterSponsorship,
+// UpdateSponsorshipStatus, etc.) so admin edits show up promptly.
+func InvalidateSponsorshipsCache() {
+	sponsorshipsCacheMu.Lock()
+	sponsorshipsFetchedAt = time.Time{}
+	sponsorshipsCacheMu.Unlock()
 }
 
 func ListSponsorships(ctx *config.AppContext, confRef string) ([]*types.Sponsorship, error) {
@@ -333,12 +394,19 @@ func RegisterSponsorship(n *types.Notion, sp *types.Sponsorship) error {
 	}
 
 	props := map[string]*notion.PropertyValue{
-		"Name":  notion.NewTitlePropertyValue(richText(name)...),
-		"Notes": notion.NewRichTextPropertyValue(richText(sp.Notes)...),
+		"Name": notion.NewTitlePropertyValue(richText(name)...),
+	}
+	// Notion rejects rich_text properties whose `text.content` is
+	// undefined (empty array), so only include Notes when there's
+	// something to write. Same trap we hit on Title-typed fields
+	// elsewhere — the go-notion library's omitempty drops the
+	// content but leaves the property key in the request.
+	if sp.Notes != "" {
+		props["Notes"] = notion.NewRichTextPropertyValue(richText(sp.Notes)...)
 	}
 
 	if sp.Org != nil {
-		props["Org"] = notion.NewRelationPropertyValue(
+		props["org"] = notion.NewRelationPropertyValue(
 			[]*notion.ObjectReference{{ID: sp.Org.Ref}}...,
 		)
 	}
@@ -354,6 +422,9 @@ func RegisterSponsorship(n *types.Notion, sp *types.Sponsorship) error {
 			Type:   notion.PropertySelect,
 			Select: &notion.SelectOption{Name: sp.Level},
 		}
+	}
+	if sp.Label != "" {
+		props["Label"] = notion.NewRichTextPropertyValue(richText(sp.Label)...)
 	}
 	if sp.Status != "" {
 		props["Status"] = &notion.PropertyValue{

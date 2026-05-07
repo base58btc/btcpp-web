@@ -1,0 +1,93 @@
+{{/*
+  sponsors_section — drop-in replacement for the per-conf hardcoded
+  sponsor blocks. Pulls grouped Sponsorships from the sponsorTiers
+  template helper, then renders each tier in its own flex-wrap
+  container so:
+    - tiers with one sponsor center on the page rather than leaving
+      empty cells on the right;
+    - partial last rows (a tier of 5 in a 4-up layout) center their
+      orphans;
+    - "FullRow" tiers (Diamond / Title / Workshop) put each logo on
+      its own row, centered.
+
+  Expects context: a *types.Conf in `.Conf`. Renders nothing when
+  the conf has no sponsorships.
+*/}}
+{{ define "sponsors_section" }}
+{{ $tiers := sponsorTiers .Conf }}
+{{ if $tiers }}
+<section id="sponsors">
+  <div class="bg-white py-24 sm:py-32">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+      <div class="mx-auto max-w-3xl text-center mb-16 sm:mb-20">
+        <h2 class="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">
+          <span class="font-bitcoin">bitcoin++</span> is made possible by the support of the bitcoin community
+        </h2>
+        <p class="mt-6 text-lg leading-8 text-gray-600">
+          <span class="font-bitcoin">bitcoin++</span> is proud to be supported by a wide range of companies from across the bitcoin ecosystem. Check out what they're up to, both here online as well as at the conference.
+        </p>
+      </div>
+      <div class="mx-auto w-full max-w-5xl space-y-14 sm:space-y-16">
+        {{ range $tiers }}
+        {{ $tier := . }}
+        <div>
+          <h3 class="text-xl tracking-tight text-gray-900 text-center mb-8" style="font-family: courier;">{{ $tier.Label }}</h3>
+          {{ if $tier.FullRow }}
+          {{/* One logo per row, centered. Each tile is bounded so a
+               very wide SVG doesn't sprawl across 5xl. */}}
+          <div class="flex flex-col items-center gap-y-10">
+            {{ range $tier.Sponsors }}
+            {{ $org := .Org }}
+            {{ if $org }}
+            <a href="{{ if $org.Website }}{{ $org.Website }}{{ else }}#{{ end }}"
+               {{ if $org.Website }}target="_blank" rel="noopener noreferrer"{{ end }}
+               class="flex items-center justify-center p-4 sm:p-6 w-full max-w-2xl">
+              {{ if $org.LogoLight }}
+              <img src="{{ $org.LogoLight }}" alt="{{ $org.Name }}"
+                   class="{{ $tier.HeightClass }} w-full object-contain object-center" />
+              {{ else if $org.LogoDark }}
+              <img src="{{ $org.LogoDark }}" alt="{{ $org.Name }}"
+                   class="{{ $tier.HeightClass }} w-full object-contain object-center" />
+              {{ else }}
+              <span class="text-sm font-semibold text-gray-700">{{ $org.Name }}</span>
+              {{ end }}
+            </a>
+            {{ end }}
+            {{ end }}
+          </div>
+          {{ else }}
+          {{/* Multi-up wrap layout — items size based on viewport,
+               partial rows + single-sponsor tiers center via
+               justify-center on the flex container. The img also
+               gets a max-width cap so an ultra-wide logo doesn't
+               sprawl across the cell while the square ones stay
+               compact. */}}
+          <div class="flex flex-wrap items-center justify-center gap-x-8 gap-y-10">
+            {{ range $tier.Sponsors }}
+            {{ $org := .Org }}
+            {{ if $org }}
+            <a href="{{ if $org.Website }}{{ $org.Website }}{{ else }}#{{ end }}"
+               {{ if $org.Website }}target="_blank" rel="noopener noreferrer"{{ end }}
+               class="flex items-center justify-center p-4 sm:p-6 w-[calc(50%-1rem)] sm:w-[calc(33.333%-1.333rem)] lg:w-[calc(25%-1.5rem)] max-w-xs">
+              {{ if $org.LogoLight }}
+              <img src="{{ $org.LogoLight }}" alt="{{ $org.Name }}"
+                   class="{{ $tier.HeightClass }} max-w-[10rem] w-auto object-contain object-center" />
+              {{ else if $org.LogoDark }}
+              <img src="{{ $org.LogoDark }}" alt="{{ $org.Name }}"
+                   class="{{ $tier.HeightClass }} max-w-[10rem] w-auto object-contain object-center" />
+              {{ else }}
+              <span class="text-sm font-semibold text-gray-700">{{ $org.Name }}</span>
+              {{ end }}
+            </a>
+            {{ end }}
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+</section>
+{{ end }}
+{{ end }}

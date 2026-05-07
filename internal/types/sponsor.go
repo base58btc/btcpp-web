@@ -24,7 +24,16 @@ type (
 		Ref           string
                 Org           *Org
 		Confs         []*Conf
+		// Level is the canonical tier — drives logo size + columns
+		// at render time. One of: Title / Diamond / Gold / Silver /
+		// Bronze / Workshop / Hackathon / Networking / Media /
+		// Community.
 		Level         string
+		// Label is the section-heading display string for the conf
+		// page (e.g. "Satoshi Level Sponsors", "Pool Party Sponsor",
+		// "VIP Dinner Sponsor"). Falls back to a per-tier default
+		// when blank. Stored as a rich_text field on Notion.
+		Label         string
 		Status        string
 		IsVendor      bool
 		Notes         string

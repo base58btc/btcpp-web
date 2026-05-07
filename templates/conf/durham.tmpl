@@ -7,7 +7,7 @@
   </head>
 <body>
 {{ block "conf_nav" .Conf }} {{ end }}
-<section id="intro">
+<section id="intro" class="lg:mb-20 lg:pb-20">
  <div class="relative">
     <div class="mx-auto max-w-7xl">
       <div class="relative z-10 pt-14 lg:w-full lg:max-w-2xl">
@@ -15,7 +15,7 @@
           <polygon points="0,0 90,0 50,100 0,100" />
         </svg>
 
-        <div class="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
+        <div class="relative px-6 pt-12 pb-12 sm:pt-16 sm:pb-12 lg:px-8 lg:pt-12 lg:pb-24 lg:pr-0">
           <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
             <div class="hidden sm:mb-10 sm:flex">
               <div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
@@ -31,6 +31,9 @@
           </div>
         </div>
       </div>
+    </div>
+    <div class="relative z-30 mt-6 sm:mt-8 lg:absolute lg:inset-x-0 lg:bottom-0 lg:mt-0 lg:translate-y-[calc(50%+20px)]">
+      {{ template "sponsor_banner" . }}
     </div>
     <div class="bg-gray-50 lg:absolute lg:inset-y-0 lg:right-0 lg:w-1/2">
       <img class="aspect-[3/2] object-cover lg:aspect-auto lg:h-full lg:w-full" src="/static/img/{{ .Conf.Tag }}/leading.avif" alt="">
@@ -277,50 +280,7 @@
     </div>
 </section>
 {{ end }}
-<section id="sponsors">
-  <div class="bg-white py-24 sm:py-32">
-    <div class="mx-auto max-w-7xl px-6 lg:px-8">
-      <div class="grid grid-cols-1 items-top gap-x-8 gap-y-16 lg:grid-cols-2">
-        <div class="mx-auto w-full max-w-xl lg:mx-0">
-          <h2 class="text-3xl font-bold tracking-tight text-gray-900"><span class="font-bitcoin">bitcoin++</span> is made possible by the support of the bitcoin community</h2>
-          <p class="mt-6 text-lg leading-8 text-gray-600"><span class="font-bitcoin">bitcoin++</span> is proud to be supported by a wide range of companies from across the bitcoin ecosystem. Check out what they're up to, both here online as well as at the conference.</p>
-        </div>
-        <div class="mx-auto grid w-full max-w-xl grid-cols-2 items-center gap-y-12 sm:gap-y-14 lg:mx-0 lg:max-w-none lg:pl-8">
-          <div style="margin-bottom: -3.5em; grid-column: span 2" class="text-center">
-            <h3 class="text-xl font-bold tracking-tight text-gray-900">🔶Sponsors🔶</h3>
-          </div>
-        <a href="https://www.fcatalyst.com/" target="_blank" class="p-4 sm:p-8" style="grid-column: span 2; margin-top: -2rem;">
-            <img class="max-h-32 w-full object-contain object-center" src="/static/img/sponsors/FCAT.png" alt="Fidelity Center for Applied Technology" width="150" height="auto">
-        </a>
-        <a href="https://casa.io/" target="_blank" class="p-4"
-           style="grid-column: span 2; margin-top: -2rem;">
-            <img class="max-h-12 w-full object-contain object-center" src="/static/img/sponsors/casa.svg" alt="Casa: Take control of your digital future" width="150" height="auto">
-        </a>
-        <a href="https://triangle.madscience.org" target="_blank" class="p-4"
-           style="grid-column: span 2; margin-top: -2rem;">
-            <img class="max-h-20 w-full object-contain object-center" src="/static/img/sponsors/mad_science.jpg" alt="Mad Science camps, science shows, and labs are perfect for any event." width="150" height="auto">
-        </a>
-        <a href="https://base58.school" target="_blank" class="p-4"
-           style="grid-column: span 2; margin-top: -2rem;">
-            <img class="max-h-12 w-full object-contain object-center" src="/static/img/base58.svg" alt="Base58" width="150" height="auto">
-        </a>
-        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center">
-          <h3 class="text-lg font-bold tracking-tight text-gray-900">📡 Media Partners 📺</h3>
-        </div>
-          <a href="https://insider.btcpp.dev/" target="_blank" class="pt-8">
-            <img class="max-h-32 w-full object-contain object-center" src="/static/img/riga/insider.png" alt="btc++ insider edition" width="200" height="auto">
-          </a>
-        <div style="margin-bottom: -2.5em; grid-column: span 2" class="text-center pb-8">
-          <h3 class="text-lg font-bold tracking-tight text-gray-900">🏡 Community Partners 🛠️</h3>
-        </div>
-          <a href="https://trianglebitdevs.org/" target="_blank">
-            <img class="max-h-24 w-full object-contain object-center" src="/static/img/sponsors/tridev.jpg" alt="Triangle Bitdevs" width="200" height="auto">
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
+{{ template "sponsors_section" . }}
     {{ block "footer" . }} {{ end }}
   </body>
 </html>
