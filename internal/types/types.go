@@ -158,6 +158,11 @@ type (
                 AvailToHire bool
                 LookingToHire bool
 		TShirt     string
+		// Roles drives admin-panel access. Each entry is the raw
+		// multi-select tag from the Speakers DB Roles column —
+		// e.g. "vienna-admin", "global-volcoord". Parsed by the
+		// auth package; an empty slice means no admin access.
+		Roles      []string
 	}
 	Speakers []*Speaker
 

@@ -159,6 +159,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 		AvailToHire:   parseCheckbox(props["AvailToHire"].Checkbox),
 		LookingToHire: parseCheckbox(props["LookingToHire"].Checkbox),
 		TShirt:        parseSelect("TShirt", props),
+		Roles:         parseSelectList("Roles", props),
 	}
 
 	return speaker

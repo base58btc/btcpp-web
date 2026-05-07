@@ -680,6 +680,16 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		Dashboard(w, r, app)
 	}).Methods("GET", "POST")
 
+	r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+		Login(w, r, app)
+	}).Methods("GET", "POST")
+	r.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) {
+		AuthLanding(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		LogoutHandler(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/dashboard/conf/{confTag}/edit", func(w http.ResponseWriter, r *http.Request) {
 		DashboardEditSpeakerConf(w, r, app)
 	}).Methods("GET", "POST")

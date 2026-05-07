@@ -116,10 +116,16 @@ func makeJobKeyRep(email string, letter *mtypes.Letter) string {
 // grab it without waiting for a real email. NEVER do this in prod — anyone
 // with log access could log in as anyone.
 func OnlyForLogin(ctx *config.AppContext, email string) ([]byte, error) {
+        return OnlyForLoginLink(ctx, email, helpers.EmailLink(ctx, email, "/dashboard"))
+}
+
+// OnlyForLoginLink sends the "vollogin" magic-link letter with a
+// caller-provided URL. Used by the generic /login flow to bake a
+// `next` redirect into the link via auth.MagicLink.
+func OnlyForLoginLink(ctx *config.AppContext, email, link string) ([]byte, error) {
         onlyFor := "vollogin"
-        link := helpers.EmailLink(ctx, email, "/dashboard")
         if !ctx.InProduction {
-                ctx.Infos.Printf("[dev] dashboard login link for %s: %s", email, link)
+                ctx.Infos.Printf("[dev] login link for %s: %s", email, link)
         }
         tmplData := &VolLogin{
                 Email:        email,
