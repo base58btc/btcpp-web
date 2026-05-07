@@ -241,6 +241,40 @@ type ReviewProposalPage struct {
         Year         uint
 }
 
+// AdminInviteSpeakerPage drives /admin/conf/{tag}/invite-speaker —
+// the form an organizer uses to originate a speaker invitation.
+// PresentationTypes is the talk-length enum reused from the public
+// apply form; AttachableProposals is the conf's current Invited /
+// Accepted set, surfaced as the "attach to existing proposal" picker.
+type AdminInviteSpeakerPage struct {
+        Conf                *types.Conf
+        PresentationTypes   []types.CheckItem
+        AttachableProposals []*types.Proposal
+        FormError           string
+        // Pre-fill values when re-rendering after a validation error so
+        // the organizer doesn't lose what they typed.
+        Form struct {
+                Name              string
+                Email             string
+                SpeakerID         string
+                AttachProposalID  string
+                TalkType          string
+        }
+        Year uint
+}
+
+// AdminInviteSpeakerSentPage is the post-submit confirmation rendered
+// after a successful invite. Shows the magic link the admin can copy
+// + a CTA to invite another speaker.
+type AdminInviteSpeakerSentPage struct {
+        Conf        *types.Conf
+        Speaker     *types.Speaker
+        Proposal    *types.Proposal
+        MagicLink   string
+        AttachedToExisting bool
+        Year        uint
+}
+
 // AdminSchedulePage drives /admin/conf/{tag}/schedule — the drag-and-drop
 // schedule editor.
 type AdminSchedulePage struct {

@@ -687,6 +687,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OrgSearch(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/api/speakers/search", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerSearch(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		out := map[string]interface{}{
@@ -841,6 +845,16 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/conf/{conf}/proposal/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalRemoveSpeaker(w, r, app)
 	}).Methods("POST")
+
+	r.HandleFunc("/admin/conf/{conf}/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
+		AdminInviteSpeaker(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/conf/{conf}/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
+		AdminInviteSpeakerSubmit(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/conf/{conf}/invite-speaker/sent", func(w http.ResponseWriter, r *http.Request) {
+		AdminInviteSpeakerSent(w, r, app)
+	}).Methods("GET")
 
 	r.HandleFunc("/admin/conf/{conf}/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleConf(w, r, app)

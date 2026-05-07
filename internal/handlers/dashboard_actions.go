@@ -50,6 +50,36 @@ func OrgSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 }
 
+// SpeakerSearch returns up to 10 speakers whose name or email contains
+// the `q` query parameter, as JSON `[{id, name, email, company}, ...]`.
+// Used by the admin invite-speaker autocomplete to dedupe against
+// existing speakers before creating new rows.
+//
+// Admin-gated by CheckPin — the response leaks email addresses, which
+// shouldn't be exposed publicly.
+func SpeakerSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	q := r.URL.Query().Get("q")
+	speakers := getters.SearchSpeakersByNameOrEmail(q, 10)
+	type speakerHit struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		Email   string `json:"email"`
+		Company string `json:"company,omitempty"`
+	}
+	out := make([]speakerHit, 0, len(speakers))
+	for _, s := range speakers {
+		out = append(out, speakerHit{ID: s.ID, Name: s.Name, Email: s.Email, Company: s.Company})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(out); err != nil {
+		ctx.Err.Printf("/api/speakers/search encode: %s", err)
+	}
+}
+
 // dashboardAuthForProposal validates the magic-link HMAC and confirms the
 // authed email is one of the speakers on the given proposal. Returns the
 // proposal, the user's SpeakerConf for it, and the encoded HMAC/email so

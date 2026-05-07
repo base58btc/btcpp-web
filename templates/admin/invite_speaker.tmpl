@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invite a Speaker · {{ .Conf.Desc }}</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#128231;</text></svg>">
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+
+    <div>
+      <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+      <h1 class="mt-1 text-xl font-bold text-gray-900">Invite a Speaker</h1>
+      <p class="mt-1 text-sm text-gray-500">Originate a speaker invitation. Creates an Invited proposal (or attaches them to a panel) and emails the speaker a magic link they can use to fill in the details.</p>
+    </div>
+
+    {{ if .FormError }}
+    <div class="mt-6 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+      <p class="text-sm text-red-800">{{ .FormError }}</p>
+    </div>
+    {{ end }}
+
+    <form method="POST" action="/admin/conf/{{ .Conf.Tag }}/invite-speaker" class="mt-6 bg-white shadow rounded-lg p-6 space-y-6">
+      <input type="hidden" id="SpeakerID" name="SpeakerID" value="{{ .Form.SpeakerID }}">
+
+      <div>
+        <label for="SpeakerEmail" class="block text-sm font-semibold text-gray-900">Speaker email <span class="text-red-500">*</span></label>
+        <p class="mt-1 text-xs text-gray-500">Start typing — we'll match against existing speakers so you don't double-up.</p>
+        <input type="email" id="SpeakerEmail" name="Email" required
+               value="{{ .Form.Email }}"
+               class="mt-2 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
+        <p id="SpeakerLookupFlash" class="mt-1 text-xs text-indigo-700 hidden"></p>
+      </div>
+
+      <div>
+        <label for="SpeakerName" class="block text-sm font-semibold text-gray-900">Speaker name <span class="text-red-500">*</span></label>
+        <input type="text" id="SpeakerName" name="Name" required
+               value="{{ .Form.Name }}"
+               class="mt-2 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
+      </div>
+
+      <div>
+        <label for="AttachProposalID" class="block text-sm font-semibold text-gray-900">Attach to existing proposal <span class="text-gray-400 font-normal">(optional, for panels &amp; co-speakers)</span></label>
+        <select id="AttachProposalID" name="AttachProposalID" onchange="toggleTalkType(this)"
+                class="mt-2 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
+          <option value="">— Create a new proposal —</option>
+          {{ range .AttachableProposals }}
+          <option value="{{ .ID }}" {{ if eq $.Form.AttachProposalID .ID }}selected{{ end }}>
+            {{ .Title }}{{ if .Status }} ({{ .Status }}){{ end }}
+          </option>
+          {{ end }}
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Pick one to add this speaker as a co-presenter on a panel that already exists. Leave blank to create a fresh proposal.</p>
+      </div>
+
+      <fieldset id="TalkTypeBlock">
+        <legend class="block text-sm font-semibold text-gray-900">Talk type <span class="text-gray-400 font-normal">(optional — speaker can change later)</span></legend>
+        <div class="mt-2 grid grid-cols-2 gap-2">
+          {{ range .PresentationTypes }}
+          <label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
+            <input type="radio" name="TalkType" value="{{ .ItemID }}"
+                   {{ if eq $.Form.TalkType .ItemID }}checked{{ end }}>
+            <span>{{ .ItemDesc }}</span>
+          </label>
+          {{ end }}
+        </div>
+        <p class="mt-1 text-xs text-gray-500">Disabled when attaching to an existing proposal — the proposal already has a type.</p>
+      </fieldset>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <a href="/admin/conf/{{ .Conf.Tag }}" class="text-sm text-gray-600 hover:text-gray-800">Cancel</a>
+        <button type="submit"
+                class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+          Send invitation
+        </button>
+      </div>
+    </form>
+
+  </div>
+
+  <script src="/static/js/speaker-autocomplete.js" defer></script>
+  <script>
+    // When an attach-to-existing proposal is picked, the talk-type
+    // fieldset is moot — the proposal already has a type. Disable the
+    // radios so they don't get submitted, but keep the block visible
+    // so the organizer sees why it's inactive.
+    function toggleTalkType(sel) {
+      const block = document.getElementById('TalkTypeBlock');
+      const disabled = !!sel.value;
+      block.classList.toggle('opacity-50', disabled);
+      block.querySelectorAll('input[type=radio]').forEach(function (r) { r.disabled = disabled; });
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+      const sel = document.getElementById('AttachProposalID');
+      if (sel) toggleTalkType(sel);
+    });
+  </script>
+
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>

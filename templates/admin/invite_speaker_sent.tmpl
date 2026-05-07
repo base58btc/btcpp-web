@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invite sent · {{ .Conf.Desc }}</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#9989;</text></svg>">
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+
+    <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+
+    <div class="mt-3 bg-white shadow rounded-lg p-6">
+      <div class="flex items-start gap-4">
+        <div class="text-4xl">&#9989;</div>
+        <div class="flex-1">
+          <h1 class="text-xl font-bold text-gray-900">
+            {{ if .AttachedToExisting }}Co-speaker invited{{ else }}Invite sent{{ end }}
+          </h1>
+          {{ if .Speaker }}
+          <p class="mt-1 text-sm text-gray-600">{{ .Speaker.Name }} &lt;{{ .Speaker.Email }}&gt; will receive the magic link by email.</p>
+          {{ end }}
+          {{ if .AttachedToExisting }}
+          <p class="mt-1 text-sm text-gray-600">Attached as a co-speaker on <span class="font-medium">{{ .Proposal.Title }}</span>. They'll fill in their own SpeakerConf info via the link below.</p>
+          {{ else }}
+          <p class="mt-1 text-sm text-gray-600">A placeholder proposal is in <span class="font-medium">Invited</span> status. The speaker uses the link below to fill in their talk title, description, and bio.</p>
+          {{ end }}
+        </div>
+      </div>
+
+      <div class="mt-6">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-500">Magic link (copy &amp; share if email bounces)</label>
+        <div class="mt-2 flex items-stretch gap-2">
+          <input id="magic" type="text" readonly value="{{ .MagicLink }}"
+                 class="flex-1 block rounded-md bg-gray-50 px-3 py-2 text-sm font-mono text-gray-700 outline outline-1 outline-gray-300">
+          <button type="button" onclick="copyMagic()"
+                  class="inline-flex items-center rounded-md bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-900">
+            Copy
+          </button>
+        </div>
+        <p id="copyflash" class="mt-1 text-xs text-green-700 hidden">Copied to clipboard.</p>
+      </div>
+
+      <div class="mt-8 flex flex-wrap items-center gap-3">
+        <a href="/admin/conf/{{ .Conf.Tag }}/invite-speaker"
+           class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
+          Invite another speaker
+        </a>
+        <a href="/admin/applicants/{{ .Conf.Tag }}"
+           class="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200">
+          View applicants
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function copyMagic() {
+      const input = document.getElementById('magic');
+      input.select();
+      input.setSelectionRange(0, 99999);
+      navigator.clipboard.writeText(input.value).then(function () {
+        const f = document.getElementById('copyflash');
+        f.classList.remove('hidden');
+        setTimeout(function () { f.classList.add('hidden'); }, 2000);
+      });
+    }
+  </script>
+
+  {{ block "footer" . }} {{ end }}
+</body>
+</html>
