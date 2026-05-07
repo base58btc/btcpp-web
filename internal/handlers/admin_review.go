@@ -55,8 +55,7 @@ type reviewAction struct {
 // /admin/conf/{tag}/. Hub for everything organizer-y for one
 // conference: review applications today, more tools as we add them.
 func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -85,8 +84,7 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 // specific row (after-action redirect uses this to advance to the next
 // pending). With no id we pick the first by creation order.
 func ReviewProposals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -135,8 +133,7 @@ func ReviewProposals(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 // `action` is one of: invite / confirm / waitlist / decline / reject
 // — see reviewActions for the full mapping to (status, onlyfor tag).
 func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -234,8 +231,7 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 //
 // Path: POST /admin/applicants/{conf}/resend-tickets
 func AdminResendSpeakerTickets(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -308,8 +304,7 @@ func emailHasConfRegistration(ctx *config.AppContext, email, confRef string) (bo
 //
 // Path: GET /admin/conf/{tag}/proposal/{proposalID}/invite
 func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -358,8 +353,7 @@ func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config
 //
 // Path: POST /admin/conf/{tag}/proposal/{proposalID}/speakers/{speakerConfID}/remove
 func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)

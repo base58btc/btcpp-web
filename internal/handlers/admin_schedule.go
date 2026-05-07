@@ -37,8 +37,7 @@ const scheduleSnapMin = 15
 // ScheduleConf renders the drag-and-drop schedule page at
 // /admin/conf/{tag}/schedule.
 func ScheduleConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -70,8 +69,7 @@ func ScheduleConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 // already populated. On subsequent moves of an already-placed talk:
 // patches the existing ConfTalk's Sched + Venue.
 func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -165,8 +163,7 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 // applicant's stated ask, the schedule UI just records what we
 // actually gave them via ConfTalk.Sched.
 func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -211,8 +208,7 @@ func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 //
 // Body: {proposalID}.
 func ScheduleUnplace(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -267,8 +263,7 @@ var addTalkAllowedTypes = map[string]bool{
 // The resulting Proposal lands in the conf's sidebar with Status =
 // Accepted, ready to drag onto the grid.
 func ScheduleAddTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -341,8 +336,7 @@ var hackathonProposals = []struct {
 // already exist on the conf, so admins can add new ones (after a
 // rename, say) without piling on duplicates of the rest.
 func ScheduleAddHackathon(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
@@ -332,9 +333,7 @@ func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for verified */
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := auth.RequireRole(w, r, ctx, auth.Spec{Role: auth.RoleAdmin}); id == nil {
 		return
 	}
 
@@ -389,9 +388,7 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 }
 
 func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for verified */
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := auth.RequireRole(w, r, ctx, auth.Spec{Role: auth.RoleAdmin}); id == nil {
 		return
 	}
 
@@ -435,9 +432,7 @@ func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.App
 }
 
 func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for verified */
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := auth.RequireRole(w, r, ctx, auth.Spec{Role: auth.RoleAdmin}); id == nil {
 		return
 	}
 
@@ -473,9 +468,7 @@ func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 }
 
 func UnscheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for verified */
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := auth.RequireRole(w, r, ctx, auth.Spec{Role: auth.RoleAdmin}); id == nil {
 		return
 	}
 

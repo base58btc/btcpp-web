@@ -114,8 +114,7 @@ func isTargetChannel(ch buffer.Channel) bool {
 }
 
 func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -335,8 +334,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 }
 
 func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 

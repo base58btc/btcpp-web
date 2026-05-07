@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/imgproc"
@@ -53,12 +54,16 @@ func OrgSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 // SpeakerSearch returns up to 10 speakers whose name or email contains
 // the `q` query parameter, as JSON `[{id, name, email, company}, ...]`.
 // Used by the admin invite-speaker autocomplete to dedupe against
-// existing speakers before creating new rows.
+// existing speakers before creating new rows, and by the dashboard
+// role manager.
 //
-// Admin-gated by CheckPin — the response leaks email addresses, which
-// shouldn't be exposed publicly.
+// Gated to any user with at least one admin or volcoord role — the
+// response leaks email addresses, which shouldn't be exposed publicly.
+// Returns 401 (rather than 302→/login) so the autocomplete XHR
+// surfaces the error inline.
 func SpeakerSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
+	id := auth.RequireOptional(r, ctx)
+	if id == nil || len(id.Roles) == 0 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}

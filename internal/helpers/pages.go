@@ -4,12 +4,6 @@ import (
         "fmt"
 )
 
-type LoginPage struct {
-	Year        uint
-	Destination string
-}
-
-
 func ErrSpeakerApp(message string) string {
         return ErrApp(message, "speak")
 }

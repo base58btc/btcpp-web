@@ -20,8 +20,7 @@ import (
 // the post-submit page so they can copy it into Signal/Twitter as a
 // personal nudge.
 func AdminInviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -48,8 +47,7 @@ func AdminInviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 // the InviteToken, sends the talkinvited-direct letter, and redirects
 // to the sent page.
 func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -171,8 +169,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 // AdminInviteSpeakerSent renders the post-invite confirmation page
 // with the magic link visible for the admin to copy.
 func AdminInviteSpeakerSent(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)

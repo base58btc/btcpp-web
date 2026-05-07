@@ -558,9 +558,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	r.HandleFunc("/i/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
-		/* Check for verified */
-		if ok := helpers.CheckPin(w, r, app); !ok {
-			helpers.Render401(w, r, app)
+		if id := requireConfAdmin(w, r, app); id == nil {
 			return
 		}
 
@@ -603,9 +601,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	r.HandleFunc("/vols/admin/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
-		/* Check for verified */
-		if ok := helpers.CheckPin(w, r, app); !ok {
-			helpers.Render401(w, r, app)
+		if id := requireConfVolcoord(w, r, app); id == nil {
 			return
 		}
 
@@ -900,9 +896,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		AdminResendSpeakerTickets(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
-		/* Check for verified */
-		if ok := helpers.CheckPin(w, r, app); !ok {
-			helpers.Render401(w, r, app)
+		if id := requireConfAdmin(w, r, app); id == nil {
 			return
 		}
 
@@ -1004,9 +998,7 @@ func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discou
 }
 
 func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	/* Check for verified */
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3292,10 +3284,8 @@ func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.
 }
 
 func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        /* Check for verified */
-        if ok := helpers.CheckPin(w, r, ctx); !ok {
-                helpers.Render401(w, r, ctx)
-                return
+        if id := requireConfVolcoord(w, r, ctx); id == nil {
+        	return
         }
 
 	conf, err := helpers.FindConf(r, ctx)
@@ -3405,10 +3395,8 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        /* Check for verified */
-        if ok := helpers.CheckPin(w, r, ctx); !ok {
-                helpers.Render401(w, r, ctx)
-                return
+        if id := requireConfVolcoord(w, r, ctx); id == nil {
+        	return
         }
 
 	conf, err := helpers.FindConf(r, ctx)
@@ -3460,8 +3448,7 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 }
 
 func VolAdminAutoAssign(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3715,8 +3702,7 @@ func volAdminLoadVol(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 }
 
 func VolAdminDetails(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3854,8 +3840,7 @@ func volAdminRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf, 
 }
 
 func VolAdminUpdateStatus(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3882,8 +3867,7 @@ func VolAdminUpdateStatus(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 }
 
 func VolAdminUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3911,8 +3895,7 @@ func VolAdminUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *con
 }
 
 func VolAdminUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3946,8 +3929,7 @@ func VolAdminUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *config
 }
 
 func VolAdminAddShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -3974,8 +3956,7 @@ func VolAdminAddShift(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 }
 
 func VolAdminRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4002,8 +3983,7 @@ func VolAdminRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 }
 
 func VolAdminMarkScheduled(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4033,8 +4013,7 @@ func VolAdminMarkScheduled(w http.ResponseWriter, r *http.Request, ctx *config.A
 }
 
 func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4178,8 +4157,7 @@ func findJobByTag(jobs []*types.JobType, tag string) *types.JobType {
 }
 
 func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4285,8 +4263,7 @@ func volAdminShiftsRedirect(w http.ResponseWriter, r *http.Request, conf *types.
 }
 
 func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4330,8 +4307,7 @@ func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 }
 
 func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4377,8 +4353,7 @@ func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 }
 
 func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4440,8 +4415,7 @@ func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 }
 
 func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4502,8 +4476,7 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 }
 
 func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4601,8 +4574,7 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 }
 
 func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4666,8 +4638,7 @@ func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 }
 
 func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4758,8 +4729,7 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 }
 
 func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4873,8 +4843,7 @@ func speakerName(sp *types.Speaker) string {
 }
 
 func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -4960,8 +4929,7 @@ func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.
 // Always redirects back to the applicants page with a flash describing the
 // outcome.
 func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 

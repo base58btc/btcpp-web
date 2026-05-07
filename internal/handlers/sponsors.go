@@ -45,8 +45,7 @@ type SponsorshipsPage struct {
 }
 
 func OrgList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -73,8 +72,7 @@ func OrgList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -116,8 +114,7 @@ func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 // OrgCreate where to redirect after a successful create — we round-trip
 // it as a hidden form field so the POST handler can consume it.
 func OrgNew(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 	page := &OrgNewPage{
@@ -132,8 +129,7 @@ func OrgNew(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -204,8 +200,7 @@ func appendFlash(rawURL, msg string) string {
 }
 
 func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 
@@ -247,8 +242,7 @@ func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 }
 
 func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if ok := helpers.CheckPin(w, r, ctx); !ok {
-		helpers.Render401(w, r, ctx)
+	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
 	}
 

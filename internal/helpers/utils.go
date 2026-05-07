@@ -277,28 +277,10 @@ func MakeJobHash(email string, uid uint64, title string) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func Render401(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	err := ctx.TemplateCache.ExecuteTemplate(w, "401.tmpl", &LoginPage{
-		Year:        CurrentYear(),
-		Destination: r.URL.Path,
-	})
-	if err != nil {
-		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/401.tmpl exec template failed %s\n", err.Error())
-		return
-	}
-}
-
-func CheckPin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) bool {
-	pin := ctx.Session.GetString(r.Context(), "pin")
-	if pin == "" {
-		w.Header().Set("x-missing-field", "pin")
-		w.WriteHeader(http.StatusUnauthorized)
-		ctx.Infos.Printf("401 login failed: %s", r.URL.Path)
-		return false
-	}
-	return pin == ctx.Env.RegistryPin
-}
+// CheckPin / Render401 used to gate every admin handler on a single
+// shared PIN held in session storage. Replaced by the role-aware
+// auth.RequireRole flow — see internal/auth and internal/handlers/auth_shim.go.
+// Removed in favor of redirect-to-/login on missing identity.
 
 func VerifyEmailHMAC(ctx *config.AppContext, hmac, email string) bool {
         verify := CreateEmailHMAC(ctx, email)
