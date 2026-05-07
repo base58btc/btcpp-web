@@ -868,6 +868,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/applicants/{conf}/accept", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdminAccept(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/admin/applicants/{conf}/resend-tickets", func(w http.ResponseWriter, r *http.Request) {
+		AdminResendSpeakerTickets(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		/* Check for verified */
 		if ok := helpers.CheckPin(w, r, app); !ok {
@@ -995,11 +998,23 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// filterSpeakers returns the deduped Speaker list for the conf page's
+// "Who's Coming" section. Restricted to talks whose Proposal status
+// is "Accepted" or "Scheduled" — anything else (Applied / InReview /
+// Waitlisted / Invited / WeDecline / TheyDecline / Rejected) is
+// filtered out so legacy ConfTalks for non-confirmed proposals
+// don't surface their speakers.
 func filterSpeakers(talks []*types.Talk) types.Speakers {
 	var speakers types.Speakers
 	already := make(map[string]int)
 
 	for _, talk := range talks {
+		if talk == nil {
+			continue
+		}
+		if talk.Status != StatusAccepted && talk.Status != "Scheduled" {
+			continue
+		}
 		for _, speaker := range talk.Speakers {
 			if _, ok := already[speaker.ID]; !ok {
 				speakers = append(speakers, speaker)

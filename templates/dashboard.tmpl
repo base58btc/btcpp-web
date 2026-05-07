@@ -420,7 +420,7 @@
 {{ end }}
 
 {{/* ---- Empty state ---- */}}
-{{ if and (not .ActiveBlocks) (not .EligibleConfs) (not .BuyableConfs) }}
+{{ if and (not .ActiveBlocks) (not .DiscoverConfs) }}
 <section id="empty" class="mt-8">
   <div class="bg-white shadow rounded-lg overflow-hidden">
     <div class="px-4 py-5 sm:p-6 text-center">
@@ -434,43 +434,54 @@
 </section>
 {{ end }}
 
-{{/* ---- Discover: apply to speak elsewhere ---- */}}
-{{ if .EligibleConfs }}
-<section id="discover-apply" class="mt-8">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Apply to speak at another conf</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {{ range .EligibleConfs }}
-    <a href="/talk/{{ .Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-       class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-indigo-50 hover:shadow-md transition">
-      <div class="text-2xl">{{ .EmojiOrDefault }}</div>
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
-        <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
+{{/* ---- Discover: per-event cards with hero image + 3 CTAs ----
+     Same visual shape as the speaker EventBlocks above, just for
+     confs the user has no existing relationship with. */}}
+{{ if .DiscoverConfs }}
+<section id="discover" class="mt-8 space-y-6">
+  <h2 class="text-lg font-semibold text-gray-900">Other upcoming events</h2>
+  {{ range .DiscoverConfs }}
+  {{ $conf := . }}
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <a href="/conf/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
+      <picture>
+        <source srcset="/static/img/{{ $conf.Tag }}/leading.avif" type="image/avif" />
+        <img src="/static/img/{{ $conf.Tag }}/leading.png" alt="{{ $conf.Desc }}"
+             class="absolute inset-0 w-full h-full object-cover" />
+      </picture>
+      <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+      <div class="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 text-white">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">{{ $conf.EmojiOrDefault }}</span>
+          <h3 class="text-lg sm:text-xl font-bold">{{ $conf.Desc }}</h3>
+        </div>
+        <p class="text-xs sm:text-sm text-white/80">{{ $conf.DateDesc }}{{ if $conf.Location }} &middot; {{ $conf.Location }}{{ end }}</p>
       </div>
-      <span class="text-sm font-medium text-indigo-600 group-hover:text-indigo-700">Apply &rarr;</span>
     </a>
-    {{ end }}
-  </div>
-</section>
-{{ end }}
 
-{{/* ---- Discover: buy a ticket elsewhere ---- */}}
-{{ if .BuyableConfs }}
-<section id="discover-tickets" class="mt-8">
-  <h2 class="text-lg font-semibold text-gray-900 mb-4">Get a ticket for another conf</h2>
-  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-    {{ range .BuyableConfs }}
-    <a href="/conf/{{ .Tag }}#tickets"
-       class="group flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-orange-50 hover:shadow-md transition">
-      <div class="text-2xl">{{ .EmojiOrDefault }}</div>
-      <div class="min-w-0 flex-1">
-        <p class="text-sm font-semibold text-gray-900 truncate">{{ .Desc }}</p>
-        <p class="text-xs text-gray-500">{{ .DateDesc }} - {{ .Location }}</p>
-      </div>
-      <span class="text-sm font-medium text-orange-600 group-hover:text-orange-700">Buy ticket &rarr;</span>
-    </a>
-    {{ end }}
+    <div class="px-4 py-4 sm:px-6 flex flex-wrap gap-2">
+      <a href="/conf/{{ $conf.Tag }}#tickets"
+         class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700">
+        Get a ticket
+      </a>
+      {{ if $conf.TalksOpen }}
+      <a href="/talk/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700">
+        Apply to speak
+      </a>
+      {{ else }}
+      <span title="Talk applications have closed for this event"
+            class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-gray-400 bg-gray-100 cursor-not-allowed">
+        Apply to speak
+      </span>
+      {{ end }}
+      <a href="/volunteer/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+         class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200">
+        Apply to volunteer
+      </a>
+    </div>
   </div>
+  {{ end }}
 </section>
 {{ end }}
 

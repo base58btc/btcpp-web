@@ -235,6 +235,15 @@ type (
 		Speakers    []*Speaker
 		CalNotif    string
 		TalkCardURL string
+		// Status mirrors the underlying Proposal.Status so the conf
+		// page's speaker list can filter to Accepted-only without
+		// re-fetching proposals. Empty when this Talk wasn't sourced
+		// from a Proposal (defensive).
+		Status      string
+		// YTLink is the YouTube URL when a Recording row exists for
+		// this talk's ConfTalk. Drives the "Watch" badge on the
+		// agenda + /talks pages.
+		YTLink      string
 	}
 
 	Session struct {

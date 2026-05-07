@@ -217,6 +217,7 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		Confs:            confs,
 		EligibleConfs:    eligible,
 		BuyableConfs:     buyable,
+		DiscoverConfs:    discoverConfs(confs, activeBlocks),
 		Tickets:          tickets,
 		ActiveBlocks:     activeBlocks,
 		PastBlocks:       pastBlocks,
@@ -558,6 +559,32 @@ func upcomingTickets(regs []*types.Registration, allConfs []*types.Conf) []*User
 			continue
 		}
 		out = append(out, &UserTicket{Reg: r, Conf: c})
+	}
+	return out
+}
+
+// discoverConfs returns every Active+InFuture conf the user has no
+// existing relationship with — drives the dashboard's per-event
+// discover cards. Each card renders three CTAs (Get ticket / Apply
+// to speak / Apply to volunteer) gated independently in the template,
+// so we don't pre-filter by which CTAs are enabled — we just want the
+// full list of confs to surface.
+func discoverConfs(allConfs []*types.Conf, blocks []*EventBlock) []*types.Conf {
+	inBlock := map[string]bool{}
+	for _, b := range blocks {
+		if b != nil && b.Conf != nil {
+			inBlock[b.Conf.Tag] = true
+		}
+	}
+	var out []*types.Conf
+	for _, c := range allConfs {
+		if c == nil || !c.Active || !c.InFuture() {
+			continue
+		}
+		if inBlock[c.Tag] {
+			continue
+		}
+		out = append(out, c)
 	}
 	return out
 }

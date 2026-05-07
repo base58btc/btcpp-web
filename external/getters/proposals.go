@@ -642,10 +642,16 @@ func talkFromConfTalk(ct *types.ConfTalk, proposal *types.Proposal) *types.Talk 
 	if talk.Sched != nil {
 		talk.TimeDesc = talk.Sched.Desc()
 	}
+	// Pull the YouTube link from the Recording cache when available
+	// — drives the "Watch" badge on the agenda + /talks pages.
+	if rec := FetchRecordingByConfTalk(ct.ID); rec != nil {
+		talk.YTLink = rec.YTLink
+	}
 	if proposal != nil {
 		talk.Name = proposal.Title
 		talk.Description = proposal.Description
 		talk.Type = proposal.TalkType
+		talk.Status = proposal.Status
 		for _, sc := range proposal.Speakers {
 			if sc == nil || sc.Speaker == nil {
 				continue

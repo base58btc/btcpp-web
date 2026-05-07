@@ -11,9 +11,18 @@
         <div class="mx-auto max-w-5xl">
             <section id="topline" class="mb-6">
                 <div class="overflow-hidden sm:rounded-lg bg-white shadow">
-                    <div class="px-4 py-5 sm:p-6">
-                        <h1 class="text-xl font-bold text-gray-900">Speaker Applicants</h1>
-                        <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                    <div class="px-4 py-5 sm:p-6 flex items-center justify-between gap-4">
+                        <div>
+                            <h1 class="text-xl font-bold text-gray-900">Speaker Applicants</h1>
+                            <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
+                        </div>
+                        <form method="POST" action="/admin/applicants/{{ .Conf.Tag }}/resend-tickets" class="shrink-0">
+                            <button type="submit"
+                                    onclick="return confirm('Issue speaker tickets for every Accepted proposal whose speakers don't already have a ticket for this conf?');"
+                                    class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                                Resend tickets
+                            </button>
+                        </form>
                     </div>
                 </div>
             </section>

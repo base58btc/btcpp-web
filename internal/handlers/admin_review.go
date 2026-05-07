@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strings"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
@@ -219,6 +220,83 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	http.Redirect(w, r,
 		fmt.Sprintf("/admin/conf/%s/?flash=%s", conf.Tag, url.QueryEscape(flash+" Queue is now empty.")),
 		http.StatusSeeOther)
+}
+
+// AdminResendSpeakerTickets walks every Accepted proposal for a conf
+// and issues a complimentary "speaker"-type ticket to each attached
+// speaker who doesn't already have a registration for that conf
+// (paid, volunteer, or speaker — any type counts).
+//
+// Used by the "Resend tickets" button on the applicants table —
+// patches gaps where a talk got Accepted before the comp-ticket
+// pipeline existed, or where an admin manually flipped a status in
+// Notion bypassing the normal accept flow.
+//
+// Path: POST /admin/applicants/{conf}/resend-tickets
+func AdminResendSpeakerTickets(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if ok := helpers.CheckPin(w, r, ctx); !ok {
+		helpers.Render401(w, r, ctx)
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	var issued, skipped, failed int
+	seen := map[string]bool{}
+	for _, p := range loadConfProposals(ctx, conf) {
+		if p == nil || p.Status != StatusAccepted {
+			continue
+		}
+		for _, ref := range p.SpeakerConfRefs {
+			sc := getters.FetchSpeakerConfByID(ref)
+			if sc == nil || sc.Speaker == nil || sc.Speaker.Email == "" {
+				continue
+			}
+			email := strings.ToLower(strings.TrimSpace(sc.Speaker.Email))
+			if seen[email] {
+				continue
+			}
+			seen[email] = true
+
+			has, err := emailHasConfRegistration(ctx, email, conf.Ref)
+			if err != nil {
+				ctx.Err.Printf("/admin/applicants/%s/resend-tickets lookup %s: %s", conf.Tag, email, err)
+				failed++
+				continue
+			}
+			if has {
+				skipped++
+				continue
+			}
+			issueSpeakerTicket(ctx, sc.Speaker.Email, conf)
+			issued++
+		}
+	}
+
+	flash := fmt.Sprintf("Resend tickets: issued=%d, skipped (already have one)=%d, failed=%d", issued, skipped, failed)
+	http.Redirect(w, r,
+		fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, url.QueryEscape(flash)),
+		http.StatusSeeOther)
+}
+
+// emailHasConfRegistration reports whether an email already has any
+// PurchasesDb row for the given conf — paid ticket, volunteer comp,
+// previous speaker comp, doesn't matter. Used by the resend-tickets
+// flow to avoid double-issuing.
+func emailHasConfRegistration(ctx *config.AppContext, email, confRef string) (bool, error) {
+	regs, err := getters.ListRegistrationsByEmail(ctx, email)
+	if err != nil {
+		return false, err
+	}
+	for _, r := range regs {
+		if r != nil && r.ConfRef == confRef {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // AdminProposalInviteLink mints (if needed) the share-a-link

@@ -187,6 +187,12 @@ type DashboardPage struct {
         // a "Buy a ticket" section on the dashboard.
         BuyableConfs []*types.Conf
 
+        // DiscoverConfs is the unified list of upcoming Active confs the
+        // user has no existing relationship with — drives the per-event
+        // discover cards (hero image + Get ticket / Apply to speak /
+        // Apply to volunteer CTAs).
+        DiscoverConfs []*types.Conf
+
         // Tickets the user has purchased for upcoming/active confs, with
         // their Conf resolved for header rendering. Past tickets are
         // omitted (no point downloading a PDF for a conf that's over).
