@@ -3771,6 +3771,17 @@ func VolAdminDetails(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 }
 
 func volAdminRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf, volRef string) {
+	// Honor an optional `return` form value so callers (e.g. the admin
+	// list page's quick-action buttons) can stay on their current view
+	// instead of bouncing into the vol_details page. Only accept paths
+	// rooted at /vols/admin/<this-conf>/ to avoid open-redirect.
+	if ret := r.FormValue("return"); ret != "" {
+		prefix := fmt.Sprintf("/vols/admin/%s", conf.Tag)
+		if strings.HasPrefix(ret, prefix+"/") || ret == prefix || strings.HasPrefix(ret, prefix+"?") {
+			http.Redirect(w, r, ret, http.StatusSeeOther)
+			return
+		}
+	}
 	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s/vol/%s", conf.Tag, volRef), http.StatusSeeOther)
 }
 

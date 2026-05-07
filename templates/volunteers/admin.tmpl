@@ -155,6 +155,7 @@
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                                    <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -187,6 +188,48 @@
                                     <td class="px-4 py-2 text-sm text-gray-500">{{ .Hometown }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-500">{{ len .WorkShifts }}</td>
                                     <td class="px-4 py-2 text-sm text-gray-500 max-w-xs truncate" title="{{ .Comments }}">{{ .Comments }}</td>
+                                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                                        {{ $returnURL := printf "/vols/admin/%s" $.Conf.Tag }}
+                                        {{ if $.StatusFilter }}{{ $returnURL = printf "%s?status=%s" $returnURL $.StatusFilter }}{{ end }}
+                                        {{ $statusURL := printf "/vols/admin/%s/vol/%s/status?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
+                                        {{ $schedURL := printf "/vols/admin/%s/vol/%s/scheduled?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
+                                        <span class="inline-flex items-center gap-1">
+                                            {{ if eq .Status "Applied" }}
+                                            <button type="submit" name="status" value="PendingShifts"
+                                                formaction="{{ $statusURL }}" formmethod="POST" formnovalidate
+                                                title="Promote to Pending Shifts"
+                                                class="inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700">→ Pending</button>
+                                            <button type="submit" name="status" value="Waitlist"
+                                                formaction="{{ $statusURL }}" formmethod="POST" formnovalidate
+                                                class="inline-flex items-center rounded bg-yellow-500 px-2 py-1 text-xs font-semibold text-white hover:bg-yellow-600">Waitlist</button>
+                                            {{ else if eq .Status "Waitlist" }}
+                                            <button type="submit" name="status" value="PendingShifts"
+                                                formaction="{{ $statusURL }}" formmethod="POST" formnovalidate
+                                                title="Promote to Pending Shifts"
+                                                class="inline-flex items-center rounded bg-blue-600 px-2 py-1 text-xs font-semibold text-white hover:bg-blue-700">→ Pending</button>
+                                            {{ else if eq .Status "PendingShifts" }}
+                                            {{ if gt (len .WorkShifts) 0 }}
+                                            <button type="submit"
+                                                formaction="{{ $schedURL }}" formmethod="POST" formnovalidate
+                                                onclick="return confirm('Mark {{ .Name }} as Scheduled? Sends onboarding email, issues a ticket, and sends calendar invites.')"
+                                                class="inline-flex items-center rounded bg-green-600 px-2 py-1 text-xs font-semibold text-white hover:bg-green-700">Schedule</button>
+                                            {{ else }}
+                                            <span class="text-xs text-gray-400" title="Assign shifts before scheduling">no shifts</span>
+                                            {{ end }}
+                                            {{ end }}
+                                            {{ if ne .Status "Declined" }}
+                                            <button type="submit" name="status" value="Declined"
+                                                formaction="{{ $statusURL }}" formmethod="POST" formnovalidate
+                                                onclick="return confirm('Decline {{ .Name }}?')"
+                                                class="inline-flex items-center rounded bg-gray-600 px-2 py-1 text-xs font-semibold text-white hover:bg-gray-700">Decline</button>
+                                            {{ else }}
+                                            <button type="submit" name="status" value="Applied"
+                                                formaction="{{ $statusURL }}" formmethod="POST" formnovalidate
+                                                title="Reset to Applied"
+                                                class="inline-flex items-center rounded bg-gray-200 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-300">Reopen</button>
+                                            {{ end }}
+                                        </span>
+                                    </td>
                                 </tr>
                                 {{ end }}
                             </tbody>
