@@ -948,6 +948,74 @@ func SetProposalInviteToken(ctx *config.AppContext, proposalID, token string) er
 	return nil
 }
 
+// setSpeakerConfDate stamps a date property on a SpeakerConf row and
+// invalidates the cache. Shared by the three timestamp writers below.
+// Returns nil if the row already has a timestamp and onlyIfEmpty is
+// true — that's the right semantics for ViewedAt (first-view-wins),
+// where repeated visits shouldn't keep updating the field.
+func setSpeakerConfDate(ctx *config.AppContext, speakerConfID, field string, when time.Time, onlyIfEmpty bool) error {
+	if onlyIfEmpty {
+		if sc := FetchSpeakerConfByID(speakerConfID); sc != nil {
+			already := scTimestamp(sc, field)
+			if already != nil {
+				return nil
+			}
+		}
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), speakerConfID,
+		map[string]*notion.PropertyValue{
+			field: notion.NewDatePropertyValue(&notion.Date{Start: when}),
+		})
+	if err != nil {
+		return fmt.Errorf("set %s on speakerconf %s: %w", field, speakerConfID, err)
+	}
+	InvalidateSpeakerConfsCache()
+	if cached := FetchSpeakerConfByID(speakerConfID); cached != nil {
+		w := when
+		switch field {
+		case "InvitedAt":
+			cached.InvitedAt = &w
+		case "ViewedAt":
+			cached.ViewedAt = &w
+		case "AcceptedAt":
+			cached.AcceptedAt = &w
+		}
+	}
+	return nil
+}
+
+func scTimestamp(sc *types.SpeakerConf, field string) *time.Time {
+	switch field {
+	case "InvitedAt":
+		return sc.InvitedAt
+	case "ViewedAt":
+		return sc.ViewedAt
+	case "AcceptedAt":
+		return sc.AcceptedAt
+	}
+	return nil
+}
+
+// SetSpeakerConfInvitedAt stamps the moment an admin sent an invite.
+// Always overwrites — re-inviting is a real event the audit trail
+// should reflect.
+func SetSpeakerConfInvitedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
+	return setSpeakerConfDate(ctx, speakerConfID, "InvitedAt", when, false)
+}
+
+// SetSpeakerConfViewedAt stamps the first time the invited speaker
+// opened the magic link. First-view-wins so we don't overwrite the
+// initial signal on every page reload.
+func SetSpeakerConfViewedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
+	return setSpeakerConfDate(ctx, speakerConfID, "ViewedAt", when, true)
+}
+
+// SetSpeakerConfAcceptedAt stamps the moment the speaker hit the
+// Accept Invitation button on the magic-link form. First-accept-wins.
+func SetSpeakerConfAcceptedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
+	return setSpeakerConfDate(ctx, speakerConfID, "AcceptedAt", when, true)
+}
+
 // AddSpeakerConfToProposal appends speakerConfID to a Proposal's `speakers`
 // multi-relation. Idempotent — no-op when the SpeakerConf is already in
 // the relation.

@@ -98,10 +98,14 @@ func fanoutAcceptedProposal(ctx *config.AppContext, proposal *types.Proposal, co
 	if err := emails.SendOnlyForProposal(ctx, "talkconfirmed", proposal, conf); err != nil {
 		ctx.Err.Printf("fanoutAcceptedProposal %s: send talkconfirmed: %s", proposal.ID, err)
 	}
+	now := time.Now()
 	for _, ref := range proposal.SpeakerConfRefs {
 		sc := getters.FetchSpeakerConfByID(ref)
 		if sc == nil || sc.Speaker == nil || sc.Speaker.Email == "" {
 			continue
+		}
+		if err := getters.SetSpeakerConfAcceptedAt(ctx, ref, now); err != nil {
+			ctx.Err.Printf("fanoutAcceptedProposal %s: stamp AcceptedAt on %s: %s", proposal.ID, ref, err)
 		}
 		issueSpeakerTicket(ctx, sc.Speaker.Email, conf)
 	}

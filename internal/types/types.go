@@ -207,6 +207,14 @@ type (
                 Company       string
                 OrgPhoto      string
                 OtherEvents   []*Conf
+                // Invite-flow audit trail: set by the admin "Invite a
+                // Speaker" flow and the magic-link landing page.
+                // InvitedAt is when the admin sent the invite, ViewedAt
+                // is the first time the speaker opened the magic link,
+                // AcceptedAt is when they clicked Accept.
+                InvitedAt     *time.Time
+                ViewedAt      *time.Time
+                AcceptedAt    *time.Time
         }
 
         ConfTalk struct {
@@ -435,6 +443,16 @@ const (
 	Morning DayTime = iota
 	Afternoon
 	Evening
+)
+
+// Placeholder strings stamped onto a freshly admin-invited proposal
+// before the speaker has filled the form. The magic-link form uses
+// PlaceholderTitlePrefix to detect "this proposal still needs talk
+// content" and unhide the title/description/setup/length fields that
+// are otherwise hidden in InviteMode.
+const (
+	PlaceholderTitlePrefix = "TBD ("
+	PlaceholderDescription = "Description to come"
 )
 
 var daytimenames = map[DayTime]string{

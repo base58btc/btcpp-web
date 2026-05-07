@@ -92,6 +92,11 @@ type (
                 Email           string
                 TalkConfirmLink string
                 DashboardLink   string
+                // MagicLink is the InviteToken-gated /invite-speaker URL
+                // — populated only on talkinvited-direct (the admin-
+                // originated invite flow). Empty for the regular review
+                // letters (talkinvited / talkconfirmed / etc.).
+                MagicLink       string
         }
 )
 
@@ -239,6 +244,7 @@ func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types
                         Email:           sp.Email,
                         TalkConfirmLink: helpers.EmailLink(ctx, sp.Email, "/dashboard/talks/"+proposal.ID+"/confirm"),
                         DashboardLink:   helpers.EmailLink(ctx, sp.Email, "/dashboard"),
+                        MagicLink:       helpers.InviteLink(ctx, proposal.ID, proposal.InviteToken),
                 }
                 if _, err := execOnlyFor(ctx, sp.Email, onlyFor, data); err != nil {
                         ctx.Err.Printf("SendOnlyForProposal %s → %s: %s", onlyFor, sp.Email, err)

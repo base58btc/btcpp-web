@@ -106,6 +106,31 @@ func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error)
 	return speakers, nil
 }
 
+// SearchSpeakersByNameOrEmail returns up to limit Speakers whose Name
+// or Email contains q (case-insensitive substring). Cache-only — used
+// by the admin invite-speaker autocomplete; rapid keystrokes shouldn't
+// hammer Notion. Empty q returns nil.
+func SearchSpeakersByNameOrEmail(q string, limit int) []*types.Speaker {
+	q = strings.TrimSpace(strings.ToLower(q))
+	if q == "" {
+		return nil
+	}
+	out := make([]*types.Speaker, 0, limit)
+	for _, s := range cacheSpeakers {
+		if s == nil {
+			continue
+		}
+		if strings.Contains(strings.ToLower(s.Name), q) ||
+			strings.Contains(strings.ToLower(s.Email), q) {
+			out = append(out, s)
+			if len(out) >= limit {
+				break
+			}
+		}
+	}
+	return out
+}
+
 func CreateSpeaker(n *types.Notion, in SpeakerInput) (string, error) {
 	parent := notion.NewDatabaseParent(n.Config.SpeakersDb)
 	page, err := n.Client.CreatePage(context.Background(), parent, speakerCreateProps(in))

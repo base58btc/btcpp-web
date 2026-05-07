@@ -252,6 +252,9 @@ func parseSpeakerConf(ctx *config.AppContext, pageID string, props map[string]no
 		Sponsor:      parseCheckbox(props["Sponsor"].Checkbox),
 		Company:      parseRichText("Company", props),
 		OrgPhoto:     parseRichText("OrgPhoto", props),
+		InvitedAt:    parseDate("InvitedAt", props),
+		ViewedAt:     parseDate("ViewedAt", props),
+		AcceptedAt:   parseDate("AcceptedAt", props),
 	}
 	for _, tag := range parseSelectList("OtherEvents", props) {
 		if c := lookupConfByTag(ctx, tag); c != nil {
