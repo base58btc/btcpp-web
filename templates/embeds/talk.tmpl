@@ -11,9 +11,15 @@
         <div class="isolate bg-white px-6 py-24 sm:py-32 lg:px-8">
             <div class="mx-auto max-w-2xl text-center">
                 {{ if .InviteMode }}
+                {{ if .EditTalkContent }}
+                <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">You're Invited!</h2>
+                <p class="mt-2 text-lg/8 text-gray-600">Speak at <span class="font-semibold">{{ .Conf.Desc }}</span>{{ if .Conf.DateDesc }}, {{ .Conf.DateDesc }}{{ end }}.</p>
+                <p class="mt-2 text-lg/8 text-gray-600">Fill in your talk details and bio below, then accept the invitation to lock it in.</p>
+                {{ else }}
                 <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Co-speaker Invitation</h2>
                 <p class="mt-2 text-lg/8 text-gray-600">You've been invited to co-present <span class="font-semibold">"{{ .Proposal.Title }}"</span>{{ if .Conf }} at {{ .Conf.Desc }}{{ end }}.</p>
                 <p class="mt-2 text-lg/8 text-gray-600">Fill in your details below to be added to the talk.</p>
+                {{ end }}
                 {{ else }}
                 <h2 class="text-balance text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">Speaker Application</h2>
                 <p class="mt-2 text-lg/8 text-gray-600">Apply to talk or present at {{ .Conf.Desc }}.</p>
@@ -36,12 +42,8 @@
             enctype="multipart/form-data"
             >
                 <div class="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2">
-                    {{ if $.KnownSpeaker }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Name }}
                     <input type="hidden" name="Name" value="{{ $.KnownSpeaker.Name }}" />
-                    <input type="hidden" name="Phone" value="{{ $.KnownSpeaker.Phone }}" />
-                    <input type="hidden" name="Email" value="{{ $.KnownSpeaker.Email }}" />
-                    <input type="hidden" name="Signal" value="{{ $.KnownSpeaker.Signal }}" />
-                    <input type="hidden" name="Telegram" value="{{ $.KnownSpeaker.Telegram }}" />
                     {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
@@ -54,6 +56,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Phone }}
+                    <input type="hidden" name="Phone" value="{{ $.KnownSpeaker.Phone }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
                         <div class="mt-2.5">
@@ -65,6 +71,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Email }}
+                    <input type="hidden" name="Email" value="{{ $.KnownSpeaker.Email }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
                         <div class="mt-2.5">
@@ -73,6 +83,10 @@
                             autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Signal }}
+                    <input type="hidden" name="Signal" value="{{ $.KnownSpeaker.Signal }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number *</label>
                         <div class="mt-2.5">
@@ -84,6 +98,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Telegram }}
+                    <input type="hidden" name="Telegram" value="{{ $.KnownSpeaker.Telegram }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Telegram" class="block text-sm/6 font-semibold text-gray-900">Telegram Username or Number</label>
                         <div class="mt-2.5">
@@ -98,11 +116,12 @@
                     <div class="sm:col-span-2">
                         <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Hometown" id="Hometown" type="text" 
+                            <input
+                            name="Hometown" id="Hometown" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="Hometown, USA"
                             required
+                            value="{{ if $.KnownSpeakerConf }}{{ $.KnownSpeakerConf.ComingFrom }}{{ end }}"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
@@ -111,24 +130,21 @@
                         Will you need a Visa to attend? *
                         </label>
                         <div class="mt-2.5">
-                            <select id="Visa" name="Visa" 
-                                autocomplete="off" 
-                                aria-label="Need Visa?" 
+                            {{ $visa := "No" }}{{ if and $.KnownSpeakerConf $.KnownSpeakerConf.Visa }}{{ $visa = $.KnownSpeakerConf.Visa }}{{ end }}
+                            <select id="Visa" name="Visa"
+                                autocomplete="off"
+                                aria-label="Need Visa?"
                                 required
                                 class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
-                                <option value="No" selected>No</option>
-                                <option value="Yes">Yes</option>
-                                <option value="IDK">I don't know</option>
+                                <option value="No" {{ if eq $visa "No" }}selected{{ end }}>No</option>
+                                <option value="Yes" {{ if eq $visa "Yes" }}selected{{ end }}>Yes</option>
+                                <option value="IDK" {{ if eq $visa "IDK" }}selected{{ end }}>I don't know</option>
                             </select>
                         </div>
                     </div>
 
-                    {{ if $.KnownSpeaker }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Twitter.Handle }}
                     <input type="hidden" name="Twitter" value="{{ $.KnownSpeaker.Twitter.Handle }}" />
-                    <input type="hidden" name="Nostr" value="{{ $.KnownSpeaker.Nostr }}" />
-                    <input type="hidden" name="Github" value="{{ $.KnownSpeaker.Github }}" />
-                    <input type="hidden" name="Website" value="{{ $.KnownSpeaker.Website }}" />
-                    <input type="hidden" name="Shirt" value="{{ $.KnownSpeaker.TShirt }}" />
                     {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Twitter" class="block text-sm/6 font-semibold text-gray-900">
@@ -142,6 +158,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Nostr }}
+                    <input type="hidden" name="Nostr" value="{{ $.KnownSpeaker.Nostr }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Nostr" class="block text-sm/6 font-semibold text-gray-900">
                         Nostr Npub
@@ -154,6 +174,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Github }}
+                    <input type="hidden" name="Github" value="{{ $.KnownSpeaker.Github }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Github" class="block text-sm/6 font-semibold text-gray-900">Link to your Github profile *</label>
                         <div class="mt-2.5">
@@ -165,6 +189,10 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.Website }}
+                    <input type="hidden" name="Website" value="{{ $.KnownSpeaker.Website }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Website" class="block text-sm/6 font-semibold text-gray-900">Personal website</label>
                         <div class="mt-2.5">
@@ -175,7 +203,9 @@
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
+                    {{ end }}
 
+                    {{ if not (and $.KnownSpeaker $.KnownSpeaker.Photo) }}
                     <div class="sm:col-span-2">
                         <label for="PicFile" class="block text-sm/6 font-semibold text-gray-900">
                         Your pfp (Profile Picture) *
@@ -204,7 +234,11 @@
                             </div>
                         </div>
                     </div>
+                    {{ end }}
 
+                    {{ if and $.KnownSpeaker $.KnownSpeaker.TShirt }}
+                    <input type="hidden" name="Shirt" value="{{ $.KnownSpeaker.TShirt }}" />
+                    {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Shirt" class="block text-sm/6 font-semibold text-gray-900">
                         Shirt Size *
@@ -234,11 +268,13 @@
                         Company or Organizational Affiliation *
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Org" id="Org" type="text" 
+                            {{ $org := "" }}{{ if and $.KnownSpeakerConf $.KnownSpeakerConf.Company }}{{ $org = $.KnownSpeakerConf.Company }}{{ else if and $.KnownSpeaker $.KnownSpeaker.Company }}{{ $org = $.KnownSpeaker.Company }}{{ end }}
+                            <input
+                            name="Org" id="Org" type="text"
                             autoComplete="organization" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="bitcoin++"
                             required
+                            value="{{ $org }}"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
@@ -247,7 +283,7 @@
                         <div class="flex h-6 items-center">
                             <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
                                 <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-                                <input id="Sponsor" type="checkbox" name="Sponsor" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                                <input id="Sponsor" type="checkbox" name="Sponsor" aria-label="Subscribe to Newsletter" {{ if and $.KnownSpeakerConf $.KnownSpeakerConf.Sponsor }}checked{{ end }} class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
                             </div>
                         </div>
                         <label for="Sponsor" class="text-sm/6 text-gray-600">
@@ -269,7 +305,10 @@
                         </div>
                     </div>
 
-                    {{ if not .InviteMode }}
+                    {{ if or (not .InviteMode) .EditTalkContent }}
+                    {{ $title := "" }}{{ if and .Proposal .Proposal.Title (not (hasPrefix .Proposal.Title "TBD (")) }}{{ $title = .Proposal.Title }}{{ end }}
+                    {{ $desc := "" }}{{ if and .Proposal .Proposal.Description (ne .Proposal.Description "Description to come") }}{{ $desc = .Proposal.Description }}{{ end }}
+                    {{ $setup := "" }}{{ if .Proposal }}{{ $setup = .Proposal.Setup }}{{ end }}
                     <div class="sm:col-span-2">
                         <label for="TalkTitle" class="block text-sm/6 font-semibold text-gray-900">
                         Talk/Workshop Title *
@@ -281,6 +320,7 @@
                             autoCapitalize="off" spellCheck="false"
                             placeholder="Lightning at the edges..."
                             required
+                            value="{{ $title }}"
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
@@ -296,7 +336,7 @@
                             placeholder="This talk will..."
                             rows="3"
                             required
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin">{{ $desc }}</textarea>
                         </div>
                     </div>
 
@@ -323,7 +363,7 @@
                         </div>
                     </fieldset>
 
-                    {{ if not .InviteMode }}
+                    {{ if or (not .InviteMode) .EditTalkContent }}
                     <div class="sm:col-span-2">
                         <label for="Setup" class="block text-sm/6 font-semibold text-gray-900">
                         Workshop / talk setup notes
@@ -337,7 +377,7 @@
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="e.g. Please install Bitcoin Core 27.0 on your laptop ahead of the workshop."
                             rows="3"
-                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"></textarea>
+                            class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin">{{ if .Proposal }}{{ .Proposal.Setup }}{{ end }}</textarea>
                         </div>
                     </div>
                     {{ end }}
@@ -358,13 +398,14 @@
                         I'll be able to attend the VIP dinner on {{ .RSVPFor }}, the night before the conference starts.
                         </label>
                         <div class="mt-2.5">
-                            <select id="DinnerOpt" name="DinnerOpt" 
-                                autocomplete="off" 
-                                aria-label="Dinner RSVP" 
+                            {{ $dinnerYes := true }}{{ if and $.KnownSpeakerConf (not $.KnownSpeakerConf.DinnerRSVP) }}{{ $dinnerYes = false }}{{ end }}
+                            <select id="DinnerOpt" name="DinnerOpt"
+                                autocomplete="off"
+                                aria-label="Dinner RSVP"
                                 required
                                 class="col-start-1 row-start-1 w-full appearance-none rounded-md py-2 pl-3.5 pr-7 text-base text-gray-500 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin sm:text-sm/6">
-                                <option value="Yes" selected>Yes</option>
-                                <option value="No">No</option>
+                                <option value="Yes" {{ if $dinnerYes }}selected{{ end }}>Yes</option>
+                                <option value="No" {{ if not $dinnerYes }}selected{{ end }}>No</option>
                             </select>
                         </div>
                     </div>
@@ -404,7 +445,7 @@
                         <div class="flex h-6 items-center">
                             <div class="group relative inline-flex w-8 shrink-0 rounded-full bg-gray-200 p-px outline-offset-2 outline-bitcoin ring-1 ring-inset ring-gray-900/5 transition-colors duration-200 ease-in-out has-[:checked]:bg-bitcion has-[:focus-visible]:outline has-[:focus-visible]:outline-2">
                                 <span class="size-4 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-3.5"></span>
-                                <input id="FirstEvent" type="checkbox" name="FirstEvent" aria-label="Subscribe to Newsletter" class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
+                                <input id="FirstEvent" type="checkbox" name="FirstEvent" aria-label="Subscribe to Newsletter" {{ if and $.KnownSpeakerConf $.KnownSpeakerConf.FirstEvent }}checked{{ end }} class="absolute inset-0 size-full appearance-none focus:outline-none text-bitcoin" />
                             </div>
                         </div>
                         <label for="FirstEvent" class="text-sm/6 text-gray-600">
@@ -456,11 +497,23 @@
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                         </svg>
-                        <span class="submit-label-idle">{{ if .InviteMode }}Add me as a co-speaker{{ else }}Submit Application{{ end }}</span>
+                        <span class="submit-label-idle">{{ if .InviteMode }}{{ if .EditTalkContent }}Save talk details{{ else }}Add me as a co-speaker{{ end }}{{ else }}Submit Application{{ end }}</span>
                         <span class="submit-label-busy">Submitting…</span>
                     </button>
                 </div>
             </form>
+            {{ if and .InviteMode .IsInvited }}
+            <form method="POST"
+                  action="/dashboard/talks/{{ .Proposal.ID }}/accept-invite?t={{ .InviteToken }}"
+                  class="mx-auto mt-4 max-w-xl">
+                <button type="submit"
+                        onclick="return confirm('Accept this invitation? This sends the confirmation email and issues your speaker ticket.');"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-green-700">
+                    Accept invitation
+                </button>
+                <p class="mt-2 text-center text-xs text-gray-500">Save first if you've changed any details — accepting locks the talk in.</p>
+            </form>
+            {{ end }}
             <div id="result" class="mt-5 mx-auto max-w-xl text-red-700 scroll-mt-24">
             </div>
         </div>

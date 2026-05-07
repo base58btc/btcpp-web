@@ -733,6 +733,52 @@ func DashboardAcceptInvite(w http.ResponseWriter, r *http.Request, ctx *config.A
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
 }
 
+// AcceptInviteByToken is the InviteToken-gated parallel to
+// DashboardAcceptInvite — the speaker the admin invited may not have
+// an HMAC-authenticated dashboard link yet (their email may not match
+// any pre-existing magic-link), so they accept via the same token
+// that gates /invite-speaker. The token is matched constant-time
+// against proposal.InviteToken; rotating or clearing the field in
+// Notion revokes acceptance ability the same way it revokes the
+// share link.
+func AcceptInviteByToken(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	token := r.URL.Query().Get("t")
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		http.Error(w, "Talk not found.", http.StatusNotFound)
+		return
+	}
+	if token == "" || proposal.InviteToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(proposal.InviteToken)) != 1 {
+		http.Error(w, "Invalid or revoked invite link.", http.StatusForbidden)
+		return
+	}
+	if proposal.Status != "Invited" && proposal.Status != StatusAccepted {
+		http.Error(w, "This talk isn't currently invited — nothing to accept.", http.StatusGone)
+		return
+	}
+
+	res, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard accept-invite pipeline: %s", err)
+		http.Error(w, "accept failed", http.StatusInternalServerError)
+		return
+	}
+	if !res.AlreadyAccepted {
+		// fanoutAcceptedProposal sends talkconfirmed + issues comp
+		// tickets + stamps AcceptedAt on each SpeakerConf.
+		fanoutAcceptedProposal(ctx, proposal, proposal.ScheduleFor)
+	}
+
+	// Bounce back to the magic-link page so the speaker sees the
+	// post-accept state (status now "Accepted", Accept button gone).
+	q := url.Values{}
+	q.Set("t", token)
+	q.Set("flash", "accepted")
+	http.Redirect(w, r, "/invite-speaker/"+proposalID+"?"+q.Encode(), http.StatusSeeOther)
+}
+
 // DashboardInviteCoSpeaker renders the inviter-side "share a link"
 // page: confirms which talk the invite is for and shows the URL the
 // existing speaker copies to send their co-speaker.
@@ -835,19 +881,97 @@ func InviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
+	// Pick out the SpeakerConf the admin invited (has InvitedAt set).
+	// Prefer one whose ViewedAt is still nil so we identify the
+	// just-arriving speaker on a panel where one co-speaker already
+	// opened the link. Used both to stamp ViewedAt and to surface the
+	// existing Speaker record as KnownSpeaker so the form can hide
+	// fields we already know.
+	var inviteeSC *types.SpeakerConf
+	for _, ref := range proposal.SpeakerConfRefs {
+		sc := getters.FetchSpeakerConfByID(ref)
+		if sc == nil || sc.InvitedAt == nil {
+			continue
+		}
+		if inviteeSC == nil || (inviteeSC.ViewedAt != nil && sc.ViewedAt == nil) {
+			inviteeSC = sc
+		}
+	}
+	if inviteeSC != nil && inviteeSC.ViewedAt == nil {
+		if err := getters.SetSpeakerConfViewedAt(ctx, inviteeSC.ID, time.Now()); err != nil {
+			ctx.Err.Printf("/invite-speaker stamp ViewedAt on %s: %s", inviteeSC.ID, err)
+		}
+	}
+
 	daylist := conf.DaysList("days-", true)
+	avails := daylist[1:]
+	presTypes := helpers.GetPresentationTypes()
+	otherEvents := helpers.GetOtherConfs(confs, *conf)
+
+	// Pre-mark form options from the existing SpeakerConf when we
+	// have one. Empty Availability on the SpeakerConf means
+	// "everything" (the default) — leave defaults alone in that case.
+	if inviteeSC != nil {
+		if len(inviteeSC.Availability) > 0 {
+			set := make(map[string]bool, len(inviteeSC.Availability))
+			for _, a := range inviteeSC.Availability {
+				set[a] = true
+			}
+			for i := range avails {
+				avails[i].Checked = set[avails[i].ItemID[len("days-"):]]
+			}
+		}
+		if len(inviteeSC.OtherEvents) > 0 {
+			set := make(map[string]bool, len(inviteeSC.OtherEvents))
+			for _, c := range inviteeSC.OtherEvents {
+				if c != nil {
+					set[c.Ref] = true
+				}
+			}
+			for i := range otherEvents {
+				otherEvents[i].Checked = set[otherEvents[i].ItemID[len("conf-"):]]
+			}
+		}
+	}
+	// Pre-select the proposal's TalkType in the radio list. The
+	// helper's default ("20talk" Checked: true) is overridden when
+	// the proposal carries a value.
+	if proposal.TalkType != "" {
+		for i := range presTypes {
+			presTypes[i].Checked = presTypes[i].ItemID == proposal.TalkType
+		}
+	}
+	// Pre-select the SpeakerConf's RecordOK in the recording radio
+	// list. Same Checked-flip pattern.
+	recOpts := helpers.GetRecordingOptions()
+	if inviteeSC != nil && inviteeSC.RecordOK != "" {
+		for i := range recOpts {
+			recOpts[i].Checked = recOpts[i].ItemID == inviteeSC.RecordOK
+		}
+	}
+
 	page := &SpeakerPage{
 		Conf:             conf,
 		Confs:            confs,
-		ConfItems:        helpers.GetOtherConfs(confs, *conf),
-		DaysList:         daylist[1:],
+		ConfItems:        otherEvents,
+		DaysList:         avails,
 		RSVPFor:          daylist[0].ItemDesc,
-		PresentationType: helpers.GetPresentationTypes(),
-		RecordingOptions: helpers.GetRecordingOptions(),
+		PresentationType: presTypes,
+		RecordingOptions: recOpts,
 		InviteMode:       true,
 		InviteToken:      token,
 		Proposal:         proposal,
+		EditTalkContent:  strings.HasPrefix(proposal.Title, types.PlaceholderTitlePrefix),
+		IsInvited:        proposal.Status == "Invited",
 		Year:             helpers.CurrentYear(),
+	}
+	// Surface what we already know about the invitee so the form can
+	// hide / pre-fill fields per-field when they're populated.
+	if inviteeSC != nil {
+		page.KnownSpeakerConf = inviteeSC
+		if inviteeSC.Speaker != nil {
+			page.KnownSpeaker = inviteeSC.Speaker
+		}
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", page); err != nil {
 		ctx.Err.Printf("/invite-speaker render: %s", err)

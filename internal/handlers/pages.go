@@ -130,6 +130,21 @@ type SpeakerPage struct {
         InviteMode  bool
         InviteToken string
         Proposal    *types.Proposal
+        // KnownSpeakerConf is the existing SpeakerConf for the
+        // recipient at this conf — used to pre-fill ComingFrom / Visa
+        // / Availability / Company / etc. so the speaker only has to
+        // confirm or tweak rather than re-enter them.
+        KnownSpeakerConf *types.SpeakerConf
+        // EditTalkContent overrides InviteMode's content-hiding when
+        // true — used for the admin "Invite a Speaker" flow where the
+        // freshly-invited primary speaker still needs to fill in
+        // title/description/length. Detected via a placeholder-string
+        // check on the Proposal's Title.
+        EditTalkContent bool
+        // IsInvited surfaces the explicit "Accept Invitation" button
+        // alongside the regular Save submit. Set when Proposal.Status
+        // is "Invited"; the button POSTs to /dashboard/talks/{id}/accept-invite?t={token}.
+        IsInvited bool
 
         Year uint
 }
