@@ -127,14 +127,14 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	// Load already-posted refs to hide them
 	postedRefs, err := getters.ListPostedRefs(ctx.Notion, conf)
 	if err != nil {
-		ctx.Err.Printf("/admin/social/%s failed to load posted refs: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/social failed to load posted refs: %s", conf.Tag, err.Error())
 		postedRefs = make(map[string]bool)
 	}
 
 	talks, err := getters.LoadTalksFromConfTalks(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/social/%s failed to get conf talks: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/social failed to get conf talks: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -259,7 +259,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	var sponsorRows []*SocialSponsorRow
 	sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
 	if err != nil {
-		ctx.Err.Printf("/admin/social/%s failed to get sponsorships: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/social failed to get sponsorships: %s", conf.Tag, err.Error())
 	} else {
 		for _, sp := range sponsorships {
 			if sp.Org == nil {
@@ -329,7 +329,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/social/%s template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/social template failed: %s", conf.Tag, err.Error())
 	}
 }
 
@@ -354,7 +354,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	// Get target channels
 	allChannels, err := buffer.FetchChannels()
 	if err != nil {
-		ctx.Err.Printf("/admin/social/%s/post failed to fetch channels: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/social/post failed to fetch channels: %s", conf.Tag, err.Error())
 		http.Error(w, "Failed to fetch Buffer channels: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -516,7 +516,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 
 	flash := fmt.Sprintf("%d posts queued to Buffer", posted)
-	http.Redirect(w, r, "/admin/social/"+conf.Tag+"?flash="+strings.ReplaceAll(flash, " ", "+"), http.StatusFound)
+	http.Redirect(w, r, "/" + conf.Tag + "/admin/social"+"?flash="+strings.ReplaceAll(flash, " ", "+"), http.StatusFound)
 }
 
 func RecordInstagramBatch(ctx *config.AppContext, conf *types.Conf, sponsors []selectedSponsor, text string, channel buffer.Channel) {

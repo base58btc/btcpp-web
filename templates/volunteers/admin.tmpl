@@ -18,8 +18,8 @@
                                 <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
                             </div>
                             <div class="flex items-center gap-3">
-                                <a href="/vols/admin/{{ .Conf.Tag }}/shifts" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200">Manage Shifts</a>
-                                <form method="POST" action="/vols/admin/{{ .Conf.Tag }}/sendcal">
+                                <a href="/{{ .Conf.Tag }}/volcoord/shifts" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200">Manage Shifts</a>
+                                <form method="POST" action="/{{ .Conf.Tag }}/volcoord/sendcal">
                                     <button type="submit" class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700" onclick="return confirm('Send calendar invites for all volunteer shifts at {{ .Conf.Desc }}?')">Send Shift Calendar Invites</button>
                                 </form>
                                 <div class="text-3xl">{{ .Conf.Emoji }}</div>
@@ -87,27 +87,27 @@
                 <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
                     <div class="flex items-center space-x-3 flex-wrap">
                         <span class="text-sm font-medium text-gray-700">Filter by status:</span>
-                        <a href="/vols/admin/{{ .Conf.Tag }}"
+                        <a href="/{{ .Conf.Tag }}/volcoord"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "" }}bg-gray-800 text-white{{ else }}bg-gray-100 text-gray-800 hover:bg-gray-200{{ end }}">
                             All
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Applied"
+                        <a href="/{{ .Conf.Tag }}/volcoord?status=Applied"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Applied" }}bg-gray-800 text-white{{ else }}bg-gray-100 text-gray-800 hover:bg-gray-200{{ end }}">
                             Applied
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=PendingShifts"
+                        <a href="/{{ .Conf.Tag }}/volcoord?status=PendingShifts"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "PendingShifts" }}bg-blue-800 text-white{{ else }}bg-blue-100 text-blue-800 hover:bg-blue-200{{ end }}">
                             Pending Shifts
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Waitlist"
+                        <a href="/{{ .Conf.Tag }}/volcoord?status=Waitlist"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Waitlist" }}bg-yellow-800 text-white{{ else }}bg-yellow-100 text-yellow-800 hover:bg-yellow-200{{ end }}">
                             Waitlist
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Scheduled"
+                        <a href="/{{ .Conf.Tag }}/volcoord?status=Scheduled"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Scheduled" }}bg-green-800 text-white{{ else }}bg-green-100 text-green-800 hover:bg-green-200{{ end }}">
                             Scheduled
                         </a>
-                        <a href="/vols/admin/{{ .Conf.Tag }}?status=Declined"
+                        <a href="/{{ .Conf.Tag }}/volcoord?status=Declined"
                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium {{ if eq .StatusFilter "Declined" }}bg-red-800 text-white{{ else }}bg-red-100 text-red-800 hover:bg-red-200{{ end }}">
                             Declined
                         </a>
@@ -120,7 +120,7 @@
                 <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
                     <h3 class="text-sm font-medium text-gray-900 mb-3">Bulk Actions</h3>
                     <div class="flex flex-wrap items-center gap-3">
-                        <form method="POST" action="/vols/admin/{{ .Conf.Tag }}/promote" class="inline">
+                        <form method="POST" action="/{{ .Conf.Tag }}/volcoord/promote" class="inline">
                             <input type="hidden" name="from_status" value="Applied">
                             <input type="hidden" name="target_status" value="PendingShifts">
                             <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
@@ -128,7 +128,7 @@
                                 Applied &rarr; Pending Shifts
                             </button>
                         </form>
-                        <form method="POST" action="/vols/admin/{{ .Conf.Tag }}/auto-assign" class="inline">
+                        <form method="POST" action="/{{ .Conf.Tag }}/volcoord/auto-assign" class="inline">
                             <button type="submit" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
                                     onclick="return confirm('Auto-assign PendingShifts volunteers to open shifts? Each volunteer will be filled up to 3 shifts based on availability and preferences.')">
                                 Auto-Assign Shifts
@@ -145,7 +145,7 @@
             {{ end }}
 
             <!-- Volunteers Table + Bulk Email Form -->
-            <form id="bulk-email-form" method="POST" action="/vols/admin/{{ .Conf.Tag }}/email">
+            <form id="bulk-email-form" method="POST" action="/{{ .Conf.Tag }}/volcoord/email">
             <section id="volunteers" class="mb-8">
                 <div class="bg-white shadow rounded-lg overflow-hidden">
                     <div class="px-4 py-4 sm:px-6 flex flex-wrap items-center justify-between gap-3">
@@ -191,7 +191,7 @@
                                         <input type="checkbox" name="vol_refs" value="{{ .Ref }}" data-status="{{ .Status }}" class="vol-checkbox">
                                     </td>
                                     <td class="px-4 py-2 text-sm font-medium text-gray-900">
-                                        <a href="/vols/admin/{{ $.Conf.Tag }}/vol/{{ .Ref }}" class="text-indigo-600 hover:text-indigo-500">{{ .Name }}</a>
+                                        <a href="/{{ $.Conf.Tag }}/volcoord/vol/{{ .Ref }}" class="text-indigo-600 hover:text-indigo-500">{{ .Name }}</a>
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap text-sm">
                                         {{ if eq .Status "Applied" }}
@@ -209,10 +209,10 @@
                                         {{ end }}
                                     </td>
                                     <td class="px-4 py-2 whitespace-nowrap">
-                                        {{ $returnURL := printf "/vols/admin/%s" $.Conf.Tag }}
+                                        {{ $returnURL := printf "/%s/volcoord" $.Conf.Tag }}
                                         {{ if $.StatusFilter }}{{ $returnURL = printf "%s?status=%s" $returnURL $.StatusFilter }}{{ end }}
-                                        {{ $statusURL := printf "/vols/admin/%s/vol/%s/status?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
-                                        {{ $schedURL := printf "/vols/admin/%s/vol/%s/scheduled?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
+                                        {{ $statusURL := printf "/%s/volcoord/vol/%s/status?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
+                                        {{ $schedURL := printf "/%s/volcoord/vol/%s/scheduled?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
                                         <span class="inline-flex items-center gap-1">
                                             {{ if eq .Status "Applied" }}
                                             <button type="submit" name="status" value="PendingShifts"

@@ -10,7 +10,7 @@
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
 
     <div>
-      <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+      <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
       <h1 class="mt-1 text-xl font-bold text-gray-900">Invite a Speaker</h1>
       <p class="mt-1 text-sm text-gray-500">Originate a speaker invitation. Creates an Invited proposal (or attaches them to a panel) and emails the speaker a magic link they can use to fill in the details.</p>
     </div>
@@ -21,7 +21,7 @@
     </div>
     {{ end }}
 
-    <form method="POST" action="/admin/conf/{{ .Conf.Tag }}/invite-speaker" class="mt-6 bg-white shadow rounded-lg p-6 space-y-6">
+    <form method="POST" action="/{{ .Conf.Tag }}/admin/invite-speaker" class="mt-6 bg-white shadow rounded-lg p-6 space-y-6">
       <input type="hidden" id="SpeakerID" name="SpeakerID" value="{{ .Form.SpeakerID }}">
 
       <div>
@@ -69,7 +69,7 @@
       </fieldset>
 
       <div class="flex items-center justify-end gap-3 pt-2">
-        <a href="/admin/conf/{{ .Conf.Tag }}" class="text-sm text-gray-600 hover:text-gray-800">Cancel</a>
+        <a href="/{{ .Conf.Tag }}/admin" class="text-sm text-gray-600 hover:text-gray-800">Cancel</a>
         <button type="submit"
                 class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
           Send invitation

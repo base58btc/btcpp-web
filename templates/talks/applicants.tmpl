@@ -17,11 +17,11 @@
                             <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <a href="/admin/conf/{{ .Conf.Tag }}/invite-speaker"
+                            <a href="/{{ .Conf.Tag }}/admin/invite-speaker"
                                class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
                                 Invite a speaker
                             </a>
-                            <form method="POST" action="/admin/applicants/{{ .Conf.Tag }}/resend-tickets">
+                            <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/resend-tickets">
                                 <button type="submit"
                                         onclick="return confirm('Issue speaker tickets for every Accepted proposal whose speakers don't already have a ticket for this conf?');"
                                         class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
@@ -42,7 +42,7 @@
             {{ end }}
 
             {{ if .Rows }}
-            <form method="POST" action="/admin/applicants/{{ .Conf.Tag }}/email">
+            <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/email">
             <section id="applicants-table" class="mb-6">
                 <div class="bg-white shadow rounded-lg overflow-hidden">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -75,7 +75,7 @@
                                     <span class="inline-flex items-center gap-2">
                                         {{ if ne .Proposal.Status "Invited" }}
                                         <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/invite?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/invite?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
                                             formmethod="POST"
                                             class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
                                             Invite
@@ -83,20 +83,20 @@
                                         {{ end }}
                                         {{ if and (ne .Proposal.Status "Waitlisted") (ne .Proposal.Status "Invited") }}
                                         <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/waitlist?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/waitlist?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
                                             formmethod="POST"
                                             class="inline-flex items-center rounded-md bg-yellow-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600">
                                             Waitlist
                                         </button>
                                         {{ end }}
                                         <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/decline?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/decline?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
                                             formmethod="POST"
                                             class="inline-flex items-center rounded-md bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700">
                                             Decline
                                         </button>
                                         <button type="submit"
-                                            formaction="/admin/conf/{{ $.Conf.Tag }}/review/{{ .Proposal.ID }}/confirm?return=%2Fadmin%2Fapplicants%2F{{ $.Conf.Tag }}"
+                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/confirm?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
                                             formmethod="POST"
                                             class="text-xs text-gray-500 hover:text-gray-800 underline bg-transparent border-0 p-0">
                                             Mark Confirmed

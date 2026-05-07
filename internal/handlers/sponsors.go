@@ -213,14 +213,14 @@ func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
 	if err != nil {
 		http.Error(w, "Unable to load sponsorships", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/sponsors/%s failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/sponsors failed: %s", conf.Tag, err.Error())
 		return
 	}
 
 	orgs, err := getters.ListOrgs(ctx.Notion)
 	if err != nil {
 		http.Error(w, "Unable to load orgs", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/sponsors/%s failed to load orgs: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/sponsors failed to load orgs: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -237,7 +237,7 @@ func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/sponsors/%s template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/sponsors template failed: %s", conf.Tag, err.Error())
 	}
 }
 
@@ -273,10 +273,10 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
 	err = getters.RegisterSponsorship(ctx.Notion, sp)
 	if err != nil {
-		ctx.Err.Printf("/admin/sponsors/%s/new failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/sponsors/new failed: %s", conf.Tag, err.Error())
 		http.Error(w, "Failed to create sponsorship", http.StatusInternalServerError)
 		return
 	}
 
-	http.Redirect(w, r, "/admin/sponsors/"+conf.Tag+"?flash=Sponsorship+created", http.StatusFound)
+	http.Redirect(w, r, "/" + conf.Tag + "/admin/sponsors"+"?flash=Sponsorship+created", http.StatusFound)
 }

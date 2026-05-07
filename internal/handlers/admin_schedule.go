@@ -48,14 +48,14 @@ func ScheduleConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 
 	page, err := buildSchedulePage(ctx, conf)
 	if err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule build: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/schedule build: %s", conf.Tag, err)
 		http.Error(w, "Unable to build schedule", http.StatusInternalServerError)
 		return
 	}
 	page.FlashMessage = r.URL.Query().Get("flash")
 
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/schedule.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule render: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/schedule render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -130,7 +130,7 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 			ProposalID: req.ProposalID,
 		})
 		if err != nil {
-			ctx.Err.Printf("/admin/conf/%s/schedule create conftalk: %s", conf.Tag, err)
+			ctx.Err.Printf("/%s/admin/schedule create conftalk: %s", conf.Tag, err)
 			http.Error(w, "create failed", http.StatusInternalServerError)
 			return
 		}
@@ -141,7 +141,7 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	endTime := startTime.Add(time.Duration(dur) * time.Minute)
 
 	if err := getters.UpdateConfTalkSchedule(ctx, confTalkID, req.Venue, startTime, endTime); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule update sched: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/schedule update sched: %s", conf.Tag, err)
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
@@ -193,7 +193,7 @@ func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	newEnd := ct.Sched.Start.Add(time.Duration(req.DurationMin) * time.Minute)
 	if err := getters.UpdateConfTalkSchedule(ctx, ct.ID, ct.Venue, ct.Sched.Start, newEnd); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule resize: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/schedule resize: %s", conf.Tag, err)
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
@@ -236,7 +236,7 @@ func ScheduleUnplace(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 	if err := getters.DeleteConfTalk(ctx, ct.ID); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule delete %s: %s", conf.Tag, ct.ID, err)
+		ctx.Err.Printf("/%s/admin/schedule delete %s: %s", conf.Tag, ct.ID, err)
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
@@ -278,7 +278,7 @@ func ScheduleAddTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 
 	flash := func(msg string) {
 		http.Redirect(w, r,
-			fmt.Sprintf("/admin/conf/%s/schedule?flash=%s", conf.Tag, url.QueryEscape(msg)),
+			fmt.Sprintf("/%s/admin/schedule?flash=%s", conf.Tag, url.QueryEscape(msg)),
 			http.StatusSeeOther)
 	}
 
@@ -307,7 +307,7 @@ func ScheduleAddTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		ScheduleForTag:  conf.Tag,
 		Status:          StatusAccepted,
 	}); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/schedule add-talk %q: %s", conf.Tag, title, err)
+		ctx.Err.Printf("/%s/admin/schedule add-talk %q: %s", conf.Tag, title, err)
 		flash("Couldn't add talk: " + err.Error())
 		return
 	}
@@ -366,9 +366,9 @@ func ScheduleAddHackathon(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 			Status:          StatusAccepted,
 		})
 		if err != nil {
-			ctx.Err.Printf("/admin/conf/%s/schedule add-hackathon %s: %s", conf.Tag, h.Title, err)
+			ctx.Err.Printf("/%s/admin/schedule add-hackathon %s: %s", conf.Tag, h.Title, err)
 			http.Redirect(w, r,
-				fmt.Sprintf("/admin/conf/%s/schedule?flash=%s", conf.Tag,
+				fmt.Sprintf("/%s/admin/schedule?flash=%s", conf.Tag,
 					url.QueryEscape("Couldn't add "+h.Title+": "+err.Error())),
 				http.StatusSeeOther)
 			return
@@ -382,7 +382,7 @@ func ScheduleAddHackathon(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		flash = "Hackathon proposals already exist for this conf — nothing added."
 	}
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/conf/%s/schedule?flash=%s", conf.Tag, url.QueryEscape(flash)),
+		fmt.Sprintf("/%s/admin/schedule?flash=%s", conf.Tag, url.QueryEscape(flash)),
 		http.StatusSeeOther)
 }
 

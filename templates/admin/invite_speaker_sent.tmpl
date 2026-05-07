@@ -9,7 +9,7 @@
   {{ block "mainnav" . }} {{ end }}
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
 
-    <a href="/admin/conf/{{ .Conf.Tag }}" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+    <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
 
     <div class="mt-3 bg-white shadow rounded-lg p-6">
       <div class="flex items-start gap-4">
@@ -43,11 +43,11 @@
       </div>
 
       <div class="mt-8 flex flex-wrap items-center gap-3">
-        <a href="/admin/conf/{{ .Conf.Tag }}/invite-speaker"
+        <a href="/{{ .Conf.Tag }}/admin/invite-speaker"
            class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">
           Invite another speaker
         </a>
-        <a href="/admin/applicants/{{ .Conf.Tag }}"
+        <a href="/{{ .Conf.Tag }}/admin/applicants"
            class="inline-flex items-center rounded-md bg-gray-100 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-200">
           View applicants
         </a>

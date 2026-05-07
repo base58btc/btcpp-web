@@ -596,11 +596,11 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 
         /* Internal pages */
-	r.HandleFunc("/vols/admin/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord", func(w http.ResponseWriter, r *http.Request) {
 		VolAdmin(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/vols/admin/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfVolcoord(w, r, app); id == nil {
 			return
 		}
@@ -615,60 +615,60 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 		params := mux.Vars(r)
 		confTag := params["conf"]
-		http.Redirect(w, r, "/vols/admin/"+confTag+"?flash=Shift+calendar+invites+sent", http.StatusFound)
+		http.Redirect(w, r, "/"+confTag+"/volcoord?flash=Shift+calendar+invites+sent", http.StatusFound)
 	}).Methods("GET", "POST")
 
-	r.HandleFunc("/vols/admin/{conf}/promote", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/promote", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminPromote(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/auto-assign", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/auto-assign", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminAutoAssign(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/shifts", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/shifts", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminShifts(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/vols/admin/{conf}/shifts/new", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/shifts/new", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminCreateShift(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/shifts/{shiftRef}/update", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/shifts/{shiftRef}/update", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateShift(w, r, app)
 	}).Methods("POST")
 
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminDetails(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/status", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/status", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateStatus(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/availability", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/availability", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateAvailability(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateWorkPrefs(w, r, app)
 	}).Methods("POST")
 
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/add-shift", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/add-shift", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminAddShift(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/remove-shift", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/remove-shift", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminRemoveShift(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/vol/{volRef}/scheduled", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/scheduled", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminMarkScheduled(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/vols/admin/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/volcoord/email", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
@@ -801,101 +801,101 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OrgDetail(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/sponsors/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/sponsors", func(w http.ResponseWriter, r *http.Request) {
 		SponsorshipsList(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/sponsors/{conf}/new", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/sponsors/new", func(w http.ResponseWriter, r *http.Request) {
 		SponsorshipCreate(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/social/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/social", func(w http.ResponseWriter, r *http.Request) {
 		SocialAdmin(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/social/{conf}/post", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/social/post", func(w http.ResponseWriter, r *http.Request) {
 		SocialPost(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/speakers/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/speakers", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdmin(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/speakers/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/speakers/email", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/registrations/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/registrations", func(w http.ResponseWriter, r *http.Request) {
 		RegistrationsAdmin(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/registrations/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/registrations/email", func(w http.ResponseWriter, r *http.Request) {
 		RegistrationsAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/applicants/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/applicants", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdmin(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin", func(w http.ResponseWriter, r *http.Request) {
 		OrganizerDashboard(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/", func(w http.ResponseWriter, r *http.Request) {
 		OrganizerDashboard(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/review", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/review", func(w http.ResponseWriter, r *http.Request) {
 		ReviewProposals(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/review/{proposalID}/{action}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/review/{proposalID}/{action}", func(w http.ResponseWriter, r *http.Request) {
 		ReviewProposalAction(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/proposal/{proposalID}/invite", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/proposal/{proposalID}/invite", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalInviteLink(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/proposal/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/proposal/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalRemoveSpeaker(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/conf/{conf}/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
 		AdminInviteSpeaker(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/invite-speaker", func(w http.ResponseWriter, r *http.Request) {
 		AdminInviteSpeakerSubmit(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/invite-speaker/sent", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/invite-speaker/sent", func(w http.ResponseWriter, r *http.Request) {
 		AdminInviteSpeakerSent(w, r, app)
 	}).Methods("GET")
 
-	r.HandleFunc("/admin/conf/{conf}/schedule", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleConf(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/admin/conf/{conf}/schedule/place", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule/place", func(w http.ResponseWriter, r *http.Request) {
 		SchedulePlace(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/schedule/unplace", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule/unplace", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleUnplace(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/schedule/resize", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule/resize", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleResize(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/schedule/add-hackathon", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule/add-hackathon", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleAddHackathon(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/conf/{conf}/schedule/add-talk", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/schedule/add-talk", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleAddTalk(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/applicants/{conf}/email", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/applicants/email", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdminBulkEmail(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/admin/applicants/{conf}/accept", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/applicants/accept", func(w http.ResponseWriter, r *http.Request) {
 		ProposalAdminAccept(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/applicants/{conf}/resend-tickets", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/applicants/resend-tickets", func(w http.ResponseWriter, r *http.Request) {
 		AdminResendSpeakerTickets(w, r, app)
 	}).Methods("POST")
-	r.HandleFunc("/admin/speakers/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/speakers/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
 		}
@@ -910,8 +910,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 		params := mux.Vars(r)
 		confTag := params["conf"]
-		http.Redirect(w, r, "/admin/speakers/"+confTag+"?flash=Calendar+invites+sent", http.StatusFound)
+		http.Redirect(w, r, "/"+confTag+"/admin/speakers?flash=Calendar+invites+sent", http.StatusFound)
 	}).Methods("GET", "POST")
+
+	// 301-redirect every legacy admin URL (/admin/conf/{tag}/...,
+	// /vols/admin/{tag}/..., etc.) to the new /{conf}/{role}/...
+	// shape. Registered last so it doesn't shadow live routes.
+	RegisterAdminRedirects(r)
 
 	// Create a file server to serve static files from the "static" directory
 	fs := http.FileServer(http.Dir("static"))
@@ -3297,14 +3302,14 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
 	if err != nil {
 		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s failed to get volunteers: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord failed to get volunteers: %s", conf.Tag, err.Error())
 		return
 	}
 
 	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s failed to get shifts: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord failed to get shifts: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -3356,13 +3361,13 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 
 	missiveList, err := getters.ListOnlyForLetters(ctx.Notion)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s failed to load missives: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord failed to load missives: %s", conf.Tag, err.Error())
 		// continue without missives
 	}
 
 	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s failed to load volinfo: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord failed to load volinfo: %s", conf.Tag, err.Error())
 		// continue without volinfo
 	}
 
@@ -3390,7 +3395,7 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord template failed: %s", conf.Tag, err.Error())
 	}
 }
 
@@ -3428,7 +3433,7 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 
 		err = getters.UpdateVolunteerStatus(ctx, vol.Ref, targetStatus)
 		if err != nil {
-			ctx.Err.Printf("/vols/admin/%s/promote failed to update %s: %s", conf.Tag, vol.Name, err.Error())
+			ctx.Err.Printf("/%s/volcoord/promote failed to update %s: %s", conf.Tag, vol.Name, err.Error())
 			continue
 		}
 
@@ -3436,7 +3441,7 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		if targetStatus == "PendingShifts" {
 			_, emailErr := emails.OnlyForVolSignup(ctx, vol, conf)
 			if emailErr != nil {
-				ctx.Err.Printf("/vols/admin/%s/promote email failed for %s: %s", conf.Tag, vol.Email, emailErr)
+				ctx.Err.Printf("/%s/volcoord/promote email failed for %s: %s", conf.Tag, vol.Email, emailErr)
 			}
 		}
 
@@ -3444,7 +3449,7 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	}
 
 	// Redirect back to admin page
-	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s", conf.Tag), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord", conf.Tag), http.StatusSeeOther)
 }
 
 func VolAdminAutoAssign(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -3461,14 +3466,14 @@ func VolAdminAutoAssign(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
 	if err != nil {
 		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s/auto-assign failed to get volunteers: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/auto-assign failed to get volunteers: %s", conf.Tag, err.Error())
 		return
 	}
 
 	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s/auto-assign failed to get shifts: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/auto-assign failed to get shifts: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -3484,10 +3489,10 @@ func VolAdminAutoAssign(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	err = volunteers.AssignShifts(ctx, eligibleVols, shifts)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/auto-assign failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/auto-assign failed: %s", conf.Tag, err.Error())
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s", conf.Tag), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord", conf.Tag), http.StatusSeeOther)
 }
 
 func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -3830,13 +3835,13 @@ func volAdminRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf, 
 	// instead of bouncing into the vol_details page. Only accept paths
 	// rooted at /vols/admin/<this-conf>/ to avoid open-redirect.
 	if ret := r.FormValue("return"); ret != "" {
-		prefix := fmt.Sprintf("/vols/admin/%s", conf.Tag)
+		prefix := fmt.Sprintf("/%s/volcoord", conf.Tag)
 		if strings.HasPrefix(ret, prefix+"/") || ret == prefix || strings.HasPrefix(ret, prefix+"?") {
 			http.Redirect(w, r, ret, http.StatusSeeOther)
 			return
 		}
 	}
-	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s/vol/%s", conf.Tag, volRef), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord/vol/%s", conf.Tag, volRef), http.StatusSeeOther)
 }
 
 func VolAdminUpdateStatus(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -4030,7 +4035,7 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	isTest := r.FormValue("send_test") == "1" && testEmail != ""
 
 	if len(volRefs) == 0 && !isTest {
-		http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=No+volunteers+selected", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=No+volunteers+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4056,7 +4061,7 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	// Pre-load shifts and volinfo so each send can include shift context
 	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/email failed to load shifts: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/email failed to load shifts: %s", conf.Tag, err.Error())
 	}
 	for _, v := range targets {
 		v.WorkShifts = getSelectedShifts(v, shifts)
@@ -4064,14 +4069,14 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
 	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/email failed to load volinfo: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/email failed to load volinfo: %s", conf.Tag, err.Error())
 	}
 
 	sent := 0
         title := r.FormValue("title")
         body := r.FormValue("body")
         if title == "" || body == "" {
-                http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+                http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
                 return
         }
 
@@ -4084,32 +4089,32 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 			testVol = allVols[0]
 		}
 		if testVol == nil {
-			http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=No+volunteers+available+for+test", conf.Tag), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=No+volunteers+available+for+test", conf.Tag), http.StatusSeeOther)
 			return
 		}
 		tv := *testVol
 		tv.Email = testEmail
 		_, err := emails.SendCustomToVol(ctx, &tv, conf, volinfo, title, body)
 		if err != nil {
-			ctx.Err.Printf("/vols/admin/%s/email test -> %s failed: %s", conf.Tag, testEmail, err)
-			http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			ctx.Err.Printf("/%s/volcoord/email test -> %s failed: %s", conf.Tag, testEmail, err)
+			http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
 		return
 	}
 
         for _, v := range targets {
                 _, err := emails.SendCustomToVol(ctx, v, conf, volinfo, title, body)
                 if err != nil {
-                        ctx.Err.Printf("/vols/admin/%s/email custom -> %s failed: %s", conf.Tag, v.Email, err)
+                        ctx.Err.Printf("/%s/volcoord/email custom -> %s failed: %s", conf.Tag, v.Email, err)
                         continue
                 }
                 sent++
         }
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+volunteers", sent, len(targets))
-	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 // parseShiftFormTimes turns a date (YYYY-MM-DD or 01/02/2006) plus two HH:MM
@@ -4170,20 +4175,20 @@ func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s/shifts failed to get shifts: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts failed to get shifts: %s", conf.Tag, err.Error())
 		return
 	}
 
 	jobs, err := getters.FetchJobsCached(ctx)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/shifts failed to fetch jobs: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts failed to fetch jobs: %s", conf.Tag, err.Error())
 	}
 
 	// Resolve all unique assignees → Volunteer for name display
 	volMap := make(map[string]*types.Volunteer)
 	allVols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/shifts failed to load vols: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts failed to load vols: %s", conf.Tag, err.Error())
 	}
 	for _, v := range allVols {
 		volMap[v.Ref] = v
@@ -4254,12 +4259,12 @@ func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/vols/admin/%s/shifts template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts template failed: %s", conf.Tag, err.Error())
 	}
 }
 
 func volAdminShiftsRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf) {
-	http.Redirect(w, r, fmt.Sprintf("/vols/admin/%s/shifts", conf.Tag), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord/shifts", conf.Tag), http.StatusSeeOther)
 }
 
 func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -4298,7 +4303,7 @@ func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 
 	err = getters.CreateShift(ctx, conf, jobType, name, start, end, uint(maxVols), uint(priority))
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/shifts/new failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts/new failed: %s", conf.Tag, err.Error())
 		http.Error(w, "Failed to create shift: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -4344,7 +4349,7 @@ func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 
 	err = getters.UpdateShift(ctx, shiftRef, name, jobType, start, end, uint(maxVols), uint(priority))
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/shifts/%s/update failed: %s", conf.Tag, shiftRef, err.Error())
+		ctx.Err.Printf("/%s/volcoord/shifts/%s/update failed: %s", conf.Tag, shiftRef, err.Error())
 		http.Error(w, "Failed to update shift: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -4428,7 +4433,7 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	talks, err := getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/speakers/%s failed to get talks: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/speakers failed to get talks: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -4492,7 +4497,7 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	if title == "" || body == "" {
-		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4501,7 +4506,7 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	isTest := r.FormValue("send_test") == "1" && testEmail != ""
 
 	if len(speakerRefs) == 0 && !isTest {
-		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+selected", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=No+speakers+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4538,18 +4543,18 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 			}
 		}
 		if testSpeaker == nil {
-			http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=No+speakers+available+for+test", conf.Tag), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=No+speakers+available+for+test", conf.Tag), http.StatusSeeOther)
 			return
 		}
 		ts := *testSpeaker
 		ts.Email = testEmail
 		_, err := emails.SendCustomToSpeaker(ctx, &ts, conf, testTalks, title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/speakers/%s/email test -> %s failed: %s", conf.Tag, testEmail, err)
-			http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			ctx.Err.Printf("/%s/admin/speakers/email test -> %s failed: %s", conf.Tag, testEmail, err)
+			http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
 		return
 	}
 
@@ -4563,14 +4568,14 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		}
 		_, err := emails.SendCustomToSpeaker(ctx, speaker, conf, speakerTalks[id], title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/speakers/%s/email -> %s failed: %s", conf.Tag, speaker.Email, err)
+			ctx.Err.Printf("/%s/admin/speakers/email -> %s failed: %s", conf.Tag, speaker.Email, err)
 			continue
 		}
 		sent++
 	}
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+speakers", sent, len(speakerRefs))
-	http.Redirect(w, r, fmt.Sprintf("/admin/speakers/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -4587,7 +4592,7 @@ func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	regs, err := getters.FetchRegistrations(ctx, conf.Ref)
 	if err != nil {
 		http.Error(w, "Unable to load registrations", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/registrations/%s failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/registrations failed: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -4633,7 +4638,7 @@ func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/registrations/%s template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/registrations template failed: %s", conf.Tag, err.Error())
 	}
 }
 
@@ -4654,7 +4659,7 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	if title == "" || body == "" {
-		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4662,7 +4667,7 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 	isTest := r.FormValue("send_test") == "1" && testEmail != ""
 
 	if len(selectedEmails) == 0 && !isTest {
-		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=No+attendees+selected", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=No+attendees+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4688,18 +4693,18 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 			testReg = regs[0]
 		}
 		if testReg == nil {
-			http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=No+registrations+available", conf.Tag), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=No+registrations+available", conf.Tag), http.StatusSeeOther)
 			return
 		}
 		tr := *testReg
 		tr.Email = testEmail
 		_, err := emails.SendCustomToAttendee(ctx, &tr, conf, title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/registrations/%s/email test failed: %s", conf.Tag, err)
-			http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
+			ctx.Err.Printf("/%s/admin/registrations/email test failed: %s", conf.Tag, err)
+			http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=Test+email+failed", conf.Tag), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
 		return
 	}
 
@@ -4718,14 +4723,14 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 		sentEmails[reg.Email] = true
 		_, err := emails.SendCustomToAttendee(ctx, reg, conf, title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/registrations/%s/email -> %s failed: %s", conf.Tag, reg.Email, err)
+			ctx.Err.Printf("/%s/admin/registrations/email -> %s failed: %s", conf.Tag, reg.Email, err)
 			continue
 		}
 		sent++
 	}
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+attendees", sent, len(selectedEmails))
-	http.Redirect(w, r, fmt.Sprintf("/admin/registrations/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/registrations?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -4742,7 +4747,7 @@ func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	rows, err := loadProposalRowsForConf(ctx, conf)
 	if err != nil {
 		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/applicants/%s failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/applicants failed: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -4769,7 +4774,7 @@ func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/applicants/%s template failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/applicants template failed: %s", conf.Tag, err.Error())
 	}
 }
 
@@ -4856,21 +4861,21 @@ func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.
 	r.ParseForm()
 	proposalRefs := r.Form["proposal_refs"]
 	if len(proposalRefs) == 0 {
-		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicants+selected", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=No+applicants+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
 	title := r.FormValue("title")
 	body := r.FormValue("body")
 	if title == "" || body == "" {
-		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
 	rows, err := loadProposalRowsForConf(ctx, conf)
 	if err != nil {
 		http.Error(w, "Unable to load applicants", http.StatusInternalServerError)
-		ctx.Err.Printf("/admin/applicants/%s/email failed: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/admin/applicants/email failed: %s", conf.Tag, err.Error())
 		return
 	}
 
@@ -4897,13 +4902,13 @@ func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.
 			testSpeaker.Email = testEmail
 			_, err := emails.SendCustomToProposalSpeaker(ctx, row.Proposal, &testSpeaker, conf, title, body)
 			if err != nil {
-				http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+email+failed:+%s", conf.Tag, err.Error()), http.StatusSeeOther)
+				http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Test+email+failed:+%s", conf.Tag, err.Error()), http.StatusSeeOther)
 				return
 			}
-			http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
+			http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Test+sent+to+%s", conf.Tag, testEmail), http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+applicant+selected+for+test", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=No+applicant+selected+for+test", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
@@ -4915,14 +4920,14 @@ func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.
 		}
 		_, err := emails.SendCustomToProposalSpeaker(ctx, row.Proposal, row.Speaker, conf, title, body)
 		if err != nil {
-			ctx.Err.Printf("/admin/applicants/%s/email -> %s failed: %s", conf.Tag, row.Speaker.Email, err)
+			ctx.Err.Printf("/%s/admin/applicants/email -> %s failed: %s", conf.Tag, row.Speaker.Email, err)
 			continue
 		}
 		sent++
 	}
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+applicants", sent, len(proposalRefs))
-	http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 }
 
 // ProposalAdminAccept flips a Proposal to Accepted and creates a ConfTalk row.
@@ -4942,15 +4947,15 @@ func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.App
 	r.ParseForm()
 	proposalID := r.FormValue("proposal_ref")
 	if proposalID == "" {
-		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=No+proposal+selected", conf.Tag), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=No+proposal+selected", conf.Tag), http.StatusSeeOther)
 		return
 	}
 
 	result, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
 	if err != nil {
-		ctx.Err.Printf("/admin/applicants/%s/accept (%s) failed: %s", conf.Tag, proposalID, err)
+		ctx.Err.Printf("/%s/admin/applicants/accept (%s) failed: %s", conf.Tag, proposalID, err)
 		flash := url.QueryEscape(fmt.Sprintf("Accept failed: %s", err.Error()))
-		http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, flash), http.StatusSeeOther)
 		return
 	}
 
@@ -4960,7 +4965,7 @@ func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.App
 	} else {
 		msg = "Accepted: created conf talk"
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, url.QueryEscape(msg)), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, url.QueryEscape(msg)), http.StatusSeeOther)
 }
 
 func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -4972,14 +4977,14 @@ func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/sendcal failed to get shifts: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/sendcal failed to get shifts: %s", conf.Tag, err.Error())
 		http.Error(w, "Unable to load shifts", http.StatusInternalServerError)
 		return
 	}
 
 	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
 	if err != nil {
-		ctx.Err.Printf("/vols/admin/%s/sendcal failed to get volunteers: %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/volcoord/sendcal failed to get volunteers: %s", conf.Tag, err.Error())
 		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
 		return
 	}

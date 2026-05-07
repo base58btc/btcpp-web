@@ -36,7 +36,7 @@ func AdminInviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		Year:                helpers.CurrentYear(),
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/invite_speaker.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker render: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -80,7 +80,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 		page.Form.AttachProposalID = attachProposalID
 		page.Form.TalkType = talkType
 		if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/invite_speaker.tmpl", page); err != nil {
-			ctx.Err.Printf("/admin/conf/%s/invite-speaker re-render: %s", conf.Tag, err)
+			ctx.Err.Printf("/%s/admin/invite-speaker re-render: %s", conf.Tag, err)
 		}
 	}
 
@@ -97,7 +97,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 	// look up by email; create a new row if neither matches.
 	speaker, err := resolveOrCreateSpeaker(ctx, speakerID, name, email)
 	if err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker resolve speaker: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker resolve speaker: %s", conf.Tag, err)
 		formErr("Couldn't look up or create the speaker — see logs.")
 		return
 	}
@@ -105,7 +105,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 	// 2. Resolve proposal: attach to existing or create a fresh one.
 	proposal, attachedToExisting, err := resolveOrCreateInvitedProposal(ctx, conf, speaker, attachProposalID, talkType)
 	if err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker resolve proposal: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker resolve proposal: %s", conf.Tag, err)
 		formErr("Couldn't create or attach the proposal — see logs.")
 		return
 	}
@@ -117,27 +117,27 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 		ProposalID: proposal.ID,
 	})
 	if err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker upsert speakerconf: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker upsert speakerconf: %s", conf.Tag, err)
 		formErr("Couldn't link speaker to conf — see logs.")
 		return
 	}
 	// Mirror the relation on the Proposal side so admin queues see the
 	// new co-speaker without waiting for a cache cycle.
 	if err := getters.AddSpeakerConfToProposal(ctx, proposal.ID, scID); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker add speakerconf to proposal: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker add speakerconf to proposal: %s", conf.Tag, err)
 		// non-fatal — Notion's two-way relation usually backfills
 	}
 
 	// 4. Stamp InvitedAt.
 	if err := getters.SetSpeakerConfInvitedAt(ctx, scID, time.Now()); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker stamp InvitedAt: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker stamp InvitedAt: %s", conf.Tag, err)
 	}
 
 	// 5. Mint an InviteToken if the proposal doesn't have one yet.
 	if proposal.InviteToken == "" {
 		proposal.InviteToken = helpers.MintInviteToken()
 		if err := getters.SetProposalInviteToken(ctx, proposal.ID, proposal.InviteToken); err != nil {
-			ctx.Err.Printf("/admin/conf/%s/invite-speaker set token: %s", conf.Tag, err)
+			ctx.Err.Printf("/%s/admin/invite-speaker set token: %s", conf.Tag, err)
 			formErr("Couldn't mint magic link — see logs.")
 			return
 		}
@@ -154,14 +154,14 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 	soloProposal := *proposal
 	soloProposal.SpeakerConfRefs = []string{scID}
 	if err := emails.SendOnlyForProposal(ctx, "talkinvited-direct", &soloProposal, conf); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker send letter: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker send letter: %s", conf.Tag, err)
 		// Non-fatal — the admin still gets the magic link to send manually.
 	}
 
 	// 7. Redirect (POST/redirect/GET) to the sent page so a refresh
 	// doesn't re-fire the invite.
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/conf/%s/invite-speaker/sent?proposal=%s&existing=%t",
+		fmt.Sprintf("/%s/admin/invite-speaker/sent?proposal=%s&existing=%t",
 			conf.Tag, proposal.ID, attachedToExisting),
 		http.StatusSeeOther)
 }
@@ -209,7 +209,7 @@ func AdminInviteSpeakerSent(w http.ResponseWriter, r *http.Request, ctx *config.
 		Year:               helpers.CurrentYear(),
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/invite_speaker_sent.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/invite-speaker/sent render: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/invite-speaker/sent render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }

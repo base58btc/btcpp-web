@@ -74,7 +74,7 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		Year:           helpers.CurrentYear(),
 	})
 	if err != nil {
-		ctx.Err.Printf("/admin/conf/%s render: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -118,7 +118,7 @@ func ReviewProposals(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	}
 
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/review_proposal.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/review render: %s", conf.Tag, err)
+		ctx.Err.Printf("/%s/admin/review render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -161,14 +161,14 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	if action.RunAcceptPipeline {
 		res, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
 		if err != nil {
-			ctx.Err.Printf("/admin/conf/%s/review accept pipeline: %s", conf.Tag, err)
+			ctx.Err.Printf("/%s/admin/review accept pipeline: %s", conf.Tag, err)
 			redirectReview(w, r, conf, proposalID, "Accept failed: "+err.Error())
 			return
 		}
 		freshAccept = !res.AlreadyAccepted
 	} else {
 		if err := getters.UpdateProposalStatus(ctx, proposalID, action.Status); err != nil {
-			ctx.Err.Printf("/admin/conf/%s/review update status %q: %s", conf.Tag, action.Status, err)
+			ctx.Err.Printf("/%s/admin/review update status %q: %s", conf.Tag, action.Status, err)
 			redirectReview(w, r, conf, proposalID, "Status update failed: "+err.Error())
 			return
 		}
@@ -185,7 +185,7 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		// Reject) fires its own letter. Best-effort — admin can
 		// re-fire from the email composer if the send blips.
 		if err := emails.SendOnlyForProposal(ctx, action.Letter, proposal, conf); err != nil {
-			ctx.Err.Printf("/admin/conf/%s/review send %s (continuing): %s", conf.Tag, action.Letter, err)
+			ctx.Err.Printf("/%s/admin/review send %s (continuing): %s", conf.Tag, action.Letter, err)
 		}
 	}
 
@@ -208,14 +208,14 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	next := nextProposalAfter(pending, proposalID)
 	if next != nil {
 		http.Redirect(w, r,
-			fmt.Sprintf("/admin/conf/%s/review?id=%s&flash=%s",
+			fmt.Sprintf("/%s/admin/review?id=%s&flash=%s",
 				conf.Tag, next.ID, url.QueryEscape(flash)),
 			http.StatusSeeOther)
 		return
 	}
 	// Queue empty — bounce to the conf dashboard with the success flash.
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/conf/%s/?flash=%s", conf.Tag, url.QueryEscape(flash+" Queue is now empty.")),
+		fmt.Sprintf("/%s/admin/?flash=%s", conf.Tag, url.QueryEscape(flash+" Queue is now empty.")),
 		http.StatusSeeOther)
 }
 
@@ -259,7 +259,7 @@ func AdminResendSpeakerTickets(w http.ResponseWriter, r *http.Request, ctx *conf
 
 			has, err := emailHasConfRegistration(ctx, email, conf.Ref)
 			if err != nil {
-				ctx.Err.Printf("/admin/applicants/%s/resend-tickets lookup %s: %s", conf.Tag, email, err)
+				ctx.Err.Printf("/%s/admin/applicants/resend-tickets lookup %s: %s", conf.Tag, email, err)
 				failed++
 				continue
 			}
@@ -274,7 +274,7 @@ func AdminResendSpeakerTickets(w http.ResponseWriter, r *http.Request, ctx *conf
 
 	flash := fmt.Sprintf("Resend tickets: issued=%d, skipped (already have one)=%d, failed=%d", issued, skipped, failed)
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/applicants/%s?flash=%s", conf.Tag, url.QueryEscape(flash)),
+		fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, url.QueryEscape(flash)),
 		http.StatusSeeOther)
 }
 
@@ -321,7 +321,7 @@ func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config
 	if proposal.InviteToken == "" {
 		token := helpers.MintInviteToken()
 		if err := getters.SetProposalInviteToken(ctx, proposalID, token); err != nil {
-			ctx.Err.Printf("/admin/conf/%s/proposal/%s/invite mint: %s", conf.Tag, proposalID, err)
+			ctx.Err.Printf("/%s/admin/proposal/%s/invite mint: %s", conf.Tag, proposalID, err)
 			redirectReview(w, r, conf, proposalID, "Couldn't mint invite link: "+err.Error())
 			return
 		}
@@ -341,7 +341,7 @@ func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config
 		Year:      helpers.CurrentYear(),
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/proposal_invite.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/proposal/%s/invite render: %s", conf.Tag, proposalID, err)
+		ctx.Err.Printf("/%s/admin/proposal/%s/invite render: %s", conf.Tag, proposalID, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -366,7 +366,7 @@ func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *con
 	speakerConfID := vars["speakerConfID"]
 
 	if err := getters.RemoveProposalFromSpeakerConf(ctx, speakerConfID, proposalID); err != nil {
-		ctx.Err.Printf("/admin/conf/%s/proposal/%s remove speaker %s: %s", conf.Tag, proposalID, speakerConfID, err)
+		ctx.Err.Printf("/%s/admin/proposal/%s remove speaker %s: %s", conf.Tag, proposalID, speakerConfID, err)
 		redirectReview(w, r, conf, proposalID, "Remove failed: "+err.Error())
 		return
 	}
@@ -524,7 +524,7 @@ func (a reviewAction) ActionKey() string { return a.actionKey() }
 
 func redirectReview(w http.ResponseWriter, r *http.Request, conf *types.Conf, proposalID, flash string) {
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/conf/%s/review?id=%s&flash=%s",
+		fmt.Sprintf("/%s/admin/review?id=%s&flash=%s",
 			conf.Tag, proposalID, url.QueryEscape(flash)),
 		http.StatusSeeOther)
 }
