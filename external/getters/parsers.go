@@ -294,6 +294,8 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		DateDesc:      parseRichText("DateDesc", props),
 		Location:      parseRichText("Location", props),
 		Venue:         parseRichText("Venue", props),
+		VenueMap:      props["VenueMap"].URL,
+		VenueWebsite:  props["VenueWebsite"].URL,
 		ShowAgenda:    parseCheckbox(props["Show Agenda"].Checkbox),
 		ShowHackathon: parseCheckbox(props["Show Hacks"].Checkbox),
 		ShowTalks:     parseCheckbox(props["Show Talks"].Checkbox),

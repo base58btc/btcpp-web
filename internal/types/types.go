@@ -55,6 +55,17 @@ type (
 		EndDate       time.Time
 		Location      string
 		Venue         string
+		// VenueMap is a Google Maps / OpenStreetMap link to the
+		// venue's location; rendered in the ticket email.
+		VenueMap      string
+		// VenueWebsite is the venue's official site; rendered in
+		// the ticket email so attendees can read about it directly.
+		VenueWebsite  string
+		// DoorsOpen is the human-readable check-in time string —
+		// not a Notion field, populated just-in-time by the ticket
+		// email sender before template render so the body can do
+		// {{ .Conf.DoorsOpen }} without round-tripping ConfInfo.
+		DoorsOpen     string
 		ShowAgenda    bool
 		ShowTalks     bool
 		ShowHackathon bool

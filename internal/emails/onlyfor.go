@@ -57,6 +57,7 @@ type (
 
         VolApp struct {
                 Name         string
+                Volunteer    *types.Volunteer
                 Conf         *types.Conf
                 VolInfo      *types.VolInfo
                 Email        string
@@ -151,6 +152,7 @@ func OnlyForVolApp(ctx *config.AppContext, vol *types.Volunteer, conf *types.Con
         onlyFor := "volapp"
         tmplData := &VolApp{
                 Name:         vol.Name,
+                Volunteer:    vol,
                 Conf:         conf,
                 VolInfo:      volinfo,
                 Email:        vol.Email,
@@ -370,6 +372,174 @@ func SendCustomToSpeaker(ctx *config.AppContext, speaker *types.Speaker, conf *t
 
         renderedTitle := templatizeTitle(title, tmplData)
         return sendOnlyFor(ctx, speaker.Email, letter, renderedTitle, buf)
+}
+
+// OnlyForTicket is the data shape passed to the "ticket" OnlyFor
+// letter — the per-recipient ticket-receipt email that fires from
+// the registration mailer. The PDF attachment is built upstream and
+// attached at send time, not via the template.
+type OnlyForTicket struct {
+        Conf          *types.Conf
+        Email         string
+        // URI is the site root (e.g. "https://btcpp.dev"). Used to
+        // build the absolute leading-image URL that the email body
+        // markdowns reference at the top of the message.
+        URI           string
+        // DayCount is the conference duration written out in
+        // English ("two", "three", …) so the email body reads
+        // naturally — populated by SendOnlyForTicket.
+        DayCount      string
+        DashboardLink string
+}
+
+// SendOnlyForTicket renders the "ticket" OnlyFor letter against
+// (conf, email) and dispatches it with `pdf` attached. Replaces the
+// per-conf templates/emails/{tag}.tmpl path that's been used for
+// every conference's ticket receipt to date — same delivery
+// pipeline (`ComposeAndSendMail` → mailer service), just with a
+// single Notion-stored letter instead of N hand-written templates.
+//
+// Pre-fills `conf.DoorsOpen` from `DoorsOpenDesc(ctx, conf)` so the
+// template body can reference {{ .Conf.DoorsOpen }} directly without
+// the caller round-tripping ConfInfo.
+//
+// `ticketID` is folded into the JobKey so the remote mailer's
+// idempotency layer dedupes per (recipient, ticket) and the cron
+// can re-run on a restart without double-sending.
+//
+// `uriOverride` lets test paths render with a different absolute
+// URL than the running app's GetURI() — e.g. a local dev box
+// emitting test ticket emails wants images sourced from
+// https://btcpp.dev so they actually render in the recipient's
+// inbox. Pass "" to use ctx.Env.GetURI() (the normal cron path).
+func SendOnlyForTicket(ctx *config.AppContext, conf *types.Conf, email string, pdf []byte, ticketID, uriOverride string) error {
+        if conf == nil {
+                return fmt.Errorf("SendOnlyForTicket: nil conf")
+        }
+        if email == "" {
+                return fmt.Errorf("SendOnlyForTicket: empty email")
+        }
+
+        // Mutate a SHALLOW COPY so DoorsOpen lives only on the
+        // template-data version — caching the cached *Conf with this
+        // value would leak per-render state.
+        confCopy := *conf
+        confCopy.DoorsOpen = DoorsOpenDesc(ctx, conf)
+
+        uri := uriOverride
+        if uri == "" {
+                uri = ctx.Env.GetURI()
+        }
+
+        data := &OnlyForTicket{
+                Conf:          &confCopy,
+                Email:         email,
+                URI:           uri,
+                DayCount:      englishCount(confDayCount(conf)),
+                DashboardLink: helpers.EmailLink(ctx, email, "/dashboard"),
+        }
+
+        letter, err := getters.GetLetterFor(ctx.Notion, "ticket")
+        if err != nil {
+                return fmt.Errorf("load ticket letter: %w", err)
+        }
+
+        var buf bytes.Buffer
+        if err := missiveTemplate(ctx, letter).Execute(&buf, data); err != nil {
+                return fmt.Errorf("render ticket letter: %w", err)
+        }
+        title := templatizeTitle(letter.Title, data)
+        if title == "" {
+                title = fmt.Sprintf("[%s] Your Conference Pass is Here!", conf.Desc)
+        }
+
+        htmlBody, err := BuildHTMLEmail(ctx, buf.Bytes())
+        if err != nil {
+                return fmt.Errorf("build html: %w", err)
+        }
+
+        // Attachment file naming mirrors the legacy SendTickets
+        // path (btcpp_{tag}_ticket_{shortid}.pdf) so existing
+        // archives + email-rule filters keep matching.
+        short := ticketID
+        if len(short) > 6 {
+                short = short[:6]
+        }
+        attachName := fmt.Sprintf("btcpp_%s_ticket_%s.pdf", conf.Tag, short)
+
+        // Per-recipient idempotency key: same (email, ticket) pair
+        // collapses on the mailer side regardless of restart noise.
+        jobKey := makeJobKeyRep(email, letter) + "-" + short
+
+        mail := &Mail{
+                JobKey:   jobKey,
+                Missive:  letter.Missive(),
+                Email:    email,
+                Title:    title,
+                SendAt:   time.Now(),
+                HTMLBody: htmlBody,
+                TextBody: buf.Bytes(),
+                Files: []*EmailFile{
+                        {PDF: pdf, Name: attachName},
+                },
+        }
+        ctx.Infos.Printf("Sending ticket (%s)%s to %s", jobKey, title, email)
+        return ComposeAndSendMail(ctx, mail)
+}
+
+// DoorsOpenDesc returns the human-readable check-in time for the
+// conf, sourced from ConfInfo[Day=1].Doors.Start. Falls back to
+// "9:00am" when no Day-1 ConfInfo row exists yet (or its Doors.Start
+// is zero-valued) so the email body still reads sensibly during
+// the early-conf-setup window.
+func DoorsOpenDesc(ctx *config.AppContext, conf *types.Conf) string {
+        const fallback = "9:00am"
+        if conf == nil || conf.Tag == "" {
+                return fallback
+        }
+        infos, err := getters.ListConfInfos(ctx, conf.Tag)
+        if err != nil {
+                ctx.Err.Printf("DoorsOpenDesc %s: list confinfos: %s", conf.Tag, err)
+                return fallback
+        }
+        for _, ci := range infos {
+                if ci != nil && ci.Day == 1 && ci.Doors != nil && !ci.Doors.Start.IsZero() {
+                        // 8:00 AM-style 12h clock; lowercase am/pm
+                        // so it reads casually in the email body.
+                        s := ci.Doors.Start.Format("3:04pm")
+                        return s
+                }
+        }
+        return fallback
+}
+
+// confDayCount returns the inclusive day count between StartDate
+// and EndDate. Defaults to 1 when EndDate isn't set so the email
+// body never reads "for zero days".
+func confDayCount(conf *types.Conf) int {
+        if conf == nil || conf.StartDate.IsZero() {
+                return 1
+        }
+        end := conf.EndDate
+        if end.IsZero() {
+                end = conf.StartDate
+        }
+        days := int(end.Sub(conf.StartDate).Hours()/24) + 1
+        if days < 1 {
+                return 1
+        }
+        return days
+}
+
+// englishCount returns small integers spelled out as English words —
+// "one" for 1, "two" for 2, etc. Up to ten covers every plausible
+// conference duration. Anything past ten falls back to digits.
+func englishCount(n int) string {
+        words := []string{"zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
+        if n >= 0 && n < len(words) {
+                return words[n]
+        }
+        return fmt.Sprintf("%d", n)
 }
 
 func execOnlyFor(ctx *config.AppContext, email, onlyFor string, tmplData interface{}) ([]byte, error) {

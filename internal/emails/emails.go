@@ -119,14 +119,15 @@ func SendMail(ctx *config.AppContext, rez *types.Registration) error {
 	if err != nil {
 		return err
 	}
-
-	tickets := make([]*types.Ticket, 1)
-	tickets[0] = &types.Ticket{
-		Pdf: pdf,
-		ID:  rez.RefID,
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		return err
 	}
-
-	return SendTickets(ctx, tickets, rez.ConfRef, rez.Email, time.Now())
+	conf := helpers.FindConfByRef(confs, rez.ConfRef)
+	if conf == nil {
+		return fmt.Errorf("SendMail: no conf for ref %s", rez.ConfRef)
+	}
+	return SendOnlyForTicket(ctx, conf, rez.Email, pdf, rez.RefID, "")
 }
 
 func TicketCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -461,38 +462,63 @@ func SendNewsletterSubEmail(ctx *config.AppContext, email, token, newsletter str
 	return mail.HTMLBody, ComposeAndSendMail(ctx, mail)
 }
 
+// SendMailTest fires a single ticket email through the OnlyFor
+// pipeline against the conf + email supplied as query params:
+//
+//   GET /trial-email?conf=atx25&email=you@example.com
+//
+// Defaults to conf=atx25 and email=niftynei@gmail.com so a bare
+// /trial-email hit still works for the maintainer's own inbox.
+// Each call uses a unique RefID (testticket-<unix>) so the remote
+// mailer's idempotency layer doesn't dedupe re-runs.
 func SendMailTest(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	confTag := r.URL.Query().Get("conf")
+	if confTag == "" {
+		confTag = "atx25"
+	}
+	email := r.URL.Query().Get("email")
+	if email == "" {
+		email = "niftynei@gmail.com"
+	}
+
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		http.Error(w, "load confs: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var conf *types.Conf
+	for _, c := range confs {
+		if c != nil && c.Tag == confTag {
+			conf = c
+			break
+		}
+	}
+	if conf == nil {
+		http.Error(w, "unknown conf tag: "+confTag, http.StatusNotFound)
+		return
+	}
+
+	refID := fmt.Sprintf("testticket-%d", time.Now().UTC().Unix())
 	reg := &types.Registration{
-		RefID:      "testticket",
+		RefID:      refID,
+		ConfRef:    conf.Ref,
 		Type:       "volunteer",
-		Email:      "niftynei@gmail.com",
+		Email:      email,
 		ItemBought: "bitcoin++",
 	}
-
-	sendMail(w, r, ctx, reg)
-}
-
-func sendMail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, reg *types.Registration) {
 	pdf, err := MakeTicketPDF(ctx, reg)
-
 	if err != nil {
-		http.Error(w, "Unable to make ticket, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/send test mail failed ! %s", err.Error())
+		http.Error(w, "make pdf: "+err.Error(), http.StatusInternalServerError)
+		ctx.Err.Printf("/trial-email pdf: %s", err)
 		return
 	}
-
-	tickets := make([]*types.Ticket, 1)
-	tickets[0] = &types.Ticket{
-		Pdf: pdf,
-		ID:  reg.RefID,
-	}
-
-	err = SendTickets(ctx, tickets, reg.ConfRef, reg.Email, time.Now())
-
-	/* Return the error */
-	if err != nil {
-		http.Error(w, "Unable to send ticket, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/send test mail failed to send! %s", err.Error())
+	// Test emails always use the prod URI for image links so they
+	// render in the recipient's inbox even when this build is
+	// running locally on http://localhost:8080.
+	if err := SendOnlyForTicket(ctx, conf, email, pdf, refID, "https://btcpp.dev"); err != nil {
+		http.Error(w, "send: "+err.Error(), http.StatusInternalServerError)
+		ctx.Err.Printf("/trial-email send: %s", err)
 		return
 	}
+	fmt.Fprintf(w, "sent test ticket for %s to %s (refID=%s)\n", confTag, email, refID)
 }
