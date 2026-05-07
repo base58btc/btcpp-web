@@ -56,6 +56,32 @@
             </section>
             {{ end }}
 
+            <!-- Dashboard: shift coverage at a glance -->
+            {{ with .Stats }}
+            <section id="dashboard" class="mb-6">
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="bg-white shadow rounded-lg px-4 py-3">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts filled</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .ShiftsFilled }}<span class="text-sm font-normal text-gray-500"> / {{ .ShiftsTotal }}</span></p>
+                    </div>
+                    <div class="bg-white shadow rounded-lg px-4 py-3">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts left</p>
+                        <p class="mt-1 text-2xl font-semibold {{ if gt .ShiftsLeft 0 }}text-amber-600{{ else }}text-green-600{{ end }}">{{ .ShiftsLeft }}</p>
+                    </div>
+                    <div class="bg-white shadow rounded-lg px-4 py-3">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Unscheduled vols</p>
+                        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .UnscheduledVols }}</p>
+                        <p class="text-xs text-gray-500">Applied + Pending Shifts</p>
+                    </div>
+                    <div class="bg-white shadow rounded-lg px-4 py-3">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Vols still needed</p>
+                        <p class="mt-1 text-2xl font-semibold {{ if gt .VolsNeeded .UnscheduledVols }}text-red-600{{ else if gt .VolsNeeded 0 }}text-amber-600{{ else }}text-green-600{{ end }}">{{ .VolsNeeded }}</p>
+                        <p class="text-xs text-gray-500">@ 3 shifts each</p>
+                    </div>
+                </div>
+            </section>
+            {{ end }}
+
             <!-- Status Filter -->
             <section id="filters" class="mb-6">
                 <div class="bg-white shadow rounded-lg px-4 py-4 sm:px-6">
@@ -149,13 +175,13 @@
                                     </th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signal</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">From</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shifts</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
-                                    <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
@@ -182,13 +208,7 @@
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{{ .Status }}</span>
                                         {{ end }}
                                     </td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Email }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Signal }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Phone }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Hometown }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500">{{ len .WorkShifts }}</td>
-                                    <td class="px-4 py-2 text-sm text-gray-500 max-w-xs truncate" title="{{ .Comments }}">{{ .Comments }}</td>
-                                    <td class="px-4 py-2 text-right whitespace-nowrap">
+                                    <td class="px-4 py-2 whitespace-nowrap">
                                         {{ $returnURL := printf "/vols/admin/%s" $.Conf.Tag }}
                                         {{ if $.StatusFilter }}{{ $returnURL = printf "%s?status=%s" $returnURL $.StatusFilter }}{{ end }}
                                         {{ $statusURL := printf "/vols/admin/%s/vol/%s/status?return=%s" $.Conf.Tag .Ref (urlquery $returnURL) }}
@@ -230,6 +250,12 @@
                                             {{ end }}
                                         </span>
                                     </td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Email }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Signal }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Phone }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ .Hometown }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500">{{ len .WorkShifts }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-500 max-w-xs truncate" title="{{ .Comments }}">{{ .Comments }}</td>
                                 </tr>
                                 {{ end }}
                             </tbody>

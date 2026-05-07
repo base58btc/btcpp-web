@@ -444,7 +444,25 @@ type VolAdminPage struct {
         FlashMessage    string
         Year            uint
         EmailCompose    *EmailComposeData
+        Stats           *VolAdminStats
 }
+
+// VolAdminStats are derived shift+volunteer counts shown in the
+// dashboard at the top of the admin page. Always computed against
+// the *unfiltered* volunteer list so the numbers stay stable as the
+// user clicks status-filter chips.
+type VolAdminStats struct {
+        ShiftsFilled    int // assignment count, summed across all shifts
+        ShiftsTotal     int // sum of WorkShift.MaxVols
+        ShiftsLeft      int // ShiftsTotal - ShiftsFilled
+        UnscheduledVols int // # of vols in Applied or PendingShifts
+        VolsNeeded      int // ceil(ShiftsLeft / VolShiftQuota)
+}
+
+// VolShiftQuota is the per-volunteer shift-count target used to
+// translate "shifts left to fill" into "volunteers still needed."
+// Mirrors the auto-assign default (3 shifts per vol).
+const VolShiftQuota = 3
 
 type ShiftDayGroup struct {
         Date     string             // "01/02/2006"

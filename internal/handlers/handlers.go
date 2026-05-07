@@ -3319,6 +3319,10 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return a.Before(*b)
 	})
 
+	// Compute dashboard stats from the *unfiltered* volunteer list so
+	// the headline numbers don't shift when admins click filter chips.
+	stats := computeVolAdminStats(vols, shifts)
+
 	statusFilter := r.URL.Query().Get("status")
 
 	// Filter by status if requested
@@ -3353,6 +3357,7 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		Missives:     missiveList,
 		FlashMessage: r.URL.Query().Get("flash"),
 		Year:         helpers.CurrentYear(),
+		Stats:        stats,
 		EmailCompose: &EmailComposeData{
 			Title:            "Email Selected Volunteers",
 			Description:      "Write a one-off email to volunteers. Uses Go template syntax.",
@@ -3768,6 +3773,41 @@ func VolAdminDetails(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
 		ctx.Err.Printf("vol admin details template failed: %s", err.Error())
 	}
+}
+
+// computeVolAdminStats sums shift capacity vs assignments and counts
+// volunteers still in pre-scheduled states. VolsNeeded is ceil-divided
+// by VolShiftQuota so a 15-spot gap with a 3-shift quota reads as 5
+// vols needed (matching the user-facing wording).
+func computeVolAdminStats(vols []*types.Volunteer, shifts []*types.WorkShift) *VolAdminStats {
+	s := &VolAdminStats{}
+	for _, sh := range shifts {
+		if sh == nil {
+			continue
+		}
+		s.ShiftsTotal += int(sh.MaxVols)
+		assigned := len(sh.AssigneesRef)
+		if assigned > int(sh.MaxVols) {
+			assigned = int(sh.MaxVols)
+		}
+		s.ShiftsFilled += assigned
+	}
+	s.ShiftsLeft = s.ShiftsTotal - s.ShiftsFilled
+	if s.ShiftsLeft < 0 {
+		s.ShiftsLeft = 0
+	}
+	for _, v := range vols {
+		if v == nil {
+			continue
+		}
+		if v.Status == "Applied" || v.Status == "PendingShifts" {
+			s.UnscheduledVols++
+		}
+	}
+	if s.ShiftsLeft > 0 && VolShiftQuota > 0 {
+		s.VolsNeeded = (s.ShiftsLeft + VolShiftQuota - 1) / VolShiftQuota
+	}
+	return s
 }
 
 func volAdminRedirect(w http.ResponseWriter, r *http.Request, conf *types.Conf, volRef string) {
