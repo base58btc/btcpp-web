@@ -141,9 +141,11 @@ type SpeakerPage struct {
         // title/description/length. Detected via a placeholder-string
         // check on the Proposal's Title.
         EditTalkContent bool
-        // IsInvited surfaces the explicit "Accept Invitation" button
-        // alongside the regular Save submit. Set when Proposal.Status
-        // is "Invited"; the button POSTs to /dashboard/talks/{id}/accept-invite?t={token}.
+        // IsInvited relabels the form's submit button to "Accept
+        // invitation" (with green styling) when the proposal is in
+        // Invited status. The submit target stays /invite-speaker/{id};
+        // the POST handler runs the accept pipeline inline after a
+        // successful save, so saving and accepting are one click.
         IsInvited bool
 
         Year uint

@@ -491,28 +491,19 @@
                 </div>
                 <div class="mt-10">
                     <button type="submit"
-                    class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-bitcoin px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-bitcoin focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin disabled:opacity-60 disabled:cursor-wait">
+                    class="inline-flex w-full items-center justify-center gap-2 rounded-md {{ if and .InviteMode .IsInvited }}bg-green-600 hover:bg-green-700 focus-visible:outline-green-600{{ else }}bg-bitcoin hover:bg-bitcoin focus-visible:outline-bitcoin{{ end }} px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-60 disabled:cursor-wait">
                         <svg class="submit-spinner h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                         </svg>
-                        <span class="submit-label-idle">{{ if .InviteMode }}{{ if .EditTalkContent }}Save talk details{{ else }}Add me as a co-speaker{{ end }}{{ else }}Submit Application{{ end }}</span>
+                        <span class="submit-label-idle">{{ if .InviteMode }}{{ if .IsInvited }}Accept invitation{{ else }}Add me as a co-speaker{{ end }}{{ else }}Submit Application{{ end }}</span>
                         <span class="submit-label-busy">Submitting…</span>
                     </button>
+                    {{ if and .InviteMode .IsInvited }}
+                    <p class="mt-2 text-center text-xs text-gray-500">Saves your details and locks the talk in. We'll email a confirmation and issue your speaker ticket.</p>
+                    {{ end }}
                 </div>
             </form>
-            {{ if and .InviteMode .IsInvited }}
-            <form method="POST"
-                  action="/dashboard/talks/{{ .Proposal.ID }}/accept-invite?t={{ .InviteToken }}"
-                  class="mx-auto mt-4 max-w-xl">
-                <button type="submit"
-                        onclick="return confirm('Accept this invitation? This sends the confirmation email and issues your speaker ticket.');"
-                        class="inline-flex w-full items-center justify-center gap-2 rounded-md bg-green-600 px-3.5 py-2.5 text-center text-sm font-semibold text-white shadow-sm hover:bg-green-700">
-                    Accept invitation
-                </button>
-                <p class="mt-2 text-center text-xs text-gray-500">Save first if you've changed any details — accepting locks the talk in.</p>
-            </form>
-            {{ end }}
             <div id="result" class="mt-5 mx-auto max-w-xl text-red-700 scroll-mt-24">
             </div>
         </div>

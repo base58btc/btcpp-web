@@ -795,52 +795,6 @@ func DashboardAcceptInvite(w http.ResponseWriter, r *http.Request, ctx *config.A
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
 }
 
-// AcceptInviteByToken is the InviteToken-gated parallel to
-// DashboardAcceptInvite — the speaker the admin invited may not have
-// an HMAC-authenticated dashboard link yet (their email may not match
-// any pre-existing magic-link), so they accept via the same token
-// that gates /invite-speaker. The token is matched constant-time
-// against proposal.InviteToken; rotating or clearing the field in
-// Notion revokes acceptance ability the same way it revokes the
-// share link.
-func AcceptInviteByToken(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	proposalID := mux.Vars(r)["proposalID"]
-	token := r.URL.Query().Get("t")
-
-	proposal, err := getters.GetProposal(ctx, proposalID)
-	if err != nil || proposal == nil {
-		http.Error(w, "Talk not found.", http.StatusNotFound)
-		return
-	}
-	if token == "" || proposal.InviteToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(proposal.InviteToken)) != 1 {
-		http.Error(w, "Invalid or revoked invite link.", http.StatusForbidden)
-		return
-	}
-	if proposal.Status != "Invited" && proposal.Status != StatusAccepted {
-		http.Error(w, "This talk isn't currently invited — nothing to accept.", http.StatusGone)
-		return
-	}
-
-	res, err := newAcceptPipeline(ctx).AcceptProposal(proposalID)
-	if err != nil {
-		ctx.Err.Printf("/dashboard accept-invite pipeline: %s", err)
-		http.Error(w, "accept failed", http.StatusInternalServerError)
-		return
-	}
-	if !res.AlreadyAccepted {
-		// fanoutAcceptedProposal sends talkconfirmed + issues comp
-		// tickets + stamps AcceptedAt on each SpeakerConf.
-		fanoutAcceptedProposal(ctx, proposal, proposal.ScheduleFor)
-	}
-
-	// Bounce back to the magic-link page so the speaker sees the
-	// post-accept state (status now "Accepted", Accept button gone).
-	q := url.Values{}
-	q.Set("t", token)
-	q.Set("flash", "accepted")
-	http.Redirect(w, r, "/invite-speaker/"+proposalID+"?"+q.Encode(), http.StatusSeeOther)
-}
-
 // DashboardInviteCoSpeaker renders the inviter-side "share a link"
 // page: confirms which talk the invite is for and shows the URL the
 // existing speaker copies to send their co-speaker.
@@ -1124,14 +1078,43 @@ func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 		ctx.Err.Printf("/invite-speaker newsletter sub (continuing): %s", err)
 	}
 
-	// HTMX swaps innerHTML of #result with this content; we render a
-	// success message that includes a link to the dashboard so the
-	// user can keep going.
+	// Auto-accept when the proposal is in Invited status. The
+	// magic-link form's submit button is the only Accept affordance
+	// — saving and accepting are the same click, so the speaker
+	// can't end up half-onboarded.
+	accepted := false
+	if proposal.Status == "Invited" {
+		acceptRes, acceptErr := newAcceptPipeline(ctx).AcceptProposal(proposal.ID)
+		if acceptErr != nil {
+			ctx.Err.Printf("/invite-speaker accept pipeline: %s", acceptErr)
+			// Non-fatal: the form data was saved. The admin can
+			// flip the status manually if needed.
+		} else if !acceptRes.AlreadyAccepted {
+			// fanoutAcceptedProposal sends talkconfirmed, issues
+			// comp speaker tickets, and stamps AcceptedAt on each
+			// SpeakerConf attached to the proposal.
+			fanoutAcceptedProposal(ctx, proposal, conf)
+			accepted = true
+		}
+	}
+
+	// HTMX swaps innerHTML of #result with this content. The success
+	// message branches on whether we promoted to Accepted on this
+	// click — accepted speakers get a "ticket on the way" line; the
+	// fallback (already-Accepted, or non-Invited share-link adds)
+	// lands on the dashboard.
 	dashURL := helpers.EmailLink(ctx, talkapp.Email, "/dashboard")
-	w.Write([]byte(helpers.SuccessApp(fmt.Sprintf(
-		`You've been added to "%s"! <a href="%s" class="underline font-semibold">Open your dashboard &rarr;</a>`,
-		proposal.Title, dashURL,
-	))))
+	if accepted {
+		w.Write([]byte(helpers.SuccessApp(fmt.Sprintf(
+			`Locked in! "%s" is confirmed and your speaker ticket is on the way. <a href="%s" class="underline font-semibold">Open your dashboard &rarr;</a>`,
+			proposal.Title, dashURL,
+		))))
+	} else {
+		w.Write([]byte(helpers.SuccessApp(fmt.Sprintf(
+			`You've been added to "%s"! <a href="%s" class="underline font-semibold">Open your dashboard &rarr;</a>`,
+			proposal.Title, dashURL,
+		))))
+	}
 }
 
 // alreadyOnProposal reports whether the email is already linked to this
