@@ -697,6 +697,12 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/api/speakers/search", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerSearch(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/api/speakers/{speakerID}/roles", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerRolesGet(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/admin/roles", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerRolesUpdate(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

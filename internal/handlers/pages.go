@@ -228,6 +228,12 @@ type DashboardPage struct {
 
         FlashMessage string
 
+        // IsGlobalAdmin gates the role-management panel — only a
+        // global-admin can edit other speakers' Roles. Other admin
+        // surfaces (the per-conf Admin button on conf cards) are
+        // gated by EventBlock.AdminRole, not this flag.
+        IsGlobalAdmin bool
+
         Year uint
 }
 
@@ -370,6 +376,11 @@ type EventBlock struct {
         // CTA inside the block alongside any tickets the user already
         // has.
         CanBuy bool
+        // AdminRole is set to "admin" or "volcoord" when the user has
+        // a matching role for this conf — drives the "Admin" / "Vol
+        // coord" link on the conf card. Empty when the user has no
+        // admin relationship with the event.
+        AdminRole string
 }
 
 type DashboardStats struct {

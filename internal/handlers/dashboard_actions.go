@@ -85,6 +85,63 @@ func SpeakerSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 }
 
+// SpeakerRolesGet returns the Roles slice for a speaker by ID, as
+// JSON `{roles: [...]}`. Used by the dashboard's role-manager
+// autocomplete to pre-fill existing tags. Caller must be a
+// global-admin — this leaks role memberships otherwise.
+func SpeakerRolesGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	id := auth.RequireOptional(r, ctx)
+	if id == nil || !id.IsGlobalAdmin() {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	speakerID := mux.Vars(r)["speakerID"]
+	for _, s := range getters.AllCachedSpeakers() {
+		if s != nil && s.ID == speakerID {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{"roles": s.Roles})
+			return
+		}
+	}
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// SpeakerRolesUpdate writes the Roles multi-select on a Speakers row.
+// POST form: speakerID + roles (comma-separated tags). Caller must be
+// global-admin. Redirects back to /dashboard with a flash.
+func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	id := auth.RequireOptional(r, ctx)
+	if id == nil || !id.IsGlobalAdmin() {
+		http.Error(w, "Forbidden — only a global-admin can edit roles.", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	speakerID := strings.TrimSpace(r.FormValue("speakerID"))
+	if speakerID == "" {
+		http.Error(w, "missing speakerID", http.StatusBadRequest)
+		return
+	}
+	rolesRaw := r.FormValue("roles")
+	var roles []string
+	for _, t := range strings.Split(rolesRaw, ",") {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		roles = append(roles, t)
+	}
+	if err := getters.UpdateSpeakerRoles(ctx.Notion, speakerID, roles); err != nil {
+		ctx.Err.Printf("/dashboard/admin/roles update %s: %s", speakerID, err)
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	ctx.Infos.Printf("/dashboard/admin/roles %s set roles for %s → %v", id.Email, speakerID, roles)
+	http.Redirect(w, r, "/dashboard?flash="+url.QueryEscape("Roles updated."), http.StatusSeeOther)
+}
+
 // dashboardAuthForProposal validates the magic-link HMAC and confirms the
 // authed email is one of the speakers on the given proposal. Returns the
 // proposal, the user's SpeakerConf for it, and the encoded HMAC/email so

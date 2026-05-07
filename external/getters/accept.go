@@ -181,6 +181,42 @@ func UpdateSpeaker(n *types.Notion, speakerID string, up SpeakerUpdate) error {
 	return err
 }
 
+// AllCachedSpeakers returns the in-memory Speaker slice. Read-only
+// access for callers outside the package — exposed so the dashboard's
+// role manager can look up a Speaker by ID without hammering Notion.
+// Don't mutate the returned slice.
+func AllCachedSpeakers() []*types.Speaker {
+	return cacheSpeakers
+}
+
+// UpdateSpeakerRoles overwrites the Roles multi-select on a Speakers
+// row. Used by the dashboard's global-admin role manager. Roles are
+// the per-conf admin tags ("vienna-admin", "global-volcoord", ...);
+// see the auth package for the parsing/coverage rules. Caller is
+// responsible for whatever authorization gate (this function trusts
+// its input).
+func UpdateSpeakerRoles(n *types.Notion, speakerID string, roles []string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), speakerID,
+		map[string]*notion.PropertyValue{
+			"Roles": multiSelectValue(roles),
+		})
+	if err != nil {
+		return err
+	}
+	// Patch the warm cache so the next request sees the new role set
+	// without waiting for a periodic refresh tick. The cached pointer
+	// survives across cache rebuilds in practice, but mutating in
+	// place is still the right move because the role lookup goes
+	// through GetSpeakersByEmail → cacheSpeakers.
+	for _, s := range cacheSpeakers {
+		if s != nil && s.ID == speakerID {
+			s.Roles = append(s.Roles[:0], roles...)
+			break
+		}
+	}
+	return nil
+}
+
 // MergeUniqueTags returns existing followed by any additions not already in
 // existing. Order-preserving dedupe — used for Conference multiselect merges.
 func MergeUniqueTags(existing, additions []string) []string {

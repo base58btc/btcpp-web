@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
@@ -189,6 +190,29 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if len(speakers) > 0 {
 		topSpeaker = speakers[0]
 	}
+	// Decorate event blocks with the user's admin role for each conf
+	// — drives the "Admin" / "Vol coord" link on conf cards. Build
+	// once per request from the topSpeaker's Roles list. globalAdmin
+	// also gates the role-manager panel below.
+	var idRoles []auth.Role
+	if topSpeaker != nil {
+		idRoles = auth.ParseRoles(topSpeaker.Roles)
+	}
+	id := &auth.Identity{Speaker: topSpeaker, Roles: idRoles}
+	if topSpeaker != nil {
+		id.Email = topSpeaker.Email
+	}
+	for _, b := range activeBlocks {
+		if b == nil || b.Conf == nil {
+			continue
+		}
+		switch {
+		case id.HasRoleForConf(b.Conf.Tag, auth.RoleAdmin):
+			b.AdminRole = auth.RoleAdmin
+		case id.HasRoleForConf(b.Conf.Tag, auth.RoleVolcoord):
+			b.AdminRole = auth.RoleVolcoord
+		}
+	}
 	var hasUpTalk, hasUpVol bool
 	for _, b := range activeBlocks {
 		if b == nil {
@@ -224,6 +248,7 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		HasUpcomingTalk:  hasUpTalk,
 		HasUpcomingVol:   hasUpVol,
 		FlashMessage:     r.URL.Query().Get("flash"),
+		IsGlobalAdmin:    id.IsGlobalAdmin(),
 		Year:             helpers.CurrentYear(),
 	})
 	if err != nil {
