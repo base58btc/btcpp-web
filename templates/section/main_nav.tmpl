@@ -180,9 +180,8 @@
 {{ end }}
 
 {{/*
-  nav_conf_card — one tile in the desktop "Events" flyout. Compact
-  layout (emoji + title + tagline) so the flyout fits ~20+ confs in a
-  4-column grid without scrolling.
+  nav_conf_card — one tile in the desktop "Events" flyout. Three
+  lines: title / tagline / date.
 */}}
 {{ define "nav_conf_card" }}
 <a href="/conf/{{ .Tag }}" class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
@@ -190,8 +189,9 @@
     {{ .EmojiOrDefault }}
   </div>
   <div class="min-w-0 flex-1">
-    <div class="font-semibold text-gray-900 truncate">{{ .Desc }} | {{ .DateDesc }}</div>
+    <div class="font-semibold text-gray-900 truncate">{{ .Desc }}</div>
     {{ if .Tagline }}<p class="mt-0.5 text-xs text-gray-600 truncate">{{ .Tagline }}</p>{{ end }}
+    {{ if .DateDesc }}<p class="mt-0.5 text-xs text-gray-500 truncate">{{ .DateDesc }}</p>{{ end }}
   </div>
 </a>
 {{ end }}
