@@ -51,7 +51,7 @@
                     {{ end }}
                   </div>
                 </div>
-                <div class="mt-4 sm:mt-0 flex justify-center sm:justify-end shrink-0">
+                <div class="mt-4 sm:mt-0 flex justify-center sm:justify-end shrink-0 gap-2">
                   {{ if .Speaker }}
                   <a href="/dashboard/speaker?hr={{ .HMAC }}&em={{ .Email }}"
                      class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50">
@@ -63,6 +63,12 @@
                     + Create profile
                   </a>
                   {{ end }}
+                  <form method="POST" action="/logout" class="inline">
+                    <button type="submit"
+                            class="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-md border border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-gray-700">
+                      Sign out
+                    </button>
+                  </form>
                 </div>
               </div>
             </div>
