@@ -8,7 +8,8 @@
 <body class="bg-gray-50">
   {{ block "mainnav" . }} {{ end }}
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
-    <div class="flex items-center gap-4">
+    <a href="/dashboard" class="text-xs text-gray-500 hover:text-gray-700">&larr; Back to all events</a>
+    <div class="mt-2 flex items-center gap-4">
       <div class="text-3xl">{{ .Conf.EmojiOrDefault }}</div>
       <div class="flex-1">
         <h1 class="text-2xl font-bold text-gray-900">{{ .Conf.Desc }}</h1>
