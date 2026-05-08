@@ -218,11 +218,18 @@ func run(env *types.EnvConfig) error {
 	// for the legacy CheckPin model (one shared PIN, re-typed
 	// after every restart) but a regression for the magic-link
 	// auth flow where a restart silently logs everyone out.
+	// No defer Close — the DB lives for the lifetime of the
+	// process. A defer here would fire when run() returns (i.e.
+	// before the HTTP server even starts handling requests),
+	// shuttering the store and breaking every session-touching
+	// route with "database not open." On process exit the OS
+	// reclaims the file handle; bbolt's mmap+commit format is
+	// crash-consistent, so an unclean shutdown is recoverable on
+	// the next open.
 	sessDB, err := bolt.Open("sessions.bolt", 0600, &bolt.Options{Timeout: 5 * time.Second})
 	if err != nil {
 		app.Err.Fatalf("open sessions.bolt: %s", err)
 	}
-	defer sessDB.Close()
 	app.Session = scs.New()
 	app.Session.Lifetime = 4 * 24 * time.Hour
 	app.Session.Cookie.Persist = true
