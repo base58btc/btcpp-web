@@ -13,7 +13,7 @@ import (
 
 const CHARGES_ENDPOINT string = "/charges"
 
-func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string, subNewsletter bool) (*types.OpenNodePayment, error) {
+func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice, preDiscountPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string, subNewsletter bool) (*types.OpenNodePayment, error) {
 
 	metadata := &types.OpenNodeMetadata{
 		Email:            email,
@@ -24,7 +24,10 @@ func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice uint, tix *types.Conf
 		/* We have to save it b/c OpenNode doesnt */
 		Currency:         tix.Currency,
 		Subscribe:        subNewsletter,
-		PreDiscountCents: int64(tixPrice) * 100,
+		// Pre-discount per-ticket price in the buyer's selected
+		// currency (BTC / USD / Local). tixPrice here is the post-
+		// discount form value; preDiscountPrice is the original tier.
+		PreDiscountCents: int64(preDiscountPrice) * 100,
 	}
 
 	domain := ctx.Env.GetURI()

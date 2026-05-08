@@ -1051,6 +1051,29 @@ func affiliateSessionKey(confTag string) string {
 	return "aff:" + confTag
 }
 
+// affiliateMath returns (savedCents, earnedCents) for one checkout.
+// preDiscountPerTicket is the per-ticket price the buyer was quoted
+// BEFORE any discount, in cents (or sats — the math is unit-agnostic).
+// count is the number of tickets in the entry. paidTotal is what the
+// buyer actually paid (Stripe AmountTotal / OpenNode equivalent), in
+// the same unit. The 20% ceiling is fixed: affiliates earn whatever's
+// left after the buyer's actual savings come out of that ceiling.
+// Both outputs are floored at zero to avoid negatives leaking into
+// Notion (rounding noise from currency conversion / fee math).
+func affiliateMath(preDiscountPerTicket, count, paidTotal int64) (savedCents, earnedCents int64) {
+	originalCents := preDiscountPerTicket * count
+	ceilingCents := originalCents * 20 / 100
+	savedCents = originalCents - paidTotal
+	if savedCents < 0 {
+		savedCents = 0
+	}
+	earnedCents = ceilingCents - savedCents
+	if earnedCents < 0 {
+		earnedCents = 0
+	}
+	return savedCents, earnedCents
+}
+
 // recordAffiliateUsageFromCheckout writes one AffiliateUsage row to
 // Notion when a successful checkout consumed a discount code that
 // has an AffiliateEmail set. Math:
@@ -1086,16 +1109,7 @@ func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, 
 	if count <= 0 {
 		return
 	}
-	originalCents := preDiscount * count
-	ceilingCents := originalCents * 20 / 100
-	savedCents := originalCents - entry.Total
-	if savedCents < 0 {
-		savedCents = 0
-	}
-	earnedCents := ceilingCents - savedCents
-	if earnedCents < 0 {
-		earnedCents = 0
-	}
+	savedCents, earnedCents := affiliateMath(preDiscount, count, entry.Total)
 	err = getters.RecordAffiliateUsage(ctx, getters.AffiliateUsageInput{
 		CodeName:        disc.CodeName,
 		AffiliateEmail:  disc.AffiliateEmail,
@@ -2676,9 +2690,9 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		isLocal := tixPrice == tix.Local
 
 		if form.PaymentMethod == "btc" {
-			OpenNodeInit(w, r, ctx, conf, tix, form.DiscountPrice, &form, isLocal)
+			OpenNodeInit(w, r, ctx, conf, tix, form.DiscountPrice, tixPrice, &form, isLocal)
 		} else {
-			StripeInitWithDiscount(w, r, ctx, conf, tix, form.DiscountPrice, &form, isLocal)
+			StripeInitWithDiscount(w, r, ctx, conf, tix, form.DiscountPrice, tixPrice, &form, isLocal)
 		}
 		return
 	default:
@@ -2687,8 +2701,8 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 }
 
-func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice uint, tixForm *types.TixForm, isLocal bool) {
-	payment, err := getters.InitOpenNodeCheckout(ctx, tixPrice, tix, conf, isLocal, tixForm.Count, tixForm.Email, tixForm.DiscountRef, tixForm.Subscribe)
+func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice, preDiscountPrice uint, tixForm *types.TixForm, isLocal bool) {
+	payment, err := getters.InitOpenNodeCheckout(ctx, tixPrice, preDiscountPrice, tix, conf, isLocal, tixForm.Count, tixForm.Email, tixForm.DiscountRef, tixForm.Subscribe)
 
 	if err != nil {
 		http.Error(w, "unable to init btc payment", http.StatusInternalServerError)
@@ -2701,7 +2715,7 @@ func OpenNodeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	http.Redirect(w, r, payment.HostedCheckoutURL, http.StatusSeeOther)
 }
 
-func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice uint, form *types.TixForm, isLocal bool) {
+func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, tix *types.ConfTicket, tixPrice, preDiscountPrice uint, form *types.TixForm, isLocal bool) {
 	domain := ctx.Env.GetURI()
 	priceAsCents := int64(tixPrice * 100)
 	confDesc := fmt.Sprintf("%d ticket(s) for %s", form.Count, conf.Desc)
@@ -2713,8 +2727,10 @@ func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.
 	metadata["subscribe"] = fmt.Sprintf("%t", form.Subscribe)
 	// Pre-discount per-ticket price in cents — webhook reads this
 	// to compute originalCents (× ticket count) for the affiliate
-	// math without re-looking-up the ticket tier.
-	metadata["pre-discount-cents"] = strconv.FormatInt(priceAsCents, 10)
+	// math. Sourced from the original tier price (USD / BTC / Local)
+	// the buyer selected, NOT the `tixPrice` arg, because callers pass
+	// tixPrice = form.DiscountPrice (the *post*-discount value).
+	metadata["pre-discount-cents"] = strconv.FormatInt(int64(preDiscountPrice)*100, 10)
 	if isLocal {
 		metadata["tix-local"] = "yes"
 	}
