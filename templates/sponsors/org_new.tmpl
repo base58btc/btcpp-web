@@ -97,22 +97,81 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label for="LogoLight" class="block text-sm/6 font-semibold text-gray-900">Logo (light bg)</label>
+          <div class="flex items-baseline justify-between">
+            <label for="LogoLight" class="block text-sm/6 font-semibold text-gray-900">Logo (light bg)</label>
+            <button type="button" data-target="LogoLight"
+                    class="logo-upload-trigger text-xs font-medium text-indigo-600 hover:text-indigo-700">
+              Upload a file
+            </button>
+          </div>
           <input id="LogoLight" name="LogoLight" type="url"
                  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                  class="mt-2 block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"
-                 placeholder="Spaces URL" />
-          <p class="mt-1 text-xs text-gray-500">For light backgrounds. Full URL to the file.</p>
+                 placeholder="Spaces URL or click Upload" />
+          <p id="LogoLight-status" class="mt-1 text-xs text-gray-500">For light backgrounds. Full URL to the file.</p>
         </div>
         <div>
-          <label for="LogoDark" class="block text-sm/6 font-semibold text-gray-900">Logo (dark bg)</label>
+          <div class="flex items-baseline justify-between">
+            <label for="LogoDark" class="block text-sm/6 font-semibold text-gray-900">Logo (dark bg)</label>
+            <button type="button" data-target="LogoDark"
+                    class="logo-upload-trigger text-xs font-medium text-indigo-600 hover:text-indigo-700">
+              Upload a file
+            </button>
+          </div>
           <input id="LogoDark" name="LogoDark" type="url"
                  autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                  class="mt-2 block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"
-                 placeholder="Spaces URL" />
-          <p class="mt-1 text-xs text-gray-500">For dark backgrounds. Full URL to the file.</p>
+                 placeholder="Spaces URL or click Upload" />
+          <p id="LogoDark-status" class="mt-1 text-xs text-gray-500">For dark backgrounds. Full URL to the file.</p>
         </div>
       </div>
+
+      <input type="file" id="LogoFilePicker" accept="image/*" class="hidden">
+      <script>
+        // "Upload a file" link → hidden file picker → POST to
+        // /admin/orgs/upload-logo → drop the returned URL into the
+        // matching input. Hides the spaces / Notion plumbing from
+        // the admin: pick a file, see a URL appear.
+        (function () {
+          const picker = document.getElementById('LogoFilePicker');
+          let activeTarget = null;
+          document.querySelectorAll('.logo-upload-trigger').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              activeTarget = btn.dataset.target;
+              picker.value = '';
+              picker.click();
+            });
+          });
+          picker.addEventListener('change', function () {
+            if (!activeTarget || !picker.files || picker.files.length === 0) return;
+            const file = picker.files[0];
+            const status = document.getElementById(activeTarget + '-status');
+            const input  = document.getElementById(activeTarget);
+            const targetID = activeTarget;
+            status.textContent = 'Uploading ' + file.name + '…';
+            status.className = 'mt-1 text-xs text-gray-700';
+            const fd = new FormData();
+            fd.append('file', file);
+            fetch('/admin/orgs/upload-logo', { method: 'POST', body: fd, credentials: 'same-origin' })
+              .then(function (r) {
+                if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+                return r.json();
+              })
+              .then(function (data) {
+                input.value = data.url;
+                status.textContent = 'Uploaded → saved on form submit.';
+                status.className = 'mt-1 text-xs text-green-700';
+              })
+              .catch(function (err) {
+                status.textContent = 'Upload failed: ' + (err.message || err);
+                status.className = 'mt-1 text-xs text-red-700';
+              })
+              .finally(function () {
+                if (activeTarget === targetID) activeTarget = null;
+              });
+          });
+        })();
+      </script>
 
       <div class="flex items-center gap-3">
         <input id="Hiring" name="Hiring" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />

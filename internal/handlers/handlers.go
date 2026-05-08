@@ -799,6 +799,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/orgs/new", func(w http.ResponseWriter, r *http.Request) {
 		OrgCreate(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/admin/orgs/upload-logo", func(w http.ResponseWriter, r *http.Request) {
+		OrgLogoUpload(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/admin/orgs/{ref}", func(w http.ResponseWriter, r *http.Request) {
 		OrgDetail(w, r, app)

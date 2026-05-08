@@ -1,14 +1,17 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"sort"
 	"strings"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/external/spaces"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/imgproc"
 	"btcpp-web/internal/types"
 
 	"github.com/gorilla/mux"
@@ -126,6 +129,40 @@ func OrgNew(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		ctx.Err.Printf("/admin/orgs/new render: %s", err)
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
 	}
+}
+
+// OrgLogoUpload accepts a multipart `file` upload from the org form's
+// inline "Upload a file" affordance, mirrors it to Spaces under
+// sponsors/{shortID}{ext}, and returns the public URL as JSON
+// `{url: "..."}` so the page JS can drop it into the URL input.
+//
+// Idempotent on identical file content via the shortID +
+// spaces.Exists short-circuit, mirroring mirrorOrgLogoToSpaces.
+// Gated to global-admin since /admin/orgs/* is.
+func OrgLogoUpload(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+		return
+	}
+	raw, contentType, ext, err := readMultipartFile(r, "file")
+	if err != nil {
+		http.Error(w, "missing or unreadable file", http.StatusBadRequest)
+		return
+	}
+	if !spaces.IsConfigured() {
+		http.Error(w, "spaces not configured", http.StatusInternalServerError)
+		return
+	}
+	shortID := imgproc.ShortID(raw)
+	key := "sponsors/" + shortID + ext
+	if !spaces.Exists(key) {
+		if _, err := spaces.Upload(key, raw, contentType, ""); err != nil {
+			ctx.Err.Printf("/admin/orgs/upload-logo: %s", err)
+			http.Error(w, "upload failed", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"url": spaces.PublicURL(key)})
 }
 
 func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
