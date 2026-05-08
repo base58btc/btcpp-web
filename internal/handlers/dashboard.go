@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/url"
 	"sort"
@@ -40,13 +41,33 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
+	// Two equally valid auth paths land here:
+	//
+	//   1. Magic-link click with ?em=&hr= URL params — the
+	//      magic-link's HMAC validates the email; we stamp the
+	//      session for subsequent navigation.
+	//   2. Already-authed visitor (the affiliate / role-manager
+	//      flows redirect back here without rebuilding the URL
+	//      params) — session has the email; we mint a fresh
+	//      ?em=&hr= pair from it so dashboard sub-pages that
+	//      still hand-build URLs (talks, vol shifts, etc.) keep
+	//      working.
 	email, encodedHMAC, err := validateVolEmail(r, ctx)
+	encodedEmail := r.URL.Query().Get("em")
+	if err != nil {
+		// Fall back to the SCS session before giving up.
+		if sessEmail := ctx.Session.GetString(r.Context(), auth.SessionEmailKey); sessEmail != "" {
+			email = sessEmail
+			encodedHMAC = base64.RawURLEncoding.EncodeToString([]byte(helpers.CreateEmailHMAC(ctx, email)))
+			encodedEmail = base64.RawURLEncoding.EncodeToString([]byte(email))
+			err = nil
+		}
+	}
 	if err != nil {
 		ctx.Infos.Printf("/dashboard HMAC validation failed: %s", err)
 		renderDashboardLogin(w, r, ctx)
 		return
 	}
-	encodedEmail := r.URL.Query().Get("em")
 
 	// The magic-link URL HMAC is itself proof of identity — stamp
 	// the session so admin pages (gated on auth.RequireRole, which
