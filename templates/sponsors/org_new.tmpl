@@ -97,41 +97,41 @@
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <div class="flex items-baseline justify-between">
-            <label for="LogoLight" class="block text-sm/6 font-semibold text-gray-900">Logo (light bg)</label>
+          <span class="block text-sm/6 font-semibold text-gray-900">Logo (light bg)</span>
+          <p class="text-xs text-gray-500">For light backgrounds.</p>
+          <input id="LogoLight" name="LogoLight" type="hidden" value="">
+          <div class="mt-2 flex items-center gap-3">
             <button type="button" data-target="LogoLight"
-                    class="logo-upload-trigger text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                    class="logo-upload-trigger inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
               Upload a file
             </button>
+            <img id="LogoLight-preview" alt="" class="hidden h-10 w-auto max-w-[160px] rounded border border-gray-200 bg-white object-contain">
           </div>
-          <input id="LogoLight" name="LogoLight" type="url"
-                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                 class="mt-2 block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"
-                 placeholder="Spaces URL or click Upload" />
-          <p id="LogoLight-status" class="mt-1 text-xs text-gray-500">For light backgrounds. Full URL to the file.</p>
+          <p id="LogoLight-status" class="mt-1 text-xs text-gray-500">No file selected.</p>
         </div>
         <div>
-          <div class="flex items-baseline justify-between">
-            <label for="LogoDark" class="block text-sm/6 font-semibold text-gray-900">Logo (dark bg)</label>
+          <span class="block text-sm/6 font-semibold text-gray-900">Logo (dark bg)</span>
+          <p class="text-xs text-gray-500">For dark backgrounds.</p>
+          <input id="LogoDark" name="LogoDark" type="hidden" value="">
+          <div class="mt-2 flex items-center gap-3">
             <button type="button" data-target="LogoDark"
-                    class="logo-upload-trigger text-xs font-medium text-indigo-600 hover:text-indigo-700">
+                    class="logo-upload-trigger inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
               Upload a file
             </button>
+            <img id="LogoDark-preview" alt="" class="hidden h-10 w-auto max-w-[160px] rounded border border-gray-200 bg-gray-900 object-contain">
           </div>
-          <input id="LogoDark" name="LogoDark" type="url"
-                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-                 class="mt-2 block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin"
-                 placeholder="Spaces URL or click Upload" />
-          <p id="LogoDark-status" class="mt-1 text-xs text-gray-500">For dark backgrounds. Full URL to the file.</p>
+          <p id="LogoDark-status" class="mt-1 text-xs text-gray-500">No file selected.</p>
         </div>
       </div>
 
       <input type="file" id="LogoFilePicker" accept="image/*" class="hidden">
       <script>
-        // "Upload a file" link → hidden file picker → POST to
-        // /admin/orgs/upload-logo → drop the returned URL into the
-        // matching input. Hides the spaces / Notion plumbing from
-        // the admin: pick a file, see a URL appear.
+        // "Upload a file" button → hidden file picker → POST to
+        // /admin/orgs/upload-logo → store the returned Spaces URL
+        // on a hidden input the form submits, plus show a preview
+        // thumbnail so the admin sees what they picked. The full
+        // URL never appears on the form — the admin doesn't need
+        // to think about Spaces at all.
         (function () {
           const picker = document.getElementById('LogoFilePicker');
           let activeTarget = null;
@@ -145,9 +145,10 @@
           picker.addEventListener('change', function () {
             if (!activeTarget || !picker.files || picker.files.length === 0) return;
             const file = picker.files[0];
-            const status = document.getElementById(activeTarget + '-status');
-            const input  = document.getElementById(activeTarget);
             const targetID = activeTarget;
+            const status  = document.getElementById(targetID + '-status');
+            const input   = document.getElementById(targetID);
+            const preview = document.getElementById(targetID + '-preview');
             status.textContent = 'Uploading ' + file.name + '…';
             status.className = 'mt-1 text-xs text-gray-700';
             const fd = new FormData();
@@ -159,7 +160,9 @@
               })
               .then(function (data) {
                 input.value = data.url;
-                status.textContent = 'Uploaded → saved on form submit.';
+                preview.src = data.url;
+                preview.classList.remove('hidden');
+                status.textContent = file.name + ' — uploaded.';
                 status.className = 'mt-1 text-xs text-green-700';
               })
               .catch(function (err) {
