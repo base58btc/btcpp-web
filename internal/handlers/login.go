@@ -70,6 +70,6 @@ func AuthLanding(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 // LogoutHandler clears the auth session and bounces home. POST so
 // it isn't trivially CSRF'd via an <img src=...> trick.
 func LogoutHandler(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	auth.Logout(ctx, r)
+	auth.Logout(ctx, r, w)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

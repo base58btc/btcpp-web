@@ -28,7 +28,7 @@
             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
           </svg>
         </button>
-        <a href="/dashboard" class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600">
+        <a href="/dashboard" data-nav-login class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600">
           Log in <span aria-hidden="true">&rarr;</span>
         </a>
         <style>
@@ -93,6 +93,18 @@
       </div>
     </div>
   </nav>
+  <script>
+    // Hide the "Log in" link in mainnav when the auth companion
+    // cookie (btcpp_authed=1) is set. The real session cookie is
+    // HttpOnly, so this non-sensitive cookie is the only auth-state
+    // signal client JS can read. Set / cleared by auth.LoginEmail
+    // and auth.Logout server-side.
+    (function () {
+      if (document.cookie.split('; ').indexOf('btcpp_authed=1') < 0) return;
+      document.querySelectorAll('[data-nav-login]').forEach(function (el) { el.style.display = 'none'; });
+      document.querySelectorAll('[data-nav-login-wrap]').forEach(function (el) { el.style.display = 'none'; });
+    })();
+  </script>
   <!-- Mobile menu, show/hide based on menu open state. -->
   <div class="hidden lg:hidden" role="nav-dialog" aria-modal="true">
     <div class="fixed inset-0 z-20"></div>
@@ -108,8 +120,8 @@
       </div>
       <div class="mt-6 flow-root">
         <div class="-my-6 divide-y divide-gray-500/10">
-          <div class="py-6">
-            <a href="/dashboard" class="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">
+          <div class="py-6" data-nav-login-wrap>
+            <a href="/dashboard" data-nav-login class="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">
               Log in <span aria-hidden="true">&rarr;</span>
             </a>
           </div>
