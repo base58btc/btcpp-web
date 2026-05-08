@@ -14,9 +14,16 @@ import (
 )
 
 type (
+        // URI is the absolute site root (e.g. "https://btcpp.dev")
+        // present on every OnlyFor data struct so letter templates can
+        // reference assets like
+        // ![]({{ .URI }}/static/img/{{ .Conf.Tag }}/leading.png).
+        // Populated by each Send* helper from ctx.Env.GetURI().
+
         VolLogin struct {
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         VolSignup struct {
@@ -24,6 +31,7 @@ type (
                 Conf         *types.Conf
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         VolWaitlist struct {
@@ -31,6 +39,7 @@ type (
                 Conf         *types.Conf
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         VolShifts struct {
@@ -39,6 +48,7 @@ type (
                 VolInfo      *types.VolInfo
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         VolCustom struct {
@@ -47,12 +57,14 @@ type (
                 VolInfo      *types.VolInfo
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         VolCancel struct {
                 Volunteer    *types.Volunteer
                 Conf         *types.Conf
                 VolShiftLink string
+                URI          string
         }
 
         VolApp struct {
@@ -62,6 +74,7 @@ type (
                 VolInfo      *types.VolInfo
                 Email        string
                 VolShiftLink string
+                URI          string
         }
 
         SpeakerCustom struct {
@@ -69,6 +82,7 @@ type (
                 Conf    *types.Conf
                 Talks   []*types.Talk
                 Email   string
+                URI     string
         }
 
         // OnlyForProposal is the data shape passed to the per-proposal
@@ -97,6 +111,7 @@ type (
                 // originated invite flow). Empty for the regular review
                 // letters (talkinvited / talkconfirmed / etc.).
                 MagicLink       string
+                URI             string
         }
 )
 
@@ -130,6 +145,7 @@ func OnlyForLoginLink(ctx *config.AppContext, email, link string) ([]byte, error
         tmplData := &VolLogin{
                 Email:        email,
                 VolShiftLink: link,
+                URI:          ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, email, onlyFor, tmplData)
@@ -142,6 +158,7 @@ func OnlyForVolWaitlist(ctx *config.AppContext, vol *types.Volunteer, conf *type
                 Conf: conf,
                 Volunteer: vol,
                 VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI: ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
@@ -154,6 +171,7 @@ func OnlyForVolSignup(ctx *config.AppContext, vol *types.Volunteer, conf *types.
                 Conf: conf,
                 Volunteer: vol,
                 VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI: ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
@@ -168,6 +186,7 @@ func OnlyForVolApp(ctx *config.AppContext, vol *types.Volunteer, conf *types.Con
                 VolInfo:      volinfo,
                 Email:        vol.Email,
                 VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI:          ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
@@ -179,6 +198,7 @@ func OnlyForVolCancel(ctx *config.AppContext, vol *types.Volunteer, conf *types.
                 Volunteer:  vol,
                 Conf:  conf,
                 VolShiftLink:   helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI: ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
@@ -192,6 +212,7 @@ func OnlyForVolShift(ctx *config.AppContext, volinfo *types.VolInfo, vol *types.
                 VolInfo:        volinfo,
                 Email:          vol.Email,
                 VolShiftLink:   helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI:            ctx.Env.GetURI(),
 	}
 
         return execOnlyFor(ctx, vol.Email, onlyFor, tmplData)
@@ -251,6 +272,7 @@ func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types
                         TalkConfirmLink: helpers.EmailLink(ctx, sp.Email, "/dashboard/talks/"+proposal.ID+"/confirm"),
                         DashboardLink:   helpers.EmailLink(ctx, sp.Email, "/dashboard"),
                         MagicLink:       helpers.InviteLink(ctx, proposal.ID, proposal.InviteToken),
+                        URI:             ctx.Env.GetURI(),
                 }
                 if _, err := execOnlyFor(ctx, sp.Email, onlyFor, data); err != nil {
                         ctx.Err.Printf("SendOnlyForProposal %s → %s: %s", onlyFor, sp.Email, err)
@@ -287,6 +309,7 @@ func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.C
                 VolInfo:      volinfo,
                 Email:        vol.Email,
                 VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
+                URI:          ctx.Env.GetURI(),
         }
 
         // Build an in-memory Letter so we can reuse the existing renderer pipeline.
@@ -312,9 +335,11 @@ func SendCustomToAttendee(ctx *config.AppContext, reg *types.Registration, conf 
         tmplData := &struct {
                 Conf  *types.Conf
                 Email string
+                URI   string
         }{
                 Conf:  conf,
                 Email: reg.Email,
+                URI:   ctx.Env.GetURI(),
         }
 
         letter := &mtypes.Letter{
@@ -339,11 +364,13 @@ func SendCustomToProposalSpeaker(ctx *config.AppContext, proposal *types.Proposa
                 Speaker  *types.Speaker
                 Conf     *types.Conf
                 Email    string
+                URI      string
         }{
                 Proposal: proposal,
                 Speaker:  speaker,
                 Conf:     conf,
                 Email:    speaker.Email,
+                URI:      ctx.Env.GetURI(),
         }
 
         letter := &mtypes.Letter{
@@ -368,6 +395,7 @@ func SendCustomToSpeaker(ctx *config.AppContext, speaker *types.Speaker, conf *t
                 Conf:    conf,
                 Talks:   talks,
                 Email:   speaker.Email,
+                URI:     ctx.Env.GetURI(),
         }
 
         letter := &mtypes.Letter{
