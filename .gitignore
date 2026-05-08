@@ -12,6 +12,7 @@ chat
 
 /media/*/
 credentials.json
+sessions.bolt
 
 # one-shot migration CLI binaries + their state files (output of cmd/migrate-*)
 /migrate-*

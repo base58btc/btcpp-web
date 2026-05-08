@@ -19,7 +19,9 @@ import (
 	"btcpp-web/internal/handlers"
 	"btcpp-web/internal/types"
 	"github.com/BurntSushi/toml"
+	"github.com/alexedwards/scs/boltstore"
 	"github.com/alexedwards/scs/v2"
+	bolt "go.etcd.io/bbolt"
 )
 
 const configFile = "config.toml"
@@ -210,12 +212,23 @@ func run(env *types.EnvConfig) error {
 	app.Infos.Println("~~~~app restarted, here we go~~~~~")
 	app.Infos.Println("Running in prod?", env.Prod)
 
-	// Initialize the session manager
+	// Initialize the session manager backed by a BoltDB file so
+	// admin/dashboard logins survive app restarts. Default
+	// memstore wipes every session when the process exits — fine
+	// for the legacy CheckPin model (one shared PIN, re-typed
+	// after every restart) but a regression for the magic-link
+	// auth flow where a restart silently logs everyone out.
+	sessDB, err := bolt.Open("sessions.bolt", 0600, &bolt.Options{Timeout: 5 * time.Second})
+	if err != nil {
+		app.Err.Fatalf("open sessions.bolt: %s", err)
+	}
+	defer sessDB.Close()
 	app.Session = scs.New()
 	app.Session.Lifetime = 4 * 24 * time.Hour
 	app.Session.Cookie.Persist = true
 	app.Session.Cookie.SameSite = http.SameSiteLaxMode
 	app.Session.Cookie.Secure = app.InProduction
+	app.Session.Store = boltstore.New(sessDB)
 
 	app.Notion = &types.Notion{Config: &env.Notion}
 	app.Notion.Setup(env.Notion.Token)
