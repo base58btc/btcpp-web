@@ -14,6 +14,7 @@ import (
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
+	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/imgproc"
 	"btcpp-web/internal/missives"
@@ -804,6 +805,45 @@ func DashboardAcceptInvite(w http.ResponseWriter, r *http.Request, ctx *config.A
 		fanoutAcceptedProposal(ctx, proposal, proposal.ScheduleFor)
 	}
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, flash), http.StatusSeeOther)
+}
+
+// DashboardDeclineInvite is the speaker-side counterpart to
+// DashboardAcceptInvite: the speaker received an invite letter and
+// chose to decline it. Flips the proposal to TheyDecline and fans out
+// the `talkselfdecline` letter to every speaker on the proposal so
+// the rest of the panel knows the talk is off.
+//
+// Refuses on anything other than `Invited` to keep the action
+// idempotent — re-clicks of an emailed link, or clicks after admin
+// already moved the proposal, hit the dashboard with an explanatory
+// flash instead of double-firing the email or rolling back a later
+// state change.
+//
+// The `talkselfdecline` letter is a separate Notion letter UID from
+// the admin-side `talkdeclined` (which is in WeDecline voice — "we
+// were not able to include your talk"). If the letter UID isn't yet
+// configured in Notion, SendOnlyForProposal logs and returns an error
+// — non-fatal here so the status flip lands either way.
+func DashboardDeclineInvite(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	proposal, _, encHMAC, encEmail, err := dashboardAuthForProposal(w, r, ctx, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/dashboard decline: %s", err)
+		return
+	}
+	if proposal.Status != "Invited" {
+		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "This talk isn't currently invited — nothing to decline."), http.StatusSeeOther)
+		return
+	}
+	if err := getters.UpdateProposalStatus(ctx, proposalID, "TheyDecline"); err != nil {
+		ctx.Err.Printf("/dashboard decline update status: %s", err)
+		http.Error(w, "decline failed", http.StatusInternalServerError)
+		return
+	}
+	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor); err != nil {
+		ctx.Err.Printf("/dashboard decline send talkselfdecline (continuing): %s", err)
+	}
+	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Invitation declined. Thanks for letting us know."), http.StatusSeeOther)
 }
 
 // DashboardInviteCoSpeaker renders the inviter-side "share a link"

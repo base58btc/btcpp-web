@@ -339,6 +339,13 @@
                     Accept invitation
                   </button>
                 </form>
+                <form method="POST" action="/dashboard/talks/{{ .ID }}/decline?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+                  <button type="submit"
+                          class="inline-flex items-center px-2.5 py-1 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50"
+                          onclick="return confirm('Decline this invitation? Your talk will not be added to the program and your co-speakers (if any) will be notified.');">
+                    Decline invite
+                  </button>
+                </form>
                 {{ end }}
               </div>
             </div>

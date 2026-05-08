@@ -756,6 +756,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/dashboard/talks/{proposalID}/accept", func(w http.ResponseWriter, r *http.Request) {
 		DashboardAcceptInvite(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/dashboard/talks/{proposalID}/decline", func(w http.ResponseWriter, r *http.Request) {
+		DashboardDeclineInvite(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/dashboard/talks/{proposalID}/confirm", func(w http.ResponseWriter, r *http.Request) {
 		DashboardConfirmTalk(w, r, app)
 	}).Methods("GET")
