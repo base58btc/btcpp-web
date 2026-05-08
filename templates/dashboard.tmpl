@@ -197,8 +197,20 @@
       {{ end }}
     </div>
 
-    {{ if or $eb.SpeakerConf $eb.VolApp $eb.Tickets $eb.CanBuy }}
+    {{ if or $eb.SpeakerConf $eb.VolApp $eb.Tickets $eb.CanBuy $.AffiliateCode }}
     <div class="px-4 py-5 sm:p-6">
+      {{ if $.AffiliateCode }}
+      <div class="flex items-center justify-between gap-2 mb-3 rounded-md bg-indigo-50 border border-indigo-200 px-3 py-2 text-xs">
+        <span class="text-indigo-900 truncate">
+          Share your <code class="font-mono font-semibold">{{ $.AffiliateCode.CodeName }}</code> link for {{ $conf.Desc }}
+        </span>
+        <button type="button"
+                data-share-url="{{ $.BaseURI }}/conf/{{ $conf.Tag }}?code={{ $.AffiliateCode.CodeName }}"
+                class="affiliate-share-btn shrink-0 inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 font-semibold text-white hover:bg-indigo-700">
+          Copy link
+        </button>
+      </div>
+      {{ end }}
       {{ if and $eb.SpeakerConf $conf.CanInvite }}
       <div class="flex justify-end -mt-2 mb-2">
         <a href="/dashboard/conf/{{ $conf.Tag }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
@@ -681,6 +693,37 @@
 
     </div>
   </div>
+  {{ if .AffiliateCode }}
+  <script>
+    // Per-event-card "Copy link" buttons: click → copy the
+    // affiliate share URL to the clipboard + briefly flash the
+    // button to acknowledge. Each button carries its conf-scoped
+    // share URL on data-share-url so we don't string-build at
+    // click time.
+    (function () {
+      document.querySelectorAll('.affiliate-share-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const url = btn.dataset.shareUrl;
+          if (!url) return;
+          const original = btn.textContent;
+          navigator.clipboard.writeText(url).then(function () {
+            btn.textContent = 'Copied!';
+            btn.classList.add('bg-green-600');
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            setTimeout(function () {
+              btn.textContent = original;
+              btn.classList.remove('bg-green-600');
+              btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }, 1500);
+          }).catch(function () {
+            btn.textContent = 'Copy failed';
+            setTimeout(function () { btn.textContent = original; }, 1500);
+          });
+        });
+      });
+    })();
+  </script>
+  {{ end }}
   {{ if .IsGlobalAdmin }}
   <script>
     // Role-manager autocomplete: search /api/speakers/search, fill

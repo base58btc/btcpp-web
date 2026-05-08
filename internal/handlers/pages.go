@@ -254,6 +254,10 @@ type DashboardPage struct {
         HasAnyTicket   bool
         AffiliateCode  *types.DiscountCode
         AffiliateStats *AffiliateStats
+        // BaseURI is the absolute site root used to build full
+        // affiliate share URLs the user can copy from per-event
+        // cards (e.g. https://btcpp.dev/conf/vienna?code=NIFTY10).
+        BaseURI        string
 
         Year uint
 }

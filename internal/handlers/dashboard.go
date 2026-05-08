@@ -298,6 +298,7 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		HasAnyTicket:     len(regs) > 0,
 		AffiliateCode:    loadAffiliateCode(ctx, email, len(regs) > 0),
 		AffiliateStats:   loadAffiliateStats(ctx, email, len(regs) > 0),
+		BaseURI:          ctx.Env.GetURI(),
 		Year:             helpers.CurrentYear(),
 	})
 	if err != nil {
