@@ -1006,6 +1006,15 @@ func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	RenderPage(w, r, ctx, "404")
 }
 
+// discountSessionKey is the SCS session key under which a per-conf
+// discount code from a /conf/{tag}?code= visit is stashed. Per-conf
+// scoping keeps codes from one event from leaking into another's
+// checkout flow when a visitor browses multiple confs in the same
+// session.
+func discountSessionKey(confTag string) string {
+	return "disc:" + confTag
+}
+
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
 	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
 	mac.Write([]byte(conf.Ref))
@@ -1507,6 +1516,16 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	if err != nil {
 		handle404(w, r, ctx)
 		return
+	}
+
+	// Stash a ?code= query into the session per-conf so the
+	// tickets-checkout page can pre-fill the Discount field
+	// without the visitor copy-pasting. Tied to the conf tag so
+	// codes from different conf links don't bleed into each
+	// other's checkout. Trimmed because URL-encoded codes
+	// occasionally pick up trailing whitespace.
+	if code := strings.TrimSpace(r.URL.Query().Get("code")); code != "" {
+		ctx.Session.Put(r.Context(), discountSessionKey(conf.Tag), code)
 	}
 
 	talks, err := getters.GetTalksFor(ctx, conf.Tag)
@@ -2342,7 +2361,14 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	switch r.Method {
 	case http.MethodGet:
 
+		// `?q=` on the checkout URL takes precedence (admin debug
+		// flow); falls back to the session-stashed code from a
+		// /conf/{tag}?code= visit so a visitor who landed via a
+		// shared discount link gets it auto-applied.
 		discountCode, _ := helpers.GetSessionKey("q", r)
+		if discountCode == "" {
+			discountCode = ctx.Session.GetString(r.Context(), discountSessionKey(conf.Tag))
+		}
 
 		discountPrice := tixPrice
 		var errStr string
