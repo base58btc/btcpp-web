@@ -131,6 +131,7 @@
       {{ end }}
     </div>
 
+    {{ if or $eb.SpeakerConf $eb.VolApp $eb.Tickets $eb.CanBuy }}
     <div class="px-4 py-5 sm:p-6">
       {{ if and $eb.SpeakerConf $conf.CanInvite }}
       <div class="flex justify-end -mt-2 mb-2">
@@ -423,6 +424,7 @@
       {{ end }}
 
     </div>
+    {{ end }}
   </div>
   {{ end }}
 </section>

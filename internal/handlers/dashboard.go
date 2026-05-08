@@ -222,6 +222,42 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			b.AdminRole = auth.RoleVolcoord
 		}
 	}
+	// Synthesize event blocks for confs the user can admin but has no
+	// other relationship with (the global-admin case, or per-conf
+	// admins watching events they're not personally speaking at).
+	// Without this, an admin's dashboard would surface no Admin
+	// button at all because activeBlocks is built only from
+	// SpeakerConf/VolApp/Ticket relationships.
+	if len(idRoles) > 0 {
+		existing := make(map[string]bool, len(activeBlocks))
+		for _, b := range activeBlocks {
+			if b != nil && b.Conf != nil {
+				existing[b.Conf.Tag] = true
+			}
+		}
+		for _, c := range confs {
+			if c == nil || existing[c.Tag] || !c.Active {
+				continue
+			}
+			var role string
+			switch {
+			case id.HasRoleForConf(c.Tag, auth.RoleAdmin):
+				role = auth.RoleAdmin
+			case id.HasRoleForConf(c.Tag, auth.RoleVolcoord):
+				role = auth.RoleVolcoord
+			default:
+				continue
+			}
+			activeBlocks = append(activeBlocks, &EventBlock{Conf: c, AdminRole: role})
+		}
+		// Discover cards filter against activeBlocks via
+		// excludeConfsInBlocks above, so re-run it now that we've
+		// added admin-only blocks — a global-admin shouldn't see
+		// every conf doubled (once as admin block, once as
+		// "discover").
+		eligible = excludeConfsInBlocks(eligible, activeBlocks)
+		buyable = excludeConfsInBlocks(buyable, activeBlocks)
+	}
 	var hasUpTalk, hasUpVol bool
 	for _, b := range activeBlocks {
 		if b == nil {
