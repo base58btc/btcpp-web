@@ -195,18 +195,33 @@ type AffiliateUsageInput struct {
 // when the discount has an AffiliateEmail. Failure is best-effort —
 // the caller logs and continues so a Notion blip can't block the
 // ticket-issuance pipeline.
+//
+// AffiliateEmail is written as a Notion email-typed property to
+// match the DiscountsDb AffiliateEmail column convention. The
+// AffiliateUsageDb column should be email type. SatsSavedCents /
+// SatsEarnedCents / TicketsCount are number-typed and skipped when
+// zero — go-notion's PropertyValue.Number is `,omitempty`, so a 0
+// value JSON-marshals as `{"type": "number"}` with no concrete body
+// and Notion rejects it. Empty cells read back as 0 from the
+// dashboard sum, so omitting is semantically equivalent.
 func RecordAffiliateUsage(ctx *config.AppContext, in AffiliateUsageInput) error {
 	if ctx.Notion.Config.AffiliateUsageDb == "" {
 		return fmt.Errorf("RecordAffiliateUsage: AffiliateUsageDb not configured")
 	}
 	props := map[string]*notion.PropertyValue{
-		"Name":            titleValue(fmt.Sprintf("%s/%s/%d", in.CodeName, in.ConfTag, in.TicketsCount)),
-		"DiscountCode":    richTextValue(in.CodeName),
-		"AffiliateEmail":  richTextValue(in.AffiliateEmail),
-		"Conference":      selectValue(in.ConfTag),
-		"SatsSavedCents":  numberValue(float64(in.SatsSavedCents)),
-		"SatsEarnedCents": numberValue(float64(in.SatsEarnedCents)),
-		"TicketsCount":    numberValue(float64(in.TicketsCount)),
+		"Name":           titleValue(fmt.Sprintf("%s/%s/%d", in.CodeName, in.ConfTag, in.TicketsCount)),
+		"DiscountCode":   richTextValue(in.CodeName),
+		"AffiliateEmail": notion.NewEmailPropertyValue(in.AffiliateEmail),
+		"Conference":     selectValue(in.ConfTag),
+	}
+	if in.SatsSavedCents != 0 {
+		props["SatsSavedCents"] = numberValue(float64(in.SatsSavedCents))
+	}
+	if in.SatsEarnedCents != 0 {
+		props["SatsEarnedCents"] = numberValue(float64(in.SatsEarnedCents))
+	}
+	if in.TicketsCount != 0 {
+		props["TicketsCount"] = numberValue(float64(in.TicketsCount))
 	}
 	parent := notion.NewDatabaseParent(ctx.Notion.Config.AffiliateUsageDb)
 	_, err := ctx.Notion.Client.CreatePage(context.Background(), parent, props)
