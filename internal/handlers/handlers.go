@@ -1661,20 +1661,35 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			stashKey = affiliateSessionKey
 		}
 		ctx.Session.Put(r.Context(), stashKey(conf.Tag), code)
-		if disc != nil && len(disc.ConfRef) > 0 {
+		if disc != nil {
 			allConfs, _ := getters.FetchConfsCached(ctx)
-			tagByRef := make(map[string]string, len(allConfs))
-			for _, c := range allConfs {
-				if c != nil {
-					tagByRef[c.Ref] = c.Tag
+			if len(disc.ConfRef) > 0 {
+				// Code is pinned to specific confs — stash
+				// for each one in the list.
+				tagByRef := make(map[string]string, len(allConfs))
+				for _, c := range allConfs {
+					if c != nil {
+						tagByRef[c.Ref] = c.Tag
+					}
 				}
-			}
-			for _, ref := range disc.ConfRef {
-				tag := tagByRef[ref]
-				if tag == "" || tag == conf.Tag {
-					continue
+				for _, ref := range disc.ConfRef {
+					tag := tagByRef[ref]
+					if tag == "" || tag == conf.Tag {
+						continue
+					}
+					ctx.Session.Put(r.Context(), stashKey(tag), code)
 				}
-				ctx.Session.Put(r.Context(), stashKey(tag), code)
+			} else {
+				// Universal code (no ConfRef) — stash for
+				// every active event so a visitor browsing
+				// multiple confs in one session still gets
+				// auto-apply on each one's checkout.
+				for _, c := range allConfs {
+					if c == nil || !c.Active || c.Tag == conf.Tag {
+						continue
+					}
+					ctx.Session.Put(r.Context(), stashKey(c.Tag), code)
+				}
 			}
 		}
 	}

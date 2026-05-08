@@ -58,12 +58,9 @@
         <p id="PctPreview" class="mt-3 text-xs text-gray-600"></p>
       </div>
 
-      {{ if .ConfNames }}
       <div class="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
-        Works at:
-        {{ range $idx, $tag := .ConfNames }}{{ if $idx }}, {{ end }}<span class="font-mono">{{ $tag }}</span>{{ end }}
+        Works at any active bitcoin++ event{{ if .ConfNames }} (currently {{ range $idx, $tag := .ConfNames }}{{ if $idx }}, {{ end }}<span class="font-mono">{{ $tag }}</span>{{ end }}){{ end }}.
       </div>
-      {{ end }}
 
       <div class="flex items-center justify-end gap-3 pt-2">
         <a href="/dashboard" class="text-sm text-gray-600 hover:text-gray-800">Cancel</a>

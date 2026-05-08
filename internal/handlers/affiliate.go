@@ -112,8 +112,11 @@ func AffiliateCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	confRefs := activeConfRefs(ctx)
-	if _, err := getters.CreateAffiliateCode(ctx.Notion, email, codeName, buyerPct, confRefs); err != nil {
+	// Affiliate codes mint without any Conference relation —
+	// CalcDiscount treats an empty ConfRef as "valid at any
+	// active event," so a single user code works wherever they
+	// share it without an admin re-attaching it per conf launch.
+	if _, err := getters.CreateAffiliateCode(ctx.Notion, email, codeName, buyerPct, nil); err != nil {
 		ctx.Err.Printf("/dashboard/affiliate/new create: %s", err)
 		formErr("Couldn't save the code — try again.")
 		return
@@ -208,8 +211,10 @@ func AffiliateUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		}
 	}
 
-	confRefs := activeConfRefs(ctx)
-	if err := getters.UpdateAffiliateCode(ctx, code.Ref, codeName, buyerPct, confRefs); err != nil {
+	// Affiliate codes stay universal — clear any Conference
+	// relation a previous form save (or admin edit) might have
+	// left behind. Empty slice = wildcard at CalcDiscount time.
+	if err := getters.UpdateAffiliateCode(ctx, code.Ref, codeName, buyerPct, nil); err != nil {
 		ctx.Err.Printf("/dashboard/affiliate/edit update: %s", err)
 		formErr("Couldn't save the change — try again.")
 		return
@@ -267,26 +272,12 @@ func affiliateAuthAndGate(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	return email, true
 }
 
-// activeConfRefs returns the page-IDs of every Active conf, used as
-// the ConfRef relation when minting / refreshing an affiliate code.
-func activeConfRefs(ctx *config.AppContext) []string {
-	confs, err := getters.FetchConfsCached(ctx)
-	if err != nil {
-		ctx.Err.Printf("affiliate activeConfRefs: %s", err)
-		return nil
-	}
-	var refs []string
-	for _, c := range confs {
-		if c != nil && c.Active {
-			refs = append(refs, c.Ref)
-		}
-	}
-	return refs
-}
-
-// activeConfTagNames is the human-readable parallel to
-// activeConfRefs, used by the form to show "this code will work at:"
-// without leaking page IDs.
+// activeConfTagNames returns the tag names of every Active conf,
+// used by the affiliate form to show the user what events their
+// universal code currently applies to (e.g. "currently vienna,
+// nairobi"). Affiliate codes mint without a Conference relation
+// — see CalcDiscount's wildcard handling — so this list is purely
+// informational, not a binding.
 func activeConfTagNames(ctx *config.AppContext) []string {
 	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {

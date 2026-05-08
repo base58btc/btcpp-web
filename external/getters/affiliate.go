@@ -58,9 +58,11 @@ func UpdateAffiliateCode(ctx *config.AppContext, codeID, codeName string, buyerP
 	props := map[string]*notion.PropertyValue{
 		"CodeName": richTextValue(codeName),
 		"Discount": richTextValue(fmt.Sprintf("%%%d", buyerPct)),
-	}
-	if len(confRefs) > 0 {
-		props["Conference"] = relationValue(confRefs)
+		// Always write Conference — empty slice clears any
+		// relation a previous version might have set, so a code
+		// migrated from the old per-conf-stamp behavior becomes
+		// universal on next save without a manual Notion edit.
+		"Conference": relationValue(confRefs),
 	}
 	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), codeID, props)
 	if err != nil {

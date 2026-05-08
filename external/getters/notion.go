@@ -1660,13 +1660,20 @@ func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice 
 		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" not found", code)
 	}
 
-	found := false
-	for _, discountConfRef := range discount.ConfRef {
-		found = found || discountConfRef == confRef
-	}
-
-	if !found {
-		return tixPrice * count, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
+	// Empty ConfRef = wildcard. Used by self-service affiliate
+	// codes (which mint without any Conference relation) so a
+	// single user code applies at every active event without an
+	// admin re-attaching it per launch. Admin-created codes that
+	// want this universal-redemption behavior can leave the
+	// Conference relation empty too.
+	if len(discount.ConfRef) > 0 {
+		found := false
+		for _, discountConfRef := range discount.ConfRef {
+			found = found || discountConfRef == confRef
+		}
+		if !found {
+			return tixPrice * count, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
+		}
 	}
 
 	if discount.MaxUses > 0 && discount.UsesCount >= discount.MaxUses {
