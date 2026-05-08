@@ -61,15 +61,23 @@ func UpdateAffiliateCode(ctx *config.AppContext, codeID, codeName string, buyerP
 	props := map[string]*notion.PropertyValue{
 		"CodeName": titleValue(codeName),
 		"Discount": richTextValue(fmt.Sprintf("%%%d", buyerPct)),
-		// Always write Conference — empty slice clears any
-		// relation a previous version might have set, so a code
-		// migrated from the old per-conf-stamp behavior becomes
-		// universal on next save without a manual Notion edit.
-		"Conference": relationValue(confRefs),
+	}
+	if len(confRefs) > 0 {
+		props["Conference"] = relationValue(confRefs)
 	}
 	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), codeID, props)
 	if err != nil {
 		return err
+	}
+	// go-notion's PropertyValue.Relation is `omitempty`, so an
+	// empty slice gets dropped from the PATCH body and Notion
+	// rejects "Conference" with no concrete sub-field. To
+	// actually clear the relation we issue a separate raw PATCH
+	// via the existing clearRelationProperty helper.
+	if len(confRefs) == 0 {
+		if err := clearRelationProperty(ctx.Notion.Config.Token, codeID, "Conference"); err != nil {
+			return err
+		}
 	}
 	queueRefresh(JobDiscounts)
 	return nil
