@@ -601,7 +601,7 @@ func handleCreateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 		Website:   strings.TrimSpace(r.FormValue("Website")),
 		TShirt:    validShirtCode(strings.TrimSpace(r.FormValue("TShirt"))),
 	}
-	if missing := firstMissingProfileField(in.Phone, in.Signal, in.Github, hasNewPic); missing != "" {
+	if missing := firstMissingProfileField(in.Phone, in.Signal, hasNewPic); missing != "" {
 		http.Redirect(w, r,
 			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
 				encHMAC, encEmail, url.QueryEscape(missing+" is required.")),
@@ -629,15 +629,12 @@ func handleCreateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 // required profile field that's empty, or "" when all are filled.
 // hasPhoto is the boolean form because the photo lives outside the
 // form's text values (multipart blob).
-func firstMissingProfileField(phone, signal, github string, hasPhoto bool) string {
+func firstMissingProfileField(phone, signal string, hasPhoto bool) string {
 	if phone == "" {
 		return "Phone"
 	}
 	if signal == "" {
 		return "Signal"
-	}
-	if github == "" {
-		return "Github"
 	}
 	if !hasPhoto {
 		return "Photo"

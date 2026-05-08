@@ -111,8 +111,8 @@
           <input id="Nostr" name="Nostr" type="text" value="{{ if .Speaker }}{{ .Speaker.Nostr }}{{ end }}" class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
         </div>
         <div>
-          <label for="Github" class="block text-sm font-semibold text-gray-900">Github URL *</label>
-          <input id="Github" name="Github" type="url" required value="{{ if .Speaker }}{{ .Speaker.Github }}{{ end }}" class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
+          <label for="Github" class="block text-sm font-semibold text-gray-900">Github URL</label>
+          <input id="Github" name="Github" type="url" value="{{ if .Speaker }}{{ .Speaker.Github }}{{ end }}" class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
         </div>
         <div>
           <label for="Website" class="block text-sm font-semibold text-gray-900">Website</label>
