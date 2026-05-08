@@ -32,7 +32,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
@@ -181,17 +180,9 @@ func ParseRoles(tags []string) []Role {
 	return out
 }
 
-// UIAuthCookieName is the non-sensitive companion cookie set
-// alongside the SCS session so the mainnav JS can hide the "Log in"
-// link when the user's already authed. The real session cookie is
-// HttpOnly (and SCS-managed), so a parallel non-HttpOnly cookie is
-// the simplest way to surface login state to client JS without
-// poking at every page struct.
-const UIAuthCookieName = "btcpp_authed"
-
 // LoginEmail stamps the authed email into the session. Called by the
 // magic-link landing handler after the email HMAC checks out.
-func LoginEmail(ctx *config.AppContext, r *http.Request, w http.ResponseWriter, email string) error {
+func LoginEmail(ctx *config.AppContext, r *http.Request, email string) error {
 	if email == "" {
 		return errors.New("LoginEmail: empty email")
 	}
@@ -199,43 +190,12 @@ func LoginEmail(ctx *config.AppContext, r *http.Request, w http.ResponseWriter, 
 		return fmt.Errorf("renew session: %w", err)
 	}
 	ctx.Session.Put(r.Context(), SessionEmailKey, email)
-	if w != nil {
-		setUIAuthCookie(w, ctx)
-	}
 	return nil
 }
 
-// Logout drops the authed email from the session and clears the
-// UI-state companion cookie.
-func Logout(ctx *config.AppContext, r *http.Request, w http.ResponseWriter) {
+// Logout drops the authed email from the session.
+func Logout(ctx *config.AppContext, r *http.Request) {
 	ctx.Session.Remove(r.Context(), SessionEmailKey)
-	if w != nil {
-		clearUIAuthCookie(w, ctx)
-	}
-}
-
-func setUIAuthCookie(w http.ResponseWriter, ctx *config.AppContext) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     UIAuthCookieName,
-		Value:    "1",
-		Path:     "/",
-		MaxAge:   int((4 * 24 * time.Hour).Seconds()), // mirrors SCS Lifetime
-		HttpOnly: false,                                // JS reads this
-		Secure:   strings.HasPrefix(ctx.Env.GetURI(), "https"),
-		SameSite: http.SameSiteLaxMode,
-	})
-}
-
-func clearUIAuthCookie(w http.ResponseWriter, ctx *config.AppContext) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     UIAuthCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: false,
-		Secure:   strings.HasPrefix(ctx.Env.GetURI(), "https"),
-		SameSite: http.SameSiteLaxMode,
-	})
 }
 
 // Resolve looks up the current request's Identity. Returns nil
@@ -363,7 +323,7 @@ func AuthRedirect(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		http.Error(w, "expired or invalid link", http.StatusForbidden)
 		return
 	}
-	if err := LoginEmail(ctx, r, w, email); err != nil {
+	if err := LoginEmail(ctx, r, email); err != nil {
 		ctx.Err.Printf("/auth login %s: %s", email, err)
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return

@@ -94,13 +94,18 @@
     </div>
   </nav>
   <script>
-    // Hide the "Log in" link in mainnav when the auth companion
-    // cookie (btcpp_authed=1) is set. The real session cookie is
-    // HttpOnly, so this non-sensitive cookie is the only auth-state
-    // signal client JS can read. Set / cleared by auth.LoginEmail
-    // and auth.Logout server-side.
+    // Hide the "Log in" link on pages that require auth — every
+    // visitor of /dashboard, /{conf}/admin/..., or /{conf}/volcoord/...
+    // is either already signed in (link is noise) or will be
+    // bounced to /login by the gate (link goes to a useless
+    // intermediate). Path-based so it doesn't depend on cookie
+    // state staying in sync.
     (function () {
-      if (document.cookie.split('; ').indexOf('btcpp_authed=1') < 0) return;
+      const p = window.location.pathname;
+      const authed = p === '/dashboard' || p.startsWith('/dashboard/') ||
+                     /^\/[^/]+\/admin(\/|$)/.test(p) ||
+                     /^\/[^/]+\/volcoord(\/|$)/.test(p);
+      if (!authed) return;
       document.querySelectorAll('[data-nav-login]').forEach(function (el) { el.style.display = 'none'; });
       document.querySelectorAll('[data-nav-login-wrap]').forEach(function (el) { el.style.display = 'none'; });
     })();
