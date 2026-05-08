@@ -1116,6 +1116,13 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
+	// Clear the stashed discount code now that the visitor has
+	// completed checkout — otherwise a subsequent ticket purchase
+	// from the same browser session would silently re-apply the
+	// code, even if the original link's owner only intended one
+	// use. Code is per-conf, so other confs' codes (if any) stay.
+	ctx.Session.Remove(r.Context(), discountSessionKey(conf.Tag))
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
 		Conf: conf,
 		Year: helpers.CurrentYear(),
