@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -122,7 +123,7 @@ func AffiliateCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 	http.Redirect(w, r,
-		"/dashboard?flash="+url.QueryEscape("Affiliate code "+codeName+" created."),
+		dashboardURLForEmail(ctx, email, "Affiliate code "+codeName+" created.", ""),
 		http.StatusSeeOther)
 }
 
@@ -136,7 +137,7 @@ func AffiliateEdit(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	code, err := getters.FindAffiliateCodeByEmail(ctx, email)
 	if err != nil {
 		ctx.Err.Printf("/dashboard/affiliate/edit lookup: %s", err)
-		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("Couldn't load your code."), http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURLForEmail(ctx, email, "", "Couldn't load your code."), http.StatusSeeOther)
 		return
 	}
 	if code == nil {
@@ -170,7 +171,7 @@ func AffiliateUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	}
 	code, err := getters.FindAffiliateCodeByEmail(ctx, email)
 	if err != nil || code == nil {
-		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("Couldn't load your code."), http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURLForEmail(ctx, email, "", "Couldn't load your code."), http.StatusSeeOther)
 		return
 	}
 	codeName := strings.ToUpper(strings.TrimSpace(r.FormValue("CodeName")))
@@ -220,7 +221,7 @@ func AffiliateUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 	http.Redirect(w, r,
-		"/dashboard?flash="+url.QueryEscape("Affiliate code updated."),
+		dashboardURLForEmail(ctx, email, "Affiliate code updated.", ""),
 		http.StatusSeeOther)
 }
 
@@ -232,16 +233,16 @@ func AffiliateDisable(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 	code, err := getters.FindAffiliateCodeByEmail(ctx, email)
 	if err != nil || code == nil {
-		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("Couldn't find your code."), http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURLForEmail(ctx, email, "", "Couldn't find your code."), http.StatusSeeOther)
 		return
 	}
 	if err := getters.ArchiveAffiliateCode(ctx, code.Ref); err != nil {
 		ctx.Err.Printf("/dashboard/affiliate/disable archive: %s", err)
-		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("Couldn't disable the code."), http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURLForEmail(ctx, email, "", "Couldn't disable the code."), http.StatusSeeOther)
 		return
 	}
 	http.Redirect(w, r,
-		"/dashboard?flash="+url.QueryEscape("Affiliate code "+code.CodeName+" disabled."),
+		dashboardURLForEmail(ctx, email, "Affiliate code "+code.CodeName+" disabled.", ""),
 		http.StatusSeeOther)
 }
 
@@ -260,16 +261,37 @@ func affiliateAuthAndGate(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	regs, err := getters.ListRegistrationsByEmail(ctx, email)
 	if err != nil {
 		ctx.Err.Printf("/dashboard/affiliate gate check %s: %s", email, err)
-		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("Couldn't check your ticket history."), http.StatusSeeOther)
+		http.Redirect(w, r, dashboardURLForEmail(ctx, email, "", "Couldn't check your ticket history."), http.StatusSeeOther)
 		return "", false
 	}
 	if len(regs) == 0 {
 		http.Redirect(w, r,
-			"/dashboard?error="+url.QueryEscape("Affiliate codes are open to ticket holders. Buy a ticket first."),
+			dashboardURLForEmail(ctx, email, "", "Affiliate codes are open to ticket holders. Buy a ticket first."),
 			http.StatusSeeOther)
 		return "", false
 	}
 	return email, true
+}
+
+// dashboardURLForEmail builds /dashboard?em=&hr=&flash=&error= for
+// post-action redirects. The em+hr pair lets the dashboard handler's
+// URL-auth path pick up the visitor without falling through to its
+// session-based fallback (which works too, but landing with the
+// canonical URL keeps every dashboard sub-link that hand-builds
+// from .HMAC / .Email working without a re-mint).
+func dashboardURLForEmail(ctx *config.AppContext, email, flash, errMsg string) string {
+	q := url.Values{}
+	if email != "" {
+		q.Set("em", base64.RawURLEncoding.EncodeToString([]byte(email)))
+		q.Set("hr", base64.RawURLEncoding.EncodeToString([]byte(helpers.CreateEmailHMAC(ctx, email))))
+	}
+	if flash != "" {
+		q.Set("flash", flash)
+	}
+	if errMsg != "" {
+		q.Set("error", errMsg)
+	}
+	return "/dashboard?" + q.Encode()
 }
 
 // activeConfTagNames returns the tag names of every Active conf,
