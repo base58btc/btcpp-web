@@ -142,6 +142,17 @@ func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	http.Redirect(w, r, "/dashboard?flash="+url.QueryEscape("Roles updated."), http.StatusSeeOther)
 }
 
+// inviteLinkBail redirects an unusable /invite-speaker click to the
+// dashboard with an explanatory flash banner, instead of dropping the
+// recipient on a bare http.Error page. Used by the InviteSpeaker
+// handler's pre-flight checks (proposal not found, expired token,
+// terminal status, conf too close).
+func inviteLinkBail(w http.ResponseWriter, r *http.Request, msg string) {
+	http.Redirect(w, r,
+		"/dashboard?flash="+url.QueryEscape(msg),
+		http.StatusSeeOther)
+}
+
 // dashboardAuthForProposal validates the magic-link HMAC and confirms the
 // authed email is one of the speakers on the given proposal. Returns the
 // proposal, the user's SpeakerConf for it, and the encoded HMAC/email so
@@ -873,20 +884,20 @@ func InviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 
 	proposal, err := getters.GetProposal(ctx, proposalID)
 	if err != nil || proposal == nil {
-		http.Error(w, "Talk not found.", http.StatusNotFound)
+		inviteLinkBail(w, r, "We couldn't find that talk — it may have been removed.")
 		return
 	}
 	if token == "" || proposal.InviteToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(proposal.InviteToken)) != 1 {
-		http.Error(w, "Invalid or revoked invite link.", http.StatusForbidden)
+		inviteLinkBail(w, r, "That invite link has expired or been revoked. Ask the organizer for a fresh one.")
 		return
 	}
 	conf := proposal.ScheduleFor
 	if isTerminalProposalStatus(proposal.Status) {
-		http.Error(w, "This talk is finalized — no new speakers can be added.", http.StatusGone)
+		inviteLinkBail(w, r, "This talk is already finalized — no further changes can be made via the invite link.")
 		return
 	}
 	if conf == nil || !conf.CanInvite() {
-		http.Error(w, "It's too close to the conference to add a co-speaker.", http.StatusGone)
+		inviteLinkBail(w, r, "It's too close to the conference to add or change speakers — please email speak@btcpp.dev.")
 		return
 	}
 
