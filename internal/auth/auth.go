@@ -241,7 +241,12 @@ func RequireRole(w http.ResponseWriter, r *http.Request, ctx *config.AppContext,
 	}
 	if !id.Satisfies(spec) {
 		ctx.Infos.Printf("auth deny %s for %s wants %+v has %+v", r.URL.Path, id.Email, spec, id.Roles)
-		http.Error(w, "Forbidden — your account doesn't have access to this page.", http.StatusForbidden)
+		// Authed but insufficient — bounce to the dashboard with a
+		// red error banner instead of a bare 403 page. The user
+		// stays signed in; they just don't have permission for the
+		// thing they tried to reach.
+		msg := "You don't have access to that page. If you think you should, ask a global-admin to add the role."
+		http.Redirect(w, r, "/dashboard?error="+url.QueryEscape(msg), http.StatusSeeOther)
 		return nil
 	}
 	return id
