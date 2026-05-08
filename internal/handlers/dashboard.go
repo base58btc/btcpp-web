@@ -48,6 +48,15 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 	encodedEmail := r.URL.Query().Get("em")
 
+	// The magic-link URL HMAC is itself proof of identity — stamp
+	// the session so admin pages (gated on auth.RequireRole, which
+	// reads the session) treat this as a logged-in user without
+	// asking for another login. One magic-link click → access to
+	// every page their role covers.
+	if err := auth.LoginEmail(ctx, r, email); err != nil {
+		ctx.Err.Printf("/dashboard session stamp for %s: %s", email, err)
+	}
+
 	dashStart := time.Now()
 	defer func() {
 		ctx.Infos.Printf("/dashboard total: %s", time.Since(dashStart))
