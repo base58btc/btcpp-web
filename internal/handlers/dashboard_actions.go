@@ -1062,6 +1062,46 @@ func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 		ctx.Err.Printf("/invite-speaker mirror to proposal (continuing): %s", err)
 	}
 
+	// JoinProposal upserts Speaker / Org / SpeakerConf but never
+	// touches the proposal's talk-content fields. For admin-invited
+	// proposals (created with placeholder Title/Description), the
+	// magic-link form is the only place those land — write them
+	// back here when the form supplied them. Co-speaker invites
+	// hide the title/desc/setup inputs entirely (EditTalkContent
+	// false), so this no-ops in that case.
+	if talkapp.TalkTitle != "" {
+		dur := durationFromPresType(talkapp.PresType)
+		propUpdate := getters.ProposalInput{
+			Title:           talkapp.TalkTitle,
+			Description:     talkapp.Description,
+			Setup:           talkapp.Setup,
+			TalkType:        mapPresTypeToTalkType(talkapp.PresType),
+			DesiredDuration: dur,
+			AvailDuration:   dur,
+		}
+		if err := getters.UpdateProposal(ctx, proposal.ID, propUpdate); err != nil {
+			ctx.Err.Printf("/invite-speaker proposal update %s (continuing): %s", proposal.ID, err)
+		} else {
+			// Patch the in-memory proposal so the auto-accept
+			// success message + the rest of this handler see the
+			// new values without re-reading from Notion.
+			proposal.Title = talkapp.TalkTitle
+			if talkapp.Description != "" {
+				proposal.Description = talkapp.Description
+			}
+			if talkapp.Setup != "" {
+				proposal.Setup = talkapp.Setup
+			}
+			if propUpdate.TalkType != "" {
+				proposal.TalkType = propUpdate.TalkType
+			}
+			if dur > 0 {
+				proposal.DesiredDuration = dur
+				proposal.AvailDuration = dur
+			}
+		}
+	}
+
 	// Fire-and-forget Spaces uploads, same as the apply form.
 	if hasNewPic {
 		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)

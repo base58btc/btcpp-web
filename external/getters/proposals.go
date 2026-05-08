@@ -774,7 +774,14 @@ func UpdateProposal(ctx *config.AppContext, proposalID string, in ProposalInput)
 		return nil
 	}
 	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID, vals)
-	return err
+	if err != nil {
+		return err
+	}
+	// Drop the warm cache so subsequent reads (the dashboard, the
+	// admin views) see the updated content fields without waiting
+	// for the periodic refresh.
+	InvalidateProposalsCache()
+	return nil
 }
 
 // ListRecordings fetches every row in RecordingsDb. Used by the warm-cache
