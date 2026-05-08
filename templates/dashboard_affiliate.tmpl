@@ -49,7 +49,7 @@
             <input type="radio" name="BuyerPct" value="{{ . }}"
                    {{ if eq $.Form.BuyerPct . }}checked{{ end }}
                    class="peer sr-only" onchange="updatePctPreview()">
-            <span class="block rounded-md border border-gray-300 bg-white py-3 text-center text-sm font-semibold text-gray-700 peer-checked:bg-green-50 peer-checked:text-green-700 peer-checked:border-green-600">
+            <span class="block rounded-md border border-gray-300 bg-white py-3 text-center text-sm font-semibold text-gray-700 peer-checked:bg-green-100 peer-checked:text-green-800 peer-checked:border-green-600 peer-checked:ring-2 peer-checked:ring-green-600">
               {{ . }}%
             </span>
           </label>
