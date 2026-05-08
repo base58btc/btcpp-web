@@ -5,4 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="/static/js/script.js" type="text/javascript"></script>
     <script src="/static/js/htmx-206.min.js" type="text/javascript"></script>
+    <script>
+      // Salvage misplaced ?code= from the URL fragment. Visitors
+      // who hand-build share links sometimes write
+      //   /conf/{tag}#tickets?code=X
+      // instead of the standard
+      //   /conf/{tag}?code=X#tickets.
+      // The server only sees the query string (not the fragment),
+      // so the misplaced form would silently lose the discount.
+      // Detect on load and bounce to the canonical shape so the
+      // server-side stash logic (RenderConf) picks it up.
+      (function () {
+        if (!window.location.pathname.startsWith('/conf/')) return;
+        const m = window.location.hash.match(/[#?&]code=([^#?&]+)/);
+        if (!m) return;
+        const code = decodeURIComponent(m[1]);
+        let newHash = window.location.hash.replace(/[?&]code=[^#?&]+/, '');
+        if (newHash === '#') newHash = '';
+        const sep = window.location.search ? '&' : '?';
+        window.location.replace(
+          window.location.pathname +
+          window.location.search + sep + 'code=' + encodeURIComponent(code) +
+          newHash
+        );
+      })();
+    </script>
 {{ end }}
