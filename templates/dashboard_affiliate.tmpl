@@ -56,6 +56,19 @@
           {{ end }}
         </div>
         <p id="PctPreview" class="mt-3 text-xs text-gray-600"></p>
+        <div class="mt-3 grid grid-cols-2 gap-2 rounded-md bg-gray-50 px-3 py-2 text-xs">
+          <div>
+            <div class="text-gray-500 uppercase tracking-wider">Buyer pays</div>
+            <div id="ExampleBuyerPays" class="mt-0.5 text-sm font-semibold text-gray-900"></div>
+          </div>
+          <div>
+            <div class="text-gray-500 uppercase tracking-wider">You earn</div>
+            <div id="ExampleYouEarn" class="mt-0.5 text-sm font-semibold text-indigo-700"></div>
+          </div>
+          <div class="col-span-2 text-[11px] text-gray-400">
+            On a $100 ticket.
+          </div>
+        </div>
       </div>
 
       <div class="rounded-md bg-gray-50 px-3 py-2 text-xs text-gray-600">
@@ -84,6 +97,12 @@
       } else {
         out.textContent = 'Buyer saves ' + buyer + '% per ticket. You earn ' + aff + '% per ticket.';
       }
+      // $100-ticket worked example so the percentage abstractly
+      // turns into a number the user can sanity-check against.
+      const buyerPays = 100 - buyer;
+      const youEarn   = aff;
+      document.getElementById('ExampleBuyerPays').textContent = '$' + buyerPays.toFixed(2);
+      document.getElementById('ExampleYouEarn').textContent   = '$' + youEarn.toFixed(2);
     }
     document.addEventListener('DOMContentLoaded', updatePctPreview);
   </script>
