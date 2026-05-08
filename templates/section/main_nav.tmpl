@@ -28,6 +28,9 @@
             <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
           </svg>
         </button>
+        <a href="/dashboard" class="text-sm font-semibold leading-6 text-gray-900 hover:text-indigo-600">
+          Log in <span aria-hidden="true">&rarr;</span>
+        </a>
         <style>
           .transition-in {
             transition-property: opacity transform;
@@ -105,6 +108,11 @@
       </div>
       <div class="mt-6 flow-root">
         <div class="-my-6 divide-y divide-gray-500/10">
+          <div class="py-6">
+            <a href="/dashboard" class="block rounded-lg px-3 py-2 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">
+              Log in <span aria-hidden="true">&rarr;</span>
+            </a>
+          </div>
           <div class="space-y-2 py-6">
             <div>
               {{ if $nav.Upcoming }}
