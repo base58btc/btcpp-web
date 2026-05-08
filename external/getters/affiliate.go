@@ -30,10 +30,13 @@ func CreateAffiliateCode(n *types.Notion, email, codeName string, buyerPct uint,
 	if codeName == "" {
 		return "", fmt.Errorf("CreateAffiliateCode: empty codeName")
 	}
+	// CodeName is the DiscountsDb title-typed property; AffiliateEmail
+	// is an email-typed property. Using rich_text for either gets a
+	// "expected to be title / email" rejection from Notion.
 	props := map[string]*notion.PropertyValue{
-		"CodeName":       richTextValue(codeName),
+		"CodeName":       titleValue(codeName),
 		"Discount":       richTextValue(fmt.Sprintf("%%%d", buyerPct)),
-		"AffiliateEmail": richTextValue(email),
+		"AffiliateEmail": notion.NewEmailPropertyValue(email),
 	}
 	if len(confRefs) > 0 {
 		props["Conference"] = relationValue(confRefs)
@@ -56,7 +59,7 @@ func UpdateAffiliateCode(ctx *config.AppContext, codeID, codeName string, buyerP
 		return fmt.Errorf("UpdateAffiliateCode: empty codeID")
 	}
 	props := map[string]*notion.PropertyValue{
-		"CodeName": richTextValue(codeName),
+		"CodeName": titleValue(codeName),
 		"Discount": richTextValue(fmt.Sprintf("%%%d", buyerPct)),
 		// Always write Conference — empty slice clears any
 		// relation a previous version might have set, so a code
