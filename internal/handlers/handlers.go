@@ -1525,14 +1525,36 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
-	// Stash a ?code= query into the session per-conf so the
-	// tickets-checkout page can pre-fill the Discount field
-	// without the visitor copy-pasting. Tied to the conf tag so
-	// codes from different conf links don't bleed into each
-	// other's checkout. Trimmed because URL-encoded codes
-	// occasionally pick up trailing whitespace.
+	// Stash a ?code= query into the session under disc:{tag} so
+	// the tickets-checkout page can pre-fill the Discount field
+	// without the visitor copy-pasting. Trimmed because
+	// URL-encoded codes occasionally pick up trailing whitespace.
+	//
+	// We ALSO stash the code under every other conf the discount
+	// is valid for — a visitor who lands on /conf/vienna with a
+	// code that's valid at vienna+nairobi gets auto-apply on
+	// nairobi's checkout too, not just on the landing conf's.
+	// Lookup is best-effort: an unknown / expired code still
+	// stashes for the landing conf (the checkout error path will
+	// surface the rejection there).
 	if code := strings.TrimSpace(r.URL.Query().Get("code")); code != "" {
 		ctx.Session.Put(r.Context(), discountSessionKey(conf.Tag), code)
+		if disc, derr := getters.FindDiscount(ctx, code); derr == nil && disc != nil && len(disc.ConfRef) > 0 {
+			allConfs, _ := getters.FetchConfsCached(ctx)
+			tagByRef := make(map[string]string, len(allConfs))
+			for _, c := range allConfs {
+				if c != nil {
+					tagByRef[c.Ref] = c.Tag
+				}
+			}
+			for _, ref := range disc.ConfRef {
+				tag := tagByRef[ref]
+				if tag == "" || tag == conf.Tag {
+					continue
+				}
+				ctx.Session.Put(r.Context(), discountSessionKey(tag), code)
+			}
+		}
 	}
 
 	talks, err := getters.GetTalksFor(ctx, conf.Tag)
