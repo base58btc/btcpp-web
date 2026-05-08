@@ -119,6 +119,12 @@ type (
 		Count         uint
 		DiscountPrice uint
 		Discount      string
+		// AffiliateCode is the silent referral that hitches a
+		// ride through the form when the visitor came in via a
+		// /conf/{tag}?code= link tied to a `%0` affiliate code.
+		// On POST the visible Discount wins — typing a different
+		// code drops the silent affiliate's credit.
+		AffiliateCode string
 		DiscountRef   string
 		HMAC          string
 		PaymentMethod string // "btc" or "fiat"
@@ -130,6 +136,10 @@ type (
 		Discount  string   // raw expression (e.g. "%50", "$10:50", "=25:70")
 		ConfRef   []string
 		UsesCount uint     // current usage count from Notion
+		// AffiliateEmail is set when the code is owned by a
+		// dashboard self-service affiliate. Webhooks read this
+		// to decide whether to record an AffiliateUsage row.
+		AffiliateEmail string
 		// Parsed from Discount expression:
 		DiscType   rune       // '%', '$', or '='
 		Amount     uint       // the number value
@@ -137,6 +147,24 @@ type (
 		ExtraQty   uint       // from +N modifier (BOGO), 0 = not BOGO
 		ValidFrom  *time.Time // from @ modifier, nil = no start restriction
 		ValidUntil *time.Time // from < or @ modifier, nil = no end restriction
+	}
+
+	// AffiliateUsage is one row in the AffiliateUsageDb — appended
+	// once per successful checkout that consumed an affiliate
+	// code. Aggregated by AffiliateEmail to produce the dashboard
+	// stats (tickets sold, $ saved, $ earned). CodeName + ConfTag
+	// are stored as plain strings rather than Notion relations so
+	// the queries are straightforward and rows survive code
+	// renames.
+	AffiliateUsage struct {
+		ID              string
+		CodeName        string
+		AffiliateEmail  string
+		ConfTag         string
+		SatsSavedCents  int64
+		SatsEarnedCents int64
+		TicketsCount    uint
+		Created         *time.Time
 	}
 
 	Speaker struct {

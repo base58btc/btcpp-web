@@ -22,13 +22,18 @@ type (
 	}
 
 	OpenNodeMetadata struct {
-		Email       string  `json:"email"`
-		Quantity    float64 `json:"quantity"`
-		ConfRef     string  `json:"conf-ref"`
-		TixLocal    bool    `json:"tix-local"`
-		DiscountRef string  `json:"discount,omitempty"`
-		Currency    string  `json:"currency"`
-		Subscribe   bool    `json:"subscribe,omitempty"`
+		Email            string  `json:"email"`
+		Quantity         float64 `json:"quantity"`
+		ConfRef          string  `json:"conf-ref"`
+		TixLocal         bool    `json:"tix-local"`
+		DiscountRef      string  `json:"discount,omitempty"`
+		Currency         string  `json:"currency"`
+		Subscribe        bool    `json:"subscribe,omitempty"`
+		// PreDiscountCents is the per-ticket price in cents
+		// before any discount is applied. Webhook reads this to
+		// compute originalCents = PreDiscountCents × Quantity
+		// for the affiliate usage record.
+		PreDiscountCents int64   `json:"pre-discount-cents,omitempty"`
 	}
 
 	OpenNodeChainInvoice struct {

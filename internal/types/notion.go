@@ -38,6 +38,7 @@ type (
                 OrgDb        string
                 SponsorshipsDb string
                 SocialPostsDb  string
+                AffiliateUsageDb string
 	}
 
 	Notion struct {

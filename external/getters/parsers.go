@@ -100,10 +100,11 @@ func parseRichText(key string, props map[string]notion.PropertyValue) string {
 
 func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.DiscountCode {
 	discount := &types.DiscountCode{
-		Ref:       pageID,
-		CodeName:  parseRichText("CodeName", props),
-		Discount:  parseRichText("Discount", props),
-		UsesCount: uint(props["UsesCount"].Number),
+		Ref:            pageID,
+		CodeName:       parseRichText("CodeName", props),
+		Discount:       parseRichText("Discount", props),
+		UsesCount:      uint(props["UsesCount"].Number),
+		AffiliateEmail: parseAffiliateEmail(props),
 	}
 
 	for _, confRef := range props["Conference"].Relation {
@@ -113,6 +114,34 @@ func parseDiscount(pageID string, props map[string]notion.PropertyValue) *types.
 	discount.ParseDiscountExpr()
 
 	return discount
+}
+
+// parseAffiliateEmail reads the AffiliateEmail property as either a
+// Notion email field or a rich_text field, whichever the admin chose
+// to set up. Returning the empty string for missing / unset values
+// means non-affiliate codes (the legacy ones) parse unchanged.
+func parseAffiliateEmail(props map[string]notion.PropertyValue) string {
+	if v, ok := props["AffiliateEmail"]; ok && v.Email != "" {
+		return v.Email
+	}
+	return parseRichText("AffiliateEmail", props)
+}
+
+// parseAffiliateUsage projects one AffiliateUsageDb row into the
+// internal struct. CodeName / Email come from rich_text, ConfTag
+// from a Notion select, the cents + count from numbers, Created
+// from Notion's built-in created_time.
+func parseAffiliateUsage(pageID string, props map[string]notion.PropertyValue, createdAt *time.Time) *types.AffiliateUsage {
+	return &types.AffiliateUsage{
+		ID:              pageID,
+		CodeName:        parseRichText("DiscountCode", props),
+		AffiliateEmail:  parseRichText("AffiliateEmail", props),
+		ConfTag:         parseSelect("Conference", props),
+		SatsSavedCents:  int64(props["SatsSavedCents"].Number),
+		SatsEarnedCents: int64(props["SatsEarnedCents"].Number),
+		TicketsCount:    uint(props["TicketsCount"].Number),
+		Created:         createdAt,
+	}
 }
 
 func parseRef(props map[string]notion.PropertyValue, refname string) string {

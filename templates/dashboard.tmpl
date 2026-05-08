@@ -456,6 +456,61 @@
 </section>
 {{ end }}
 
+{{/* ---- Affiliate ---- */}}
+{{ if .HasAnyTicket }}
+<section id="affiliate" class="mt-8">
+  <div class="bg-white shadow rounded-lg overflow-hidden">
+    <div class="px-4 py-5 sm:p-6">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-base font-semibold text-gray-900">Affiliate</h3>
+          <p class="mt-1 text-sm text-gray-500">Mint your own discount code. Share it; bitcoin++ pays you a cut for every ticket sold via your link.</p>
+        </div>
+        {{ if .AffiliateCode }}
+        <div class="flex items-center gap-2 shrink-0">
+          <a href="/dashboard/affiliate/edit"
+             class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">Update code</a>
+          <form method="POST" action="/dashboard/affiliate/disable" class="inline">
+            <button type="submit"
+                    onclick="return confirm('Disable {{ .AffiliateCode.CodeName }}? Past redemption stats stay; the code stops working immediately.');"
+                    class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">Disable</button>
+          </form>
+        </div>
+        {{ else }}
+        <a href="/dashboard/affiliate/new"
+           class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 shrink-0">Create code</a>
+        {{ end }}
+      </div>
+
+      {{ if .AffiliateCode }}
+      <div class="mt-4 flex flex-wrap items-baseline gap-2">
+        <span class="text-xs text-gray-500">Your code:</span>
+        <code class="inline-flex items-center rounded bg-gray-100 px-2 py-0.5 font-mono text-sm font-semibold text-gray-900">{{ .AffiliateCode.CodeName }}</code>
+        <span class="text-xs text-gray-500">— buyer saves {{ .AffiliateCode.Amount }}% off</span>
+      </div>
+      {{ end }}
+
+      {{ if .AffiliateStats }}
+      <div class="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div class="rounded-md border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Tickets sold</p>
+          <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .AffiliateStats.TicketsSold }}</p>
+        </div>
+        <div class="rounded-md border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">Buyers saved</p>
+          <p class="mt-1 text-2xl font-semibold text-green-700">${{ dollars .AffiliateStats.SavedCents }}</p>
+        </div>
+        <div class="rounded-md border border-gray-200 px-4 py-3">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">You earned</p>
+          <p class="mt-1 text-2xl font-semibold text-indigo-700">${{ dollars .AffiliateStats.EarnedCents }}</p>
+        </div>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+</section>
+{{ end }}
+
 {{/* ---- Discover: per-event cards with hero image + 3 CTAs ----
      Same visual shape as the speaker EventBlocks above, just for
      confs the user has no existing relationship with. */}}

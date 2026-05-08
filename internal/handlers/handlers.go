@@ -150,6 +150,18 @@ func loadTemplates(ctx *config.AppContext) error {
 			return false
 		},
 		"hasPrefix": strings.HasPrefix,
+		"dollars": func(cents int64) string {
+			// "%.2f" with the dollars+cents split keeps negative
+			// values rendering correctly (e.g. -$1.50). Used by
+			// the dashboard affiliate stats — values stored in
+			// cents, displayed as $X.XX.
+			whole := cents / 100
+			frac := cents % 100
+			if frac < 0 {
+				frac = -frac
+			}
+			return fmt.Sprintf("%d.%02d", whole, frac)
+		},
 		"siteStats": func() siteStatsView {
 			return formatSiteStats(getters.FetchSiteStats(ctx))
 		},
@@ -704,6 +716,22 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		SpeakerRolesUpdate(w, r, app)
 	}).Methods("POST")
 
+	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateNew(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateCreate(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateEdit(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateUpdate(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/dashboard/affiliate/disable", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateDisable(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		out := map[string]interface{}{
@@ -1015,6 +1043,72 @@ func discountSessionKey(confTag string) string {
 	return "disc:" + confTag
 }
 
+// affiliateSessionKey is the parallel slot for silent (%0) affiliate
+// codes — the buyer never sees a discount UI, but the code rides
+// through to checkout via a hidden form input so the affiliate still
+// gets credit.
+func affiliateSessionKey(confTag string) string {
+	return "aff:" + confTag
+}
+
+// recordAffiliateUsageFromCheckout writes one AffiliateUsage row to
+// Notion when a successful checkout consumed a discount code that
+// has an AffiliateEmail set. Math:
+//
+//	originalCents = preDiscountCents * count
+//	ceilingCents  = originalCents * 20 / 100
+//	savedCents    = originalCents - entry.Total
+//	earnedCents   = ceilingCents  - savedCents
+//
+// The 20% ceiling is fixed — affiliates earn whatever's left after
+// the buyer's actual savings come out of that ceiling. preDiscount
+// is a string from webhook metadata (Stripe map / OpenNode struct);
+// missing or unparseable means we skip recording rather than
+// guessing. Failures are logged, never fatal — a Notion blip can't
+// block ticket issuance.
+func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, entry *types.Entry, preDiscountCentsStr string) {
+	if conf == nil || entry == nil || entry.DiscountRef == "" {
+		return
+	}
+	disc, err := getters.GetDiscountByRef(ctx, entry.DiscountRef)
+	if err != nil || disc == nil || disc.AffiliateEmail == "" {
+		// Non-affiliate code — nothing to record. Errors are
+		// silent because the discount might just be missing
+		// from cache mid-refresh.
+		return
+	}
+	preDiscount, err := strconv.ParseInt(strings.TrimSpace(preDiscountCentsStr), 10, 64)
+	if err != nil || preDiscount <= 0 {
+		ctx.Err.Printf("affiliate usage skip %s: missing pre-discount-cents (%q)", disc.CodeName, preDiscountCentsStr)
+		return
+	}
+	count := int64(len(entry.Items))
+	if count <= 0 {
+		return
+	}
+	originalCents := preDiscount * count
+	ceilingCents := originalCents * 20 / 100
+	savedCents := originalCents - entry.Total
+	if savedCents < 0 {
+		savedCents = 0
+	}
+	earnedCents := ceilingCents - savedCents
+	if earnedCents < 0 {
+		earnedCents = 0
+	}
+	err = getters.RecordAffiliateUsage(ctx, getters.AffiliateUsageInput{
+		CodeName:        disc.CodeName,
+		AffiliateEmail:  disc.AffiliateEmail,
+		ConfTag:         conf.Tag,
+		SatsSavedCents:  savedCents,
+		SatsEarnedCents: earnedCents,
+		TicketsCount:    uint(count),
+	})
+	if err != nil {
+		ctx.Err.Printf("affiliate usage record %s for %s: %s", disc.CodeName, disc.AffiliateEmail, err)
+	}
+}
+
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
 	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
 	mac.Write([]byte(conf.Ref))
@@ -1025,6 +1119,20 @@ func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discou
 	mac.Write(priceBytes)
 	mac.Write([]byte(discountCode))
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// effectiveDiscountCode picks which of the two form-carried codes
+// drives checkout: a buyer-typed Discount wins over a silent
+// AffiliateCode. The override semantic — "type a different code
+// and the prior affiliate's credit is dropped" — falls out of this:
+// the discount-ref recorded on the entry is whatever the effective
+// code resolves to, so RecordAffiliateUsage only fires for the
+// code that was actually applied.
+func effectiveDiscountCode(typedCode, affiliateCode string) string {
+	if strings.TrimSpace(typedCode) != "" {
+		return typedCode
+	}
+	return affiliateCode
 }
 
 func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -1116,12 +1224,14 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	// Clear the stashed discount code now that the visitor has
-	// completed checkout — otherwise a subsequent ticket purchase
-	// from the same browser session would silently re-apply the
-	// code, even if the original link's owner only intended one
-	// use. Code is per-conf, so other confs' codes (if any) stay.
+	// Clear the stashed discount + silent-affiliate codes now that
+	// the visitor has completed checkout — otherwise a subsequent
+	// ticket purchase from the same browser session would silently
+	// re-apply the code, even if the original link's owner only
+	// intended one use. Per-conf, so other confs' stashed codes
+	// stay put.
 	ctx.Session.Remove(r.Context(), discountSessionKey(conf.Tag))
+	ctx.Session.Remove(r.Context(), affiliateSessionKey(conf.Tag))
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "success.tmpl", &SuccessPage{
 		Conf: conf,
@@ -1525,21 +1635,33 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
-	// Stash a ?code= query into the session under disc:{tag} so
-	// the tickets-checkout page can pre-fill the Discount field
-	// without the visitor copy-pasting. Trimmed because
-	// URL-encoded codes occasionally pick up trailing whitespace.
+	// Stash a ?code= query in the session so the checkout page
+	// can apply it without the visitor copy-pasting. The slot
+	// depends on whether the code is buyer-facing (any non-zero
+	// percent / fixed-amount discount) or a silent affiliate
+	// referral (a `%0` code, which doesn't reduce the buyer's
+	// price but still credits the affiliate at checkout):
 	//
-	// We ALSO stash the code under every other conf the discount
-	// is valid for — a visitor who lands on /conf/vienna with a
-	// code that's valid at vienna+nairobi gets auto-apply on
-	// nairobi's checkout too, not just on the landing conf's.
-	// Lookup is best-effort: an unknown / expired code still
-	// stashes for the landing conf (the checkout error path will
-	// surface the rejection there).
+	//   - Buyer-facing → disc:{tag}     — pre-fills the visible
+	//     Discount input + drives the price preview.
+	//   - Silent affiliate → aff:{tag}  — invisible in the UI;
+	//     a hidden form field carries it through checkout so
+	//     the affiliate gets credited.
+	//
+	// Multi-conf stashing applies to both slots: a code valid for
+	// vienna+nairobi auto-applies on either's checkout.
+	//
+	// Lookup is best-effort. An unknown / expired code falls back
+	// to disc:{tag} for the landing conf (the checkout error path
+	// surfaces the rejection there).
 	if code := strings.TrimSpace(r.URL.Query().Get("code")); code != "" {
-		ctx.Session.Put(r.Context(), discountSessionKey(conf.Tag), code)
-		if disc, derr := getters.FindDiscount(ctx, code); derr == nil && disc != nil && len(disc.ConfRef) > 0 {
+		disc, _ := getters.FindDiscount(ctx, code)
+		stashKey := discountSessionKey
+		if disc != nil && disc.DiscType == '%' && disc.Amount == 0 {
+			stashKey = affiliateSessionKey
+		}
+		ctx.Session.Put(r.Context(), stashKey(conf.Tag), code)
+		if disc != nil && len(disc.ConfRef) > 0 {
 			allConfs, _ := getters.FetchConfsCached(ctx)
 			tagByRef := make(map[string]string, len(allConfs))
 			for _, c := range allConfs {
@@ -1552,7 +1674,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 				if tag == "" || tag == conf.Tag {
 					continue
 				}
-				ctx.Session.Put(r.Context(), discountSessionKey(tag), code)
+				ctx.Session.Put(r.Context(), stashKey(tag), code)
 			}
 		}
 	}
@@ -2280,6 +2402,11 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		if err != nil {
 			ctx.Err.Printf("Failed to increment discount uses: %s", err)
 		}
+		preDiscountStr := ""
+		if charge.Metadata.PreDiscountCents > 0 {
+			preDiscountStr = strconv.FormatInt(charge.Metadata.PreDiscountCents, 10)
+		}
+		recordAffiliateUsageFromCheckout(ctx, conf, &entry, preDiscountStr)
 	}
 
 	ctx.Infos.Println("Added ticket!", entry.ID)
@@ -2310,6 +2437,7 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	r.ParseForm()
 	discountCode := r.Form.Get("Discount")
+	affiliateCode := r.Form.Get("AffiliateCode")
 	discountPrice, err := getPrice(r.Form.Get("DiscountPrice"))
 	if err != nil {
 		ctx.Err.Printf("/tix/%s/apply-discount massively blew up: %s", tixSlug, err)
@@ -2330,17 +2458,32 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
 	}
 
-	/* Calculate the discount */
+	// Effective code: typed wins over silent affiliate. The HMAC
+	// + recorded discount-ref both follow the effective code.
+	effectiveCode := effectiveDiscountCode(discountCode, affiliateCode)
 	var discountRef string
-	discountPrice, discount, err := getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice, 1)
-	if discount != nil {
-		discountRef = discount.Ref
-	}
 	errStr := ""
-	if err != nil {
-		ctx.Err.Printf("/tix/%s/apply-discount discount not available: %s", tixSlug, err)
-		/* We don't bail though.. just continue */
-		errStr = err.Error()
+	if effectiveCode != "" {
+		var discount *types.DiscountCode
+		discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, effectiveCode, tixPrice, 1)
+		if discount != nil {
+			discountRef = discount.Ref
+		}
+		if err != nil {
+			ctx.Err.Printf("/tix/%s/apply-discount discount not available: %s", tixSlug, err)
+			// Silent affiliate codes that fail validation
+			// stay invisible — drop them and proceed at full
+			// price rather than surfacing an error the buyer
+			// didn't trigger.
+			if effectiveCode == affiliateCode && discountCode == "" {
+				affiliateCode = ""
+				discountPrice = tixPrice
+			} else {
+				errStr = err.Error()
+			}
+		}
+	} else {
+		discountPrice = tixPrice
 	}
 
 	w.Header().Set("Content-Type", "text/html")
@@ -2350,10 +2493,11 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		TixSlug:       tixSlug,
 		TixPrice:      tixPrice,
 		Discount:      discountCode,
+		AffiliateCode: affiliateCode,
 		DiscountPrice: discountPrice,
 		DiscountRef:   discountRef,
 		Err:           errStr,
-		HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
+		HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, effectiveCode),
 		Count:         uint(1),
 		Year:          helpers.CurrentYear(),
 	})
@@ -2391,25 +2535,52 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	case http.MethodGet:
 
 		// `?q=` on the checkout URL takes precedence (admin debug
-		// flow); falls back to the session-stashed code from a
-		// /conf/{tag}?code= visit so a visitor who landed via a
-		// shared discount link gets it auto-applied.
+		// flow); otherwise fall back to two parallel session
+		// slots that get populated when a visitor lands via a
+		// shared link:
+		//
+		//   - disc:{tag}  → buyer-facing discount code, pre-fills
+		//     the visible Discount input + drives the price.
+		//   - aff:{tag}   → silent (`%0`) affiliate referral; the
+		//     visible Discount stays empty and no "saved $X" line
+		//     shows, but a hidden AffiliateCode field carries the
+		//     code through the form so checkout still credits the
+		//     affiliate.
+		//
+		// The visible code wins at submit time — see HandleDiscount
+		// + the POST branch's effective-code resolution.
 		discountCode, _ := helpers.GetSessionKey("q", r)
 		if discountCode == "" {
 			discountCode = ctx.Session.GetString(r.Context(), discountSessionKey(conf.Tag))
 		}
+		affiliateCode := ctx.Session.GetString(r.Context(), affiliateSessionKey(conf.Tag))
 
 		discountPrice := tixPrice
 		var errStr string
 		var discountRef string
-		if discountCode != "" {
+		// The "effective" code for this render is the visible one
+		// when present, else the silent affiliate one. CalcDiscount
+		// runs against either — both produce a valid, finalized
+		// price (a `%0` affiliate just leaves the price unchanged).
+		effective := discountCode
+		if effective == "" {
+			effective = affiliateCode
+		}
+		if effective != "" {
 			var discount *types.DiscountCode
-			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, discountCode, tixPrice, 1)
+			discountPrice, discount, err = getters.CalcDiscount(ctx, conf.Ref, effective, tixPrice, 1)
 			if err != nil {
 				ctx.Err.Printf("/tix/%s/checkout discount not available: %s", tixSlug, err)
-				errStr = err.Error()
+				// Silent affiliate codes that fail validation
+				// shouldn't show a buyer-facing error — drop
+				// the affiliate ref and proceed at full price.
+				if effective == affiliateCode && discountCode == "" {
+					affiliateCode = ""
+					discountPrice = tixPrice
+				} else {
+					errStr = err.Error()
+				}
 			}
-
 			if discount != nil {
 				discountRef = discount.Ref
 			}
@@ -2420,10 +2591,11 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			TixSlug:       tixSlug,
 			TixPrice:      tixPrice,
 			Discount:      discountCode,
+			AffiliateCode: affiliateCode,
 			DiscountPrice: discountPrice,
 			DiscountRef:   discountRef,
 			Err:           errStr,
-			HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, discountCode),
+			HMAC:          calcTixHMAC(ctx, conf, tixPrice, discountPrice, effective),
 			Count:         uint(1),
 			Year:          helpers.CurrentYear(),
 			PaymentMethod: paymentMethod,
@@ -2450,13 +2622,41 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
                         return
 		}
 
-		/*  Validate HMAC */
-		expectedHMAC := calcTixHMAC(ctx, conf, tixPrice, form.DiscountPrice, form.Discount)
+		// Resolve the effective discount code: the typed one wins
+		// over the silent affiliate carry-through. Anyone typing a
+		// different code at checkout drops the prior affiliate's
+		// credit because the discount-ref written to Stripe
+		// metadata follows whichever code is actually applied.
+		effectiveCode := effectiveDiscountCode(form.Discount, form.AffiliateCode)
+
+		/*  Validate HMAC over the effective code (matches the
+		 *  HMAC computed on render, which signed over the same
+		 *  effective code — typed vs. silent — that resolves on
+		 *  this submit). */
+		expectedHMAC := calcTixHMAC(ctx, conf, tixPrice, form.DiscountPrice, effectiveCode)
 		if expectedHMAC != form.HMAC {
 			ctx.Err.Printf("/tix/%s/checkout hmac mismatch. %s != %s", tixSlug, expectedHMAC, form.HMAC)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+
+		// Webhook side reads form.DiscountRef to decide whether
+		// to fire RecordAffiliateUsage. Make sure it points at
+		// the EFFECTIVE code's row, not whatever the GET render
+		// originally stamped (a buyer who switched codes mid-
+		// checkout should produce a discount-ref tied to their
+		// chosen code, not to the silent affiliate they walked in
+		// with).
+		if effectiveCode != "" {
+			if disc, derr := getters.FindDiscount(ctx, effectiveCode); derr == nil && disc != nil {
+				form.DiscountRef = disc.Ref
+			}
+		} else {
+			form.DiscountRef = ""
+		}
+		// Keep form.Discount in sync with the effective code so
+		// downstream Stripe metadata + entry.DiscountRef agree.
+		form.Discount = effectiveCode
 
 		isLocal := tixPrice == tix.Local
 
@@ -2496,6 +2696,10 @@ func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.
 	metadata["tix-id"] = tix.ID
 	metadata["discount-ref"] = form.DiscountRef
 	metadata["subscribe"] = fmt.Sprintf("%t", form.Subscribe)
+	// Pre-discount per-ticket price in cents — webhook reads this
+	// to compute originalCents (× ticket count) for the affiliate
+	// math without re-looking-up the ticket tier.
+	metadata["pre-discount-cents"] = strconv.FormatInt(priceAsCents, 10)
 	if isLocal {
 		metadata["tix-local"] = "yes"
 	}
@@ -2540,6 +2744,7 @@ func StripeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 	metadata["conf-tag"] = conf.Tag
 	metadata["conf-ref"] = conf.Ref
 	metadata["tix-id"] = tix.ID
+	metadata["pre-discount-cents"] = strconv.FormatInt(priceAsCents, 10)
 	if tixPrice == tix.Local {
 		metadata["tix-local"] = "yes"
 	}
@@ -2687,6 +2892,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			if err != nil {
 				ctx.Err.Printf("Failed to increment discount uses: %s", err)
 			}
+			recordAffiliateUsageFromCheckout(ctx, conf, &entry, checkout.Metadata["pre-discount-cents"])
 		}
 
 		/* Add to mailing list + send mails */

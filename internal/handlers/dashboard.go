@@ -295,6 +295,9 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		FlashMessage:     r.URL.Query().Get("flash"),
 		FlashError:       r.URL.Query().Get("error"),
 		IsGlobalAdmin:    id.IsGlobalAdmin(),
+		HasAnyTicket:     len(regs) > 0,
+		AffiliateCode:    loadAffiliateCode(ctx, email, len(regs) > 0),
+		AffiliateStats:   loadAffiliateStats(ctx, email, len(regs) > 0),
 		Year:             helpers.CurrentYear(),
 	})
 	if err != nil {
@@ -760,4 +763,39 @@ func calcDashboardStats(speakerConfs []*types.SpeakerConf, volapps []*types.Volu
 		}
 	}
 	return s
+}
+
+// loadAffiliateCode returns the user's live (non-archived) affiliate
+// DiscountCode, or nil when the gate is closed (no tickets) / they
+// haven't made one yet / the cache lookup blipped.
+func loadAffiliateCode(ctx *config.AppContext, email string, eligible bool) *types.DiscountCode {
+	if !eligible || email == "" {
+		return nil
+	}
+	code, err := getters.FindAffiliateCodeByEmail(ctx, email)
+	if err != nil {
+		ctx.Err.Printf("/dashboard affiliate lookup %s: %s", email, err)
+		return nil
+	}
+	return code
+}
+
+// loadAffiliateStats sums every AffiliateUsage row for the user via
+// a live Notion query (no cache, since affiliates expect to see
+// their freshest stats on refresh). Returns zeros when the gate is
+// closed; the template renders zeros as "0 tickets sold / $0".
+func loadAffiliateStats(ctx *config.AppContext, email string, eligible bool) *AffiliateStats {
+	if !eligible || email == "" {
+		return &AffiliateStats{}
+	}
+	totals, err := getters.SumAffiliateStatsByEmail(ctx, email)
+	if err != nil {
+		ctx.Err.Printf("/dashboard affiliate stats %s: %s", email, err)
+		return &AffiliateStats{}
+	}
+	return &AffiliateStats{
+		TicketsSold: totals.TicketsSold,
+		SavedCents:  totals.SavedCents,
+		EarnedCents: totals.EarnedCents,
+	}
 }

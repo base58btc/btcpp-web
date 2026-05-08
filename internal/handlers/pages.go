@@ -74,6 +74,13 @@ type TixFormPage struct {
 	Discount      string
 	DiscountPrice uint
 	DiscountRef   string
+	// AffiliateCode is the silent (`%0`) referral code stashed
+	// from a /conf/{tag}?code= visit. Carried through the form
+	// as a hidden input — the visible Discount field stays empty
+	// for silent codes, but the affiliate still gets credit on
+	// successful checkout. Buyer typing a code into Discount
+	// overrides this on POST.
+	AffiliateCode string
 	HMAC          string
 	Err           string
 	Year          uint
@@ -240,7 +247,26 @@ type DashboardPage struct {
         // gated by EventBlock.AdminRole, not this flag.
         IsGlobalAdmin bool
 
+        // HasAnyTicket gates the affiliate section — visitors who
+        // haven't bought (or been issued) a ticket don't see the
+        // mint-a-code affordance. AffiliateCode is the user's live
+        // code (nil when none); AffiliateStats sums redemptions.
+        HasAnyTicket   bool
+        AffiliateCode  *types.DiscountCode
+        AffiliateStats *AffiliateStats
+
         Year uint
+}
+
+// AffiliateStats are the dashboard headline numbers for the
+// affiliate section. SavedCents is what redeemers paid less than
+// list (the buyer's total discount). EarnedCents is the affiliate's
+// commission, computed as the slack between a fixed 20% ceiling
+// and the buyer's actual savings.
+type AffiliateStats struct {
+        TicketsSold int
+        SavedCents  int64
+        EarnedCents int64
 }
 
 // OrganizerDashboardPage drives /admin/conf/{tag}/ — the per-event
