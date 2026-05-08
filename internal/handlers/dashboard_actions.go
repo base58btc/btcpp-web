@@ -143,13 +143,13 @@ func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 }
 
 // inviteLinkBail redirects an unusable /invite-speaker click to the
-// dashboard with an explanatory flash banner, instead of dropping the
-// recipient on a bare http.Error page. Used by the InviteSpeaker
+// dashboard with an explanatory red error banner, instead of dropping
+// the recipient on a bare http.Error page. Used by the InviteSpeaker
 // handler's pre-flight checks (proposal not found, expired token,
 // terminal status, conf too close).
 func inviteLinkBail(w http.ResponseWriter, r *http.Request, msg string) {
 	http.Redirect(w, r,
-		"/dashboard?flash="+url.QueryEscape(msg),
+		"/dashboard?error="+url.QueryEscape(msg),
 		http.StatusSeeOther)
 }
 

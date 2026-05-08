@@ -293,6 +293,7 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		HasUpcomingTalk:  hasUpTalk,
 		HasUpcomingVol:   hasUpVol,
 		FlashMessage:     r.URL.Query().Get("flash"),
+		FlashError:       r.URL.Query().Get("error"),
 		IsGlobalAdmin:    id.IsGlobalAdmin(),
 		Year:             helpers.CurrentYear(),
 	})
@@ -307,6 +308,7 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 func renderDashboardLogin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_login.tmpl", &DashboardPage{
 		FlashMessage: r.URL.Query().Get("flash"),
+		FlashError:   r.URL.Query().Get("error"),
 		Year:         helpers.CurrentYear(),
 	})
 	if err != nil {

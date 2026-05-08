@@ -229,6 +229,10 @@ type DashboardPage struct {
         HasUpcomingVol  bool
 
         FlashMessage string
+        // FlashError is the parallel red-banner message — used when
+        // a redirect bounces the user with an error rather than a
+        // success notice. Populated from ?error= on the URL.
+        FlashError string
 
         // IsGlobalAdmin gates the role-management panel — only a
         // global-admin can edit other speakers' Roles. Other admin
