@@ -106,6 +106,10 @@
               Upload a file
             </button>
             <img id="LogoLight-preview" alt="" class="hidden h-10 w-auto max-w-[160px] rounded border border-gray-200 bg-white object-contain">
+            <button type="button" data-target="LogoLight"
+                    class="logo-clear-trigger hidden text-xs font-medium text-red-600 hover:text-red-700">
+              Remove
+            </button>
           </div>
           <p id="LogoLight-status" class="mt-1 text-xs text-gray-500">No file selected.</p>
         </div>
@@ -119,6 +123,10 @@
               Upload a file
             </button>
             <img id="LogoDark-preview" alt="" class="hidden h-10 w-auto max-w-[160px] rounded border border-gray-200 bg-gray-900 object-contain">
+            <button type="button" data-target="LogoDark"
+                    class="logo-clear-trigger hidden text-xs font-medium text-red-600 hover:text-red-700">
+              Remove
+            </button>
           </div>
           <p id="LogoDark-status" class="mt-1 text-xs text-gray-500">No file selected.</p>
         </div>
@@ -149,6 +157,7 @@
             const status  = document.getElementById(targetID + '-status');
             const input   = document.getElementById(targetID);
             const preview = document.getElementById(targetID + '-preview');
+            const clear   = document.querySelector('.logo-clear-trigger[data-target="' + targetID + '"]');
             status.textContent = 'Uploading ' + file.name + '…';
             status.className = 'mt-1 text-xs text-gray-700';
             const fd = new FormData();
@@ -162,6 +171,7 @@
                 input.value = data.url;
                 preview.src = data.url;
                 preview.classList.remove('hidden');
+                if (clear) clear.classList.remove('hidden');
                 status.textContent = file.name + ' — uploaded.';
                 status.className = 'mt-1 text-xs text-green-700';
               })
@@ -172,6 +182,27 @@
               .finally(function () {
                 if (activeTarget === targetID) activeTarget = null;
               });
+          });
+
+          // Remove: clears the hidden URL input + hides the preview
+          // and the Remove button itself, so the form submits with
+          // an empty Logo* and the admin sees the upload UI reset.
+          // The file already in Spaces is left untouched (cheap to
+          // keep; content-hashed key means a re-upload of the same
+          // bytes would land on the same key anyway).
+          document.querySelectorAll('.logo-clear-trigger').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              const targetID = btn.dataset.target;
+              const status  = document.getElementById(targetID + '-status');
+              const input   = document.getElementById(targetID);
+              const preview = document.getElementById(targetID + '-preview');
+              input.value = '';
+              preview.removeAttribute('src');
+              preview.classList.add('hidden');
+              btn.classList.add('hidden');
+              status.textContent = 'No file selected.';
+              status.className = 'mt-1 text-xs text-gray-500';
+            });
           });
         })();
       </script>
