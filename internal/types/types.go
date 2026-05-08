@@ -341,6 +341,9 @@ type (
 		Img  string
 		Type string
 		Desc string
+		// Order is the display rank within a conf (smaller =
+		// earlier). Edited from /{conf}/admin/hotels.
+		Order int
 	}
 
         VolInfo struct {

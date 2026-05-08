@@ -872,6 +872,16 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		AdminInviteSpeakerSent(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/{conf}/admin/hotels", func(w http.ResponseWriter, r *http.Request) {
+		HotelsAdmin(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/hotels", func(w http.ResponseWriter, r *http.Request) {
+		HotelsAdminSave(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/hotels/upload-img", func(w http.ResponseWriter, r *http.Request) {
+		HotelImageUpload(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/{conf}/admin/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleConf(w, r, app)
 	}).Methods("GET")

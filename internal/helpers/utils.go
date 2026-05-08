@@ -12,6 +12,7 @@ import (
 	"net/http"
         "net/url"
 	"os"
+	"sort"
         "strings"
 	"time"
 
@@ -211,6 +212,12 @@ func HotelsForConf(ctx *config.AppContext, conf *types.Conf) []*types.Hotel {
 			hotels = append(hotels, hotel)
 		}
 	}
+	// Sort by the Order field (smaller first). Stable sort so two
+	// hotels at the same Order value keep their cache-arrival
+	// order — admins can disambiguate by editing one of them.
+	sort.SliceStable(hotels, func(i, j int) bool {
+		return hotels[i].Order < hotels[j].Order
+	})
 	return hotels
 }
 
