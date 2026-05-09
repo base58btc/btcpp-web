@@ -74,6 +74,16 @@ type (
 		TixSold       uint
 		OGFlavor      string
 		Emoji         string
+		// Timezone is the IANA name of the conference venue's local
+		// time (e.g. "Europe/Vienna", "America/Toronto"). Read from
+		// the Notion ConfsDb "Timezone" field. Empty when the field
+		// hasn't been filled in for this conf yet — callers should
+		// fall back via Conf.Loc() rather than reading TZ directly.
+		Timezone      string
+		// TZ is the parsed *time.Location of Timezone, or nil when
+		// Timezone is empty / unparseable. Populated once at parseConf
+		// time so hot paths don't pay LoadLocation per request.
+		TZ            *time.Location
 	}
 
         // ConfInfo is the per-day schedule strip for a conference: when
@@ -688,6 +698,18 @@ func datesBetween(start, end time.Time) []time.Time {
                 dates = append(dates, d)
         }
         return dates
+}
+
+// Loc returns the conference's local timezone. Prefers the explicit
+// Timezone field (parsed into TZ at parseConf time); falls back to
+// StartDate.Location() when the conf row hasn't been migrated to
+// have a Timezone yet — same behavior as before this field existed.
+// Always non-nil so callers can use it directly with time.Date.
+func (c *Conf) Loc() *time.Location {
+        if c.TZ != nil {
+                return c.TZ
+        }
+        return c.StartDate.Location()
 }
 
 func (c *Conf) InFuture() bool {

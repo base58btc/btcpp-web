@@ -41,7 +41,7 @@ func buildAgendaDays(conf *types.Conf, talks []*types.Talk, infosByDay map[int]*
 	if conf == nil {
 		return nil
 	}
-	loc := conf.StartDate.Location()
+	loc := conf.Loc()
 	startDate := dayStart(conf.StartDate, loc)
 
 	byDay := make(map[int][]*types.Talk)

@@ -638,9 +638,13 @@ func dayOpenCloseMinutes(ci *types.ConfInfo) (open, close int) {
 
 // dayDateFor returns midnight of the conf's Nth day in the conf's tz.
 // Conf.StartDate may carry a non-midnight time (Notion stores whatever
-// the admin enters), so we floor to the day.
+// the admin enters), so we floor to the day. Critically, this is the
+// function the schedule handler uses to construct a new TalkTime —
+// using conf.Loc() (which prefers the explicit Notion Timezone) means
+// the times the scheduler writes back to ConfTalk are in the
+// conference's local zone, not the app's GMT-5.
 func dayDateFor(conf *types.Conf, dayIdx int) time.Time {
-	loc := conf.StartDate.Location()
+	loc := conf.Loc()
 	t := conf.StartDate.In(loc)
 	base := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
 	return base.AddDate(0, 0, dayIdx-1)
@@ -650,7 +654,7 @@ func dayDateFor(conf *types.Conf, dayIdx int) time.Time {
 // conf.StartDate's calendar day. Compares dates in the conf's tz to
 // avoid timezone-mismatch off-by-ones.
 func dayIndexFor(conf *types.Conf, when time.Time) int {
-	loc := conf.StartDate.Location()
+	loc := conf.Loc()
 	w := when.In(loc)
 	wDay := time.Date(w.Year(), w.Month(), w.Day(), 0, 0, 0, 0, loc)
 	c := conf.StartDate.In(loc)

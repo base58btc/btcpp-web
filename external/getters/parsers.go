@@ -337,11 +337,29 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 
         stdate := parseDate("StartDate", props)
         if stdate != nil {
-                conf.StartDate = *stdate        
+                conf.StartDate = *stdate
         }
         edate := parseDate("EndDate", props)
         if edate != nil {
                 conf.EndDate = *edate
+        }
+
+        // Timezone is an IANA name (e.g. "Europe/Vienna"). Pre-load
+        // the *time.Location once at parse time so hot paths in
+        // scheduling / agenda rendering hit Conf.Loc() without a
+        // LoadLocation round-trip per request. Read tolerant of the
+        // Notion column type — try select first (the natural fit
+        // for an enum-shaped IANA name) and fall back to rich_text
+        // so either schema choice round-trips. Unparseable values
+        // leave TZ nil; callers fall back via Loc().
+        conf.Timezone = strings.TrimSpace(parseSelect("Timezone", props))
+        if conf.Timezone == "" {
+                conf.Timezone = strings.TrimSpace(parseRichText("Timezone", props))
+        }
+        if conf.Timezone != "" {
+                if loc, err := time.LoadLocation(conf.Timezone); err == nil {
+                        conf.TZ = loc
+                }
         }
 
 	return conf
@@ -572,9 +590,15 @@ func parseConfInfo(pageID string, props map[string]notion.PropertyValue, confByT
         if conf == nil || day < 1 {
                 return ci
         }
-        // Day 1 = StartDate. Day N is StartDate + (N-1) days, in the
-        // conf's own timezone.
-        anchor := conf.StartDate.AddDate(0, 0, day-1)
+        // anchor = midnight of the conf's Nth day in the conf's local
+        // timezone. parseHHMM reads day.Location() for the constructed
+        // wall-clock time, so anchoring in conf.Loc() (rather than
+        // StartDate's own zone — which Notion may have stored as UTC)
+        // is what makes "9:30 AM coffee" land on the right absolute
+        // instant for the conf's location.
+        loc := conf.Loc()
+        sd := conf.StartDate.In(loc)
+        anchor := time.Date(sd.Year(), sd.Month(), sd.Day(), 0, 0, 0, 0, loc).AddDate(0, 0, day-1)
         ci.Doors = parseTimesRange("Doors", props, anchor)
         ci.Breakfast = parseTimesRange("Breakfast", props, anchor)
         ci.Lunch = parseTimesRange("Lunch", props, anchor)

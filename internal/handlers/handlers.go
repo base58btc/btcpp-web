@@ -4508,7 +4508,7 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 // overnight shift).
 func parseShiftFormTimes(conf *types.Conf, dayStr, startStr, endStr string) (time.Time, time.Time, error) {
 	// Accept either Notion's "01/02/2006" or HTML date input "2006-01-02"
-	loc := conf.StartDate.Location()
+	loc := conf.Loc()
 	var day time.Time
 	var err error
 	if t, e := time.ParseInLocation("2006-01-02", dayStr, loc); e == nil {
