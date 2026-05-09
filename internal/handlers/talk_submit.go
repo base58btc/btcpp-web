@@ -377,7 +377,7 @@ func sendTalkAppLetter(ctx *config.AppContext, conf *types.Conf, res SubmitResul
 		// has at least one recipient.
 		proposal.SpeakerConfRefs = []string{res.SpeakerConfID}
 	}
-	if err := emails.SendOnlyForProposal(ctx, "talkapp", proposal, conf); err != nil {
+	if err := emails.SendOnlyForProposal(ctx, "talkapp", proposal, conf, ""); err != nil {
 		ctx.Err.Printf("/talk %s: SendOnlyForProposal talkapp: %s", applicantEmail, err)
 	}
 }

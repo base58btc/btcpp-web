@@ -184,7 +184,7 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		// Every other status change (Invite / Waitlist / Decline /
 		// Reject) fires its own letter. Best-effort — admin can
 		// re-fire from the email composer if the send blips.
-		if err := emails.SendOnlyForProposal(ctx, action.Letter, proposal, conf); err != nil {
+		if err := emails.SendOnlyForProposal(ctx, action.Letter, proposal, conf, ""); err != nil {
 			ctx.Err.Printf("/%s/admin/review send %s (continuing): %s", conf.Tag, action.Letter, err)
 		}
 	}

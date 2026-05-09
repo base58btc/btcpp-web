@@ -111,6 +111,13 @@ type (
                 // originated invite flow). Empty for the regular review
                 // letters (talkinvited / talkconfirmed / etc.).
                 MagicLink       string
+                // Note is a free-text personal message from the admin
+                // who originated the invitation, surfaced in the
+                // talkinvited-direct letter so the recipient sees a
+                // human voice ("hey jane, would love to have you
+                // back, here's the form…"). Empty for letters fired
+                // by automated status changes (talkconfirmed, etc.).
+                Note            string
                 URI             string
         }
 )
@@ -241,8 +248,13 @@ func OnlyForVolShift(ctx *config.AppContext, volinfo *types.VolInfo, vol *types.
 // proposal had no speakers at all to send to).
 //
 // onlyFor is one of: talkinvited, talkconfirmed, talkdeclined,
-// talkwaitlisted, talkrejected.
-func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types.Proposal, conf *types.Conf) error {
+// talkwaitlisted, talkrejected, talkinvited-direct, talkselfdecline.
+//
+// note is a free-text personal message attached to the rendered data
+// shape (.Note) — currently used only by the admin invite-speaker
+// flow's talkinvited-direct letter so the organizer can include a
+// human nudge. Pass "" when no note applies.
+func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types.Proposal, conf *types.Conf, note string) error {
         if proposal == nil {
                 return fmt.Errorf("SendOnlyForProposal: nil proposal")
         }
@@ -284,6 +296,7 @@ func SendOnlyForProposal(ctx *config.AppContext, onlyFor string, proposal *types
                         TalkConfirmLink: helpers.EmailLink(ctx, sp.Email, "/dashboard/talks/"+proposal.ID+"/confirm"),
                         DashboardLink:   helpers.EmailLink(ctx, sp.Email, "/dashboard"),
                         MagicLink:       helpers.InviteLink(ctx, proposal.ID, proposal.InviteToken),
+                        Note:            note,
                         URI:             ctx.Env.GetURI(),
                 }
                 if _, err := execOnlyFor(ctx, sp.Email, onlyFor, data); err != nil {

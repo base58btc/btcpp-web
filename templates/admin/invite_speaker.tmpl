@@ -68,6 +68,14 @@
         <p class="mt-1 text-xs text-gray-500">Disabled when attaching to an existing proposal — the proposal already has a type.</p>
       </fieldset>
 
+      <div>
+        <label for="Note" class="block text-sm font-semibold text-gray-900">Personal note <span class="text-gray-400 font-normal">(optional)</span></label>
+        <p class="mt-1 text-xs text-gray-500">A short message to include in the invitation email — e.g. why you're inviting them, what you'd like them to talk about. Leave blank for the boilerplate template.</p>
+        <textarea id="Note" name="Note" rows="4"
+                  placeholder="Hey Jane — would love to have you back at bitcoin++ this year. The lightning track has a slot you'd be perfect for…"
+                  class="mt-2 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">{{ .Form.Note }}</textarea>
+      </div>
+
       <div class="flex items-center justify-end gap-3 pt-2">
         <a href="/{{ .Conf.Tag }}/admin" class="text-sm text-gray-600 hover:text-gray-800">Cancel</a>
         <button type="submit"

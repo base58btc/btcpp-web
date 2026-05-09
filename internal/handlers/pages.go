@@ -369,6 +369,7 @@ type AdminInviteSpeakerPage struct {
                 SpeakerID         string
                 AttachProposalID  string
                 TalkType          string
+                Note              string
         }
         Year uint
 }

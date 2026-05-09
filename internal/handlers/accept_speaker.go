@@ -95,7 +95,7 @@ func fanoutAcceptedProposal(ctx *config.AppContext, proposal *types.Proposal, co
 	if proposal == nil || conf == nil {
 		return
 	}
-	if err := emails.SendOnlyForProposal(ctx, "talkconfirmed", proposal, conf); err != nil {
+	if err := emails.SendOnlyForProposal(ctx, "talkconfirmed", proposal, conf, ""); err != nil {
 		ctx.Err.Printf("fanoutAcceptedProposal %s: send talkconfirmed: %s", proposal.ID, err)
 	}
 	now := time.Now()

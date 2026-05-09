@@ -837,7 +837,7 @@ func DashboardDeclineInvite(w http.ResponseWriter, r *http.Request, ctx *config.
 		http.Error(w, "decline failed", http.StatusInternalServerError)
 		return
 	}
-	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor); err != nil {
+	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor, ""); err != nil {
 		ctx.Err.Printf("/dashboard decline send talkselfdecline (continuing): %s", err)
 	}
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Invitation declined. Thanks for letting us know."), http.StatusSeeOther)
@@ -1079,7 +1079,7 @@ func InviteSpeakerDecline(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		http.Error(w, "decline failed", http.StatusInternalServerError)
 		return
 	}
-	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor); err != nil {
+	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor, ""); err != nil {
 		ctx.Err.Printf("/invite-speaker/%s/decline send talkselfdecline (continuing): %s", proposalID, err)
 	}
 	http.Redirect(w, r,

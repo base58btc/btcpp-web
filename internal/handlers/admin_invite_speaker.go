@@ -65,6 +65,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 	speakerID := strings.TrimSpace(r.FormValue("SpeakerID"))
 	attachProposalID := strings.TrimSpace(r.FormValue("AttachProposalID"))
 	talkType := strings.TrimSpace(r.FormValue("TalkType"))
+	note := strings.TrimSpace(r.FormValue("Note"))
 
 	formErr := func(msg string) {
 		page := &AdminInviteSpeakerPage{
@@ -79,6 +80,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 		page.Form.SpeakerID = speakerID
 		page.Form.AttachProposalID = attachProposalID
 		page.Form.TalkType = talkType
+		page.Form.Note = note
 		if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/invite_speaker.tmpl", page); err != nil {
 			ctx.Err.Printf("/%s/admin/invite-speaker re-render: %s", conf.Tag, err)
 		}
@@ -153,7 +155,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 	// the new SpeakerConf so the fanout collapses to one recipient.
 	soloProposal := *proposal
 	soloProposal.SpeakerConfRefs = []string{scID}
-	if err := emails.SendOnlyForProposal(ctx, "talkinvited-direct", &soloProposal, conf); err != nil {
+	if err := emails.SendOnlyForProposal(ctx, "talkinvited-direct", &soloProposal, conf, note); err != nil {
 		ctx.Err.Printf("/%s/admin/invite-speaker send letter: %s", conf.Tag, err)
 		// Non-fatal — the admin still gets the magic link to send manually.
 	}
