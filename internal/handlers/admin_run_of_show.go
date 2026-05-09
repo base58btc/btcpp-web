@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -11,6 +12,46 @@ import (
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/types"
 )
+
+// venuePalette is the cycle of hex colors assigned to venues for the
+// Where-column text on the run-of-show. Tailwind 700-shade equivalents
+// so the colors stay legible on the white table background and
+// reasonably distinct under a B&W printer if anyone prints in mono.
+// Picked by sorted-index of the conf's venue list, so a given conf
+// always gets the same mapping across renders.
+var venuePalette = []string{
+	"#4338ca", // indigo-700
+	"#047857", // emerald-700
+	"#be123c", // rose-700
+	"#b45309", // amber-700
+	"#0e7490", // cyan-700
+}
+
+// venueLabels maps the raw Notion venue tags (the multi-select values
+// stored on ConfInfo.Venues / ConfTalk.Venue) to friendly display
+// labels per conference. Anything not in this map renders as the raw
+// tag — admins can keep entering Notion-friendly slugs while the
+// run-of-show shows the human-readable name.
+var venueLabels = map[string]map[string]string{
+	"vienna": {
+		"one": "Main Stage",
+		"two": "Talks Stage",
+	},
+}
+
+// venueLabel resolves a raw venue tag to its display label for a
+// given conf, falling back to the raw tag when no mapping is set.
+func venueLabel(confTag, raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if m, ok := venueLabels[confTag]; ok {
+		if l, ok := m[raw]; ok {
+			return l
+		}
+	}
+	return raw
+}
 
 // RunOfShowAdmin renders /{conf}/admin/run-of-show — a per-day
 // timeline table interleaving ConfInfo events (doors, coffee, lunch),
@@ -67,23 +108,42 @@ func RunOfShowAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return d
 	}
 
+	// Each entry with a time range produces TWO rows — one at start
+	// and one at end — bucketed independently so an overnight shift
+	// (start day N, end day N+1) lands on both days correctly.
+	//
+	// Normalize every row's Start to conf-local tz before bucketing
+	// + sorting. parseTimes returns whatever zone Notion stored
+	// (typically UTC for datetimes), but parseTimesRange anchors
+	// ConfInfo events to conf-local. Without this conversion, a shift
+	// end at "17:00 UTC" displays as "5:00 PM" but sorts at the same
+	// instant as "09:00 conf-local" — which is exactly the
+	// "shift ends in the wrong chronological position" symptom.
+	loc := conf.Loc()
+	addRows := func(rows []*RunOfShowRow) {
+		for _, row := range rows {
+			if row == nil {
+				continue
+			}
+			row.Start = row.Start.In(loc)
+			idx := dayIndexFor(conf, row.Start)
+			dayFor(idx).Rows = append(dayFor(idx).Rows, row)
+		}
+	}
 	for _, ci := range infos {
-		d := dayFor(ci.Day)
-		d.Rows = append(d.Rows, rowsFromConfInfo(ci)...)
+		addRows(rowsFromConfInfo(ci))
 	}
 	for _, t := range talks {
 		if t == nil || t.Sched == nil {
 			continue
 		}
-		idx := dayIndexFor(conf, t.Sched.Start)
-		dayFor(idx).Rows = append(dayFor(idx).Rows, rowFromTalk(t))
+		addRows(rowsFromTalk(conf.Tag, t))
 	}
 	for _, s := range shifts {
 		if s == nil || s.ShiftTime == nil {
 			continue
 		}
-		idx := dayIndexFor(conf, s.ShiftTime.Start)
-		dayFor(idx).Rows = append(dayFor(idx).Rows, rowFromShift(s, volByRef))
+		addRows(rowsFromShift(s, volByRef))
 	}
 
 	days := make([]*RunOfShowDay, 0, len(dayByIdx))
@@ -95,9 +155,34 @@ func RunOfShowAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 	sort.Slice(days, func(i, j int) bool { return days[i].Idx < days[j].Idx })
 
+	// Collect unique non-empty venue tags across every talk row so
+	// the template can render a checkbox per venue. Sort by display
+	// label for stable, alphabetical UI, then assign each venue a
+	// color from a fixed palette by sorted-index — same conf always
+	// gets the same color mapping across renders.
+	venueSeen := map[string]bool{}
+	var venues []VenueOption
+	for _, d := range days {
+		for _, row := range d.Rows {
+			if row.VenueTag == "" || venueSeen[row.VenueTag] {
+				continue
+			}
+			venueSeen[row.VenueTag] = true
+			venues = append(venues, VenueOption{
+				Tag:   row.VenueTag,
+				Label: venueLabel(conf.Tag, row.VenueTag),
+			})
+		}
+	}
+	sort.SliceStable(venues, func(i, j int) bool { return venues[i].Label < venues[j].Label })
+	for i := range venues {
+		venues[i].Color = venuePalette[i%len(venuePalette)]
+	}
+
 	page := &RunOfShowPage{
 		Conf:         conf,
 		Days:         days,
+		Venues:       venues,
 		FlashMessage: r.URL.Query().Get("flash"),
 		Year:         helpers.CurrentYear(),
 	}
@@ -107,22 +192,50 @@ func RunOfShowAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 }
 
+// rangedRows emits a "start" row at t.Start and, when t.End is set
+// and is strictly after t.Start, a matching "end" row prefixed with
+// "End: " so the timeline shows both moments at their actual times.
+// startRow carries the full content (Who / Where); the end row keeps
+// only the labelled What so the timeline doesn't repeat speaker /
+// venue info on the closing line.
+func rangedRows(t *types.Times, kind, label, who, where string) []*RunOfShowRow {
+	if t == nil {
+		return nil
+	}
+	rows := []*RunOfShowRow{{
+		Start: t.Start,
+		Kind:  kind,
+		What:  label,
+		Who:   who,
+		Where: where,
+	}}
+	if t.End != nil && t.End.After(t.Start) {
+		rows = append(rows, &RunOfShowRow{
+			Start: *t.End,
+			Kind:  kind,
+			What:  "End: " + label,
+		})
+	}
+	return rows
+}
+
 // rowsFromConfInfo emits timeline rows for the per-day strip events.
-// Doors specifically gets two rows (open + close) when End is set —
-// it reads more naturally than a ranged "8 AM – 8 PM Doors". Meals
-// stay as a single ranged row.
+// Each event with an End time produces two rows (start + end), placed
+// at their respective times so the run-of-show reads chronologically.
 func rowsFromConfInfo(ci *types.ConfInfo) []*RunOfShowRow {
 	var rows []*RunOfShowRow
 	if ci == nil {
 		return rows
 	}
+	// Doors gets a custom pair so the labels read "Doors open" /
+	// "Doors close" rather than "Doors" / "End: Doors".
 	if ci.Doors != nil {
 		rows = append(rows, &RunOfShowRow{
 			Start: ci.Doors.Start,
 			Kind:  "info",
 			What:  "Doors open",
 		})
-		if ci.Doors.End != nil {
+		if ci.Doors.End != nil && ci.Doors.End.After(ci.Doors.Start) {
 			rows = append(rows, &RunOfShowRow{
 				Start: *ci.Doors.End,
 				Kind:  "info",
@@ -130,43 +243,20 @@ func rowsFromConfInfo(ci *types.ConfInfo) []*RunOfShowRow {
 			})
 		}
 	}
-	if ci.Breakfast != nil {
-		rows = append(rows, &RunOfShowRow{
-			Start: ci.Breakfast.Start,
-			End:   ci.Breakfast.End,
-			Kind:  "info",
-			What:  "Breakfast",
-		})
-	}
-	if ci.Coffee != nil {
-		rows = append(rows, &RunOfShowRow{
-			Start: ci.Coffee.Start,
-			End:   ci.Coffee.End,
-			Kind:  "info",
-			What:  "Coffee",
-		})
-	}
-	if ci.Lunch != nil {
-		rows = append(rows, &RunOfShowRow{
-			Start: ci.Lunch.Start,
-			End:   ci.Lunch.End,
-			Kind:  "info",
-			What:  "Lunch",
-		})
-	}
+	rows = append(rows, rangedRows(ci.Breakfast, "info", "Breakfast", "", "")...)
+	rows = append(rows, rangedRows(ci.Coffee, "info", "Coffee", "", "")...)
+	rows = append(rows, rangedRows(ci.Lunch, "info", "Lunch", "", "")...)
 	return rows
 }
 
-// rowFromTalk turns a Talk into a Run-of-Show row. Speaker names are
-// joined with ", " in the order the talk's Speakers slice carries.
-func rowFromTalk(t *types.Talk) *RunOfShowRow {
-	row := &RunOfShowRow{
-		Start: t.Sched.Start,
-		End:   t.Sched.End,
-		Kind:  "talk",
-		What:  t.Name,
-		Where: t.Venue,
-	}
+// rowsFromTalk emits a single timeline row for a talk. The talk's
+// duration is folded into the label as "Title (30m)" rather than
+// emitting a separate "End:" row at the close time — talks fit
+// densely on the page and an inline duration reads more cleanly than
+// duplicate rows. Where carries the human-readable venue label
+// (resolved per confTag); the raw tag rides along on VenueTag for
+// the per-venue visibility toggle.
+func rowsFromTalk(confTag string, t *types.Talk) []*RunOfShowRow {
 	names := make([]string, 0, len(t.Speakers))
 	seen := map[string]bool{}
 	for _, sp := range t.Speakers {
@@ -176,23 +266,25 @@ func rowFromTalk(t *types.Talk) *RunOfShowRow {
 		seen[sp.ID] = true
 		names = append(names, sp.Name)
 	}
-	row.Who = strings.Join(names, ", ")
-	return row
+	label := t.Name
+	if t.Sched.End != nil && t.Sched.End.After(t.Sched.Start) {
+		durMin := int(t.Sched.End.Sub(t.Sched.Start).Minutes())
+		label = fmt.Sprintf("%s (%dm)", t.Name, durMin)
+	}
+	return []*RunOfShowRow{{
+		Start:    t.Sched.Start,
+		Kind:     "talk",
+		What:     label,
+		Who:      strings.Join(names, ", "),
+		Where:    venueLabel(confTag, t.Venue),
+		VenueTag: t.Venue,
+	}}
 }
 
-// rowFromShift turns a WorkShift into a Run-of-Show row. The Who
-// column lists every assigned volunteer's name, with the shift leader
-// rendered first and tagged " (lead)" so the responsible person is
-// obvious. Unresolved volunteer refs (cache miss) are silently
-// skipped — the shift still shows up, just with a shorter Who list.
-func rowFromShift(s *types.WorkShift, volByRef map[string]*types.Volunteer) *RunOfShowRow {
-	row := &RunOfShowRow{
-		Start: s.ShiftTime.Start,
-		End:   s.ShiftTime.End,
-		Kind:  "shift",
-		What:  shiftLabel(s),
-	}
-
+// rowsFromShift emits a start row listing every assigned volunteer
+// (leader first, tagged " (lead)") and, when the shift has an End
+// time, a closing "End: <label>" row at the shift's end.
+func rowsFromShift(s *types.WorkShift, volByRef map[string]*types.Volunteer) []*RunOfShowRow {
 	var who []string
 	included := map[string]bool{}
 	if s.ShiftLeaderRef != "" {
@@ -212,8 +304,7 @@ func rowFromShift(s *types.WorkShift, volByRef map[string]*types.Volunteer) *Run
 		who = append(who, v.Name)
 		included[ref] = true
 	}
-	row.Who = strings.Join(who, ", ")
-	return row
+	return rangedRows(s.ShiftTime, "shift", shiftLabel(s), strings.Join(who, ", "), "")
 }
 
 // shiftLabel produces the "What" string for a volunteer shift row.

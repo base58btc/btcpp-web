@@ -290,8 +290,23 @@ type OrganizerDashboardPage struct {
 type RunOfShowPage struct {
         Conf         *types.Conf
         Days         []*RunOfShowDay
+        // Venues is the deduped list of talk venues across the conf,
+        // alphabetized by display Label. Drives the per-venue
+        // visibility checkboxes at the top of the page.
+        Venues       []VenueOption
         FlashMessage string
         Year         uint
+}
+
+// VenueOption pairs a raw venue tag (the Notion select value used
+// on ConfTalk.Venue) with its human-readable display label and a
+// hex color for the run-of-show Where column. Colors cycle through
+// a small palette so different venues are visually distinct on the
+// printed timeline (e.g. "Main Stage" vs "Talks Stage").
+type VenueOption struct {
+        Tag   string
+        Label string
+        Color string
 }
 
 // RunOfShowDay groups every row falling on a single calendar day in
@@ -305,14 +320,20 @@ type RunOfShowDay struct {
 }
 
 // RunOfShowRow is one timeline row. Kind drives row styling
-// ("info" / "shift" / "talk"). End is nil for instant events.
+// ("info" / "shift" / "talk"). Ranged ConfInfo events (Breakfast /
+// Coffee / Lunch / Doors) and volunteer shifts produce TWO rows —
+// a start row with full content and an "End:" row at the close time
+// — so a chronological timeline shows both moments at their actual
+// positions. Talks emit a SINGLE row with their duration baked into
+// What ("Title (30m)") rather than a separate end row, since talks
+// pack densely on the page.
 type RunOfShowRow struct {
-        Start time.Time
-        End   *time.Time
-        Kind  string
-        What  string
-        Who   string
-        Where string
+        Start    time.Time
+        Kind     string
+        What     string
+        Who      string
+        Where    string // human-readable label (post-venueLabel translation)
+        VenueTag string // raw venue tag for per-venue visibility toggle
 }
 
 // ReviewProposalPage drives /admin/conf/{tag}/review — the
