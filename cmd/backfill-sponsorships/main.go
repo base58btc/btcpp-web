@@ -22,7 +22,7 @@
 // Reads the (edited) TSV. For each row: looks up the Org by website
 // (falling back to name match), refuses to insert if no Org exists,
 // and otherwise calls getters.RegisterSponsorship with the conf
-// relation + canonical Level. Status defaults to "Confirmed". Writes
+// relation + canonical Level. Status defaults to "Committed". Writes
 // progress to stderr; safe to re-run because the upload is idempotent
 // per (conf, org) — duplicates get skipped.
 package main
@@ -369,7 +369,7 @@ func runUpload(inPath string, dry bool) {
 			Confs:  []*types.Conf{conf},
 			Level:  row.TierCanonical,
 			Label:  row.TierLabelRaw,
-			Status: "Confirmed",
+			Status: "Committed",
 		}
 		if dry {
 			log.Printf("dry: would register %s @ %s · %s", org.Name, conf.Tag, row.TierCanonical)

@@ -93,10 +93,10 @@ func groupSponsorTiers(all []*types.Sponsorship) []*SponsorTier {
 		if sp == nil || sp.Org == nil {
 			continue
 		}
-		// Only Paid / Committed / Confirmed sponsorships render on
-		// the public page. Anything else — including blank Status —
-		// is treated as not-yet-public and gets hidden until the
-		// admin moves it forward.
+		// Only Paid / Committed sponsorships render on the public
+		// page. Anything else — including blank Status — is treated
+		// as not-yet-public and gets hidden until the admin moves it
+		// forward.
 		if !visibleSponsorStatus(sp.Status) {
 			continue
 		}
@@ -150,12 +150,12 @@ func groupSponsorTiers(all []*types.Sponsorship) []*SponsorTier {
 }
 
 // visibleSponsorStatus returns true for Sponsorship.Status values
-// that should appear on the public conf page. Paid / Committed /
-// Confirmed are all "the deal is locked in" states; anything else
-// (Pending, Invoiced, blank, …) stays hidden.
+// that should appear on the public conf page. Paid / Committed are
+// "the deal is locked in" states; anything else (Pending, Invoiced,
+// blank, …) stays hidden.
 func visibleSponsorStatus(s string) bool {
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "paid", "committed", "confirmed":
+	case "paid", "committed":
 		return true
 	}
 	return false
