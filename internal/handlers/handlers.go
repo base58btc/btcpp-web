@@ -254,6 +254,12 @@ func loadTemplates(ctx *config.AppContext) error {
 			}
 			return spaces.PublicURL("speakers/" + photo)
 		},
+		"inviteLink": func(p *types.Proposal) string {
+			if p == nil {
+				return ""
+			}
+			return helpers.InviteLink(ctx, p.ID, p.InviteToken)
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err

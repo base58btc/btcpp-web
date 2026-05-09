@@ -70,10 +70,21 @@
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ .Proposal.Title }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ .Proposal.Status }}</td>
                                 <td class="px-6 py-4 text-right">
-                                    {{ if or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
-                                    <span class="text-xs text-gray-400">—</span>
-                                    {{ else }}
-                                    <span class="inline-flex items-center gap-2">
+                                    {{ $invite := inviteLink .Proposal }}
+                                    {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
+                                    <span class="inline-flex items-center gap-2 justify-end">
+                                        {{ if $invite }}
+                                        <button type="button"
+                                                data-invite-url="{{ $invite }}"
+                                                class="copy-invite-btn inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                                            Copy invite
+                                        </button>
+                                        {{ end }}
+                                        {{ if $terminal }}
+                                        {{ if not $invite }}
+                                        <span class="text-xs text-gray-400">—</span>
+                                        {{ end }}
+                                        {{ else }}
                                         {{ if ne .Proposal.Status "Invited" }}
                                         <button type="submit"
                                             formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/invite?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
@@ -102,8 +113,8 @@
                                             class="text-xs text-gray-500 hover:text-gray-800 underline bg-transparent border-0 p-0">
                                             Mark Confirmed
                                         </button>
+                                        {{ end }}
                                     </span>
-                                    {{ end }}
                                 </td>
                             </tr>
                             {{ end }}
@@ -131,6 +142,31 @@
         var checkboxes = document.querySelectorAll('.app-checkbox');
         checkboxes.forEach(function(cb) { cb.checked = source.checked; });
     }
+    // Per-row Copy invite buttons. data-invite-url carries the speaker's
+    // pre-built magic link so we don't string-build at click time;
+    // server-rendered to keep the template in charge of URL shape.
+    (function () {
+      document.querySelectorAll('.copy-invite-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var url = btn.dataset.inviteUrl;
+          if (!url) return;
+          var original = btn.textContent;
+          navigator.clipboard.writeText(url).then(function () {
+            btn.textContent = 'Copied!';
+            btn.classList.add('bg-green-600');
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            setTimeout(function () {
+              btn.textContent = original;
+              btn.classList.remove('bg-green-600');
+              btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }, 1500);
+          }).catch(function () {
+            btn.textContent = 'Copy failed';
+            setTimeout(function () { btn.textContent = original; }, 1500);
+          });
+        });
+      });
+    })();
     </script>
   </body>
 </html>
