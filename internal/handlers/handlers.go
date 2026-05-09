@@ -1227,6 +1227,13 @@ func acceptedSpeakersForConf(ctx *config.AppContext, confTag string, talks []*ty
 	// Source 2: Accepted/Scheduled proposals scheduled for this conf.
 	// Best-effort — if the proposals cache read errors we still
 	// return the talks-derived list rather than blanking the page.
+	//
+	// Cached Proposals only have SpeakerConfRefs (raw page IDs) — the
+	// Speakers []*SpeakerConf slice is populated only by callers that
+	// run resolveProposalSpeakers (e.g. LoadTalksFromConfTalks). Walk
+	// the refs directly via the SpeakerConf cache so this works on
+	// proposals that haven't been provisioned a ConfTalk yet (which
+	// is exactly the case this source is meant to catch).
 	proposals, err := getters.FetchProposalsCached(ctx)
 	if err != nil {
 		ctx.Err.Printf("acceptedSpeakersForConf %s proposals: %s", confTag, err)
@@ -1242,7 +1249,8 @@ func acceptedSpeakersForConf(ctx *config.AppContext, confTag string, talks []*ty
 		if p.ScheduleFor == nil || p.ScheduleFor.Tag != confTag {
 			continue
 		}
-		for _, sc := range p.Speakers {
+		for _, ref := range p.SpeakerConfRefs {
+			sc := getters.FetchSpeakerConfByID(ref)
 			if sc == nil || sc.Speaker == nil {
 				continue
 			}
