@@ -116,6 +116,19 @@ func MakeWorkShifts(ctx *config.AppContext, conf *types.Conf) (int, error) {
 			hasClose = true
 		}
 
+		// Day-of setup on Day 1: 1h before doors open → +4h, 6
+		// people. Catches the venue-touch tasks that can only
+		// happen morning-of (signage, A/V check, registration
+		// table layout) — separate from the day-before setup
+		// crew which handles bigger move-in work.
+		if i == 0 {
+			dayOfStart := doorsOpen.Add(-1 * time.Hour)
+			dayOfEnd := dayOfStart.Add(4 * time.Hour)
+			create(setup, "setup",
+				"Setup, Day of",
+				dayOfStart, dayOfEnd, 6, 0)
+		}
+
 		// Check-in AM/PM — per day, not per venue.
 		amStart := doorsOpen.Add(-30 * time.Minute)
 		amEnd := amStart.Add(4 * time.Hour)
