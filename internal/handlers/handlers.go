@@ -1173,16 +1173,35 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// filterSpeakers returns the deduped Speaker list for the conf page's
-// "Who's Coming" section. Restricted to talks whose Proposal status
-// is "Accepted" or "Scheduled" — anything else (Applied / InReview /
-// Waitlisted / Invited / WeDecline / TheyDecline / Rejected) is
-// filtered out so legacy ConfTalks for non-confirmed proposals
-// don't surface their speakers.
-func filterSpeakers(talks []*types.Talk) types.Speakers {
+// acceptedSpeakersForConf returns the deduped speaker list for the
+// conf page's "Who's Coming" section. Unions two sources so the list
+// is complete even when one side is sparsely populated:
+//
+//   1. Speakers attached to ConfTalk-backed Talks for this conf with
+//      Proposal.Status == Accepted/Scheduled. This is the source the
+//      previous filterSpeakers used and remains the primary feed for
+//      events whose Proposal rows don't have ScheduleFor set
+//      (older confs / hand-entered ConfTalks pre-dating the
+//      proposal-flow).
+//
+//   2. Accepted/Scheduled Proposals whose ScheduleFor.Tag matches
+//      this conf. Picks up speakers attached to a freshly-Accepted
+//      proposal whose ConfTalk hasn't been provisioned yet (accept
+//      pipeline failure, status flipped manually in Notion, etc).
+//
+// Any status other than Accepted/Scheduled is filtered out (Applied
+// / InReview / Waitlisted / Invited / WeDecline / TheyDecline /
+// Rejected). Speaker views get Company / OrgLogo overlaid from the
+// per-conf SpeakerConf row so templates referencing Speaker.Company
+// render the conf-specific affiliation rather than the stale top-
+// level Speaker.Company.
+func acceptedSpeakersForConf(ctx *config.AppContext, confTag string, talks []*types.Talk) types.Speakers {
 	var speakers types.Speakers
-	already := make(map[string]int)
+	seen := make(map[string]bool)
 
+	// Source 1: speakers from ConfTalk-backed Talks (the existing
+	// pipeline). Talks already carry conf-overlaid Speaker views
+	// from talkFromConfTalk, so we just dedupe and append.
 	for _, talk := range talks {
 		if talk == nil {
 			continue
@@ -1190,11 +1209,45 @@ func filterSpeakers(talks []*types.Talk) types.Speakers {
 		if talk.Status != StatusAccepted && talk.Status != "Scheduled" {
 			continue
 		}
-		for _, speaker := range talk.Speakers {
-			if _, ok := already[speaker.ID]; !ok {
-				speakers = append(speakers, speaker)
-				already[speaker.ID] = 1
+		for _, sp := range talk.Speakers {
+			if sp == nil || seen[sp.ID] {
+				continue
 			}
+			seen[sp.ID] = true
+			speakers = append(speakers, sp)
+		}
+	}
+
+	// Source 2: Accepted/Scheduled proposals scheduled for this conf.
+	// Best-effort — if the proposals cache read errors we still
+	// return the talks-derived list rather than blanking the page.
+	proposals, err := getters.FetchProposalsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("acceptedSpeakersForConf %s proposals: %s", confTag, err)
+		return speakers
+	}
+	for _, p := range proposals {
+		if p == nil {
+			continue
+		}
+		if p.Status != StatusAccepted && p.Status != "Scheduled" {
+			continue
+		}
+		if p.ScheduleFor == nil || p.ScheduleFor.Tag != confTag {
+			continue
+		}
+		for _, sc := range p.Speakers {
+			if sc == nil || sc.Speaker == nil {
+				continue
+			}
+			if seen[sc.Speaker.ID] {
+				continue
+			}
+			seen[sc.Speaker.ID] = true
+			view := *sc.Speaker
+			view.Company = sc.Company
+			view.OrgLogo = sc.OrgPhoto
+			speakers = append(speakers, &view)
 		}
 	}
 	return speakers
@@ -1216,7 +1269,7 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	}
 
 	var evSpeakers types.Speakers
-	evSpeakers = filterSpeakers(talks)
+	evSpeakers = acceptedSpeakersForConf(ctx, conf.Tag, talks)
 
 	sort.Sort(talks)
 	sort.Sort(evSpeakers)
@@ -1719,7 +1772,7 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 
 	var evSpeakers types.Speakers
-	evSpeakers = filterSpeakers(talks)
+	evSpeakers = acceptedSpeakersForConf(ctx, conf.Tag, talks)
 	sort.Sort(evSpeakers)
 
 	soldCount := getters.SoldTixCached(ctx, conf)
