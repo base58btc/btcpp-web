@@ -81,8 +81,10 @@ body {
           <blockquote class="speaker text-lg font-semibold text-white sm:text-xl/8">
             <p>{{ .Name }}</p>
           </blockquote>
-          <figcaption class="mt-4 text-base text-white"> 
-            <div class="talk font-semibold">{{ .TalkTitle }}</div>
+          <figcaption class="mt-4 text-base text-white">
+	    {{ if ne .Company "" }}
+            <div class="talk font-semibold">{{ .Company }}</div>
+	    {{ end }}
 	    {{ if ne .Twitter "" }}
             <div class="social mt-1">@{{ .Twitter }}</div>
 	    {{ end }}

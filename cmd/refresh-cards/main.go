@@ -155,7 +155,7 @@ func main() {
 				continue
 			}
 			log.Printf("→ %s: %d talks", c.Tag, len(confTalks))
-			handlers.RefreshTalkCardsForce(appCtx, confTalks)
+			handlers.RefreshTalkCardsForceOpt(appCtx, confTalks, *force)
 			handlers.RefreshSponsorCardsForConfOpt(appCtx, c, "", *force)
 			refreshed++
 		}
@@ -196,7 +196,7 @@ func main() {
 		return
 	}
 
-	handlers.RefreshTalkCardsForce(appCtx, filtered)
+	handlers.RefreshTalkCardsForceOpt(appCtx, filtered, *force)
 
 	// Sponsor cards aren't tied to a talk; refresh them per-conf when
 	// -conf is set. Skipped on a no-flag full sweep because the
@@ -206,7 +206,7 @@ func main() {
 		confs, _ := getters.FetchConfsCached(appCtx)
 		for _, c := range confs {
 			if c != nil && c.Tag == *confTag {
-				handlers.RefreshSponsorCardsForConf(appCtx, c)
+				handlers.RefreshSponsorCardsForConfOpt(appCtx, c, "", *force)
 				break
 			}
 		}

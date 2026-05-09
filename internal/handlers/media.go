@@ -96,11 +96,11 @@ type TalkCard struct {
 }
 
 type SpeakerCard struct {
-	ConfTag   string
-	TalkTitle string
-	TalkImg   string
-	Name      string
-	Twitter   string
+	ConfTag string
+	TalkImg string
+	Name    string
+	Company string
+	Twitter string
 }
 
 type SponsorCard struct {
@@ -338,11 +338,11 @@ func PreviewSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	template := fmt.Sprintf("media/%s_%s.tmpl", confTag, card)
 	err := ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
-		ConfTag:   confTag,
-		Name:      "Speaker's Name",
-		TalkTitle: "This is a very long talk Name: one that goes way too far",
-		TalkImg:   "riga_clock.png",
-		Twitter:   "niftynei",
+		ConfTag: confTag,
+		Name:    "Speaker's Name",
+		Company: "Acme Bitcoin Co.",
+		TalkImg: "riga_clock.png",
+		Twitter: "niftynei",
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -380,21 +380,13 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	// Hide TBD placeholder titles from the rendered speaker card —
-	// the speaker is on the program, but we don't want to broadcast
-	// a placeholder name as if it were the real talk title.
-	talkTitle := talk.Name
-	if isTBDTitle(talkTitle) {
-		talkTitle = ""
-	}
-
 	template := fmt.Sprintf("media/speaker_%s.tmpl", card)
 	err = ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
-		ConfTag:   confTag,
-		Name:      speaker.Name,
-		TalkTitle: talkTitle,
-		TalkImg:   talk.Clipart,
-		Twitter:   speaker.TwitterHandle(),
+		ConfTag: confTag,
+		Name:    speaker.Name,
+		Company: speaker.Company,
+		TalkImg: talk.Clipart,
+		Twitter: speaker.TwitterHandle(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)

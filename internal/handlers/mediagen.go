@@ -46,6 +46,17 @@ func readFileHead(path string) []byte {
 	return buf[:n]
 }
 
+// InvalidateTalkManifest forces the next talkClipartFingerprint call
+// to re-fetch from Spaces. Used by the clipart-upload admin handler
+// after a successful PUT so subsequent card-hash computations see
+// the new entry without waiting on the 5-min TTL.
+func InvalidateTalkManifest() {
+	talkManifestMu.Lock()
+	talkManifest = nil
+	talkManifestFetchedAt = time.Time{}
+	talkManifestMu.Unlock()
+}
+
 // talkClipartFingerprint returns the manifest-recorded hash for a
 // given clipart filename. Empty when the manifest hasn't been
 // uploaded, the filename isn't listed, or the fetch errors. Cached
@@ -89,21 +100,11 @@ func speakerCardHash(speaker *types.Speaker, talk *types.Talk) string {
 	h.Write([]byte(speaker.Photo))
 	h.Write([]byte(speaker.Twitter.Handle))
 	h.Write([]byte(speaker.Company))
-	// Hash the EFFECTIVE talk title — the same string the renderer
-	// will paint onto the card. MakeSpeakerCard blanks TBD titles, so
-	// hashing them as "" here busts only the TBD-titled cards (other
-	// cards keep their existing hash) and lets a re-run regenerate
-	// them with the new no-title render.
-	effectiveTitle := talk.Name
-	if isTBDTitle(effectiveTitle) {
-		effectiveTitle = ""
-	}
-	h.Write([]byte(effectiveTitle))
+	// Talk title isn't rendered on the speaker card anymore (only
+	// Name / Company / Twitter handle), but the talk's clipart
+	// is still the card's background so it stays in the hash.
 	h.Write([]byte(talk.Clipart))
 	h.Write(readFileHead("static/img/speakers/" + speaker.Photo))
-	// Clipart fingerprint comes from the talks/_manifest.json blob in
-	// Spaces (maintained by upload-talk-cliparts) since static/img/
-	// talks/ is no longer on local disk.
 	h.Write([]byte(talkClipartFingerprint(talk.Clipart)))
 	return fmt.Sprintf("%x", h.Sum(nil))[:16]
 }
@@ -128,22 +129,33 @@ func talkCardHash(talk *types.Talk) string {
 }
 
 func generateAndUploadSpeakerPng(ctx *config.AppContext, confTag, card string, speaker *types.Speaker, talk *types.Talk) (string, error) {
+	return generateAndUploadSpeakerPngOpt(ctx, confTag, card, speaker, talk, false)
+}
+
+// generateAndUploadSpeakerPngOpt is the force-aware variant. force=true
+// bypasses both the in-memory hash dedup and the Spaces.Exists check
+// so a re-render always happens — used by the CLI's -force flag for a
+// full re-render sweep (e.g. when a template style change should
+// propagate to every existing card without bumping per-talk inputs).
+func generateAndUploadSpeakerPngOpt(ctx *config.AppContext, confTag, card string, speaker *types.Speaker, talk *types.Talk, force bool) (string, error) {
 	key := fmt.Sprintf("%s/speakers/%s-%s-%s.png", confTag, talk.ID, speaker.ID, card)
 	hash := speakerCardHash(speaker, talk)
 
-	cardHashesMu.Lock()
-	if cardHashes[key] == hash {
-		cardHashesMu.Unlock()
-		return spaces.PublicURL(key), nil
-	}
-	cardHashesMu.Unlock()
-
-	// If already in Spaces, just record the hash without re-uploading
-	if spaces.Exists(key) {
+	if !force {
 		cardHashesMu.Lock()
-		cardHashes[key] = hash
+		if cardHashes[key] == hash {
+			cardHashesMu.Unlock()
+			return spaces.PublicURL(key), nil
+		}
 		cardHashesMu.Unlock()
-		return spaces.PublicURL(key), nil
+
+		// If already in Spaces, just record the hash without re-uploading
+		if spaces.Exists(key) {
+			cardHashesMu.Lock()
+			cardHashes[key] = hash
+			cardHashesMu.Unlock()
+			return spaces.PublicURL(key), nil
+		}
 	}
 
         ctx.Infos.Printf("generating speaker media %s (%s)", key, hash)
@@ -166,25 +178,33 @@ func generateAndUploadSpeakerPng(ctx *config.AppContext, confTag, card string, s
 }
 
 func generateAndUploadTalkPng(ctx *config.AppContext, confTag, card string, talk *types.Talk) (string, error) {
+	return generateAndUploadTalkPngOpt(ctx, confTag, card, talk, false)
+}
+
+// generateAndUploadTalkPngOpt is the force-aware variant. See the
+// speaker-side companion for the rationale.
+func generateAndUploadTalkPngOpt(ctx *config.AppContext, confTag, card string, talk *types.Talk, force bool) (string, error) {
 	key := fmt.Sprintf("%s/talks/%s-%s.png", confTag, talk.ID, card)
 	hash := talkCardHash(talk)
 
-	cardHashesMu.Lock()
-	if cardHashes[key] == hash {
-		cardHashesMu.Unlock()
-		return spaces.PublicURL(key), nil
-	}
-	cardHashesMu.Unlock()
-
-	// If already in Spaces, just record the hash without re-uploading.
-	// Still set ConfTalk.SocialCard since we may have generated the file
-	// in a previous run that didn't write back the path (or it got cleared).
-	if spaces.Exists(key) {
+	if !force {
 		cardHashesMu.Lock()
-		cardHashes[key] = hash
+		if cardHashes[key] == hash {
+			cardHashesMu.Unlock()
+			return spaces.PublicURL(key), nil
+		}
 		cardHashesMu.Unlock()
-		writeSocialCardPath(ctx, talk.ID, key, card)
-		return spaces.PublicURL(key), nil
+
+		// If already in Spaces, just record the hash without re-uploading.
+		// Still set ConfTalk.SocialCard since we may have generated the file
+		// in a previous run that didn't write back the path (or it got cleared).
+		if spaces.Exists(key) {
+			cardHashesMu.Lock()
+			cardHashes[key] = hash
+			cardHashesMu.Unlock()
+			writeSocialCardPath(ctx, talk.ID, key, card)
+			return spaces.PublicURL(key), nil
+		}
 	}
 
 	ctx.Infos.Printf("generating talks media %s (%s)", key, hash)
@@ -368,7 +388,7 @@ func RefreshTalkCards(ctx *config.AppContext, talks []*types.Talk) {
 		return
 	}
 	defer atomic.StoreInt32(&refreshRunning, 0)
-	refreshTalkCards(ctx, talks, true)
+	refreshTalkCards(ctx, talks, true, false)
 }
 
 // RefreshTalkCardsForce is the CLI-friendly variant. No atomic guard (one-
@@ -376,10 +396,18 @@ func RefreshTalkCards(ctx *config.AppContext, talks []*types.Talk) {
 // useful for back-filling cards on past events (e.g., when migrating to a
 // new ConfTalk-keyed file layout).
 func RefreshTalkCardsForce(ctx *config.AppContext, talks []*types.Talk) {
-	refreshTalkCards(ctx, talks, false)
+	refreshTalkCards(ctx, talks, false, false)
 }
 
-func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive bool) {
+// RefreshTalkCardsForceOpt is the force-aware variant. force=true
+// bypasses the in-memory hash dedup AND the Spaces.Exists short-
+// circuit so every card actually re-renders. Used by the CLI's
+// -force flag for full sweeps after a template change.
+func RefreshTalkCardsForceOpt(ctx *config.AppContext, talks []*types.Talk, force bool) {
+	refreshTalkCards(ctx, talks, false, force)
+}
+
+func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive, force bool) {
 	confs, _ := getters.FetchConfsCached(ctx)
 	confset := helpers.ConfTagSet(confs)
 
@@ -398,7 +426,7 @@ func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive
 		// use Clipart only as a background image; the speaker info
 		// still renders without it, so let those generate regardless.
 		if talk.Clipart != "" {
-			if _, err := generateAndUploadTalkPng(ctx, talk.Event, card, talk); err != nil {
+			if _, err := generateAndUploadTalkPngOpt(ctx, talk.Event, card, talk, force); err != nil {
 				ctx.Err.Printf("media refresh talks: %s", err)
 			}
 		}
@@ -408,14 +436,14 @@ func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive
 				continue
 			}
 			for _, cardtype := range []string{card, "insta", "social"} {
-				if _, err := generateAndUploadSpeakerPng(ctx, talk.Event, cardtype, speaker, talk); err != nil {
+				if _, err := generateAndUploadSpeakerPngOpt(ctx, talk.Event, cardtype, speaker, talk, force); err != nil {
 					ctx.Err.Printf("media refresh speakers: %s", err)
 				}
 			}
 		}
 	}
 
-	ctx.Infos.Printf("media refresh talks: finished (%d talks, requireActive=%v)", len(talks), requireActive)
+	ctx.Infos.Printf("media refresh talks: finished (%d talks, requireActive=%v, force=%v)", len(talks), requireActive, force)
 
 	cardHashesMu.Lock()
 	hashCopy := make(map[string]string, len(cardHashes))
