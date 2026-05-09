@@ -278,6 +278,13 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		// "discover").
 		eligible = excludeConfsInBlocks(eligible, activeBlocks)
 		buyable = excludeConfsInBlocks(buyable, activeBlocks)
+		// buildEventBlocks already sorted active by StartDate, but
+		// the admin-only blocks just got appended to the end —
+		// re-sort so the dashboard renders strictly in time order
+		// regardless of which path each block came from.
+		sort.Slice(activeBlocks, func(i, j int) bool {
+			return activeBlocks[i].Conf.StartDate.Before(activeBlocks[j].Conf.StartDate)
+		})
 	}
 	var hasUpTalk, hasUpVol bool
 	for _, b := range activeBlocks {
