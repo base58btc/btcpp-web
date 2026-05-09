@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Cliparts · {{ .Conf.Desc }}</title>
+  {{ block "header" . }} {{ end }}
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#127912;</text></svg>">
+  <style>
+    .clipart-thumb {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #f3f4f6;
+    }
+    .clipart-paste-zone {
+      border: 2px dashed #cbd5e1;
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      font-size: 11px;
+      color: #64748b;
+      cursor: pointer;
+    }
+    .clipart-paste-zone.has-image {
+      border-color: #4f46e5;
+      color: #1e293b;
+    }
+  </style>
+</head>
+<body class="bg-gray-50">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mx-auto max-w-5xl">
+      <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+      <h1 class="mt-1 text-xl font-bold text-gray-900">Talk cliparts</h1>
+      <p class="mt-1 text-sm text-gray-500">Upload an image per talk. PNG only — the AVIF version is generated server-side. Files land in <code class="font-mono text-xs">talks/&lt;name&gt;.{png,avif}</code> and the manifest updates so future card refreshes pick up the change.</p>
+
+      {{ if .FlashMessage }}
+      <div class="mt-4 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+        <p class="text-sm text-green-800">{{ .FlashMessage }}</p>
+      </div>
+      {{ end }}
+      {{ if .ErrorMessage }}
+      <div class="mt-4 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+        <p class="text-sm text-red-800">{{ .ErrorMessage }}</p>
+      </div>
+      {{ end }}
+
+      {{ if not .Rows }}
+      <div class="mt-6 bg-white shadow rounded-lg px-4 py-12 text-center text-sm text-gray-500">
+        No talks for {{ .Conf.Desc }} yet.
+      </div>
+      {{ else }}
+      <div class="mt-6 bg-white shadow rounded-lg overflow-hidden">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">Current</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talk</th>
+              <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-72">Upload</th>
+              <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-20">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            {{ range .Rows }}
+            <tr>
+              <td class="px-4 py-3 align-middle">
+                {{ if .ClipartURL }}
+                <img src="{{ .ClipartURL }}" alt="" class="clipart-thumb" />
+                {{ else }}
+                <div class="clipart-thumb flex items-center justify-center text-xs text-gray-400">—</div>
+                {{ end }}
+              </td>
+              <td class="px-4 py-3 align-middle text-sm">
+                <p class="font-medium text-gray-900">{{ .TalkTitle }}</p>
+                {{ if .CurrentClipart }}
+                <p class="text-xs text-gray-500 font-mono">{{ .CurrentClipart }}</p>
+                {{ end }}
+              </td>
+              <td class="px-4 py-3 align-middle">
+                <form method="POST"
+                      action="/{{ $.Conf.Tag }}/admin/cliparts/{{ .TalkID }}"
+                      enctype="multipart/form-data"
+                      class="clipart-form flex flex-col gap-1">
+                  <div class="flex items-center gap-1">
+                    <input type="text" name="filename"
+                           value="{{ .SuggestedName }}"
+                           required
+                           pattern="[a-zA-Z0-9_\-]+"
+                           class="w-full rounded border border-gray-300 px-2 py-1 text-xs font-mono"
+                           placeholder="{{ $.Conf.Tag }}_keyword" />
+                    <span class="text-xs text-gray-400 font-mono">.png</span>
+                  </div>
+                  <input type="file" name="image" accept="image/png" required
+                         class="text-xs hidden clipart-file-input" />
+                  <div class="flex items-center gap-1.5">
+                    <button type="button"
+                            class="clipart-paste-zone hover:bg-indigo-50 flex-1 text-center"
+                            data-paste="1">
+                      📋 Paste / click to choose
+                    </button>
+                  </div>
+                  <p class="clipart-status text-[11px] text-gray-500 hidden"></p>
+                </form>
+              </td>
+              <td class="px-4 py-3 align-middle text-right">
+                <button type="button"
+                        class="clipart-save inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
+                        disabled>
+                  Save
+                </button>
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <script>
+    // Each row's paste zone tries the Clipboard API on click; if no
+    // image is available there it falls back to the hidden file
+    // input's native picker. The Save button stays disabled until
+    // the row has bytes to upload.
+    (function () {
+      document.querySelectorAll('.clipart-form').forEach(function (form) {
+        const paste = form.querySelector('.clipart-paste-zone');
+        const fileInput = form.querySelector('.clipart-file-input');
+        const status = form.querySelector('.clipart-status');
+        const save = form.parentElement.parentElement.querySelector('.clipart-save');
+
+        function setStaged(label) {
+          paste.classList.add('has-image');
+          paste.textContent = '✓ ' + label;
+          status.classList.remove('hidden');
+          status.textContent = 'Ready to save.';
+          save.disabled = false;
+        }
+
+        async function tryPaste() {
+          if (!navigator.clipboard || !navigator.clipboard.read) {
+            fileInput.click();
+            return;
+          }
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              for (const type of item.types) {
+                if (type !== 'image/png' && !type.startsWith('image/')) continue;
+                const blob = await item.getType(type);
+                const ext = blob.type.split('/')[1] || 'png';
+                const file = new File([blob], 'pasted.' + ext, { type: blob.type });
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                setStaged('clipboard image (' + Math.round(blob.size / 1024) + ' KB)');
+                return;
+              }
+            }
+            // Clipboard had no image — fall back to native file picker.
+            fileInput.click();
+          } catch (e) {
+            // Permission denied / no clipboard support → file picker.
+            fileInput.click();
+          }
+        }
+
+        paste.addEventListener('click', tryPaste);
+
+        fileInput.addEventListener('change', function () {
+          if (fileInput.files && fileInput.files.length > 0) {
+            const f = fileInput.files[0];
+            setStaged(f.name + ' (' + Math.round(f.size / 1024) + ' KB)');
+          }
+        });
+
+        // Submit button lives outside the form; wire the click via
+        // form.requestSubmit() so HTML5 validation still fires.
+        save.addEventListener('click', function () {
+          form.requestSubmit();
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

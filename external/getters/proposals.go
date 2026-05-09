@@ -744,6 +744,24 @@ func ConfTalkSetSocialCard(n *types.Notion, confTalkID, path string) error {
 	return err
 }
 
+// ConfTalkSetClipart writes a clipart filename onto ConfTalk.Clipart.
+// The Notion column is title-typed (not rich_text — parseRichText
+// reads it back fine because go-notion exposes both shapes
+// uniformly, but writes have to use the matching type or Notion
+// rejects with "Clipart is expected to be title").
+//
+// Used by the admin clipart-upload UI after the bytes land in
+// Spaces — templates reference Clipart as just the filename
+// ("vienna_bitcoin.png") and compose the URL via the talkClipart
+// template func.
+func ConfTalkSetClipart(n *types.Notion, confTalkID, filename string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), confTalkID,
+		map[string]*notion.PropertyValue{
+			"Clipart": titleValue(filename),
+		})
+	return err
+}
+
 // UpdateProposal applies a partial update to a Proposal page — only fields
 // set on `in` are written. Used by the speaker-side proposal editor on the
 // dashboard.

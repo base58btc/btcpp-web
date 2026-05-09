@@ -807,6 +807,17 @@ func FetchTalksCached(ctx *config.AppContext) ([]*types.Talk, error) {
 	return talks, nil
 }
 
+// InvalidateTalksCache forces the next FetchTalksCached call to
+// queue a refresh, even within the TTL window. The talks slice is
+// derived from ConfTalks via listTalks, so callers that mutate a
+// ConfTalk row (e.g. clipart upload) need to invalidate THIS cache
+// too — InvalidateConfTalksCache only busts the lower-level
+// confTalk index. Without this, GET /admin/cliparts after an upload
+// returns the stale derived slice and the new clipart doesn't show.
+func InvalidateTalksCache() {
+	lastTalksFetch = time.Time{}
+}
+
 func getDiscounts(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting discounts...")

@@ -309,6 +309,27 @@ type VenueOption struct {
         Color string
 }
 
+// AdminClipartsPage drives /{conf}/admin/cliparts — a per-talk table
+// for uploading clipart images. Each row exposes the talk title,
+// current Clipart filename (if any), a suggested filename derived
+// from the title (`{conftag}_<keyword>`), and an upload form.
+type AdminClipartsPage struct {
+        Conf         *types.Conf
+        Rows         []*ClipartRow
+        FlashMessage string
+        ErrorMessage string
+        Year         uint
+}
+
+// ClipartRow carries a single talk's clipart-upload row.
+type ClipartRow struct {
+        TalkID         string
+        TalkTitle      string
+        CurrentClipart string // bare filename ("vienna_bitcoin.png") or empty
+        SuggestedName  string // `{conftag}_<keyword>` minus extension
+        ClipartURL     string // Spaces URL of CurrentClipart, "" when empty
+}
+
 // RunOfShowDay groups every row falling on a single calendar day in
 // the conf's timezone. Idx is the conf-relative day index (Day 1 =
 // Conf.StartDate); zero or negative for setup days that fall before

@@ -21,6 +21,11 @@ func ShortID(data []byte) string {
 
 const ffmpegTimeout = 60 * time.Second
 
+// MakeAVIF transcodes any image bytes into AVIF. When `size > 0`, the
+// output is force-scaled to size×size with lanczos resampling (used
+// by the speaker-photo pipeline, where photos are pre-cropped square).
+// When `size <= 0`, the original aspect ratio is preserved — used by
+// talk cliparts which aren't all square.
 func MakeAVIF(data []byte, size int) ([]byte, error) {
 	in, err := os.CreateTemp("", "imgproc-in-*")
 	if err != nil {
@@ -44,19 +49,28 @@ func MakeAVIF(data []byte, size int) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), ffmpegTimeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "ffmpeg",
+	args := []string{
 		"-hide_banner", "-loglevel", "error", "-y",
 		"-i", in.Name(),
-		"-vf", fmt.Sprintf("scale=%d:%d:flags=lanczos", size, size),
+	}
+	if size > 0 {
+		args = append(args, "-vf", fmt.Sprintf("scale=%d:%d:flags=lanczos", size, size))
+	}
+	args = append(args,
 		"-c:v", "libaom-av1",
 		"-still-picture", "1",
 		"-cpu-used", "8",
 		outName,
 	)
+
+	cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return nil, fmt.Errorf("ffmpeg %dx%d: %w (stderr: %s)", size, size, err, stderr.String())
+		if size > 0 {
+			return nil, fmt.Errorf("ffmpeg %dx%d: %w (stderr: %s)", size, size, err, stderr.String())
+		}
+		return nil, fmt.Errorf("ffmpeg avif: %w (stderr: %s)", err, stderr.String())
 	}
 	return os.ReadFile(outName)
 }
