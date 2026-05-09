@@ -121,6 +121,18 @@ func makeJobKeyRep(email string, letter *mtypes.Letter) string {
 	return fmt.Sprintf("%s-%s-%d", letter.Missive(), jobhash, time.Now().Unix())
 }
 
+// makeJobKeyDedupe is the no-timestamp variant for letters where we
+// WANT the mailer-side dedupe to actually bite. Currently used only by
+// the ticket letter (SendOnlyForTicket): the cron re-runs every job
+// every tick and a fresh time.Now().Unix() in the key would punch
+// straight through the mailer's idempotency layer, double-delivering
+// every ticket on every restart. The standard makeJobKeyRep keeps its
+// timestamp for letters where re-firing IS the intent.
+func makeJobKeyDedupe(email string, letter *mtypes.Letter) string {
+	jobhash := helpers.MakeJobHash(email, letter.UID, letter.Title)
+	return fmt.Sprintf("%s-%s", letter.Missive(), jobhash)
+}
+
 
 // OnlyForLogin sends a magic-link email pointing at /dashboard. Reuses the
 // existing "vollogin" Notion letter (its template field is named
@@ -509,7 +521,9 @@ func SendOnlyForTicket(ctx *config.AppContext, conf *types.Conf, email string, p
 
         // Per-recipient idempotency key: same (email, ticket) pair
         // collapses on the mailer side regardless of restart noise.
-        jobKey := makeJobKeyRep(email, letter) + "-" + short
+        // Uses the no-timestamp variant so the mailer's dedupe layer
+        // actually catches re-runs of the same (email, ticket) pair.
+        jobKey := makeJobKeyDedupe(email, letter) + "-" + short
 
         mail := &Mail{
                 JobKey:   jobKey,
