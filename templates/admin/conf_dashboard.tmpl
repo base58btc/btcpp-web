@@ -15,6 +15,11 @@
         <h1 class="text-2xl font-bold text-gray-900">{{ .Conf.Desc }}</h1>
         <p class="text-sm text-gray-500">{{ .Conf.DateDesc }} - {{ .Conf.Location }}</p>
       </div>
+      <button type="button"
+              data-conf-tag="{{ .Conf.Tag }}"
+              class="copy-vol-invite-btn inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 shrink-0">
+        Copy volunteer invite link
+      </button>
       <a href="/conf/{{ .Conf.Tag }}" target="_blank" rel="noopener noreferrer"
          class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shrink-0">
         Conference webpage <span aria-hidden="true">&rarr;</span>
@@ -103,6 +108,34 @@
       </a>
     </div>
   </div>
+  <script>
+    // Copy the {origin}/volunteer/{tag} URL to the clipboard. Uses
+    // window.location.origin so dev and prod resolve to the right
+    // host without server-side URI threading.
+    (function () {
+      document.querySelectorAll('.copy-vol-invite-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var tag = btn.dataset.confTag;
+          if (!tag) return;
+          var url = window.location.origin + '/volunteer/' + tag;
+          var original = btn.textContent;
+          navigator.clipboard.writeText(url).then(function () {
+            btn.textContent = 'Copied!';
+            btn.classList.add('bg-green-600');
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            setTimeout(function () {
+              btn.textContent = original;
+              btn.classList.remove('bg-green-600');
+              btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            }, 1500);
+          }).catch(function () {
+            btn.textContent = 'Copy failed';
+            setTimeout(function () { btn.textContent = original; }, 1500);
+          });
+        });
+      });
+    })();
+  </script>
   {{ block "footer" . }} {{ end }}
 </body>
 </html>
