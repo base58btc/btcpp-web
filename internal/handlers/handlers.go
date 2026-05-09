@@ -261,6 +261,9 @@ func loadTemplates(ctx *config.AppContext) error {
 			return helpers.InviteLink(ctx, p.ID, p.InviteToken)
 		},
 		"formatTime": formatRunOfShowTime,
+		"inDev": func() bool {
+			return !ctx.Env.Prod
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err

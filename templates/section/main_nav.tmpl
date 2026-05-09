@@ -1,5 +1,33 @@
 {{ define "mainnav" }}
 {{ $nav := navConfs }}
+{{ if inDev }}
+{{/* Permanent dev-mode banner — only renders when the server isn't
+     running in prod (config.toml = local). Fixed at the top of the
+     viewport above the sticky nav so it stays visible during scroll
+     and is hard to miss. */}}
+<div class="dev-mode-banner">🚧 ⚠️ IN DEV MODE ⚠️ 🚧</div>
+<style>
+  .dev-mode-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 60;
+    background: #dc2626;
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    padding: 4px 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+  /* Push body content + the sticky main nav below the 28px banner
+     so neither sits underneath. */
+  body { padding-top: 28px; }
+  header.sticky { top: 28px !important; }
+</style>
+{{ end }}
 <header class="relative isolate z-20 bg-white sticky top-0 z-40">
   <nav class="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8" aria-label="Global">
     <div class="flex lg:flex-1">
