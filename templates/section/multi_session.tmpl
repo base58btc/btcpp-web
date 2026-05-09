@@ -4,8 +4,8 @@
     <div class="mb-4 flex-shrink-0 sm:mb-0 sm:mr-4">
      <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" target="_blank">
      <picture>
-       <source srcset="/static/img/talks/{{ .TalkAvif }}" type="image/avif"/>
-       <img src="/static/img/talks/{{ .TalkPhoto }}" alt="" class="inline-block h-28 w-28 rounded-md"/>
+       <source srcset="{{ talkClipart .TalkAvif }}" type="image/avif"/>
+       <img src="{{ talkClipart .TalkPhoto }}" alt="" class="inline-block h-28 w-28 rounded-md"/>
      </picture>
      </a>
     </div>

@@ -254,6 +254,16 @@ func loadTemplates(ctx *config.AppContext) error {
 			}
 			return spaces.PublicURL("speakers/" + photo)
 		},
+		"talkClipart": func(filename string) string {
+			// Empty filename → empty URL so templates render a
+			// broken/empty image rather than a "talks/" path that
+			// 404s. Most call sites already gate on the field
+			// being non-empty before rendering the <img> at all.
+			if filename == "" {
+				return ""
+			}
+			return spaces.PublicURL("talks/" + filename)
+		},
 		"inviteLink": func(p *types.Proposal) string {
 			if p == nil {
 				return ""

@@ -30,7 +30,7 @@ body {
 .img {
   padding: 1rem;
 
-  background-image: url(/static/img/talks/{{ .Talk.Clipart }});
+  background-image: url({{ talkClipart .Talk.Clipart }});
   background-size: cover;
   background-position: center;
 

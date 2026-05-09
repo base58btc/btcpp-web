@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/external/spaces"
@@ -20,7 +21,18 @@ var (
 	cardHashes    = make(map[string]string)
 	cardHashesMu  sync.Mutex
 	refreshRunning int32
+
+	// In-memory cache of the talks/_manifest.json blob, refreshed
+	// lazily on a TTL. The manifest maps clipart filename →
+	// sha256(content), maintained by upload-talk-cliparts. Card
+	// hashing reads from this instead of the filesystem now that
+	// static/img/talks/ is moving to Spaces.
+	talkManifestMu        sync.RWMutex
+	talkManifest          map[string]string
+	talkManifestFetchedAt time.Time
 )
+
+const talkManifestTTL = 5 * time.Minute
 
 // readFileHead reads up to the first 1000 bytes of a file
 func readFileHead(path string) []byte {
@@ -32,6 +44,43 @@ func readFileHead(path string) []byte {
 	buf := make([]byte, 1000)
 	n, _ := f.Read(buf)
 	return buf[:n]
+}
+
+// talkClipartFingerprint returns the manifest-recorded hash for a
+// given clipart filename. Empty when the manifest hasn't been
+// uploaded, the filename isn't listed, or the fetch errors. Cached
+// in-process with a 5-minute TTL so card-hash computation doesn't
+// fan out one Spaces GET per talk.
+//
+// Returning the recorded hash (rather than reading the file bytes
+// directly) means a clipart change still busts every card that
+// references it: re-running upload-talk-cliparts rewrites the
+// manifest entry, the next talkClipartFingerprint call pulls the
+// new value, and the next talkCardHash / speakerCardHash will
+// differ — triggering card regen.
+func talkClipartFingerprint(filename string) string {
+	if filename == "" {
+		return ""
+	}
+	talkManifestMu.RLock()
+	stale := talkManifest == nil || time.Since(talkManifestFetchedAt) > talkManifestTTL
+	cur := talkManifest[filename]
+	talkManifestMu.RUnlock()
+	if !stale {
+		return cur
+	}
+	fresh, err := spaces.LoadJSONMap(spaces.TalkManifestKey)
+	if err != nil {
+		// Keep returning whatever we last had — better stale than
+		// blank, since blank would invalidate every card on every
+		// startup until the manifest comes back.
+		return cur
+	}
+	talkManifestMu.Lock()
+	talkManifest = fresh
+	talkManifestFetchedAt = time.Now()
+	talkManifestMu.Unlock()
+	return fresh[filename]
 }
 
 func speakerCardHash(speaker *types.Speaker, talk *types.Talk) string {
@@ -52,7 +101,10 @@ func speakerCardHash(speaker *types.Speaker, talk *types.Talk) string {
 	h.Write([]byte(effectiveTitle))
 	h.Write([]byte(talk.Clipart))
 	h.Write(readFileHead("static/img/speakers/" + speaker.Photo))
-	h.Write(readFileHead("static/img/talks/" + talk.Clipart))
+	// Clipart fingerprint comes from the talks/_manifest.json blob in
+	// Spaces (maintained by upload-talk-cliparts) since static/img/
+	// talks/ is no longer on local disk.
+	h.Write([]byte(talkClipartFingerprint(talk.Clipart)))
 	return fmt.Sprintf("%x", h.Sum(nil))[:16]
 }
 
@@ -60,7 +112,9 @@ func talkCardHash(talk *types.Talk) string {
 	h := sha256.New()
 	h.Write([]byte(talk.Name))
 	h.Write([]byte(talk.Clipart))
-	h.Write(readFileHead("static/img/talks/" + talk.Clipart))
+	// Clipart fingerprint comes from the Spaces manifest now that
+	// static/img/talks/ is gone — see talkClipartFingerprint.
+	h.Write([]byte(talkClipartFingerprint(talk.Clipart)))
 	// Include speaker data so card updates when speakers change
 	sort.Slice(talk.Speakers, func(i, j int) bool {
 		return talk.Speakers[i].ID < talk.Speakers[j].ID

@@ -82,7 +82,7 @@ body {
       {{ range .Sessions }}
       <article class="session relative">
         <div class="rounded-[30px] session relative overflow-hidden bg-gray-900 shadow-xl img opacity-[.65]"
-	style="background-image: url(/static/img/talks/{{ .TalkPhoto }});"></div>
+	style="background-image: url({{ talkClipart .TalkPhoto }});"></div>
 	<div class="rounded-[30px] inset-0 session relative overflow-hidden bg-gray-900 shadow-xl bg-gradient-to-t from-gray-900 via-gray-900/40 " style="
 	    position: absolute;
 	    top: 0;

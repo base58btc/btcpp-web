@@ -230,8 +230,8 @@
             {{ if and .ConfTalk .ConfTalk.Clipart }}
             <div class="shrink-0">
               <picture>
-                <source srcset="/static/img/talks/{{ .ConfTalk.ClipartAvif }}" type="image/avif" />
-                <img src="/static/img/talks/{{ .ConfTalk.Clipart }}" alt=""
+                <source srcset="{{ talkClipart .ConfTalk.ClipartAvif }}" type="image/avif" />
+                <img src="{{ talkClipart .ConfTalk.Clipart }}" alt=""
                      class="size-16 rounded-md object-cover bg-gray-100 ring-1 ring-gray-200" />
               </picture>
             </div>
