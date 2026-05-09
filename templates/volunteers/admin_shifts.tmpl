@@ -48,11 +48,31 @@
         overflow: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
-        cursor: pointer;
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
       }
       .gantt-bar:hover {
         outline: 2px solid #4f46e5;
         outline-offset: 1px;
+      }
+      .gantt-bar.dragging {
+        cursor: grabbing;
+        opacity: 0.85;
+        outline: 2px solid #4f46e5;
+        outline-offset: 1px;
+      }
+      .gantt-resize {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 6px;
+        cursor: ew-resize;
+      }
+      .gantt-resize-l { left: 0; }
+      .gantt-resize-r { right: 0; }
+      .gantt-bar:hover .gantt-resize {
+        background: rgba(255,255,255,0.35);
       }
       .bar-color-0 { background: #4f46e5; }
       .bar-color-1 { background: #059669; }
@@ -74,10 +94,19 @@
                     <h1 class="mt-2 text-2xl font-bold text-gray-900">Manage Shifts</h1>
                     <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
                 </div>
-                <button type="button" onclick="document.getElementById('new-shift-form').classList.toggle('hidden')"
-                        class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                    + New Shift
-                </button>
+                <div class="flex items-center gap-2">
+                    <form method="POST" action="/{{ .Conf.Tag }}/volcoord/shifts/gen" class="inline"
+                          onsubmit="return confirm('Bulk-create shifts (Setup, Check-in AM/PM, per-venue Showrunner + A/V AM/PM, Teardown) for every day in this conf? Run this on a fresh conf — it WILL create duplicates if you already have shifts.');">
+                        <button type="submit"
+                                class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200">
+                            Gen workshifts
+                        </button>
+                    </form>
+                    <button type="button" onclick="document.getElementById('new-shift-form').classList.toggle('hidden')"
+                            class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                        + New Shift
+                    </button>
+                </div>
             </div>
 
             <!-- New Shift Form (hidden by default) -->
@@ -153,9 +182,15 @@
                                 <div class="gantt-row">
                                     <a href="#shift-{{ $shift.Ref }}"
                                        class="gantt-bar bar-color-{{ mod $sIdx 7 }}"
+                                       data-shift-ref="{{ $shift.Ref }}"
+                                       data-day="{{ $day.Date }}"
+                                       data-min-hour="{{ $day.MinHour }}"
+                                       data-max-hour="{{ $day.MaxHour }}"
                                        style="left: {{ printf "%.2f" (ganttLeft $shift.ShiftTime $day.MinHour $day.MaxHour) }}%; width: {{ printf "%.2f" (ganttWidth $shift.ShiftTime $day.MinHour $day.MaxHour) }}%;"
                                        title="{{ $shift.Name }} - {{ $shift.TimeDesc }}">
+                                        <span class="gantt-resize gantt-resize-l"></span>
                                         {{ $shift.Name }}
+                                        <span class="gantt-resize gantt-resize-r"></span>
                                     </a>
                                 </div>
                                 {{ end }}
@@ -263,5 +298,141 @@
             {{ end }}
         </div>
     </div>
+    <script>
+      // Gantt drag + resize. Each .gantt-bar carries the shift ref,
+      // its parent day's calendar date, and the day's hour bounds on
+      // data- attributes. Drag the body of the bar to shift it left/
+      // right (start changes, duration preserved); drag a left/right
+      // edge handle to change just one endpoint.
+      //
+      // Snap to 5-minute boundaries so coords don't end up with
+      // 17:43-style start times. Click-without-drag falls through to
+      // the bar's href (#shift-…) so the existing jump-to-edit-form
+      // flow still works.
+      (function () {
+        const SNAP_MIN = 5;
+        const DRAG_THRESHOLD_PX = 4; // movement under this is treated as a click
+        // Inside a <script>, html/template renders a string value as
+        // a JS string literal (with its own quotes). No printf "%q" —
+        // that'd double-quote and produce '"nairobi"' as the value.
+        const confTag = {{ .Conf.Tag }};
+
+        document.querySelectorAll('.gantt-bar').forEach(function (bar) {
+          bar.addEventListener('mousedown', function (e) {
+            // Decide drag mode based on which element was clicked.
+            let mode = 'move';
+            if (e.target.classList.contains('gantt-resize-l')) mode = 'left';
+            else if (e.target.classList.contains('gantt-resize-r')) mode = 'right';
+            startDrag(bar, e, mode);
+          });
+        });
+
+        function startDrag(bar, e, mode) {
+          e.preventDefault();
+          const gantt = bar.closest('.gantt');
+          const ganttRect = gantt.getBoundingClientRect();
+          const minHour = parseInt(bar.dataset.minHour, 10);
+          const maxHour = parseInt(bar.dataset.maxHour, 10);
+          const dayMinStart = minHour * 60;
+          const dayMinEnd = maxHour * 60;
+          const totalMin = dayMinEnd - dayMinStart;
+          const minutesPerPx = totalMin / ganttRect.width;
+
+          const initialLeftPx = bar.offsetLeft;
+          const initialWidthPx = bar.offsetWidth;
+          const initialStartMin = dayMinStart + Math.round(initialLeftPx * minutesPerPx);
+          const initialEndMin = initialStartMin + Math.round(initialWidthPx * minutesPerPx);
+          const initialDuration = initialEndMin - initialStartMin;
+          const cursorX0 = e.clientX;
+
+          let curStart = initialStartMin;
+          let curEnd = initialEndMin;
+          let dragged = false;
+
+          function onMove(ev) {
+            const deltaPx = ev.clientX - cursorX0;
+            if (!dragged && Math.abs(deltaPx) >= DRAG_THRESHOLD_PX) {
+              dragged = true;
+              bar.classList.add('dragging');
+            }
+            if (!dragged) return;
+
+            const rawDelta = deltaPx * minutesPerPx;
+            const deltaMin = Math.round(rawDelta / SNAP_MIN) * SNAP_MIN;
+
+            if (mode === 'move') {
+              const maxStart = dayMinEnd - initialDuration;
+              curStart = Math.max(dayMinStart, Math.min(maxStart, initialStartMin + deltaMin));
+              curEnd = curStart + initialDuration;
+            } else if (mode === 'left') {
+              curStart = Math.max(dayMinStart, Math.min(initialEndMin - SNAP_MIN, initialStartMin + deltaMin));
+              curEnd = initialEndMin;
+            } else if (mode === 'right') {
+              curEnd = Math.min(dayMinEnd, Math.max(initialStartMin + SNAP_MIN, initialEndMin + deltaMin));
+              curStart = initialStartMin;
+            }
+
+            const leftPct = ((curStart - dayMinStart) / totalMin) * 100;
+            const widthPct = ((curEnd - curStart) / totalMin) * 100;
+            bar.style.left = leftPct + '%';
+            bar.style.width = widthPct + '%';
+          }
+
+          function onUp(ev) {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            bar.classList.remove('dragging');
+
+            if (!dragged) {
+              // Click-without-drag → let the <a href="#…"> behavior fire.
+              return;
+            }
+            // Suppress the synthetic click that would otherwise navigate.
+            ev.preventDefault();
+            const swallow = function (clickEv) {
+              clickEv.preventDefault();
+              clickEv.stopImmediatePropagation();
+              bar.removeEventListener('click', swallow, true);
+            };
+            bar.addEventListener('click', swallow, true);
+
+            if (curStart === initialStartMin && curEnd === initialEndMin) return;
+
+            fetch('/' + confTag + '/volcoord/shifts/' + bar.dataset.shiftRef + '/reschedule', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                day: bar.dataset.day,
+                startMin: curStart,
+                endMin: curEnd,
+              }),
+            }).then(function (r) {
+              if (r.ok) {
+                // Keep the bar where the user dragged it — no
+                // page reload — and refresh the title so the hover
+                // tooltip reflects the new time. The expanded shift
+                // detail list further down the page is now stale
+                // until the next page load, which is fine: the
+                // gantt is the source of truth during a session.
+                bar.title = bar.title.replace(/ - .*/, ' - ' + fmtHHMM(curStart) + ' to ' + fmtHHMM(curEnd));
+              } else {
+                alert('Failed to save shift time. Reload the page to discard.');
+              }
+            }).catch(function () {
+              alert('Network error saving shift time. Reload to discard.');
+            });
+          }
+
+          function fmtHHMM(min) {
+            const h = Math.floor(min / 60);
+            const m = min % 60;
+            return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+          }
+
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }
+      })();
+    </script>
   </body>
 </html>

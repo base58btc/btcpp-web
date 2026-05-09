@@ -653,6 +653,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdminCreateShift(w, r, app)
 	}).Methods("POST")
 
+	r.HandleFunc("/{conf}/volcoord/shifts/gen", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminGenWorkShifts(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/{conf}/volcoord/shifts/{shiftRef}/reschedule", func(w http.ResponseWriter, r *http.Request) {
+		VolShiftReschedule(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/{conf}/volcoord/shifts/{shiftRef}/update", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateShift(w, r, app)
 	}).Methods("POST")
@@ -4579,6 +4587,45 @@ func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		volMap[v.Ref] = v
 	}
 
+	// Per-day ConfInfo strip — used below to widen the gantt's
+	// MinHour/MaxHour bounds with doors-open / doors-close so a
+	// coord can drag a shift earlier than the existing earliest
+	// shift (e.g. into pre-doors setup time) without having to
+	// edit the form. Best-effort: a load error degrades to bounds
+	// based purely on shift times. We also compute a conf-wide
+	// "fallback" doors range (widest window across all days that
+	// DO have Doors set) so a day that's missing its own Doors row
+	// still gets widened to the conf-wide venue-open window.
+	infoByDay := map[string]*types.ConfInfo{}
+	fallbackDoorsMin, fallbackDoorsMax := -1, -1
+	if infos, err := getters.ListConfInfos(ctx, conf.Tag); err != nil {
+		ctx.Err.Printf("/%s/volcoord/shifts list confinfos (continuing): %s", conf.Tag, err.Error())
+	} else {
+		for _, ci := range infos {
+			if ci == nil || ci.Day < 1 {
+				continue
+			}
+			key := dayDateFor(conf, ci.Day).Format("01/02/2006")
+			infoByDay[key] = ci
+			if ci.Doors == nil {
+				continue
+			}
+			sH := ci.Doors.Start.Hour()
+			if fallbackDoorsMin < 0 || sH < fallbackDoorsMin {
+				fallbackDoorsMin = sH
+			}
+			if ci.Doors.End != nil {
+				eH := ci.Doors.End.Hour()
+				if ci.Doors.End.Minute() > 0 {
+					eH++
+				}
+				if eH > fallbackDoorsMax {
+					fallbackDoorsMax = eH
+				}
+			}
+		}
+	}
+
 	// Group shifts by day
 	groups := make(map[string]*ShiftDayGroup)
 	for _, shift := range shifts {
@@ -4618,7 +4665,38 @@ func VolAdminShifts(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		sort.Slice(g.Shifts, func(i, j int) bool {
 			return g.Shifts[i].ShiftTime.Start.Before(g.Shifts[j].ShiftTime.Start)
 		})
-		// Pad ranges so the gantt has a little headroom
+		// Widen bounds with doors-open / doors-close from this
+		// day's ConfInfo so the gantt covers the full venue-open
+		// window even when no shift currently touches the edges.
+		// Per-day Doors win when set; otherwise fall back to the
+		// conf-wide widest doors window so a day without its own
+		// Doors row (common: only Day 1 has a ConfInfo entry)
+		// still gets widened.
+		dayMin, dayMax := -1, -1
+		if ci := infoByDay[g.Date]; ci != nil && ci.Doors != nil {
+			dayMin = ci.Doors.Start.Hour()
+			if ci.Doors.End != nil {
+				dayMax = ci.Doors.End.Hour()
+				if ci.Doors.End.Minute() > 0 {
+					dayMax++
+				}
+			}
+		}
+		if dayMin < 0 {
+			dayMin = fallbackDoorsMin
+		}
+		if dayMax < 0 {
+			dayMax = fallbackDoorsMax
+		}
+		if dayMin >= 0 && dayMin < g.MinHour {
+			g.MinHour = dayMin
+		}
+		if dayMax >= 0 && dayMax > g.MaxHour {
+			g.MaxHour = dayMax
+		}
+		// Pad ranges so the gantt has a little headroom (applied
+		// after the doors merge so the result is min(shift, doors)
+		// - 1 on the left and max(shift, doors) + 1 on the right).
 		if g.MinHour > 0 {
 			g.MinHour--
 		}
@@ -4740,6 +4818,59 @@ func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 	}
 
 	volAdminShiftsRedirect(w, r, conf)
+}
+
+// VolShiftReschedule handles drag/resize gestures on the gantt UI at
+// /{conf}/volcoord/shifts. JSON body: {day, startMin, endMin}. Day is
+// either "01/02/2006" (matches ShiftDayGroup.Date) or "2006-01-02";
+// startMin/endMin are minutes from midnight in conf-local time. Only
+// the ShiftTime property gets patched — Name / JobType / MaxVols /
+// Priority / Assignees stay as-is so a concurrent edit-form save
+// elsewhere doesn't get clobbered.
+func VolShiftReschedule(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	shiftRef := mux.Vars(r)["shiftRef"]
+
+	var req struct {
+		Day      string `json:"day"`
+		StartMin int    `json:"startMin"`
+		EndMin   int    `json:"endMin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+	if req.EndMin <= req.StartMin {
+		http.Error(w, "endMin must be after startMin", http.StatusBadRequest)
+		return
+	}
+
+	loc := conf.Loc()
+	var day time.Time
+	if t, e := time.ParseInLocation("01/02/2006", req.Day, loc); e == nil {
+		day = t
+	} else if t, e := time.ParseInLocation("2006-01-02", req.Day, loc); e == nil {
+		day = t
+	} else {
+		http.Error(w, "bad day format", http.StatusBadRequest)
+		return
+	}
+	start := day.Add(time.Duration(req.StartMin) * time.Minute)
+	end := day.Add(time.Duration(req.EndMin) * time.Minute)
+
+	if err := getters.UpdateShiftTimes(ctx, shiftRef, start, end); err != nil {
+		ctx.Err.Printf("/%s/volcoord/shifts/%s/reschedule: %s", conf.Tag, shiftRef, err)
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
 }
 
 func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

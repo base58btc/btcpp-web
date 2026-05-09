@@ -1359,6 +1359,46 @@ func CreateShift(ctx *config.AppContext, conf *types.Conf, jobType *types.JobTyp
 // UpdateShift updates a WorkShift's mutable fields. Pass nil for jobType to
 // skip updating the type. Pass a zero start to skip updating the time. Uses
 // direct HTTP PATCH to avoid go-notion's omitempty issues.
+// UpdateShiftTimes patches only the ShiftTime property on a shift,
+// leaving Name / JobType / MaxVols / Priority / Assignees untouched.
+// Used by the gantt drag/resize UI on /volcoord/shifts so a coord
+// can move + reshape a shift in place without re-sending fields
+// that haven't changed (which would clobber concurrent edits).
+//
+// After the PATCH succeeds we *synchronously* reload the shifts
+// cache rather than calling invalidateShiftCache (which nils the
+// slice and queues an async refresh). The drag UI reloads the page
+// immediately after the POST returns; an async refresh would race
+// the next GET and serve a nil slice — making every shift on the
+// page momentarily disappear.
+func UpdateShiftTimes(ctx *config.AppContext, shiftRef string, start, end time.Time) error {
+	if start.IsZero() {
+		return fmt.Errorf("UpdateShiftTimes: start required")
+	}
+	date := map[string]interface{}{
+		"start": start.Format(time.RFC3339),
+	}
+	if !end.IsZero() {
+		date["end"] = end.Format(time.RFC3339)
+	}
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"ShiftTime": map[string]interface{}{"date": date},
+		},
+	}
+	if err := notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+shiftRef, body); err != nil {
+		return err
+	}
+	if fresh, err := ListWorkShifts(ctx); err == nil {
+		shifts = fresh
+		lastShiftFetch = time.Now()
+		writeCache("shifts", shifts)
+	} else {
+		ctx.Err.Printf("UpdateShiftTimes: cache reload (continuing): %s", err)
+	}
+	return nil
+}
+
 func UpdateShift(ctx *config.AppContext, shiftRef, name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) error {
 	props := buildShiftPropertiesJSON(name, jobType, start, end, maxVols, priority)
 
