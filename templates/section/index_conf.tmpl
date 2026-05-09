@@ -13,6 +13,7 @@
 	    {{ if eq .Tag "berlin25" }}lightning++{{ else }}bitcoin++{{ end }}
 	    </span> {{ .Tagline }}</h1>
 	    <p class="mt-6 text-lg leading-8 text-gray-200 lg:text-gray-600">{{ .Location }} | {{ .DateDesc }}</p>
+	    {{ template "conf_countdown" . }}
 	    <div class="mt-10 flex flex-col justify-start gap-y-4">
 	      <a href="/conf/{{ .Tag }}" class="rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 w-max {{ .Tag }}">Attend</a>
 	      <div class="sm:flex">

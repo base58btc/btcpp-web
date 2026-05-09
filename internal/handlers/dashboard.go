@@ -298,6 +298,42 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			hasUpVol = true
 		}
 	}
+
+	// Populate per-conf countdown bounds for the event-card widget.
+	// Single Notion call (empty tag = all rows), bucket by tag→day,
+	// then shallow-copy each block's Conf so the cached pointer
+	// shared with other readers stays untouched.
+	infosByTag := map[string]map[int]*types.ConfInfo{}
+	if cis, err := getters.ListConfInfos(ctx, ""); err != nil {
+		ctx.Err.Printf("/dashboard ListConfInfos for countdown (continuing): %s", err)
+	} else {
+		for _, ci := range cis {
+			if ci == nil || ci.Day < 1 || ci.ConfTag == "" {
+				continue
+			}
+			m, ok := infosByTag[ci.ConfTag]
+			if !ok {
+				m = map[int]*types.ConfInfo{}
+				infosByTag[ci.ConfTag] = m
+			}
+			m[ci.Day] = ci
+		}
+	}
+	enrichBlock := func(b *EventBlock) {
+		if b == nil || b.Conf == nil {
+			return
+		}
+		copy := *b.Conf
+		copy.CountdownStart, copy.CountdownEnd = computeCountdownBounds(&copy, infosByTag[copy.Tag])
+		b.Conf = &copy
+	}
+	for _, b := range activeBlocks {
+		enrichBlock(b)
+	}
+	for _, b := range pastBlocks {
+		enrichBlock(b)
+	}
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "dashboard.tmpl", &DashboardPage{
 		Name:             name,
 		Hometown:         hometown,

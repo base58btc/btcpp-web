@@ -84,6 +84,14 @@ type (
 		// Timezone is empty / unparseable. Populated once at parseConf
 		// time so hot paths don't pay LoadLocation per request.
 		TZ            *time.Location
+
+		// CountdownStart / CountdownEnd are the conf's doors-open-
+		// day-1 and doors-close-last-day timestamps, populated at
+		// conf-page render time from ConfInfo (with a fallback to
+		// StartDate / EndDate). Drives the countdown widget in
+		// conf_nav. Not stored in Notion — recomputed each render.
+		CountdownStart *time.Time
+		CountdownEnd   *time.Time
 	}
 
         // ConfInfo is the per-day schedule strip for a conference: when

@@ -90,3 +90,54 @@ function toggleNavFlyout(el, targetId) {
 
 	return true;
 }
+
+// Conf-page countdown ticker. Each .conf-countdown element carries
+// data-start / data-end as Unix seconds (rendered by the
+// conf_countdown template). Before doors open: positive countdown.
+// Between doors open and close: 0d 00h 00m 00s. After doors close:
+// negative count. Runs site-wide; no-ops on pages without any
+// .conf-countdown elements.
+(function () {
+	function pad(n) { return String(n).padStart(2, '0'); }
+	function tick(el) {
+		var startSec = Number(el.dataset.start);
+		var endSec   = Number(el.dataset.end);
+		var valueEl  = el.querySelector('[data-cd-value]');
+		var prefixEl = el.querySelector('[data-cd-prefix]');
+		var now = Date.now() / 1000;
+		var prefix, sign, abs;
+		if (now < startSec) {
+			prefix = 'doors open in';
+			sign = '';
+			abs = startSec - now;
+		} else if (now > endSec) {
+			prefix = 'doors closed';
+			sign = '-';
+			abs = now - endSec;
+		} else {
+			prefix = 'happening now ·';
+			sign = '';
+			abs = 0;
+		}
+		var d = Math.floor(abs / 86400);
+		var h = Math.floor((abs % 86400) / 3600);
+		var m = Math.floor((abs % 3600) / 60);
+		var s = Math.floor(abs % 60);
+		if (prefixEl) prefixEl.textContent = prefix;
+		if (valueEl)  valueEl.textContent  = sign + d + 'd ' + pad(h) + 'h ' + pad(m) + 'm ' + pad(s) + 's';
+	}
+	function tickAll() {
+		document.querySelectorAll('.conf-countdown').forEach(tick);
+	}
+	function init() {
+		var els = document.querySelectorAll('.conf-countdown');
+		if (els.length === 0) return;
+		tickAll();
+		setInterval(tickAll, 1000);
+	}
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
+	}
+})();

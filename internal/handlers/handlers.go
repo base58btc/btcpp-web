@@ -1851,6 +1851,13 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 	agendaDays := buildAgendaDays(conf, talks, infosByDay)
 
+	// Populate countdown bounds for the conf_nav widget. Shallow-
+	// copy first so we don't mutate the cached Conf seen by other
+	// readers (FetchConfsCached returns a shared slice).
+	confCopy := *conf
+	confCopy.CountdownStart, confCopy.CountdownEnd = computeCountdownBounds(&confCopy, infosByDay)
+	conf = &confCopy
+
 	confHotels := helpers.HotelsForConf(ctx, conf)
 
 	currTix := findCurrTix(conf, soldCount)
@@ -2135,11 +2142,45 @@ func RenderPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 		return
 	}
 
+	// Single Notion call (empty tag = all rows) so the homepage's
+	// countdown widget on each conf card has the same per-day-strip
+	// bounds the per-conf page uses. Bucket by tag → day for cheap
+	// per-conf lookup.
+	infosByTag := map[string]map[int]*types.ConfInfo{}
+	if cis, err := getters.ListConfInfos(ctx, ""); err != nil {
+		ctx.Err.Printf("/%s ListConfInfos for index countdown (continuing): %s", page, err)
+	} else {
+		for _, ci := range cis {
+			if ci == nil || ci.Day < 1 || ci.ConfTag == "" {
+				continue
+			}
+			m, ok := infosByTag[ci.ConfTag]
+			if !ok {
+				m = map[int]*types.ConfInfo{}
+				infosByTag[ci.ConfTag] = m
+			}
+			m[ci.Day] = ci
+		}
+	}
+
+	// Shallow-copy each conf before populating the runtime-only
+	// CountdownStart/End fields so the shared FetchConfsCached
+	// slice stays untouched.
+	enriched := make([]*types.Conf, 0, len(confList))
+	for _, c := range confList {
+		if c == nil {
+			continue
+		}
+		copy := *c
+		copy.CountdownStart, copy.CountdownEnd = computeCountdownBounds(&copy, infosByTag[copy.Tag])
+		enriched = append(enriched, &copy)
+	}
+
 	data := struct {
 		Confs []*types.Conf
 		Year  uint
 	}{
-		Confs: confList,
+		Confs: enriched,
 		Year:  helpers.CurrentYear(),
 	}
 

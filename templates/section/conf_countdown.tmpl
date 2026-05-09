@@ -1,0 +1,14 @@
+{{ define "conf_countdown" }}
+{{/* Countdown pill — caller passes .Conf. Markup only; the ticker
+     JS lives in /static/js/script.js so multiple instances of this
+     template on a single page (mobile + desktop intro layouts)
+     don't double-register intervals. .conf-countdown class +
+     data-start / data-end Unix-second timestamps are the JS hooks. */}}
+{{ if and .CountdownStart .CountdownEnd }}
+<div class="conf-countdown mt-4 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-mono text-gray-700"
+     data-start="{{ .CountdownStart.Unix }}"
+     data-end="{{ .CountdownEnd.Unix }}">
+  <span data-cd-prefix class="text-gray-500"></span><span data-cd-value class="font-semibold text-gray-900">—</span>
+</div>
+{{ end }}
+{{ end }}

@@ -28,6 +28,7 @@
             <div class="mt-10 flex items-center gap-x-6">
               <a href="#tickets" class="rounded-md {{ .Conf.Tag }} px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2">Get Your All Conf Pass</a>
             </div>
+            {{ template "conf_countdown" .Conf }}
           </div>
         </div>
       </div>

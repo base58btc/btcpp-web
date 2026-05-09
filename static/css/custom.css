@@ -277,3 +277,19 @@
 	to { transform: rotate(360deg); }
 }
 
+/* Dark-background variant of the countdown pill — used by the
+   dashboard event-card hero band where the standard light-gray
+   chip would disappear into the gradient overlay. Enabled by
+   wrapping the {{ template "conf_countdown" }} call in a parent
+   that has the .conf-countdown-on-dark class. */
+.conf-countdown-on-dark .conf-countdown {
+	background: rgba(255, 255, 255, 0.15);
+	color: rgba(255, 255, 255, 0.9);
+}
+.conf-countdown-on-dark .conf-countdown [data-cd-prefix] {
+	color: rgba(255, 255, 255, 0.7);
+}
+.conf-countdown-on-dark .conf-countdown [data-cd-value] {
+	color: white;
+}
+

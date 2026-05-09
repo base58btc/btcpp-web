@@ -66,8 +66,18 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	pending, decisioned := splitProposalsByPending(loadConfProposals(ctx, conf))
 
+	// Populate countdown bounds (doors-open / doors-close) on a
+	// shallow copy of conf so the cached pointer isn't mutated.
+	// Drives the countdown widget at the top of conf_dashboard.
+	confCopy := *conf
+	var infosByDay map[int]*types.ConfInfo
+	if cis, err := getters.ListConfInfos(ctx, conf.Tag); err == nil {
+		infosByDay = confInfosByDay(cis)
+	}
+	confCopy.CountdownStart, confCopy.CountdownEnd = computeCountdownBounds(&confCopy, infosByDay)
+
 	err = ctx.TemplateCache.ExecuteTemplate(w, "admin/conf_dashboard.tmpl", &OrganizerDashboardPage{
-		Conf:           conf,
+		Conf:           &confCopy,
 		PendingCount:   len(pending),
 		DecisionedCount: len(decisioned),
 		FlashMessage:   r.URL.Query().Get("flash"),

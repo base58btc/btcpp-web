@@ -185,3 +185,53 @@ func confInfosByDay(infos []*types.ConfInfo) map[int]*types.ConfInfo {
 	}
 	return out
 }
+
+// computeCountdownBounds returns the (doors-open-day-1, doors-close-
+// last-day) timestamps that drive the countdown widget on conf pages.
+// Prefers ConfInfo.Doors when available (Day 1 for start, the highest
+// Day with a Doors row for end); falls back to Conf.StartDate /
+// Conf.EndDate when no ConfInfo is available, snapping to a 9:00 -
+// 18:00 default window so the countdown still shows something useful.
+// Either return value can be nil if even the fallback isn't set.
+func computeCountdownBounds(conf *types.Conf, infosByDay map[int]*types.ConfInfo) (*time.Time, *time.Time) {
+	if conf == nil {
+		return nil, nil
+	}
+	loc := conf.Loc()
+	var start, end *time.Time
+
+	if infosByDay != nil {
+		if ci, ok := infosByDay[1]; ok && ci != nil && ci.Doors != nil {
+			t := ci.Doors.Start.In(loc)
+			start = &t
+		}
+		// Find the highest Day index that has a Doors.End set.
+		hi := -1
+		for d := range infosByDay {
+			if d > hi {
+				if ci := infosByDay[d]; ci != nil && ci.Doors != nil && ci.Doors.End != nil {
+					hi = d
+				}
+			}
+		}
+		if hi > 0 {
+			t := infosByDay[hi].Doors.End.In(loc)
+			end = &t
+		}
+	}
+
+	// Fallbacks for confs without ConfInfo doors filled in: 9 AM
+	// of StartDate's calendar day for open, 18:00 of EndDate's day
+	// for close. Approximate but better than nothing.
+	if start == nil && !conf.StartDate.IsZero() {
+		sd := conf.StartDate.In(loc)
+		t := time.Date(sd.Year(), sd.Month(), sd.Day(), 9, 0, 0, 0, loc)
+		start = &t
+	}
+	if end == nil && !conf.EndDate.IsZero() {
+		ed := conf.EndDate.In(loc)
+		t := time.Date(ed.Year(), ed.Month(), ed.Day(), 18, 0, 0, 0, loc)
+		end = &t
+	}
+	return start, end
+}

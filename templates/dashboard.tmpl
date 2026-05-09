@@ -184,6 +184,7 @@
               <h2 class="text-lg sm:text-xl font-bold truncate">{{ $conf.Desc }}</h2>
             </div>
             <p class="mt-0.5 text-xs sm:text-sm opacity-90">{{ $conf.DateDesc }} · {{ $conf.Location }}</p>
+            <div class="conf-countdown-on-dark">{{ template "conf_countdown" $conf }}</div>
           </div>
           <span class="shrink-0 text-xs opacity-80 group-hover:opacity-100 hidden sm:inline">View conf &rarr;</span>
         </div>
