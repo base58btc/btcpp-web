@@ -32,10 +32,6 @@ func RegisterNewsletterHandlers(r *mux.Router, ctx *config.AppContext) {
 		UnsubscribeEmail(w, r, ctx)
 	}).Methods("GET")
 
-	r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		Login(w, r, ctx)
-	}).Methods("POST")
-
 	r.HandleFunc("/{newsletter}/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleNewsMissives(w, r, ctx)
 	}).Methods("GET")
@@ -308,28 +304,6 @@ func UnsubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		ctx.Err.Printf("/emails/subscribe exec template failed %s\n", err.Error())
 		return
 	}
-}
-
-/* Set the pin cookie and redirect to destination */
-func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	r.ParseForm()
-	password := r.Form.Get("pass")
-	destpath := r.Form.Get("dest")
-
-	if password != ctx.Env.RegistryPin {
-		w.Write([]byte(`
-		<div class="form_message-error" style="display: block;">
-                  <div class="error-text">Incorrect password. Try again.</div>
-                </div>
-		`))
-		return
-	}
-
-	/* Set the pin as cookie and redirect */
-	ctx.Session.Put(r.Context(), "pin", password)
-
-	/* Use HTMX to redirect */
-	w.Header().Set("HX-Redirect", destpath)
 }
 
 func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
