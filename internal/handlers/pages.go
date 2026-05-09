@@ -283,6 +283,38 @@ type OrganizerDashboardPage struct {
         Year            uint
 }
 
+// RunOfShowPage drives /{conf}/admin/run-of-show — a per-day timeline
+// table interleaving ConfInfo events (doors, coffee, lunch),
+// volunteer shifts, and conference talks. Days are emitted in
+// chronological order; only days with at least one row appear.
+type RunOfShowPage struct {
+        Conf         *types.Conf
+        Days         []*RunOfShowDay
+        FlashMessage string
+        Year         uint
+}
+
+// RunOfShowDay groups every row falling on a single calendar day in
+// the conf's timezone. Idx is the conf-relative day index (Day 1 =
+// Conf.StartDate); zero or negative for setup days that fall before
+// the first event day.
+type RunOfShowDay struct {
+        Idx  int
+        Date time.Time
+        Rows []*RunOfShowRow
+}
+
+// RunOfShowRow is one timeline row. Kind drives row styling
+// ("info" / "shift" / "talk"). End is nil for instant events.
+type RunOfShowRow struct {
+        Start time.Time
+        End   *time.Time
+        Kind  string
+        What  string
+        Who   string
+        Where string
+}
+
 // ReviewProposalPage drives /admin/conf/{tag}/review — the
 // walkthrough page for individual proposal decisions. Current is nil
 // when the queue is empty (template renders an empty state).

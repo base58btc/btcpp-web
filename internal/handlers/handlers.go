@@ -260,6 +260,7 @@ func loadTemplates(ctx *config.AppContext) error {
 			}
 			return helpers.InviteLink(ctx, p.ID, p.InviteToken)
 		},
+		"formatTime": formatRunOfShowTime,
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err
@@ -921,6 +922,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/{conf}/admin/schedule", func(w http.ResponseWriter, r *http.Request) {
 		ScheduleConf(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/run-of-show", func(w http.ResponseWriter, r *http.Request) {
+		RunOfShowAdmin(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/{conf}/admin/schedule/place", func(w http.ResponseWriter, r *http.Request) {
 		SchedulePlace(w, r, app)
