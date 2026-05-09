@@ -1043,6 +1043,50 @@ func InviteSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 }
 
+// InviteSpeakerDecline lets a magic-link invitee decline the
+// invitation directly from the /invite-speaker landing page (the one
+// with the "Accept invitation" submit button at the bottom of the
+// form). Mirrors DashboardDeclineInvite but auths via the InviteToken
+// in `?t=...` rather than the dashboard HMAC — the speaker may not
+// have an HMAC link handy when the invitation email is the only
+// thing they've clicked.
+//
+// Refuses anything other than `Invited` to keep the action
+// idempotent — re-submits or clicks after admin already moved the
+// proposal route through inviteLinkBail with an explanatory message.
+// Sends the talkselfdecline letter to every speaker on the proposal;
+// failure is non-fatal so a Notion blip can't roll back the status
+// flip.
+func InviteSpeakerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	proposalID := mux.Vars(r)["proposalID"]
+	token := r.URL.Query().Get("t")
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		inviteLinkBail(w, r, "We couldn't find that talk — it may have been removed.")
+		return
+	}
+	if token == "" || proposal.InviteToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(proposal.InviteToken)) != 1 {
+		inviteLinkBail(w, r, "That invite link has expired or been revoked. Ask the organizer for a fresh one.")
+		return
+	}
+	if proposal.Status != "Invited" {
+		inviteLinkBail(w, r, "This talk isn't currently invited — nothing to decline.")
+		return
+	}
+	if err := getters.UpdateProposalStatus(ctx, proposalID, "TheyDecline"); err != nil {
+		ctx.Err.Printf("/invite-speaker/%s/decline update status: %s", proposalID, err)
+		http.Error(w, "decline failed", http.StatusInternalServerError)
+		return
+	}
+	if err := emails.SendOnlyForProposal(ctx, "talkselfdecline", proposal, proposal.ScheduleFor); err != nil {
+		ctx.Err.Printf("/invite-speaker/%s/decline send talkselfdecline (continuing): %s", proposalID, err)
+	}
+	http.Redirect(w, r,
+		"/dashboard?flash="+url.QueryEscape("Invitation declined. Thanks for letting us know."),
+		http.StatusSeeOther)
+}
+
 // handleInviteSpeakerPOST mirrors the multipart-form handling in
 // RenderSpeakerConf's POST branch but routes through JoinProposal
 // (no new Proposal, attach to the inviter's existing one). The submit

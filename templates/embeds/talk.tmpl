@@ -503,6 +503,20 @@
                     {{ end }}
                 </div>
             </form>
+            {{ if and .InviteMode .IsInvited }}
+            {{/* Decline button lives in its own form (HTML disallows
+                 nesting), so the Accept submit + this Decline submit
+                 don't trigger each other. Standard POST (not htmx)
+                 because we redirect away on success. */}}
+            <form method="POST" action="/invite-speaker/{{ .Proposal.ID }}/decline?t={{ .InviteToken }}" class="mx-auto mt-4 max-w-xl">
+                <button type="submit"
+                        onclick="return confirm('Decline this invitation? Your talk will not be added to the program and your co-speakers (if any) will be notified.');"
+                        class="inline-flex w-full items-center justify-center rounded-md border border-gray-300 bg-white px-3.5 py-2.5 text-center text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    Decline invitation
+                </button>
+                <p class="mt-2 text-center text-xs text-gray-500">Sorry to miss you — let us know if anything changes.</p>
+            </form>
+            {{ end }}
             <div id="result" class="mt-5 mx-auto max-w-xl text-red-700 scroll-mt-24">
             </div>
         </div>

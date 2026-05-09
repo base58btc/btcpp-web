@@ -783,6 +783,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/invite-speaker/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
 		InviteSpeaker(w, r, app)
 	}).Methods("GET", "POST")
+	r.HandleFunc("/invite-speaker/{proposalID}/decline", func(w http.ResponseWriter, r *http.Request) {
+		InviteSpeakerDecline(w, r, app)
+	}).Methods("POST")
 
 	// Backwards compat: existing magic-link emails point at /vols/shift.
 	// Forward them to /dashboard, preserving the HMAC + email query params.
