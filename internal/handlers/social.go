@@ -16,6 +16,20 @@ import (
 	"btcpp-web/internal/types"
 )
 
+// isTBDTitle reports whether a talk title is a placeholder ("TBD")
+// rather than a real working title. Case-insensitive substring match
+// because admins enter "TBD", "tbd", "TBD: speaker name", etc.
+// Drives two render decisions in the social-card pipeline:
+//
+//   1. Hide the talk row from the admin's "Talks" social-post section
+//      so we don't post a "JUST SCHEDULED: TBD" card.
+//   2. Render the speaker card without a talk title — the speaker is
+//      coming, but we don't want to broadcast a placeholder name on
+//      their card (or imply they have a known talk name yet).
+func isTBDTitle(s string) bool {
+	return strings.Contains(strings.ToUpper(s), "TBD")
+}
+
 var speakerPostTmpl = template.Must(template.New("speaker").Parse(
 	`JUST IN {{.Conf.Emoji}}: {{.SpeakerName}} `+
 		`{{if .TwitterHandle}}(@{{.TwitterHandle}}) {{end}}` +
@@ -177,8 +191,11 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			}
 
 			// Only include talk name if the speaker is the sole speaker
+			// AND the title isn't a TBD placeholder. Skipping TBD here
+			// stops the speaker post from rendering "~~TBD: Foo~~" in
+			// the strikethrough block.
 			talkName := ""
-			if len(bestTalk.Speakers) == 1 {
+			if len(bestTalk.Speakers) == 1 && !isTBDTitle(bestTalk.Name) {
 				talkName = bestTalk.Name
 			}
 
@@ -217,6 +234,12 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	for _, talk := range talks {
 		// Skip if already posted
 		if postedRefs[helpers.TalkSocialPostRef(conf.Tag, talk.ID)] {
+			continue
+		}
+		// Skip placeholder-titled talks — no point posting a
+		// "JUST SCHEDULED: TBD" card. Reappears as a row once
+		// the admin renames the proposal to a real title.
+		if isTBDTitle(talk.Name) {
 			continue
 		}
 

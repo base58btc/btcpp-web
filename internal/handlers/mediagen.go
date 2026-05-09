@@ -40,7 +40,16 @@ func speakerCardHash(speaker *types.Speaker, talk *types.Talk) string {
 	h.Write([]byte(speaker.Photo))
 	h.Write([]byte(speaker.Twitter.Handle))
 	h.Write([]byte(speaker.Company))
-	h.Write([]byte(talk.Name))
+	// Hash the EFFECTIVE talk title — the same string the renderer
+	// will paint onto the card. MakeSpeakerCard blanks TBD titles, so
+	// hashing them as "" here busts only the TBD-titled cards (other
+	// cards keep their existing hash) and lets a re-run regenerate
+	// them with the new no-title render.
+	effectiveTitle := talk.Name
+	if isTBDTitle(effectiveTitle) {
+		effectiveTitle = ""
+	}
+	h.Write([]byte(effectiveTitle))
 	h.Write([]byte(talk.Clipart))
 	h.Write(readFileHead("static/img/speakers/" + speaker.Photo))
 	h.Write(readFileHead("static/img/talks/" + talk.Clipart))
@@ -173,18 +182,31 @@ func sponsorCardHash(sp *types.Sponsorship) string {
 }
 
 func generateAndUploadSponsorPng(ctx *config.AppContext, confTag, card string, sp *types.Sponsorship) (string, error) {
+	return generateAndUploadSponsorPngOpt(ctx, confTag, card, sp, false)
+}
+
+// generateAndUploadSponsorPngOpt is the force-aware variant. force=true
+// bypasses the in-memory hash dedup AND the Spaces.Exists short-circuit
+// so a re-render always happens — used by the CLI's -force flag when an
+// admin needs to push a regen even though the cached hash matches (e.g.
+// the org's logo file content changed but the filename didn't).
+func generateAndUploadSponsorPngOpt(ctx *config.AppContext, confTag, card string, sp *types.Sponsorship, force bool) (string, error) {
 	key := fmt.Sprintf("%s/sponsors/%s-%s.png", confTag, sp.Ref, card)
 	hash := sponsorCardHash(sp)
 
-	cardHashesMu.Lock()
-	if cardHashes[key] == hash {
+	if !force {
+		cardHashesMu.Lock()
+		if cardHashes[key] == hash {
+			cardHashesMu.Unlock()
+			return spaces.PublicURL(key), nil
+		}
 		cardHashesMu.Unlock()
-		return spaces.PublicURL(key), nil
 	}
-	cardHashesMu.Unlock()
 
-	// If already in Spaces, just record the hash without re-uploading
-	if spaces.Exists(key) {
+	// If already in Spaces, just record the hash without re-uploading.
+	// Skipped under -force so a logo-content change (same filename,
+	// different bytes) actually rewrites the Spaces object.
+	if !force && spaces.Exists(key) {
 		cardHashesMu.Lock()
 		cardHashes[key] = hash
 		cardHashesMu.Unlock()
@@ -210,6 +232,52 @@ func generateAndUploadSponsorPng(ctx *config.AppContext, confTag, card string, s
 	return url, nil
 }
 
+// RefreshSponsorCardsForConf regenerates sponsor cards for a single
+// conf, regardless of Active / InFuture status. Used by the CLI's
+// -conf filter so an admin can back-fill sponsor cards on a specific
+// event (including past ones) without sweeping every conf.
+func RefreshSponsorCardsForConf(ctx *config.AppContext, conf *types.Conf) {
+	RefreshSponsorCardsForConfOpt(ctx, conf, "", false)
+}
+
+// RefreshSponsorCardsForConfOpt is the filter-aware variant.
+// orgFilter (case-insensitive substring on Org.Name; empty = all)
+// narrows which sponsorships get refreshed. force=true bypasses the
+// hash + Spaces.Exists short-circuits so the upload always rewrites
+// the existing Spaces object — useful when the source logo file's
+// content changed but its filename (the only logo bit hashed) didn't.
+func RefreshSponsorCardsForConfOpt(ctx *config.AppContext, conf *types.Conf, orgFilter string, force bool) {
+	if conf == nil {
+		return
+	}
+	sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("media refresh sponsors: failed to fetch sponsorships for %s: %s", conf.Tag, err)
+		return
+	}
+	needle := strings.ToLower(strings.TrimSpace(orgFilter))
+	matched := 0
+	for _, sp := range sponsorships {
+		if sp.Org == nil {
+			continue
+		}
+		if needle != "" && !strings.Contains(strings.ToLower(sp.Org.Name), needle) {
+			continue
+		}
+		matched++
+		for _, card := range []string{"1080p", "insta", "social"} {
+			if _, err := generateAndUploadSponsorPngOpt(ctx, conf.Tag, card, sp, force); err != nil {
+				ctx.Err.Printf("media refresh sponsors: %s", err)
+			}
+		}
+	}
+	if needle != "" {
+		ctx.Infos.Printf("media refresh sponsors: finished %s (%d/%d matched %q, force=%t)", conf.Tag, matched, len(sponsorships), orgFilter, force)
+	} else {
+		ctx.Infos.Printf("media refresh sponsors: finished %s (%d sponsorships, force=%t)", conf.Tag, len(sponsorships), force)
+	}
+}
+
 func RefreshSponsorCards(ctx *config.AppContext) {
 	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
@@ -221,26 +289,7 @@ func RefreshSponsorCards(ctx *config.AppContext) {
 		if !conf.Active || !conf.InFuture() {
 			continue
 		}
-
-		sponsorships, err := getters.ListSponsorships(ctx, conf.Ref)
-		if err != nil {
-			ctx.Err.Printf("media refresh sponsors: failed to fetch sponsorships for %s: %s", conf.Tag, err)
-			continue
-		}
-
-		for _, sp := range sponsorships {
-			if sp.Org == nil {
-				continue
-			}
-			for _, card := range []string{"1080p", "insta", "social"} {
-				_, err := generateAndUploadSponsorPng(ctx, conf.Tag, card, sp)
-				if err != nil {
-					ctx.Err.Printf("media refresh sponsors: %s", err)
-				}
-			}
-		}
-
-		ctx.Infos.Printf("media refresh sponsors: finished %s (%d sponsorships)", conf.Tag, len(sponsorships))
+		RefreshSponsorCardsForConf(ctx, conf)
 	}
 
 	// Persist hash index to Spaces
@@ -289,12 +338,15 @@ func refreshTalkCards(ctx *config.AppContext, talks []*types.Talk, requireActive
 		if requireActive && !conf.Active {
 			continue
 		}
-		if talk.Clipart == "" {
-			continue
-		}
 
-		if _, err := generateAndUploadTalkPng(ctx, talk.Event, card, talk); err != nil {
-			ctx.Err.Printf("media refresh talks: %s", err)
+		// Talk-card visual is built around talk.Clipart, so skip the
+		// talk-card upload when no clipart is set yet. Speaker cards
+		// use Clipart only as a background image; the speaker info
+		// still renders without it, so let those generate regardless.
+		if talk.Clipart != "" {
+			if _, err := generateAndUploadTalkPng(ctx, talk.Event, card, talk); err != nil {
+				ctx.Err.Printf("media refresh talks: %s", err)
+			}
 		}
 
 		for _, speaker := range talk.Speakers {

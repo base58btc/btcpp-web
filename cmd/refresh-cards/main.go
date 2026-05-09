@@ -46,8 +46,9 @@ type cfgFile struct {
 		SpeakersDb        string `toml:"speakersdb"`
 		OrgDb             string `toml:"orgdb"`
 		ProposalDb        string `toml:"proposaldb"`
-		SpeakerConfDb string `toml:"speakerconfdb"`
+		SpeakerConfDb     string `toml:"speakerconfdb"`
 		ConfTalkDb        string `toml:"conftalkdb"`
+		SponsorshipsDb    string `toml:"sponsorshipsdb"`
 	} `toml:"notion"`
 	Spaces struct {
 		Endpoint string `toml:"endpoint"`
@@ -61,7 +62,16 @@ type cfgFile struct {
 func main() {
 	confTag := flag.String("conf", "", "Restrict to talks where Talk.Event matches this conf tag")
 	speakerQ := flag.String("speaker", "", "Restrict to talks containing a speaker whose name matches (case-insensitive substring)")
+	orgQ := flag.String("org", "", "Restrict sponsor refresh to orgs whose name matches (case-insensitive substring). Implies sponsor-only.")
+	force := flag.Bool("force", false, "Bypass hash + Spaces.Exists short-circuits — always re-render and re-upload. Useful when a logo's bytes changed but the filename didn't.")
+	activeOnly := flag.Bool("active", false, "Refresh talks/speakers/sponsors for every Active+future conf. Mutually exclusive with -conf.")
 	flag.Parse()
+	if *activeOnly && (*confTag != "" || *speakerQ != "" || *orgQ != "") {
+		log.Fatalf("-active is incompatible with -conf / -speaker / -org")
+	}
+	if *orgQ != "" && *confTag == "" {
+		log.Fatalf("-org requires -conf")
+	}
 
 	var c cfgFile
 	if _, err := toml.DecodeFile(configFile, &c); err != nil {
@@ -88,8 +98,9 @@ func main() {
 		SpeakersDb:        c.Notion.SpeakersDb,
 		OrgDb:             c.Notion.OrgDb,
 		ProposalDb:        c.Notion.ProposalDb,
-		SpeakerConfDb: c.Notion.SpeakerConfDb,
+		SpeakerConfDb:     c.Notion.SpeakerConfDb,
 		ConfTalkDb:        c.Notion.ConfTalkDb,
+		SponsorshipsDb:    c.Notion.SponsorshipsDb,
 	}
 	n := &types.Notion{Config: nc}
 	n.Setup(c.Notion.Token)
@@ -131,6 +142,46 @@ func main() {
 	// Pull the existing hash index so unchanged cards short-circuit.
 	handlers.PreloadCardHashes(appCtx)
 
+	if *activeOnly {
+		confs, _ := getters.FetchConfsCached(appCtx)
+		var refreshed int
+		for _, c := range confs {
+			if c == nil || !c.Active || !c.InFuture() {
+				continue
+			}
+			confTalks, err := getters.LoadTalksFromConfTalks(appCtx, c.Tag)
+			if err != nil {
+				log.Printf("load talks %s: %s — skipping", c.Tag, err)
+				continue
+			}
+			log.Printf("→ %s: %d talks", c.Tag, len(confTalks))
+			handlers.RefreshTalkCardsForce(appCtx, confTalks)
+			handlers.RefreshSponsorCardsForConfOpt(appCtx, c, "", *force)
+			refreshed++
+		}
+		log.Printf("refresh complete (%d active conf(s))", refreshed)
+		return
+	}
+
+	// -org filter is sponsor-only. Skip the talk/speaker pass and
+	// just refresh matching sponsors for the named conf.
+	if *orgQ != "" {
+		confs, _ := getters.FetchConfsCached(appCtx)
+		var hit *types.Conf
+		for _, c := range confs {
+			if c != nil && c.Tag == *confTag {
+				hit = c
+				break
+			}
+		}
+		if hit == nil {
+			log.Fatalf("conf %q not found", *confTag)
+		}
+		handlers.RefreshSponsorCardsForConfOpt(appCtx, hit, *orgQ, *force)
+		log.Println("refresh complete")
+		return
+	}
+
 	talks, err := getters.LoadTalksFromConfTalks(appCtx, *confTag)
 	if err != nil {
 		log.Fatalf("load talks: %s", err)
@@ -146,6 +197,21 @@ func main() {
 	}
 
 	handlers.RefreshTalkCardsForce(appCtx, filtered)
+
+	// Sponsor cards aren't tied to a talk; refresh them per-conf when
+	// -conf is set. Skipped on a no-flag full sweep because the
+	// ambient RefreshSponsorCards (called from the running web app)
+	// covers active/future confs already.
+	if *confTag != "" && *speakerQ == "" {
+		confs, _ := getters.FetchConfsCached(appCtx)
+		for _, c := range confs {
+			if c != nil && c.Tag == *confTag {
+				handlers.RefreshSponsorCardsForConf(appCtx, c)
+				break
+			}
+		}
+	}
+
 	log.Println("refresh complete")
 }
 

@@ -380,11 +380,19 @@ func MakeSpeakerCard(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
+	// Hide TBD placeholder titles from the rendered speaker card —
+	// the speaker is on the program, but we don't want to broadcast
+	// a placeholder name as if it were the real talk title.
+	talkTitle := talk.Name
+	if isTBDTitle(talkTitle) {
+		talkTitle = ""
+	}
+
 	template := fmt.Sprintf("media/speaker_%s.tmpl", card)
 	err = ctx.TemplateCache.ExecuteTemplate(w, template, &SpeakerCard{
 		ConfTag:   confTag,
 		Name:      speaker.Name,
-		TalkTitle: talk.Name,
+		TalkTitle: talkTitle,
 		TalkImg:   talk.Clipart,
 		Twitter:   speaker.TwitterHandle(),
 	})
