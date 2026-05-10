@@ -86,6 +86,15 @@ type (
 		// conf_nav. Not stored in Notion — recomputed each render.
 		CountdownStart *time.Time
 		CountdownEnd   *time.Time
+
+		// OrientCalNotif persists the volunteer-orientation
+		// invite state for this conf: a "UID:Sequence:Hashbytes"
+		// triple in the same shape as ConfTalk.CalNotif. Stored
+		// at the conf level rather than per-vol because the
+		// orientation is a single broadcast event — every vol
+		// gets the same time / venue, and a SEQUENCE bump
+		// propagates to all of their calendars at once.
+		OrientCalNotif string
 	}
 
         // ConfInfo is the per-day schedule strip for a conference: when

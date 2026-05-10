@@ -1088,6 +1088,38 @@ func ShiftUpdateCalNotif(n *types.Notion, shiftID string, calnotif string) error
 	return nil
 }
 
+// ConfUpdateOrientCalNotif stamps the orientation-invite state
+// triple ("UID:Sequence:Hashbytes") on a conf row's
+// OrientCalNotif rich_text column. Mirrors TalkUpdateCalNotif /
+// ShiftUpdateCalNotif's in-place cache patch so the next render
+// reads the fresh value without waiting on a cache refresh tick.
+func ConfUpdateOrientCalNotif(n *types.Notion, confRef string, calnotif string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), confRef,
+		map[string]*notion.PropertyValue{
+			"OrientCalNotif": notion.NewRichTextPropertyValue(
+				[]*notion.RichText{
+					{
+						Type: notion.RichTextText,
+						Text: &notion.Text{
+							Content: calnotif,
+						}},
+				}...),
+		})
+	if err != nil {
+		return err
+	}
+	// Patch the warm conf cache. confs[] holds pointers; the
+	// same pointer is what FetchConfsCached returns, so a
+	// single mutation reaches every reader.
+	for _, c := range confs {
+		if c != nil && c.Ref == confRef {
+			c.OrientCalNotif = calnotif
+			break
+		}
+	}
+	return nil
+}
+
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
 	var speakers []*types.Speaker
 

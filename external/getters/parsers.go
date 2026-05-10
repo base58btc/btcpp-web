@@ -334,6 +334,7 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		ShowHackathon: parseCheckbox(props["Show Hacks"].Checkbox),
 		ShowTalks:     parseCheckbox(props["Show Talks"].Checkbox),
 		HasSatellites: parseCheckbox(props["Has Satellites"].Checkbox),
+		OrientCalNotif: parseRichText("OrientCalNotif", props),
 	}
 
         stdate := parseDate("StartDate", props)
