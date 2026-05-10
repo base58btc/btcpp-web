@@ -231,12 +231,17 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	// Updates" on the schedule page (re-fan-out drifted
 	// Scheduled talks). Drift is surfaced visually via the
 	// orange tint on each card.
+	hasDrift := false
+	if ct := getters.FetchConfTalkByProposal(req.ProposalID); ct != nil {
+		hasDrift = computeScheduleDrift(ct, proposal, conf)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
+	json.NewEncoder(w).Encode(map[string]interface{}{
 		"confTalkID": confTalkID,
 		"start":      startTime.Format(time.RFC3339),
 		"end":        endTime.Format(time.RFC3339),
+		"hasDrift":   hasDrift,
 	})
 }
 
@@ -286,10 +291,17 @@ func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	// No auto-fire — drift is surfaced visually; updates
 	// propagate via the explicit "Send Cal Updates" button.
+	hasDrift := false
+	if updated := getters.FetchConfTalkByProposal(req.ProposalID); updated != nil {
+		if proposal, perr := getters.GetProposal(ctx, req.ProposalID); perr == nil && proposal != nil {
+			hasDrift = computeScheduleDrift(updated, proposal, conf)
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"durationMin": req.DurationMin,
+		"hasDrift":    hasDrift,
 	})
 }
 

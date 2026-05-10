@@ -18,17 +18,19 @@
 
   // CSS classes that differ between a sidebar card and a placed card.
   // We swap the differing ones during morphs and leave shared ones
-  // (.schedule-talk, .cursor-grab, padding, etc.) untouched.
+  // (.schedule-talk, .cursor-grab, padding, etc.) untouched. Color
+  // classes are split out so they can be toggled independently
+  // based on the post-mutation drift state.
   const sidebarOnlyClasses = ["border-gray-200", "bg-white"];
-  const placedOnlyClasses = [
+  const placedLayoutClasses = [
     "absolute",
     "left-1",
     "right-1",
-    "border-indigo-200",
-    "bg-indigo-50/80",
     "overflow-hidden",
     "group",
   ];
+  const placedCleanClasses = ["border-indigo-200", "bg-indigo-50/80"];
+  const placedDriftClasses = ["border-amber-400", "bg-amber-50/90"];
 
   let dragging = null;
 
@@ -100,6 +102,8 @@
             return;
           }
           card.dataset.actualMin = finalDur;
+          const data = await resp.json().catch(() => ({}));
+          applyDriftState(card, !!data.hasDrift);
         } catch (err) {
           alert("Network error: " + err.message);
           card.style.height = startHeight + "px";
@@ -114,10 +118,19 @@
   // morphToPlaced rewrites a card's classes / styles so it renders as
   // an absolute-positioned block inside a venue column. Ensures a
   // resize handle exists. Idempotent — calling on an already-placed
-  // card just updates the position.
+  // card just updates the position. Color classes (drift vs clean)
+  // are managed separately by applyDriftState after the network
+  // response lands.
   function morphToPlaced(card, venueEl, topPx) {
     sidebarOnlyClasses.forEach((c) => card.classList.remove(c));
-    placedOnlyClasses.forEach((c) => card.classList.add(c));
+    placedLayoutClasses.forEach((c) => card.classList.add(c));
+    // Default to the current visual state so the card doesn't
+    // flicker between drag and response. The post-response
+    // applyDriftState picks the truthy color.
+    if (!card.classList.contains("border-amber-400") &&
+        !card.classList.contains("border-indigo-200")) {
+      placedCleanClasses.forEach((c) => card.classList.add(c));
+    }
     card.style.minHeight = "";
     card.style.top = topPx + "px";
     if (!card.style.height) {
@@ -140,8 +153,13 @@
   // morphToSidebar reverses morphToPlaced — used when a placed card is
   // dragged back to the sidebar list.
   function morphToSidebar(card) {
-    placedOnlyClasses.forEach((c) => card.classList.remove(c));
+    placedLayoutClasses.forEach((c) => card.classList.remove(c));
+    placedCleanClasses.forEach((c) => card.classList.remove(c));
+    placedDriftClasses.forEach((c) => card.classList.remove(c));
     sidebarOnlyClasses.forEach((c) => card.classList.add(c));
+    // Drop the EDITED pill when going back to the sidebar; the
+    // talk is unscheduled, no drift signal makes sense.
+    removeDriftPill(card);
     card.style.top = "";
     card.style.height = "";
     const dur = parseInt(card.dataset.desiredMin || "30", 10);
@@ -150,6 +168,51 @@
     if (handle) handle.remove();
     delete card.dataset.conftalkId;
     if (sidebarList) sidebarList.appendChild(card);
+  }
+
+  // applyDriftState swaps the color classes on a placed card and
+  // shows / hides the EDITED pill based on the server-reported
+  // drift state. Called after every successful place / resize so
+  // the orange tint stays in sync with what the schedule UI shows
+  // versus what's been sent to attendees' calendars.
+  function applyDriftState(card, hasDrift) {
+    if (hasDrift) {
+      placedCleanClasses.forEach((c) => card.classList.remove(c));
+      placedDriftClasses.forEach((c) => card.classList.add(c));
+      ensureDriftPill(card);
+    } else {
+      placedDriftClasses.forEach((c) => card.classList.remove(c));
+      placedCleanClasses.forEach((c) => card.classList.add(c));
+      removeDriftPill(card);
+    }
+  }
+
+  // ensureDriftPill injects the "EDITED" badge into a placed card
+  // when it isn't already there. Matches the server-rendered
+  // markup in schedule_placed so refreshes look identical to
+  // post-drag state.
+  function ensureDriftPill(card) {
+    if (card.querySelector(".schedule-drift-pill")) return;
+    // The pill belongs next to the status pill in the card's
+    // top-right action group. Schema:
+    //   <div class="flex items-start justify-between gap-1">
+    //     <p>title</p>
+    //     <div class="flex items-center gap-1 shrink-0">
+    //       [EDITED?] [STATUS]
+    //     </div>
+    //   </div>
+    const actionGroup = card.querySelector(".flex.items-start.justify-between > div.flex");
+    if (!actionGroup) return;
+    const pill = document.createElement("span");
+    pill.title = "Edited since the last cal invite was sent — needs a Send Cal Updates click.";
+    pill.className = "schedule-drift-pill inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900";
+    pill.textContent = "EDITED";
+    actionGroup.insertBefore(pill, actionGroup.firstChild);
+  }
+
+  function removeDriftPill(card) {
+    const pill = card.querySelector(".schedule-drift-pill");
+    if (pill) pill.remove();
   }
 
   // Snapshot of a card's position before a drag. Used to revert on
@@ -251,6 +314,7 @@
         }
         const data = await resp.json().catch(() => ({}));
         if (data.confTalkID) card.dataset.conftalkId = data.confTalkID;
+        applyDriftState(card, !!data.hasDrift);
       } catch (err) {
         restore(card, snap);
         alert("Network error: " + err.message);
