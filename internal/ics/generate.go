@@ -10,6 +10,11 @@ import (
 const (
 	MethodRequest = "REQUEST"
 	MethodCancel  = "CANCEL"
+	// MethodPublish is for public "add to calendar" downloads
+	// where the recipient is opting in rather than receiving an
+	// invitation. No ATTENDEE list (or empty) is expected; the
+	// client treats the import as a one-way add.
+	MethodPublish = "PUBLISH"
 )
 
 // Status values for VEVENT.

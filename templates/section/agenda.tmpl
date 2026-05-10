@@ -161,6 +161,14 @@
   </div>
   <div class="shrink-0 flex items-center gap-2">
     {{ template "venue_chip" . }}
+    {{ if and .Sched (isFuture .Sched.Start) .AnchorTag }}
+    <a href="/conf/{{ .ConfTag }}/talk/{{ .AnchorTag }}/calendar.ics"
+       title="Add this talk to your calendar"
+       class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-700">
+      <span aria-hidden="true">📅</span>
+      <span class="hidden sm:inline">Add to calendar</span>
+    </a>
+    {{ end }}
     {{ if .YTLink }}
     <a href="{{ .YTLink }}" target="_blank" rel="noopener noreferrer"
        title="Watch recording"

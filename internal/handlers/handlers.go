@@ -301,6 +301,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"inDev": func() bool {
 			return !ctx.Env.Prod
 		},
+		"isFuture": func(t time.Time) bool {
+			return t.After(time.Now())
+		},
 	}
 	ctx.TemplateCache, err = findAndParseTemplates("templates", funcMap)
 	return err
@@ -551,6 +554,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 	r.HandleFunc("/conf/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
 		RenderTalks(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/conf/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
+		TalkPublicICS(w, r, app)
 	}).Methods("GET")
 	r.HandleFunc("/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		RenderConf(w, r, app)
