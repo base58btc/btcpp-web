@@ -14,7 +14,26 @@ import (
 	"btcpp-web/internal/types"
 )
 
-const StatusAccepted = "Accepted"
+// Talk-app proposal statuses we set programmatically. The full
+// state machine lives in /Users/niftynei/.claude/projects/.../
+// project_talk_app_states.md but two transitions matter here:
+//
+//   - Accepted: program-locked-in but the schedule is still in
+//     draft. Admin can drag/resize the talk on the schedule UI
+//     freely; no calendar invites have gone out yet.
+//   - Scheduled: cal invite has been sent — the schedule is
+//     committed. Subsequent edits show as "drift" on the
+//     schedule UI and require an explicit "Send Cal Updates"
+//     click before they propagate to attendees' calendars.
+//
+// The Accepted → Scheduled transition fires from the per-proposal
+// "Send cal invite" button on /admin/applicants (inside
+// AdminProposalSendCal). The reverse transition isn't supported —
+// once an invite has gone out, the talk is "live" until cancelled.
+const (
+	StatusAccepted  = "Accepted"
+	StatusScheduled = "Scheduled"
+)
 
 // ErrDuplicateSpeakerEmail is returned when two or more Speakers share the
 // applicant's email — a data-integrity issue the admin must resolve manually.

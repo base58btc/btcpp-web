@@ -84,9 +84,12 @@ func loadOrganizerStats(ctx *config.AppContext, conf *types.Conf, pendingCount i
 		ctx.Err.Printf("/%s/admin stats: registrations: %s", conf.Tag, err)
 	}
 
-	// Speakers confirmed = proposals with Status=Accepted.
+	// Speakers confirmed = proposals in either of the two
+	// "we're running this talk" states: Accepted (program
+	// locked, schedule still draft) or Scheduled (cal invite
+	// has gone out).
 	for _, p := range loadConfProposals(ctx, conf) {
-		if p != nil && p.Status == StatusAccepted {
+		if p != nil && (p.Status == StatusAccepted || p.Status == StatusScheduled) {
 			stats.SpeakersConfirmed++
 		}
 	}

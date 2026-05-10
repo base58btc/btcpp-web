@@ -973,6 +973,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/run-of-show", func(w http.ResponseWriter, r *http.Request) {
 		RunOfShowAdmin(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/schedule/sendcal-updates", func(w http.ResponseWriter, r *http.Request) {
+		ScheduleSendCalUpdates(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/schedule/place", func(w http.ResponseWriter, r *http.Request) {
 		SchedulePlace(w, r, app)
 	}).Methods("POST")
@@ -5758,6 +5761,13 @@ func AdminProposalSendCalAll(w http.ResponseWriter, r *http.Request, ctx *config
 		// them apart by the entering CalState.
 		if row.CalState == "none" {
 			sent++
+			// First-send locks the schedule in: flip
+			// Accepted → Scheduled.
+			if row.Proposal.Status == StatusAccepted {
+				if err := getters.UpdateProposalStatus(ctx, row.Proposal.ID, StatusScheduled); err != nil {
+					ctx.Err.Printf("sendcal-all %q status flip: %s", row.Proposal.Title, err)
+				}
+			}
 		}
 	}
 
@@ -5814,6 +5824,17 @@ func AdminProposalSendCal(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 				conf.Tag, url.QueryEscape("Cal invite failed: "+err.Error())),
 			http.StatusSeeOther)
 		return
+	}
+
+	// Sending the cal invite is what locks the talk in: flip
+	// Accepted (draft) → Scheduled. Re-sends and updates leave
+	// the status alone (already Scheduled). Best-effort — the
+	// dispatch already succeeded, so log the status-write
+	// failure but still tell the admin the invite went out.
+	if proposal.Status == StatusAccepted {
+		if err := getters.UpdateProposalStatus(ctx, proposalID, StatusScheduled); err != nil {
+			ctx.Err.Printf("/%s/admin/proposals/%s/sendcal status flip: %s", conf.Tag, proposalID, err)
+		}
 	}
 
 	http.Redirect(w, r,

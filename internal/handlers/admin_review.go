@@ -294,11 +294,11 @@ func AdminCancelTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Proposal+not+found", conf.Tag), http.StatusSeeOther)
 		return
 	}
-	if proposal.Status != StatusAccepted {
+	if proposal.Status != StatusAccepted && proposal.Status != StatusScheduled {
 		http.Redirect(w, r,
 			fmt.Sprintf("/%s/admin/applicants?flash=%s",
 				conf.Tag,
-				url.QueryEscape(fmt.Sprintf("Only Accepted talks can be cancelled (was %q)", proposal.Status))),
+				url.QueryEscape(fmt.Sprintf("Only Accepted or Scheduled talks can be cancelled (was %q)", proposal.Status))),
 			http.StatusSeeOther)
 		return
 	}
@@ -352,7 +352,7 @@ func AdminResendSpeakerTickets(w http.ResponseWriter, r *http.Request, ctx *conf
 	var issued, skipped, failed int
 	seen := map[string]bool{}
 	for _, p := range loadConfProposals(ctx, conf) {
-		if p == nil || p.Status != StatusAccepted {
+		if p == nil || (p.Status != StatusAccepted && p.Status != StatusScheduled) {
 			continue
 		}
 		for _, ref := range p.SpeakerConfRefs {
