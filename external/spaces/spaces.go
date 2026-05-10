@@ -179,6 +179,26 @@ func SaveJSONMap(key string, m map[string]string) error {
 	return err
 }
 
+// Get fetches an object's raw bytes by key. Used by the admin
+// social-cards download to stream a zip of the per-conf 1080p PNGs
+// without going through the public CDN. Returns a 404-style error
+// (NotFound from the SDK) when the key isn't in the bucket; callers
+// should treat that as "skip this entry" rather than fatal.
+func Get(key string) ([]byte, error) {
+	if client == nil {
+		return nil, fmt.Errorf("spaces not configured")
+	}
+	result, err := client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer result.Body.Close()
+	return io.ReadAll(result.Body)
+}
+
 // Exists checks if an object exists in the bucket
 func Exists(key string) bool {
 	if client == nil {
