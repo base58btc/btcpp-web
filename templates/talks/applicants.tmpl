@@ -46,8 +46,8 @@
             <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/email">
             <section id="applicants-table" class="mb-6">
                 <div class="bg-white shadow rounded-lg overflow-hidden">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full sm:divide-y sm:divide-gray-200">
+                        <thead class="bg-gray-50 hidden sm:table-header-group">
                             <tr>
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
                                     <input type="checkbox" onclick="toggleAll(this)" class="rounded border-gray-300">
@@ -59,20 +59,31 @@
                                 <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
+                        <tbody class="bg-white sm:divide-y sm:divide-gray-200">
                             {{ range .Rows }}
-                            <tr class="hover:bg-gray-50">
-                                <td class="px-3 py-4">
-                                    <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}" class="app-checkbox rounded border-gray-300">
+                            <tr class="hover:bg-gray-50 block sm:table-row border-b sm:border-0 border-gray-200 px-4 py-4 sm:p-0">
+                                <td class="block sm:table-cell sm:px-3 sm:py-4 pb-2 sm:pb-4">
+                                    <label class="inline-flex items-center gap-2 sm:gap-0">
+                                        <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}" class="app-checkbox rounded border-gray-300">
+                                        <span class="text-xs uppercase text-gray-500 sm:hidden">Select</span>
+                                    </label>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ if .Speaker }}{{ .Speaker.Name }}{{ end }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ if .Speaker }}{{ .Speaker.Email }}{{ end }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ .Proposal.Title }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ .Proposal.Status }}</td>
-                                <td class="px-6 py-4 text-right">
+                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-900">
+                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Name:</span>{{ if .Speaker }}{{ .Speaker.Name }}{{ end }}
+                                </td>
+                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-900 break-all">
+                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Email:</span>{{ if .Speaker }}{{ .Speaker.Email }}{{ end }}
+                                </td>
+                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-500">
+                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Talk:</span>{{ .Proposal.Title }}
+                                </td>
+                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-500">
+                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Status:</span>{{ .Proposal.Status }}
+                                </td>
+                                <td class="block sm:table-cell sm:px-6 sm:py-4 sm:text-right pt-2 sm:pt-4">
                                     {{ $invite := inviteLink .Proposal }}
                                     {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
-                                    <span class="inline-flex items-center gap-2 justify-end">
+                                    <span class="flex flex-wrap items-center gap-2 sm:justify-end">
                                         {{ if $invite }}
                                         <button type="button"
                                                 data-invite-url="{{ $invite }}"
