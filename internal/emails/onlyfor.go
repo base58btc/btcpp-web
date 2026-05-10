@@ -630,6 +630,23 @@ func execOnlyFor(ctx *config.AppContext, email, onlyFor string, tmplData interfa
 }
 
 func sendOnlyFor(ctx *config.AppContext, email string, letter *mtypes.Letter, title string, content bytes.Buffer) ([]byte, error) {
+	return sendOnlyForWithExtras(ctx, email, letter, title, content, SendOpts{})
+}
+
+// SendOpts carries optional extras for an OnlyFor send: a Reply-To
+// override (so cal-invite emails route replies to speak@ /
+// volunteer@ without changing the envelope From) and zero or more
+// attachments. Empty fields are no-ops; callers that don't need
+// either pass a zero-value SendOpts.
+type SendOpts struct {
+	ReplyTo string // RFC-5322 mailbox; "Display Name <addr@dom>" syntax accepted
+	Files   []*EmailFile
+}
+
+// sendOnlyForWithExtras is the variant of sendOnlyFor that honors
+// SendOpts. The original sendOnlyFor is now a thin wrapper around
+// this so existing call sites stay unchanged.
+func sendOnlyForWithExtras(ctx *config.AppContext, email string, letter *mtypes.Letter, title string, content bytes.Buffer, opts SendOpts) ([]byte, error) {
 	mail := &Mail{
 		JobKey:   makeJobKeyRep(email, letter),
 		Missive:  letter.Missive(),
@@ -637,9 +654,11 @@ func sendOnlyFor(ctx *config.AppContext, email string, letter *mtypes.Letter, ti
 		Title:    title,
 		SendAt:   time.Now(),
 		TextBody: content.Bytes(),
+		ReplyTo:  opts.ReplyTo,
+		Files:    opts.Files,
 	}
 
-        var err error
+	var err error
 	mail.HTMLBody, err = BuildHTMLEmail(ctx, content.Bytes())
 	if err != nil {
 		return nil, err
@@ -648,4 +667,22 @@ func sendOnlyFor(ctx *config.AppContext, email string, letter *mtypes.Letter, ti
 	ctx.Infos.Printf("Sending (%s)%s to %s at %s", mail.JobKey, title, email, mail.SendAt)
 
 	return mail.HTMLBody, ComposeAndSendMail(ctx, mail)
+}
+
+// ExecLetter renders a Notion letter against tmplData and sends it
+// to a single recipient with optional Reply-To + attachments.
+// Public surface used by the cal-invite dispatch (and the
+// /trial-cal-invite smoke route) to fire one-off ICS-attached
+// emails outside the proposal-fan-out path.
+func ExecLetter(ctx *config.AppContext, email, onlyFor string, tmplData interface{}, opts SendOpts) ([]byte, error) {
+	letter, err := getters.GetLetterFor(ctx.Notion, onlyFor)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	if err = missiveTemplate(ctx, letter).Execute(&buf, tmplData); err != nil {
+		return nil, err
+	}
+	title := templatizeTitle(letter.Title, tmplData)
+	return sendOnlyForWithExtras(ctx, email, letter, title, buf, opts)
 }

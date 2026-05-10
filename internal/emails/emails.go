@@ -45,8 +45,24 @@ type Mail struct {
 }
 
 type EmailFile struct {
-	PDF  []byte
-	Name string
+	// PDF holds the attachment bytes for the legacy PDF path.
+	// Kept for back-compat with existing callers that build
+	// ticket attachments. New callers should set Bytes +
+	// ContentType so non-PDF MIME types (e.g. ICS) work.
+	PDF         []byte
+	Bytes       []byte
+	ContentType string // defaults to "application/pdf" when empty
+	Name        string
+}
+
+// payload returns the attachment bytes. Bytes wins when set;
+// otherwise we fall back to PDF for back-compat with existing
+// PDF-shaped callers.
+func (f *EmailFile) payload() []byte {
+	if len(f.Bytes) > 0 {
+		return f.Bytes
+	}
+	return f.PDF
 }
 
 func RegisterEndpoints(r *mux.Router, ctx *config.AppContext) {
@@ -228,9 +244,13 @@ func ComposeAndSendMail(ctx *config.AppContext, mail *Mail) error {
 
 	attaches = make([]*mailer.Attachment, len(mail.Files))
 	for i, file := range mail.Files {
+		ct := file.ContentType
+		if ct == "" {
+			ct = "application/pdf"
+		}
 		attaches[i] = &mailer.Attachment{
-			Content: file.PDF,
-			Type:    "application/pdf",
+			Content: file.payload(),
+			Type:    ct,
 			Name:    file.Name,
 		}
 	}
