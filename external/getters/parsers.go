@@ -257,6 +257,7 @@ func parseConfTalk(ctx *config.AppContext, pageID string, props map[string]notio
 		ProductionNotes: parseRichText("ProductionNotes", props),
 		Venue:           parseSelect("Venue", props),
 		SocialCard:      parseRichText("SocialCard", props),
+		CalNotif:        parseRichText("CalNotif", props),
 	}
 	if tag := parseSelect("Event", props); tag != "" {
 		ct.Conf = lookupConfByTag(ctx, tag)
