@@ -9,24 +9,46 @@
   {{ block "mainnav" . }} {{ end }}
   <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
     <a href="/dashboard" class="text-xs text-gray-500 hover:text-gray-700">&larr; Back to all events</a>
-    <div class="mt-2 flex items-center gap-4">
-      <div class="text-3xl">{{ .Conf.EmojiOrDefault }}</div>
-      <div class="flex-1">
-        <h1 class="text-2xl font-bold text-gray-900">{{ .Conf.Desc }}</h1>
-        <p class="text-sm text-gray-500">{{ .Conf.DateDesc }} - {{ .Conf.Location }}</p>
-        {{ template "conf_countdown" .Conf }}
+
+    {{/*
+      Hero band — leading.png as background with a gradient scrim so
+      the title text stays legible on any photo. Mirrors the per-conf
+      card on /dashboard. Buttons (volunteer invite + public conf
+      page) sit absolute-positioned in the top-right so the heading
+      band stays uncluttered.
+    */}}
+    <div class="mt-2 relative overflow-hidden rounded-lg shadow bg-gray-200">
+      <div class="relative h-40 sm:h-48">
+        <picture>
+          <source srcset="/static/img/{{ .Conf.Tag }}/leading.avif" type="image/avif" />
+          <img src="/static/img/{{ .Conf.Tag }}/leading.png" alt="{{ .Conf.Desc }}"
+               class="absolute inset-0 w-full h-full object-cover" />
+        </picture>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
+
+        <div class="absolute top-2 right-2 flex items-center gap-2">
+          {{ if .IsConfVolcoord }}
+          <button type="button"
+                  data-conf-tag="{{ .Conf.Tag }}"
+                  class="copy-vol-invite-btn inline-flex items-center rounded-md bg-white/90 backdrop-blur px-2.5 py-1 text-xs font-semibold text-gray-900 shadow hover:bg-white">
+            Copy volunteer invite link
+          </button>
+          {{ end }}
+          <a href="/conf/{{ .Conf.Tag }}" target="_blank" rel="noopener noreferrer"
+             class="inline-flex items-center gap-1 rounded-md bg-white/90 backdrop-blur px-2.5 py-1 text-xs font-semibold text-gray-900 shadow hover:bg-white">
+            Conference webpage <span aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
+
+        <div class="absolute bottom-0 left-0 right-0 px-4 sm:px-6 pb-4 text-white">
+          <div class="flex items-center gap-2">
+            <span class="text-2xl">{{ .Conf.EmojiOrDefault }}</span>
+            <h1 class="text-xl sm:text-2xl font-bold truncate">{{ .Conf.Desc }}</h1>
+          </div>
+          <p class="mt-0.5 text-xs sm:text-sm opacity-90">{{ .Conf.DateDesc }} · {{ .Conf.Location }}</p>
+          <div class="conf-countdown-on-dark">{{ template "conf_countdown" .Conf }}</div>
+        </div>
       </div>
-      {{ if .IsConfVolcoord }}
-      <button type="button"
-              data-conf-tag="{{ .Conf.Tag }}"
-              class="copy-vol-invite-btn inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 shrink-0">
-        Copy volunteer invite link
-      </button>
-      {{ end }}
-      <a href="/conf/{{ .Conf.Tag }}" target="_blank" rel="noopener noreferrer"
-         class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shrink-0">
-        Conference webpage <span aria-hidden="true">&rarr;</span>
-      </a>
     </div>
 
     {{ if .FlashMessage }}
@@ -34,19 +56,6 @@
       <p class="text-sm text-green-800">{{ .FlashMessage }}</p>
     </div>
     {{ end }}
-
-    {{/*
-      Hero image + stats panel: a glanceable header that tells the
-      organizer how the event is shaping up at a single look.
-      leading.png is the same banner image used on the public conf
-      page; stats are loaded by loadOrganizerStats in admin_review.go.
-    */}}
-    <div class="mt-6 overflow-hidden rounded-lg bg-white shadow">
-      <img src="/static/img/{{ .Conf.Tag }}/leading.png"
-           alt="{{ .Conf.Desc }}"
-           class="w-full max-h-56 object-cover"
-           onerror="this.style.display='none'">
-    </div>
 
     {{ if .Stats }}
     <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-gray-500">At a glance</h2>
