@@ -1005,6 +1005,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/proposals/{proposalID}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalSendCal(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/applicants/sendcal-all", func(w http.ResponseWriter, r *http.Request) {
+		AdminProposalSendCalAll(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/speakers/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
@@ -5577,6 +5580,82 @@ func speakerName(sp *types.Speaker) string {
 		return ""
 	}
 	return sp.Name
+}
+
+// AdminProposalSendCalAll fires cal invites for every scheduled
+// proposal on the page where the data hasn't drifted since the
+// last send (CalState in {none, fresh}; "stale" is skipped). The
+// "none" rows produce first-send emails (seq=0). "fresh" rows hit
+// the hash-unchanged short-circuit inside dispatch and don't email
+// anyone. "stale" is deliberately excluded so an admin reviews
+// pending changes individually via the per-card "Update cal
+// invite" button.
+//
+// Path: POST /{conf}/admin/applicants/sendcal-all
+func AdminProposalSendCalAll(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	rows, err := loadProposalRowsForConf(ctx, conf)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/applicants/sendcal-all load rows: %s", conf.Tag, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=%s",
+				conf.Tag, url.QueryEscape("Bulk sendcal failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+
+	var attempted, sent, skippedStale, failed int
+	for _, row := range rows {
+		if row == nil || row.Proposal == nil {
+			continue
+		}
+		// Skip unscheduled proposals — no ConfTalk → no
+		// CalState → no cal-invite to send.
+		if row.CalState == "" {
+			continue
+		}
+		// Skip stale: data has drifted since the last send,
+		// the admin should review and click "Update cal
+		// invite" individually rather than push a silent
+		// SEQUENCE bump out via the bulk button.
+		if row.CalState == "stale" {
+			skippedStale++
+			continue
+		}
+		attempted++
+		// force=false: "fresh" rows hit the hash-unchanged
+		// no-op inside dispatch and don't email; "none" rows
+		// fire seq=0 first-sends.
+		if err := DispatchTalkICSForProposal(ctx, row.Proposal, conf, row.Speakers, false); err != nil {
+			ctx.Err.Printf("sendcal-all %q: %s", row.Proposal.Title, err)
+			failed++
+			continue
+		}
+		// "fresh" returns nil from dispatch but didn't actually
+		// email; only count "none" as a real send. We can tell
+		// them apart by the entering CalState.
+		if row.CalState == "none" {
+			sent++
+		}
+	}
+
+	flash := fmt.Sprintf("Bulk cal invites: %d sent · %d already current · %d pending updates skipped",
+		sent, attempted-sent-failed, skippedStale)
+	if failed > 0 {
+		flash = fmt.Sprintf("%s · %d failed (see logs)", flash, failed)
+	}
+	http.Redirect(w, r,
+		fmt.Sprintf("/%s/admin/applicants?flash=%s",
+			conf.Tag, url.QueryEscape(flash)),
+		http.StatusSeeOther)
 }
 
 // AdminProposalSendCal handles the per-card "Send / Resend /
