@@ -120,11 +120,13 @@
         <div class="text-2xl">&#128190;</div>
         <span class="text-sm font-medium text-gray-900">Download all talk cards (.zip)</span>
       </a>
+      {{ if .IsGlobalAdmin }}
       <a href="/talks/gifts?conf={{ .Conf.Tag }}"
          class="flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-gray-50">
         <div class="text-2xl">&#127873;</div>
         <span class="text-sm font-medium text-gray-900">Speaker gifts CSV</span>
       </a>
+      {{ end }}
       <a href="/{{ .Conf.Tag }}/volcoord"
          class="flex items-center gap-3 bg-white shadow rounded-lg px-4 py-3 hover:bg-gray-50">
         <div class="text-2xl">&#129489;</div>

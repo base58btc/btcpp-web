@@ -280,6 +280,11 @@ type OrganizerDashboardPage struct {
         PendingCount    int
         DecisionedCount int
         FlashMessage    string
+        // IsGlobalAdmin gates a couple of tiles (e.g. speaker gifts
+        // CSV) whose destination route is global-admin only — hide
+        // the link rather than render a tile that 404s for a
+        // conf-only admin.
+        IsGlobalAdmin   bool
         Year            uint
 }
 

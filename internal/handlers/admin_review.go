@@ -55,7 +55,8 @@ type reviewAction struct {
 // /admin/conf/{tag}/. Hub for everything organizer-y for one
 // conference: review applications today, more tools as we add them.
 func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	id := requireConfAdmin(w, r, ctx)
+	if id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -77,11 +78,12 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	confCopy.CountdownStart, confCopy.CountdownEnd = computeCountdownBounds(&confCopy, infosByDay)
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "admin/conf_dashboard.tmpl", &OrganizerDashboardPage{
-		Conf:           &confCopy,
-		PendingCount:   len(pending),
+		Conf:            &confCopy,
+		PendingCount:    len(pending),
 		DecisionedCount: len(decisioned),
-		FlashMessage:   r.URL.Query().Get("flash"),
-		Year:           helpers.CurrentYear(),
+		FlashMessage:    r.URL.Query().Get("flash"),
+		IsGlobalAdmin:   id.IsGlobalAdmin(),
+		Year:            helpers.CurrentYear(),
 	})
 	if err != nil {
 		ctx.Err.Printf("/%s/admin render: %s", conf.Tag, err)
