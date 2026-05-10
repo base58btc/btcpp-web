@@ -63,7 +63,7 @@
                 {{ $row := . }}
                 {{ $invite := inviteLink .Proposal }}
                 {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "Scheduled") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
-                <article class="bg-white shadow rounded-lg p-4 flex flex-col gap-2">
+                <article class="shadow rounded-lg p-4 flex flex-col gap-2 {{ if eq .CalState "stale" }}bg-amber-50 ring-1 ring-amber-300{{ else }}bg-white{{ end }}">
                     <div class="flex items-start gap-2">
                         <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}"
                                class="app-checkbox mt-1 rounded border-gray-300 shrink-0">
