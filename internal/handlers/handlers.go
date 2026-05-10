@@ -30,6 +30,7 @@ import (
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/ics"
 	"btcpp-web/internal/imgproc"
 	"btcpp-web/internal/missives"
 	"btcpp-web/internal/types"
@@ -609,13 +610,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
 		}
-
-		if !google.IsLoggedIn() {
-			app.Session.Put(r.Context(), "r", r.URL.Path)
-			http.Redirect(w, r, "/auth-login", http.StatusFound)
-			return
-		}
-
 		SendCals(w, r, app)
 	}).Methods("GET", "POST")
 
@@ -652,13 +646,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		if id := requireConfVolcoord(w, r, app); id == nil {
 			return
 		}
-
-		if !google.IsLoggedIn() {
-			app.Session.Put(r.Context(), "r", r.URL.Path)
-			http.Redirect(w, r, "/auth-login", http.StatusFound)
-			return
-		}
-
 		SendVolCals(w, r, app)
 
 		params := mux.Vars(r)
@@ -1019,13 +1006,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
 		}
-
-		if !google.IsLoggedIn() {
-			app.Session.Put(r.Context(), "r", r.URL.Path)
-			http.Redirect(w, r, "/auth-login", http.StatusFound)
-			return
-		}
-
 		SendCals(w, r, app)
 
 		params := mux.Vars(r)
@@ -2430,56 +2410,37 @@ func TicketPDF(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	w.Write(pdfBytes)
 }
 
+// SendCals fans the self-hosted ICS calendar pipeline across every
+// scheduled talk for a conf. Replaces the previous Google Calendar
+// API call with internal RFC-5545 generation; CalNotif is now the
+// "UID:Sequence:Hashbytes" triple maintained by DispatchTalkICSForTalk.
+//
+// Idempotent: a re-click that doesn't change any talk's start/end/
+// title hash will skip emails entirely (no SEQUENCE bump, no
+// duplicate invitation in recipients' calendars). Re-running after
+// a schedule edit fans out an UPDATE with seq+1.
 func SendCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil || conf == nil {
+		handle404(w, r, ctx)
+		return
+	}
 
-	params := mux.Vars(r)
-	confTag := params["conf"]
-
-	var talks types.TalkTime
-	talks, err := getters.GetTalksFor(ctx, confTag)
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
 		return
 	}
 
-	/* Send a cal invite to every speaker of a talk! */
 	for _, talk := range talks {
-		if talk.Sched.End == nil {
+		if talk.Sched == nil || talk.Sched.End == nil {
 			ctx.Err.Printf("Can't send cals for %s talk: no end time??", talk.Name)
 			continue
 		}
-
-		emails := make([]string, len(talk.Speakers))
-		for i, speaker := range talk.Speakers {
-			emails[i] = speaker.Email
+		if err := DispatchTalkICSForTalk(ctx, talk, conf, kindRequest, false); err != nil {
+			ctx.Err.Printf("send cals %q: %s", talk.Name, err)
 		}
-
-		ctx.Infos.Printf("Sending cal invite for %s (%d)", talk.Name, len(emails))
-		/* Send cal invites!! */
-		calInvite := &google.CalInvite{
-			ConfTag:   confTag,
-			EventName: "speak @ btc++:" + talk.Name,
-			Location:  talk.VenueName(),
-                        Desc:      "Your talk is happening now!",
-			Invitees:  emails,
-			StartTime: talk.Sched.Start,
-			EndTime:   *talk.Sched.End,
-		}
-		ident, err := google.RunCalendarInvites(talk.CalNotif, calInvite)
-
-		if err != nil {
-			ctx.Err.Printf("Failure sending cal invite for talk %s: %s", talk.Name, err)
-			continue
-		}
-
-		err = getters.TalkUpdateCalNotif(ctx.Notion, talk.ID, ident)
-		if err != nil {
-			ctx.Err.Printf("Failure updating calnotif data!!! %s", err)
-			continue
-		}
-
-		ctx.Infos.Printf("Cal invite sent to %d people!", len(emails))
 	}
 }
 
@@ -3821,43 +3782,24 @@ func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.
 
 	ctx.Infos.Println("Scheduled volunteer, ticket added:", entry.ID)
 
-	// Send calendar invites if connected
-	if google.IsLoggedIn() {
-		for _, shift := range vol.WorkShifts {
-			if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
-				continue
-			}
-			desc := ""
-			if shift.Type != nil {
-				desc = shift.Type.LongDesc
-			}
-			calInvite := &google.CalInvite{
-				ConfTag:   conf.Tag,
-				EventName: fmt.Sprintf("volunteer @ btc++: %s", shift.Name),
-				Location:  conf.Location,
-				Desc:      desc,
-				Invitees:  []string{vol.Email},
-				StartTime: shift.ShiftTime.Start,
-				EndTime:   *shift.ShiftTime.End,
-			}
-			_, calErr := google.RunCalendarInvites("", calInvite)
-			if calErr != nil {
-				ctx.Err.Printf("scheduled flow: cal invite failed for shift %s: %s", shift.Name, calErr)
-			}
+	// Self-hosted ICS calendar invites: one per shift this
+	// volunteer just signed up for, plus one orientation invite if
+	// the conf has volinfo.OrientTimes set. No more
+	// google.IsLoggedIn() gate — the pipeline runs as long as the
+	// mailer is reachable.
+	recipient := ics.Attendee{Email: vol.Email, Name: vol.Name}
+	for _, shift := range vol.WorkShifts {
+		if shift == nil || shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+			continue
 		}
+		if err := DispatchShiftICS(ctx, shift, conf, []ics.Attendee{recipient}, kindRequest, false); err != nil {
+			ctx.Err.Printf("scheduled flow: cal invite failed for shift %s: %s", shift.Name, err)
+		}
+	}
 
-		if volinfo != nil && volinfo.OrientTimes != nil && volinfo.OrientTimes.End != nil {
-			orientInvite := &google.CalInvite{
-				ConfTag:   conf.Tag,
-				EventName: fmt.Sprintf("volunteer @ bitcoin++: %s Volunteer Orientation", conf.Tag),
-				Invitees:  []string{vol.Email},
-				StartTime: volinfo.OrientTimes.Start,
-				EndTime:   *volinfo.OrientTimes.End,
-			}
-			_, calErr := google.RunCalendarInvites("", orientInvite)
-			if calErr != nil {
-				ctx.Err.Printf("scheduled flow: orientation cal invite failed: %s", calErr)
-			}
+	if volinfo != nil && volinfo.OrientTimes != nil && volinfo.OrientTimes.End != nil {
+		if err := DispatchOrientICS(ctx, conf, recipient, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End); err != nil {
+			ctx.Err.Printf("scheduled flow: orientation cal invite failed: %s", err)
 		}
 	}
 
@@ -5704,6 +5646,11 @@ func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.App
 	http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, url.QueryEscape(msg)), http.StatusSeeOther)
 }
 
+// SendVolCals fans the self-hosted ICS pipeline across every
+// scheduled volunteer shift for a conf. Mirrors SendCals on the
+// volunteer side; per-shift CalNotif now stores the "UID:Sequence:
+// Hashbytes" triple. Idempotent re-clicks skip emails when nothing
+// changed.
 func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
@@ -5725,58 +5672,37 @@ func SendVolCals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return
 	}
 
-	// Build a map of volunteer ref -> email
-	volEmails := make(map[string]string)
+	// Build a map of volunteer ref -> attendee (email + name) so
+	// the rendered ICS carries CN= alongside mailto:.
+	volByRef := make(map[string]ics.Attendee)
 	for _, vol := range vols {
-		volEmails[vol.Ref] = vol.Email
+		if vol == nil || vol.Email == "" {
+			continue
+		}
+		volByRef[vol.Ref] = ics.Attendee{Email: vol.Email, Name: vol.Name}
 	}
 
 	for _, shift := range shifts {
 		if len(shift.AssigneesRef) == 0 {
 			continue
 		}
-
 		if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
 			ctx.Err.Printf("Skipping shift %s: no end time", shift.Name)
 			continue
 		}
 
-		// Collect emails for assigned volunteers
-		var emails []string
+		recipients := make([]ics.Attendee, 0, len(shift.AssigneesRef))
 		for _, ref := range shift.AssigneesRef {
-			if email, ok := volEmails[ref]; ok && email != "" {
-				emails = append(emails, email)
+			if a, ok := volByRef[ref]; ok {
+				recipients = append(recipients, a)
 			}
 		}
-
-		if len(emails) == 0 {
+		if len(recipients) == 0 {
 			continue
 		}
 
-		ctx.Infos.Printf("Sending vol cal invite for shift %s (%d volunteers)", shift.Name, len(emails))
-
-		calInvite := &google.CalInvite{
-			ConfTag:   conf.Tag,
-			EventName: "vol shift @ btc++: " + shift.Name,
-			Location:  conf.Venue,
-			Desc:      "Your volunteer shift is happening now!",
-			Invitees:  emails,
-			StartTime: shift.ShiftTime.Start,
-			EndTime:   *shift.ShiftTime.End,
+		if err := DispatchShiftICS(ctx, shift, conf, recipients, kindRequest, false); err != nil {
+			ctx.Err.Printf("vol sendcal %q: %s", shift.Name, err)
 		}
-
-		ident, err := google.RunCalendarInvites(shift.CalNotif, calInvite)
-		if err != nil {
-			ctx.Err.Printf("Failure sending cal invite for shift %s: %s", shift.Name, err)
-			continue
-		}
-
-		err = getters.ShiftUpdateCalNotif(ctx.Notion, shift.Ref, ident)
-		if err != nil {
-			ctx.Err.Printf("Failure updating shift calnotif for %s: %s", shift.Name, err)
-			continue
-		}
-
-		ctx.Infos.Printf("Cal invite sent for shift %s to %d volunteers", shift.Name, len(emails))
 	}
 }
