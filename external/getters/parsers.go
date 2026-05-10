@@ -129,18 +129,18 @@ func parseAffiliateEmail(props map[string]notion.PropertyValue) string {
 
 // parseAffiliateUsage projects one AffiliateUsageDb row into the
 // internal struct. CodeName / Email come from rich_text, ConfTag
-// from a Notion select, the cents + count from numbers, Created
-// from Notion's built-in created_time.
+// from a Notion select, the sats amounts + count from numbers,
+// Created from Notion's built-in created_time.
 func parseAffiliateUsage(pageID string, props map[string]notion.PropertyValue, createdAt *time.Time) *types.AffiliateUsage {
 	return &types.AffiliateUsage{
-		ID:              pageID,
-		CodeName:        parseRichText("DiscountCode", props),
-		AffiliateEmail:  parseRichText("AffiliateEmail", props),
-		ConfTag:         parseSelect("Conference", props),
-		SatsSavedCents:  int64(props["SatsSavedCents"].Number),
-		SatsEarnedCents: int64(props["SatsEarnedCents"].Number),
-		TicketsCount:    uint(props["TicketsCount"].Number),
-		Created:         createdAt,
+		ID:             pageID,
+		CodeName:       parseRichText("DiscountCode", props),
+		AffiliateEmail: parseRichText("AffiliateEmail", props),
+		ConfTag:        parseSelect("Conference", props),
+		SavedSats:      int64(props["SavedSats"].Number),
+		EarnedSats:     int64(props["EarnedSats"].Number),
+		TicketsCount:   uint(props["TicketsCount"].Number),
+		Created:        createdAt,
 	}
 }
 

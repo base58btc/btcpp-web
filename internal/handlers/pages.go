@@ -263,14 +263,14 @@ type DashboardPage struct {
 }
 
 // AffiliateStats are the dashboard headline numbers for the
-// affiliate section. SavedCents is what redeemers paid less than
-// list (the buyer's total discount). EarnedCents is the affiliate's
-// commission, computed as the slack between a fixed 20% ceiling
-// and the buyer's actual savings.
+// affiliate section. SavedSats is what redeemers paid less than
+// list (the buyer's total discount, BTC-denominated). EarnedSats
+// is the affiliate's commission, computed as the slack between a
+// fixed 20% ceiling and the buyer's actual savings.
 type AffiliateStats struct {
         TicketsSold int
-        SavedCents  int64
-        EarnedCents int64
+        SavedSats   int64
+        EarnedSats  int64
 }
 
 // OrganizerDashboardPage drives /admin/conf/{tag}/ — the per-event

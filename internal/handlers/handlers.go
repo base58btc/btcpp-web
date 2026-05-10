@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"btcpp-web/external/coingecko"
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
 	"btcpp-web/external/spaces"
@@ -161,6 +162,41 @@ func loadTemplates(ctx *config.AppContext) error {
 				frac = -frac
 			}
 			return fmt.Sprintf("%d.%02d", whole, frac)
+		},
+		"sats": func(sats int64) string {
+			// Group with thousands separators so "1,234,567 sats"
+			// reads more easily than "1234567". Negative values
+			// keep the minus before the digits.
+			neg := sats < 0
+			if neg {
+				sats = -sats
+			}
+			str := strconv.FormatInt(sats, 10)
+			n := len(str)
+			if n <= 3 {
+				if neg {
+					return "-" + str
+				}
+				return str
+			}
+			var b strings.Builder
+			pre := n % 3
+			if pre > 0 {
+				b.WriteString(str[:pre])
+				if n > pre {
+					b.WriteByte(',')
+				}
+			}
+			for i := pre; i < n; i += 3 {
+				b.WriteString(str[i : i+3])
+				if i+3 < n {
+					b.WriteByte(',')
+				}
+			}
+			if neg {
+				return "-" + b.String()
+			}
+			return b.String()
 		},
 		"siteStats": func() siteStatsView {
 			return formatSiteStats(getters.FetchSiteStats(ctx))
@@ -1095,44 +1131,42 @@ func affiliateSessionKey(confTag string) string {
 	return "aff:" + confTag
 }
 
-// affiliateMath returns (savedCents, earnedCents) for one checkout.
-// preDiscountPerTicket is the per-ticket price the buyer was quoted
-// BEFORE any discount, in cents (or sats — the math is unit-agnostic).
-// count is the number of tickets in the entry. paidTotal is what the
-// buyer actually paid (Stripe AmountTotal / OpenNode equivalent), in
-// the same unit. The 20% ceiling is fixed: affiliates earn whatever's
-// left after the buyer's actual savings come out of that ceiling.
-// Both outputs are floored at zero to avoid negatives leaking into
-// Notion (rounding noise from currency conversion / fee math).
-func affiliateMath(preDiscountPerTicket, count, paidTotal int64) (savedCents, earnedCents int64) {
-	originalCents := preDiscountPerTicket * count
-	ceilingCents := originalCents * 20 / 100
-	savedCents = originalCents - paidTotal
-	if savedCents < 0 {
-		savedCents = 0
+// affiliateMath returns (saved, earned) for one checkout. Inputs +
+// outputs share a single unit — sats in this codebase, but the math
+// is unit-agnostic. preDiscountPerTicket is the per-ticket list
+// price BEFORE any discount; paidTotal is what the buyer actually
+// paid; count is the number of tickets. The 20% ceiling is fixed:
+// affiliates earn whatever's left after the buyer's actual savings
+// come out of that ceiling. Both outputs are floored at zero to
+// avoid negatives leaking into Notion (rounding noise from currency
+// conversion / fee math).
+func affiliateMath(preDiscountPerTicket, count, paidTotal int64) (saved, earned int64) {
+	original := preDiscountPerTicket * count
+	ceiling := original * 20 / 100
+	saved = original - paidTotal
+	if saved < 0 {
+		saved = 0
 	}
-	earnedCents = ceilingCents - savedCents
-	if earnedCents < 0 {
-		earnedCents = 0
+	earned = ceiling - saved
+	if earned < 0 {
+		earned = 0
 	}
-	return savedCents, earnedCents
+	return saved, earned
 }
 
 // recordAffiliateUsageFromCheckout writes one AffiliateUsage row to
 // Notion when a successful checkout consumed a discount code that
-// has an AffiliateEmail set. Math:
+// has an AffiliateEmail set. The list price + paid total arrive in
+// fiat cents (whatever currency the tier was priced in); both are
+// converted to sats at the live BTC spot rate before the math runs,
+// so the stored Saved/Earned values are BTC-denominated and stable
+// across multi-currency events.
 //
-//	originalCents = preDiscountCents * count
-//	ceilingCents  = originalCents * 20 / 100
-//	savedCents    = originalCents - entry.Total
-//	earnedCents   = ceilingCents  - savedCents
-//
-// The 20% ceiling is fixed — affiliates earn whatever's left after
-// the buyer's actual savings come out of that ceiling. preDiscount
-// is a string from webhook metadata (Stripe map / OpenNode struct);
-// missing or unparseable means we skip recording rather than
-// guessing. Failures are logged, never fatal — a Notion blip can't
-// block ticket issuance.
+// preDiscountCentsStr is a string from webhook metadata (Stripe map
+// / OpenNode struct); missing or unparseable means we skip recording
+// rather than guessing. CoinGecko fetch failures also skip — a
+// missing row is recoverable (re-run a backfill); a bogus row is
+// not. Failures are logged, never fatal.
 func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, entry *types.Entry, preDiscountCentsStr string) {
 	if conf == nil || entry == nil || entry.DiscountRef == "" {
 		return
@@ -1144,8 +1178,8 @@ func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, 
 		// from cache mid-refresh.
 		return
 	}
-	preDiscount, err := strconv.ParseInt(strings.TrimSpace(preDiscountCentsStr), 10, 64)
-	if err != nil || preDiscount <= 0 {
+	preDiscountCents, err := strconv.ParseInt(strings.TrimSpace(preDiscountCentsStr), 10, 64)
+	if err != nil || preDiscountCents <= 0 {
 		ctx.Err.Printf("affiliate usage skip %s: missing pre-discount-cents (%q)", disc.CodeName, preDiscountCentsStr)
 		return
 	}
@@ -1153,14 +1187,29 @@ func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, 
 	if count <= 0 {
 		return
 	}
-	savedCents, earnedCents := affiliateMath(preDiscount, count, entry.Total)
+	currency := strings.TrimSpace(entry.Currency)
+	if currency == "" {
+		ctx.Err.Printf("affiliate usage skip %s: empty entry.Currency", disc.CodeName)
+		return
+	}
+	preDiscountSats, err := coingecko.CentsToSats(preDiscountCents, currency)
+	if err != nil {
+		ctx.Err.Printf("affiliate usage skip %s: coingecko cents→sats (%s): %s", disc.CodeName, currency, err)
+		return
+	}
+	paidSats, err := coingecko.CentsToSats(entry.Total, currency)
+	if err != nil {
+		ctx.Err.Printf("affiliate usage skip %s: coingecko paid→sats (%s): %s", disc.CodeName, currency, err)
+		return
+	}
+	savedSats, earnedSats := affiliateMath(preDiscountSats, count, paidSats)
 	err = getters.RecordAffiliateUsage(ctx, getters.AffiliateUsageInput{
-		CodeName:        disc.CodeName,
-		AffiliateEmail:  disc.AffiliateEmail,
-		ConfTag:         conf.Tag,
-		SatsSavedCents:  savedCents,
-		SatsEarnedCents: earnedCents,
-		TicketsCount:    uint(count),
+		CodeName:       disc.CodeName,
+		AffiliateEmail: disc.AffiliateEmail,
+		ConfTag:        conf.Tag,
+		SavedSats:      savedSats,
+		EarnedSats:     earnedSats,
+		TicketsCount:   uint(count),
 	})
 	if err != nil {
 		ctx.Err.Printf("affiliate usage record %s for %s: %s", disc.CodeName, disc.AffiliateEmail, err)

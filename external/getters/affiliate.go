@@ -180,14 +180,16 @@ func IsCodeNameAvailable(ctx *config.AppContext, codeName string) (bool, error) 
 }
 
 // AffiliateUsageInput is the data needed to record one redemption.
-// All cents fields are int64 to match Stripe's AmountTotal shape.
+// SavedSats / EarnedSats are stored as int64 sats so the value is
+// stable across ticket currencies (the buyer might have paid in
+// USD, EUR, etc — the affiliate's view is BTC-denominated).
 type AffiliateUsageInput struct {
-	CodeName        string
-	AffiliateEmail  string
-	ConfTag         string
-	SatsSavedCents  int64
-	SatsEarnedCents int64
-	TicketsCount    uint
+	CodeName       string
+	AffiliateEmail string
+	ConfTag        string
+	SavedSats      int64
+	EarnedSats     int64
+	TicketsCount   uint
 }
 
 // RecordAffiliateUsage appends one row to AffiliateUsageDb. Called
@@ -198,8 +200,8 @@ type AffiliateUsageInput struct {
 //
 // AffiliateEmail is written as a Notion email-typed property to
 // match the DiscountsDb AffiliateEmail column convention. The
-// AffiliateUsageDb column should be email type. SatsSavedCents /
-// SatsEarnedCents / TicketsCount are number-typed and skipped when
+// AffiliateUsageDb column should be email type. SavedSats /
+// EarnedSats / TicketsCount are number-typed and skipped when
 // zero — go-notion's PropertyValue.Number is `,omitempty`, so a 0
 // value JSON-marshals as `{"type": "number"}` with no concrete body
 // and Notion rejects it. Empty cells read back as 0 from the
@@ -214,11 +216,11 @@ func RecordAffiliateUsage(ctx *config.AppContext, in AffiliateUsageInput) error 
 		"AffiliateEmail": notion.NewEmailPropertyValue(in.AffiliateEmail),
 		"Conference":     selectValue(in.ConfTag),
 	}
-	if in.SatsSavedCents != 0 {
-		props["SatsSavedCents"] = numberValue(float64(in.SatsSavedCents))
+	if in.SavedSats != 0 {
+		props["SavedSats"] = numberValue(float64(in.SavedSats))
 	}
-	if in.SatsEarnedCents != 0 {
-		props["SatsEarnedCents"] = numberValue(float64(in.SatsEarnedCents))
+	if in.EarnedSats != 0 {
+		props["EarnedSats"] = numberValue(float64(in.EarnedSats))
 	}
 	if in.TicketsCount != 0 {
 		props["TicketsCount"] = numberValue(float64(in.TicketsCount))
@@ -266,11 +268,13 @@ func QueryAffiliateUsageByEmail(ctx *config.AppContext, email string) ([]*types.
 }
 
 // AffiliateStatsTotals are the aggregate numbers shown on the
-// dashboard's affiliate section.
+// dashboard's affiliate section. Saved / Earned are denominated
+// in sats (converted from per-checkout fiat at write time) so the
+// total is comparable across multi-currency confs.
 type AffiliateStatsTotals struct {
 	TicketsSold int
-	SavedCents  int64
-	EarnedCents int64
+	SavedSats   int64
+	EarnedSats  int64
 }
 
 // SumAffiliateStatsByEmail aggregates every AffiliateUsage row for a
@@ -287,8 +291,8 @@ func SumAffiliateStatsByEmail(ctx *config.AppContext, email string) (AffiliateSt
 			continue
 		}
 		totals.TicketsSold += int(r.TicketsCount)
-		totals.SavedCents += r.SatsSavedCents
-		totals.EarnedCents += r.SatsEarnedCents
+		totals.SavedSats += r.SavedSats
+		totals.EarnedSats += r.EarnedSats
 	}
 	return totals, nil
 }

@@ -860,7 +860,7 @@ func loadAffiliateStats(ctx *config.AppContext, email string, eligible bool) *Af
 	}
 	return &AffiliateStats{
 		TicketsSold: totals.TicketsSold,
-		SavedCents:  totals.SavedCents,
-		EarnedCents: totals.EarnedCents,
+		SavedSats:   totals.SavedSats,
+		EarnedSats:  totals.EarnedSats,
 	}
 }

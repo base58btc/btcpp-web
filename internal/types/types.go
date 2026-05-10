@@ -175,14 +175,14 @@ type (
 	// the queries are straightforward and rows survive code
 	// renames.
 	AffiliateUsage struct {
-		ID              string
-		CodeName        string
-		AffiliateEmail  string
-		ConfTag         string
-		SatsSavedCents  int64
-		SatsEarnedCents int64
-		TicketsCount    uint
-		Created         *time.Time
+		ID             string
+		CodeName       string
+		AffiliateEmail string
+		ConfTag        string
+		SavedSats      int64
+		EarnedSats     int64
+		TicketsCount   uint
+		Created        *time.Time
 	}
 
 	Speaker struct {
