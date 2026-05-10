@@ -479,6 +479,22 @@
       </div>
       {{ end }}
 
+      {{/* ---- Volunteer signup CTA: shown when the user has no
+           VolApp for this conf yet and the conf is still upcoming.
+           Pre-fills Name / Phone / Email / Signal / Twitter / Nostr
+           from the user's Speakers row via the hr+em query params
+           the dashboard already mints for other magic-link CTAs.
+      */}}
+      {{ if and (not $eb.VolApp) $conf.InFuture }}
+      <div class="mt-5">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Volunteer</h3>
+        <a href="/volunteer/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+           class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700">
+          Sign up for volunteer shifts
+        </a>
+      </div>
+      {{ end }}
+
       {{/* ---- Tickets ---- */}}
       {{ if $eb.Tickets }}
       <div class="mt-5">

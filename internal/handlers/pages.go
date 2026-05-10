@@ -107,6 +107,14 @@ type VolunteerPage struct {
         NoJobs    []types.CheckItem
         ConfItems []types.CheckItem
         DaysList  []types.CheckItem
+        // Prefill is populated when the apply form is opened from
+        // the /dashboard "Sign up to volunteer" CTA. The dashboard
+        // passes the user's HMAC-verified email and we look up the
+        // Speakers row to pre-fill Name / Phone / Email / Signal /
+        // Twitter / Nostr — saves the speaker re-typing what we
+        // already know about them. Nil when the form is opened
+        // anonymously from the public conf page.
+        Prefill   *types.Speaker
         Year      uint
 }
 

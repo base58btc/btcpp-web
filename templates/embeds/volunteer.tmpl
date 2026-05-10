@@ -25,28 +25,30 @@
                     <div class="sm:col-span-2">
                         <label for="Name" class="block text-sm/6 font-semibold text-gray-900">Name or Nym *</label>
                         <div class="mt-2.5">
-                            <input id="Name" type="text" name="Name" 
-                            autocomplete="given-name" 
+                            <input id="Name" type="text" name="Name"
+                            autocomplete="given-name"
                             autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="Your Name"
                             required
+                            {{ if .Prefill }}value="{{ .Prefill.Name }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
                     <div class="sm:col-span-2">
                         <label for="Phone" class="block text-sm/6 font-semibold text-gray-900">Phone number *</label>
                         <div class="mt-2.5">
-                            <input id="Phone" type="tel" name="Phone" 
+                            <input id="Phone" type="tel" name="Phone"
                             autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="+1 555-928-1900"
                             required
+                            {{ if .Prefill }}value="{{ .Prefill.Phone }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
                     <div class="sm:col-span-2">
                         <label for="Email" class="block text-sm/6 font-semibold text-gray-900">Email *</label>
                         <div class="mt-2.5">
-                            <input id="Email" type="Email" name="Email" autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" />
+                            <input id="Email" type="Email" name="Email" autocomplete="email" class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" placeholder="hello@example.com" {{ if .Prefill }}value="{{ .Prefill.Email }}"{{ end }} />
                         </div>
                     </div>
                     <div class="sm:col-span-2">
@@ -63,11 +65,12 @@
                     <div class="sm:col-span-2">
                         <label for="Signal" class="block text-sm/6 font-semibold text-gray-900">Signal Username or Number *</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Signal" id="Signal" type="text" 
+                            <input
+                            name="Signal" id="Signal" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="example.99"
                             required
+                            {{ if .Prefill }}value="{{ .Prefill.Signal }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
@@ -76,10 +79,11 @@
                         X Account Username
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Twitter" id="Twitter" type="text" 
+                            <input
+                            name="Twitter" id="Twitter" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="@btcplusplus"
+                            {{ if and .Prefill .Prefill.Twitter.Handle }}value="{{ .Prefill.Twitter.Handle }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>
@@ -88,10 +92,11 @@
                         Nostr Npub
                         </label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Nostr" id="Nostr" type="text" 
+                            <input
+                            name="Nostr" id="Nostr" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="npub1dwah..."
+                            {{ if .Prefill }}value="{{ .Prefill.Nostr }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>

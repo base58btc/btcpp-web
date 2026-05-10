@@ -1773,7 +1773,19 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
         confs := listConfs(w, ctx)
 
         switch r.Method {
-        case http.MethodGet: 
+        case http.MethodGet:
+                // Pre-fill from the user's Speakers row when the
+                // form is opened from a /dashboard "Sign up to
+                // volunteer" link (hr+em query params verified).
+                // Silent fallback when params are absent / wrong /
+                // the user has no Speakers row — public visitors
+                // get the blank form.
+                var prefill *types.Speaker
+                if email, _, vErr := validateVolEmail(r, ctx); vErr == nil {
+                        if sps, sErr := getters.GetSpeakersByEmail(ctx.Notion, email); sErr == nil && len(sps) > 0 {
+                                prefill = sps[0]
+                        }
+                }
                 err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
                         Conf: conf,
                         Confs: confs,
@@ -1781,6 +1793,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                         NoJobs: helpers.BuildJobs("njob-", jobs, false),
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
                         DaysList:  conf.DaysList("days-", true),
+                        Prefill:   prefill,
                         Year: helpers.CurrentYear(),
                 })
 
