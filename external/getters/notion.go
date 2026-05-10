@@ -1097,7 +1097,22 @@ func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
 						}},
 				}...),
 		})
-	return err
+	if err != nil {
+		return err
+	}
+	// Patch the warm caches in place so the next page-render
+	// sees the new CalNotif without waiting on a refresh tick.
+	// confTalkByProposal and cacheConfTalks share pointers, so a
+	// single mutation reaches both readers.
+	confTalkCacheMu.Lock()
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.ID == talkID {
+			ct.CalNotif = calnotif
+			break
+		}
+	}
+	confTalkCacheMu.Unlock()
+	return nil
 }
 
 func ShiftUpdateCalNotif(n *types.Notion, shiftID string, calnotif string) error {
@@ -1112,7 +1127,23 @@ func ShiftUpdateCalNotif(n *types.Notion, shiftID string, calnotif string) error
 						}},
 				}...),
 		})
-	return err
+	if err != nil {
+		return err
+	}
+	// Mirror TalkUpdateCalNotif: patch the warm shift cache so a
+	// subsequent ListWorkShifts read in the same process sees
+	// the new CalNotif without waiting on a refresh tick. The
+	// `shifts` slice is unprotected (matches the existing pattern
+	// in invalidateShiftCache + the FetchShiftsCached refresh
+	// path); a parallel-write race here is no worse than what
+	// already exists upstream.
+	for _, s := range shifts {
+		if s != nil && s.Ref == shiftID {
+			s.CalNotif = calnotif
+			break
+		}
+	}
+	return nil
 }
 
 func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
