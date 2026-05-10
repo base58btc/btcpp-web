@@ -326,6 +326,19 @@
                   Edit talk &rarr;
                 </a>
                 {{ end }}
+                {{/* Scheduled-status talks already had a cal invite
+                     emailed (Accepted → Scheduled flip on the
+                     proposals admin). Surface a backup "Add to
+                     calendar" download so speakers who missed or
+                     dismissed the invite email can pull a fresh
+                     copy from the dashboard. */}}
+                {{ if and (eq .Status "Scheduled") .ConfTalk .ConfTalk.AnchorTag }}
+                <a href="/conf/{{ $conf.Tag }}/talk/{{ .ConfTalk.AnchorTag }}/calendar.ics"
+                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-600 text-white hover:bg-teal-700">
+                  <span aria-hidden="true">📅</span>
+                  <span>Add to calendar</span>
+                </a>
+                {{ end }}
                 {{ if and (and $conf $conf.CanInvite) (not (or (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected"))) }}
                 <a href="/dashboard/invite/{{ .ID }}?hr={{ $.HMAC }}&em={{ $.Email }}"
                    class="inline-flex items-center text-xs font-medium text-indigo-600 hover:text-indigo-700">

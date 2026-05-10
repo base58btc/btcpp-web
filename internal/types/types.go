@@ -546,6 +546,20 @@ func (t *Talk) AnchorTag() string {
         return t.Clipart[:len(t.Clipart)-4]
 }
 
+// AnchorTag returns the same value as Talk.AnchorTag would for
+// this conftalk's Clipart filename — used by dashboard / agenda
+// templates that have the ConfTalk handy but not the derived
+// Talk struct.
+func (ct *ConfTalk) AnchorTag() string {
+        if ct == nil || len(ct.Clipart) <= 4 {
+                if ct == nil {
+                        return ""
+                }
+                return ct.Clipart
+        }
+        return ct.Clipart[:len(ct.Clipart)-4]
+}
+
 func (t *Talk) ClipartAvif() string {
 	name := strings.TrimSuffix(t.Clipart, filepath.Ext(t.Clipart))
 	return name + ".avif"
