@@ -635,6 +635,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdmin(w, r, app)
 	}).Methods("GET")
 
+	r.HandleFunc("/{conf}/volcoord/send-orientation", func(w http.ResponseWriter, r *http.Request) {
+		SendVolOrientation(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/volcoord/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfVolcoord(w, r, app); id == nil {
 			return
@@ -6017,6 +6020,84 @@ func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.App
 }
 
 // SendVolCals fans the self-hosted ICS pipeline across every
+// SendVolOrientation broadcasts the volunteer-orientation invite
+// to every Scheduled volunteer for a conf. Used by the
+// "Resend orientation invite" button on /{conf}/volcoord when the
+// orientation time has changed and the admin wants the new time
+// to land in every volunteer's calendar in one click.
+//
+// Unlike the per-vol DispatchOrientICS (fires from scheduledFlow,
+// hash-gated), this is an explicit force-send: SEQUENCE bumps
+// once and the same seq lands on every recipient. Conf.OrientCalNotif
+// stamps the new state.
+//
+// Path: POST /{conf}/volcoord/send-orientation
+func SendVolOrientation(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil || volinfo == nil || volinfo.OrientTimes == nil || volinfo.OrientTimes.End == nil {
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
+				url.QueryEscape("No orientation time set — add it on the conf's VolInfo row first.")),
+			http.StatusSeeOther)
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/%s/volcoord/send-orientation list vols: %s", conf.Tag, err)
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		return
+	}
+
+	recipients := make([]ics.Attendee, 0, len(vols))
+	for _, v := range vols {
+		if v == nil || v.Email == "" {
+			continue
+		}
+		// Only Scheduled vols got an orientation invite the
+		// first time around (DispatchOrientICS fires inside
+		// scheduledFlow, post-status flip). Mirror that here
+		// so the broadcast doesn't blast unscheduled
+		// applicants who never received the original.
+		if v.Status != "Scheduled" {
+			continue
+		}
+		recipients = append(recipients, ics.Attendee{Email: v.Email, Name: v.Name})
+	}
+
+	if len(recipients) == 0 {
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
+				url.QueryEscape("No Scheduled volunteers to notify.")),
+			http.StatusSeeOther)
+		return
+	}
+
+	sent, err := BroadcastOrientICS(ctx, conf, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End, recipients)
+	if err != nil && sent == 0 {
+		ctx.Err.Printf("/%s/volcoord/send-orientation: %s", conf.Tag, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
+				url.QueryEscape("Orientation broadcast failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r,
+		fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
+			url.QueryEscape(fmt.Sprintf("Orientation invite re-sent to %d volunteer(s).", sent))),
+		http.StatusSeeOther)
+}
+
 // scheduled volunteer shift for a conf. Mirrors SendCals on the
 // volunteer side; per-shift CalNotif now stores the "UID:Sequence:
 // Hashbytes" triple. Idempotent re-clicks skip emails when nothing

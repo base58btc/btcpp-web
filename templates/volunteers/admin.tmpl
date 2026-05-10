@@ -46,12 +46,23 @@
                             <p class="mt-1 text-xs text-indigo-700">{{ .VolInfo.Notes }}</p>
                             {{ end }}
                         </div>
-                        {{ if .VolInfo.OrientLink }}
-                        <a href="{{ .VolInfo.OrientLink }}" target="_blank" rel="noopener noreferrer"
-                           class="ml-4 shrink-0 inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
-                            Join Orientation
-                        </a>
-                        {{ end }}
+                        <div class="ml-4 shrink-0 flex flex-col items-end gap-2">
+                          {{ if .VolInfo.OrientLink }}
+                          <a href="{{ .VolInfo.OrientLink }}" target="_blank" rel="noopener noreferrer"
+                             class="inline-flex items-center px-3 py-2 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700">
+                              Join Orientation
+                          </a>
+                          {{ end }}
+                          {{ if and .VolInfo.OrientTimes .VolInfo.OrientTimes.End }}
+                          <form method="POST" action="/{{ .Conf.Tag }}/volcoord/send-orientation">
+                              <button type="submit"
+                                      class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300"
+                                      onclick="return confirm('Re-send the orientation calendar invite to every Scheduled volunteer at {{ .Conf.Desc }}? Use this after editing the orientation time so the change lands in their calendars.');">
+                                  📅 Resend orientation invite
+                              </button>
+                          </form>
+                          {{ end }}
+                        </div>
                     </div>
                 </div>
             </section>
