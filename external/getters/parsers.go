@@ -392,6 +392,8 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 		Type:       props["Type"].Select.Name,
 		Email:      props["Email"].Email,
 		ItemBought: parseRichText("Item Bought", props),
+		Amount:     props["Amount Paid"].Number,
+		Currency:   parseSelect("Currency", props),
 	}
 	if len(props["conf"].Relation) > 0 {
 		regis.ConfRef = props["conf"].Relation[0].ID

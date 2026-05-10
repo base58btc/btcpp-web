@@ -346,6 +346,13 @@ type (
 		Type       string
 		Email      string
 		ItemBought string
+		// Amount is the buyer-paid price in main units (dollars,
+		// euros, …) — Notion stores the AddTickets-written number
+		// already pre-divided by 100. Currency is the ISO code as
+		// chosen at checkout. Both can be zero / blank for legacy
+		// rows that pre-date the field.
+		Amount     float64
+		Currency   string
 	}
 
 	Item struct {

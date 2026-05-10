@@ -267,6 +267,44 @@ func QueryAffiliateUsageByEmail(ctx *config.AppContext, email string) ([]*types.
 	return out, nil
 }
 
+// QueryAffiliateUsageByConf issues a live Notion query against
+// AffiliateUsageDb filtering on Conference == confTag. Used by the
+// per-conf admin dashboard to roll up affiliate redemptions for the
+// stats panel + top-affiliates table. No caching — same rationale
+// as QueryAffiliateUsageByEmail.
+func QueryAffiliateUsageByConf(ctx *config.AppContext, confTag string) ([]*types.AffiliateUsage, error) {
+	if confTag == "" {
+		return nil, nil
+	}
+	if ctx.Notion.Config.AffiliateUsageDb == "" {
+		return nil, fmt.Errorf("AffiliateUsageDb not configured")
+	}
+	n := ctx.Notion
+	var out []*types.AffiliateUsage
+	hasMore := true
+	cursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
+			n.Config.AffiliateUsageDb, notion.QueryDatabaseParam{
+				StartCursor: cursor,
+				Filter: &notion.Filter{
+					Property: "Conference",
+					Select:   &notion.SelectFilterCondition{Equals: confTag},
+				},
+			})
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range pages {
+			created := p.CreatedTime
+			out = append(out, parseAffiliateUsage(p.ID, p.Properties, &created))
+		}
+		cursor = next
+		hasMore = more
+	}
+	return out, nil
+}
+
 // AffiliateStatsTotals are the aggregate numbers shown on the
 // dashboard's affiliate section. Saved / Earned are denominated
 // in sats (converted from per-checkout fiat at write time) so the

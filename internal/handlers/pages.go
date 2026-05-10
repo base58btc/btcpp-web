@@ -282,6 +282,10 @@ type OrganizerDashboardPage struct {
         PendingCount    int
         DecisionedCount int
         FlashMessage    string
+        // Stats drives the headline-numbers panel under the
+        // hero image (tickets sold, revenue, sponsors, etc).
+        // nil when the load was skipped or all queries blanked.
+        Stats           *OrganizerStats
         // IsGlobalAdmin gates a couple of tiles (e.g. speaker gifts
         // CSV) whose destination is global-admin only.
         IsGlobalAdmin   bool

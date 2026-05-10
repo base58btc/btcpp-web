@@ -80,6 +80,16 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		decisionedCount = len(decisioned)
 	}
 
+	// Stats panel (tickets sold, revenue, sponsors, top affiliates,
+	// …). Pendingcount is threaded in for admins so we don't re-
+	// split the proposal list; staff get -1 → loadOrganizerStats
+	// re-derives locally so the panel is consistent across roles.
+	statsPending := pendingCount
+	if !isAdmin {
+		statsPending = -1
+	}
+	stats := loadOrganizerStats(ctx, conf, statsPending)
+
 	// Populate countdown bounds (doors-open / doors-close) on a
 	// shallow copy of conf so the cached pointer isn't mutated.
 	// Drives the countdown widget at the top of conf_dashboard.
@@ -95,6 +105,7 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		PendingCount:    pendingCount,
 		DecisionedCount: decisionedCount,
 		FlashMessage:    r.URL.Query().Get("flash"),
+		Stats:           stats,
 		IsGlobalAdmin:   id.IsGlobalAdmin(),
 		IsConfAdmin:     isAdmin,
 		IsConfVolcoord:  id.HasRoleForConf(conf.Tag, auth.RoleVolcoord),

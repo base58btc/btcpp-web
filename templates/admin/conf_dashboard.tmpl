@@ -35,6 +35,82 @@
     </div>
     {{ end }}
 
+    {{/*
+      Hero image + stats panel: a glanceable header that tells the
+      organizer how the event is shaping up at a single look.
+      leading.png is the same banner image used on the public conf
+      page; stats are loaded by loadOrganizerStats in admin_review.go.
+    */}}
+    <div class="mt-6 overflow-hidden rounded-lg bg-white shadow">
+      <img src="/static/img/{{ .Conf.Tag }}/leading.png"
+           alt="{{ .Conf.Desc }}"
+           class="w-full max-h-56 object-cover"
+           onerror="this.style.display='none'">
+    </div>
+
+    {{ if .Stats }}
+    <h2 class="mt-8 text-xs font-semibold uppercase tracking-wider text-gray-500">At a glance</h2>
+    <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="rounded-md border border-gray-200 bg-white px-4 py-3">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Tickets sold</p>
+        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .Stats.TicketsSold }}</p>
+        {{ if .Stats.RevenueByCurrency }}
+        <p class="mt-1 text-xs text-gray-500">
+          {{ range $i, $rev := .Stats.RevenueByCurrency }}{{ if $i }} · {{ end }}{{ printf "%.0f" $rev.Amount }} {{ $rev.Currency }}{{ end }}
+        </p>
+        {{ end }}
+      </div>
+      <div class="rounded-md border border-gray-200 bg-white px-4 py-3">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Speakers confirmed</p>
+        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .Stats.SpeakersConfirmed }}</p>
+        <p class="mt-1 text-xs text-gray-500">
+          {{ if .Stats.PendingApplications }}{{ .Stats.PendingApplications }} application{{ if ne .Stats.PendingApplications 1 }}s{{ end }} pending{{ else }}no apps pending{{ end }}
+        </p>
+      </div>
+      <div class="rounded-md border border-gray-200 bg-white px-4 py-3">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Volunteers scheduled</p>
+        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .Stats.VolunteersScheduled }}</p>
+      </div>
+      <div class="rounded-md border border-gray-200 bg-white px-4 py-3">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Sponsors</p>
+        <p class="mt-1 text-2xl font-semibold text-gray-900">{{ .Stats.SponsorsPaid }} <span class="text-sm font-normal text-gray-500">paid</span></p>
+        <p class="mt-1 text-xs text-gray-500">
+          {{ .Stats.SponsorsCommitted }} committed · {{ .Stats.SponsorsInProgress }} in-progress
+        </p>
+      </div>
+    </div>
+
+    {{ if or .Stats.AffiliateTickets .Stats.TopAffiliates }}
+    <div class="mt-3 rounded-md border border-gray-200 bg-white px-4 py-3">
+      <div class="flex items-baseline justify-between gap-2 flex-wrap">
+        <p class="text-xs font-medium uppercase tracking-wider text-gray-500">Affiliate tickets</p>
+        <p class="text-2xl font-semibold text-gray-900">{{ .Stats.AffiliateTickets }}</p>
+      </div>
+      {{ if .Stats.TopAffiliates }}
+      <p class="mt-3 text-xs font-medium uppercase tracking-wider text-gray-500">Top affiliates</p>
+      <table class="mt-2 min-w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs font-medium text-gray-500">
+            <th class="py-1 pr-3">Email</th>
+            <th class="py-1 pr-3">Earned (sats)</th>
+            <th class="py-1">Tickets</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+          {{ range .Stats.TopAffiliates }}
+          <tr>
+            <td class="py-1 pr-3 text-gray-900 font-mono text-xs break-all">{{ .Email }}</td>
+            <td class="py-1 pr-3 text-gray-700 font-mono text-xs">{{ sats .EarnedSats }}</td>
+            <td class="py-1 text-gray-700">{{ .TicketsSold }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+      {{ end }}
+    </div>
+    {{ end }}
+    {{ end }}
+
     {{ if .IsConfAdmin }}
     <h2 class="mt-10 text-xs font-semibold uppercase tracking-wider text-gray-500">Talk applications</h2>
     <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
