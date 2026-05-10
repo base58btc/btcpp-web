@@ -3617,8 +3617,51 @@ func VolunteerRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		return
 	}
 
+	// CANCEL ICS for this volunteer's calendar entry.
+	// Best-effort — log on error, don't fail the remove.
+	cancelShiftCalForVol(ctx, vol, shiftRef, confTag)
+
 	// Re-render the shift list
 	renderShiftList(w, r, ctx, email, confTag)
+}
+
+// cancelShiftCalForVol looks up the shift + conf and fires a
+// CANCEL ICS to the given volunteer, removing the dropped shift
+// from their calendar. No-op when the shift has no CalNotif
+// (never invited) or the lookups fail. Logged-only; never fails
+// the surrounding remove.
+func cancelShiftCalForVol(ctx *config.AppContext, vol *types.Volunteer, shiftRef, confTag string) {
+	if vol == nil || vol.Email == "" {
+		return
+	}
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		ctx.Err.Printf("cancelShiftCalForVol confs: %s", err)
+		return
+	}
+	var conf *types.Conf
+	for _, c := range confs {
+		if c != nil && c.Tag == confTag {
+			conf = c
+			break
+		}
+	}
+	if conf == nil {
+		return
+	}
+	shifts, err := getters.GetShiftsForConf(ctx, confTag)
+	if err != nil {
+		ctx.Err.Printf("cancelShiftCalForVol shifts %s: %s", confTag, err)
+		return
+	}
+	for _, s := range shifts {
+		if s != nil && s.Ref == shiftRef {
+			if err := DispatchShiftICSCancelForVol(ctx, s, conf, vol.Email, vol.Name); err != nil {
+				ctx.Err.Printf("cancelShiftCalForVol dispatch %q: %s", s.Name, err)
+			}
+			return
+		}
+	}
 }
 
 func renderShiftList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, email, confTag string) {
@@ -4068,6 +4111,12 @@ func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 			err = getters.RemoveVolunteerFromShift(ctx, vol.Ref, shift.Ref)
 			if err != nil {
 				ctx.Err.Printf("/vols/shift/%s/decline failed to remove shift %s: %s", confTag, shift.Name, err.Error())
+				continue
+			}
+			// CANCEL ICS so the dropped shift vanishes from
+			// the volunteer's calendar.
+			if dErr := DispatchShiftICSCancelForVol(ctx, shift, conf, vol.Email, vol.Name); dErr != nil {
+				ctx.Err.Printf("/vols/shift/%s/decline cancel-cal %q: %s", confTag, shift.Name, dErr)
 			}
 		}
 	}
@@ -4507,6 +4556,11 @@ func VolAdminRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 		http.Error(w, "Failed to remove shift", http.StatusInternalServerError)
 		return
 	}
+
+	// CANCEL ICS for this volunteer's calendar entry — vol
+	// admin removed them from the shift, so it shouldn't sit
+	// on their calendar.
+	cancelShiftCalForVol(ctx, vol, shiftRef, conf.Tag)
 
 	volAdminRedirect(w, r, conf, vol.Ref)
 }
@@ -5001,7 +5055,67 @@ func VolShiftReschedule(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+
+	// Auto-fire calendar update for every assignee on this
+	// shift. Hash check inside dispatch suppresses email when
+	// the time genuinely didn't change (same start/end after a
+	// no-op drag); changed times bump SEQUENCE on the
+	// assignees' calendars. Best-effort — log on error, don't
+	// fail the schedule write.
+	dispatchShiftCalAfterReschedule(ctx, conf, shiftRef)
+
 	w.WriteHeader(http.StatusOK)
+}
+
+// dispatchShiftCalAfterReschedule looks up the freshly-updated
+// shift, resolves its assignees to (email, name) attendees, and
+// fans the cal-invite update to each via DispatchShiftICS. force=
+// false so the hash check inside dispatch silently skips when
+// times didn't actually move.
+func dispatchShiftCalAfterReschedule(ctx *config.AppContext, conf *types.Conf, shiftRef string) {
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		ctx.Err.Printf("shift cal-fire: load shifts %s: %s", conf.Tag, err)
+		return
+	}
+	var shift *types.WorkShift
+	for _, s := range shifts {
+		if s != nil && s.Ref == shiftRef {
+			shift = s
+			break
+		}
+	}
+	if shift == nil || shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+		return
+	}
+	if len(shift.AssigneesRef) == 0 {
+		return
+	}
+
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("shift cal-fire: load vols %s: %s", conf.Tag, err)
+		return
+	}
+	volByRef := make(map[string]ics.Attendee, len(vols))
+	for _, v := range vols {
+		if v == nil || v.Email == "" {
+			continue
+		}
+		volByRef[v.Ref] = ics.Attendee{Email: v.Email, Name: v.Name}
+	}
+	recipients := make([]ics.Attendee, 0, len(shift.AssigneesRef))
+	for _, ref := range shift.AssigneesRef {
+		if a, ok := volByRef[ref]; ok {
+			recipients = append(recipients, a)
+		}
+	}
+	if len(recipients) == 0 {
+		return
+	}
+	if err := DispatchShiftICS(ctx, shift, conf, recipients, kindRequest, false); err != nil {
+		ctx.Err.Printf("shift cal-fire %q: %s", shift.Name, err)
+	}
 }
 
 func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
