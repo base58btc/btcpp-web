@@ -1,0 +1,17 @@
+{{/*
+  admin_favicon — favicon partial used on every per-conf admin page.
+  Renders an SVG data-URI with the merman emoji + the conf's emoji
+  (so a tab's icon tells you which event the page is for at a
+  glance), prefixed with the emergency-alarm emoji 🚨 when the app
+  isn't running in production.
+
+  Call with the conf as the dot:
+
+      {{ template "admin_favicon" .Conf }}
+
+  Pass nil (`.`) and the conf-emoji slot is omitted; the merman
+  + (optional) alarm still render.
+*/}}
+{{ define "admin_favicon" }}
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 100%22><text y=%22.9em%22 font-size=%2280%22>{{ if inDev }}🚨{{ end }}🧜‍♂️{{ if . }}{{ .EmojiOrDefault }}{{ end }}</text></svg>">
+{{ end }}
