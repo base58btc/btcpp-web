@@ -30,7 +30,22 @@ func (v volsByShiftCount) Len() int      { return len(v) }
 func (v volsByShiftCount) Swap(i, j int) { v[i], v[j] = v[j], v[i] }
 func (v volsByShiftCount) Less(i, j int) bool {
         if len(v[i].WorkShifts) == len(v[j].WorkShifts) {
-                return v[i].CreatedAt.Before(*v[j].CreatedAt)
+                // CreatedAt can be nil — Notion's created_time
+                // hasn't surfaced for a row yet, or the field was
+                // never populated. Sort nils last so registered-
+                // earlier vols keep priority and the comparison
+                // never derefs nil.
+                ai, aj := v[i].CreatedAt, v[j].CreatedAt
+                switch {
+                case ai == nil && aj == nil:
+                        return false
+                case ai == nil:
+                        return false
+                case aj == nil:
+                        return true
+                default:
+                        return ai.Before(*aj)
+                }
         }
 	return len(v[i].WorkShifts) > len(v[j].WorkShifts)
 }
