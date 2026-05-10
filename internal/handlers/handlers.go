@@ -5050,16 +5050,18 @@ func VolShiftReschedule(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 }
 
 func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	id := giftsRequireConfAccess(w, r, ctx)
+	if id == nil {
 		return
 	}
 
-	confs, err := getters.FetchConfsCached(ctx)
+	allConfs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load conferences", http.StatusInternalServerError)
 		ctx.Err.Printf("/talks/gifts failed to get confs: %s", err.Error())
 		return
 	}
+	confs := visibleGiftConfs(id, allConfs)
 
 	confTag := r.URL.Query().Get("conf")
 	filePath := r.URL.Query().Get("filepath")
@@ -5069,6 +5071,14 @@ func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	var rows []*GiftRow
 
 	if confTag != "" {
+		// Per-conf gate: the requested conf must be one this user
+		// has staff-or-above for. Hides cross-tenant peeking even
+		// if the user manually crafts the URL.
+		if !id.HasRoleForConf(confTag, auth.RoleStaff) {
+			ctx.Infos.Printf("auth deny /talks/gifts ?conf=%s for %s", confTag, id.Email)
+			http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("You don't have access to that event's gifts CSV."), http.StatusSeeOther)
+			return
+		}
 		for _, conf := range confs {
 			if conf.Tag == confTag {
 				selectedConf = conf
@@ -5083,13 +5093,36 @@ func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 				return
 			}
 
+			seenNames := map[string]bool{}
 			for _, talk := range talks {
 				for _, speaker := range talk.Speakers {
 					rows = append(rows, &GiftRow{
 						Clipart:     talk.Clipart,
 						SpeakerName: speaker.Name,
 					})
+					seenNames[strings.ToLower(strings.TrimSpace(speaker.Name))] = true
 				}
+			}
+
+			// {conf}-staff users get a row too, with the conf's
+			// leading.png as their clipart. Speaker-already
+			// takes precedence — anyone in seenNames is skipped
+			// to avoid duplicating a speaker who's also tagged
+			// staff.
+			staff := staffSpeakersForConf(ctx, selectedConf.Tag)
+			for _, sp := range staff {
+				if sp == nil {
+					continue
+				}
+				key := strings.ToLower(strings.TrimSpace(sp.Name))
+				if key == "" || seenNames[key] {
+					continue
+				}
+				seenNames[key] = true
+				rows = append(rows, &GiftRow{
+					Clipart:     "leading.png",
+					SpeakerName: sp.Name,
+				})
 			}
 
 			sort.SliceStable(rows, func(i, j int) bool {
