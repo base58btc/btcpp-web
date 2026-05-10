@@ -210,6 +210,16 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 			redirectReview(w, r, conf, proposalID, "Status update failed: "+err.Error())
 			return
 		}
+		// Terminal-decline transitions (WeDecline / Rejected)
+		// pull the talk off attendees' calendars. Silent no-op
+		// when the proposal has no ConfTalk or no CalNotif —
+		// nothing was ever invited, nothing to cancel.
+		if action.Status == "WeDecline" || action.Status == "Rejected" {
+			speakers := proposalSpeakers(proposal)
+			if cancelErr := DispatchTalkICSCancelForProposal(ctx, proposal, conf, speakers); cancelErr != nil {
+				ctx.Err.Printf("/%s/admin/review %s cancel-cal %q: %s", conf.Tag, action.Status, proposal.Title, cancelErr)
+			}
+		}
 	}
 
 	if freshAccept {
@@ -301,6 +311,14 @@ func AdminCancelTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 				url.QueryEscape("Cancel failed: "+err.Error())),
 			http.StatusSeeOther)
 		return
+	}
+
+	// Pull the talk off attendees' calendars. Silent no-op when
+	// CalNotif is empty (talk was Accepted but never had its
+	// invite fanned out).
+	speakers := proposalSpeakers(proposal)
+	if cancelErr := DispatchTalkICSCancelForProposal(ctx, proposal, conf, speakers); cancelErr != nil {
+		ctx.Err.Printf("/%s/admin/applicants/%s/cancel cancel-cal: %s", conf.Tag, proposalID, cancelErr)
 	}
 
 	http.Redirect(w, r,
@@ -456,11 +474,34 @@ func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *con
 	proposalID := vars["proposalID"]
 	speakerConfID := vars["speakerConfID"]
 
+	// Resolve the removed speaker's email + name BEFORE the
+	// removal lands so we can address them in the CANCEL ICS.
+	// Cache lookup: if the speaker isn't in the warm cache we
+	// silently skip the CANCEL (the speaker won't get an
+	// "you've been removed" calendar update; the remaining-
+	// speaker REQUEST below still fires).
+	var removedEmail, removedName string
+	if sc := getters.FetchSpeakerConfByID(speakerConfID); sc != nil && sc.Speaker != nil {
+		removedEmail = sc.Speaker.Email
+		removedName = sc.Speaker.Name
+	}
+
 	if err := getters.RemoveProposalFromSpeakerConf(ctx, speakerConfID, proposalID); err != nil {
 		ctx.Err.Printf("/%s/admin/proposal/%s remove speaker %s: %s", conf.Tag, proposalID, speakerConfID, err)
 		redirectReview(w, r, conf, proposalID, "Remove failed: "+err.Error())
 		return
 	}
+
+	// Re-fetch the proposal so the speaker list reflects the
+	// removal we just landed. Pass the trimmed slice into the
+	// dispatch helper as the "remaining" attendees.
+	if proposal, perr := getters.GetProposal(ctx, proposalID); perr == nil && proposal != nil {
+		remaining := proposalSpeakers(proposal)
+		if dErr := DispatchTalkICSRemoved(ctx, proposal, conf, removedEmail, removedName, remaining); dErr != nil {
+			ctx.Err.Printf("/%s/admin/proposal/%s remove-speaker cal-fire: %s", conf.Tag, proposalID, dErr)
+		}
+	}
+
 	redirectReview(w, r, conf, proposalID, "Speaker removed from proposal.")
 }
 

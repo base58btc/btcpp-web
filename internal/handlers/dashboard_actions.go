@@ -663,11 +663,31 @@ func DashboardWithdraw(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	}
 
 	flash := ""
+	conf := proposal.ScheduleFor
 	if proposal.TalkType == "panel" {
+		// Capture the withdrawing speaker's email + name BEFORE
+		// the removal lands so we can address them in the
+		// CANCEL ICS.
+		var leavingEmail, leavingName string
+		if speakerConf != nil && speakerConf.Speaker != nil {
+			leavingEmail = speakerConf.Speaker.Email
+			leavingName = speakerConf.Speaker.Name
+		}
 		if err := getters.RemoveProposalFromSpeakerConf(ctx, speakerConf.ID, proposalID); err != nil {
 			ctx.Err.Printf("/dashboard withdraw remove panelist: %s", err)
 			http.Error(w, "withdraw failed", http.StatusInternalServerError)
 			return
+		}
+		// CANCEL for the leaver + REQUEST(force=true) for the
+		// remaining panelists. Re-fetch the proposal so the
+		// trimmed speaker list is what we send the update with.
+		if conf != nil {
+			if updated, perr := getters.GetProposal(ctx, proposalID); perr == nil && updated != nil {
+				remaining := proposalSpeakers(updated)
+				if dErr := DispatchTalkICSRemoved(ctx, updated, conf, leavingEmail, leavingName, remaining); dErr != nil {
+					ctx.Err.Printf("/dashboard withdraw panel cal-fire: %s", dErr)
+				}
+			}
 		}
 		flash = "You've been removed from the panel."
 	} else {
@@ -675,6 +695,14 @@ func DashboardWithdraw(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 			ctx.Err.Printf("/dashboard withdraw update status: %s", err)
 			http.Error(w, "withdraw failed", http.StatusInternalServerError)
 			return
+		}
+		// Solo talk withdrawn: pull the event off every
+		// attendee's calendar.
+		if conf != nil {
+			speakers := proposalSpeakers(proposal)
+			if dErr := DispatchTalkICSCancelForProposal(ctx, proposal, conf, speakers); dErr != nil {
+				ctx.Err.Printf("/dashboard withdraw solo cal-fire: %s", dErr)
+			}
 		}
 		flash = "Your talk has been withdrawn."
 	}
@@ -730,11 +758,32 @@ func DashboardRemoveCoSpeaker(w http.ResponseWriter, r *http.Request, ctx *confi
 		return
 	}
 
+	// Capture the target's email + name BEFORE the relation is
+	// dropped — after RemoveProposalFromSpeakerConf the cache may
+	// not link them back if they had only the one proposal.
+	var removedEmail, removedName string
+	if sc := getters.FetchSpeakerConfByID(targetSpeakerConfID); sc != nil && sc.Speaker != nil {
+		removedEmail = sc.Speaker.Email
+		removedName = sc.Speaker.Name
+	}
+
 	if err := getters.RemoveProposalFromSpeakerConf(ctx, targetSpeakerConfID, proposalID); err != nil {
 		ctx.Err.Printf("/dashboard remove co-speaker %s from %s: %s", targetSpeakerConfID, proposalID, err)
 		http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Couldn't remove co-speaker — please try again."), http.StatusSeeOther)
 		return
 	}
+
+	// CANCEL for the removed speaker + REQUEST(force=true) for
+	// the remaining co-speakers so their attendee list updates.
+	if proposal.ScheduleFor != nil {
+		if updated, perr := getters.GetProposal(ctx, proposalID); perr == nil && updated != nil {
+			remaining := proposalSpeakers(updated)
+			if dErr := DispatchTalkICSRemoved(ctx, updated, proposal.ScheduleFor, removedEmail, removedName, remaining); dErr != nil {
+				ctx.Err.Printf("/dashboard remove co-speaker cal-fire: %s", dErr)
+			}
+		}
+	}
+
 	http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Co-speaker removed."), http.StatusSeeOther)
 }
 
@@ -1152,6 +1201,21 @@ func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 	// JoinProposal already wrote the canonical edge.
 	if err := getters.AddSpeakerConfToProposal(ctx, proposal.ID, res.SpeakerConfID); err != nil {
 		ctx.Err.Printf("/invite-speaker mirror to proposal (continuing): %s", err)
+	}
+
+	// Co-speaker just joined an already-scheduled talk: push a
+	// force-bumped REQUEST so the existing speakers' calendars
+	// pick up the new attendee and the new co-speaker's
+	// calendar gets the event for the first time. SEQUENCE
+	// advances even though the title/time hash didn't change —
+	// RFC-5545 considers attendee-set changes significant.
+	// Silent no-op when no ConfTalk yet (most invite-speaker
+	// flows hit before scheduling).
+	if updated, perr := getters.GetProposal(ctx, proposal.ID); perr == nil && updated != nil {
+		updatedSpeakers := proposalSpeakers(updated)
+		if dErr := DispatchTalkICSForProposal(ctx, updated, conf, updatedSpeakers, true); dErr != nil {
+			ctx.Err.Printf("/invite-speaker co-speaker cal-fire: %s", dErr)
+		}
 	}
 
 	// JoinProposal upserts Speaker / Org / SpeakerConf but never

@@ -146,6 +146,13 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
+	// Auto-fire calendar invite. First placement → seq=0
+	// REQUEST; re-placement of an already-invited talk →
+	// seq+1 update. The hash check inside dispatch suppresses
+	// emails when neither time nor title actually shifted.
+	// Best-effort: log on error, don't fail the schedule write.
+	dispatchTalkCalAfterScheduleChange(ctx, conf, req.ProposalID, "place")
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"confTalkID": confTalkID,
@@ -197,6 +204,12 @@ func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+
+	// Resize → talk's end time changed → hash bump → speakers
+	// get a SEQUENCE+1 update (or first invite if they hadn't
+	// been sent one yet).
+	dispatchTalkCalAfterScheduleChange(ctx, conf, req.ProposalID, "resize")
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"durationMin": req.DurationMin,
@@ -235,12 +248,43 @@ func ScheduleUnplace(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+
+	// CANCEL must fire BEFORE the ConfTalk row is archived: once
+	// it's gone, the cache lookup in dispatch returns nil and we
+	// can't address the existing UID anymore. Best-effort send,
+	// then delete regardless of email outcome — the row is going
+	// away either way.
+	if proposal, err := getters.GetProposal(ctx, req.ProposalID); err == nil && proposal != nil {
+		speakers := proposalSpeakers(proposal)
+		if err := DispatchTalkICSCancelForProposal(ctx, proposal, conf, speakers); err != nil {
+			ctx.Err.Printf("/%s/admin/schedule unplace cancel %s: %s", conf.Tag, ct.ID, err)
+		}
+	}
+
 	if err := getters.DeleteConfTalk(ctx, ct.ID); err != nil {
 		ctx.Err.Printf("/%s/admin/schedule delete %s: %s", conf.Tag, ct.ID, err)
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// dispatchTalkCalAfterScheduleChange is the place/resize auto-fire
+// shim: load the proposal, resolve speakers, hand off to the
+// dispatch chokepoint. force=false so the hash check inside the
+// pipeline silently skips when the grid landed in the same spot.
+// Best-effort — logs and returns; the schedule write is the
+// authoritative side-effect.
+func dispatchTalkCalAfterScheduleChange(ctx *config.AppContext, conf *types.Conf, proposalID, action string) {
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		ctx.Err.Printf("/%s/admin/schedule %s cal-fire: proposal lookup failed: %s", conf.Tag, action, err)
+		return
+	}
+	speakers := proposalSpeakers(proposal)
+	if err := DispatchTalkICSForProposal(ctx, proposal, conf, speakers, false); err != nil {
+		ctx.Err.Printf("/%s/admin/schedule %s cal-fire %q: %s", conf.Tag, action, proposal.Title, err)
+	}
 }
 
 // addTalkAllowedTypes is the set of TalkType values the "Add talk"
