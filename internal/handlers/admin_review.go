@@ -231,6 +231,59 @@ func ReviewProposalAction(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		http.StatusSeeOther)
 }
 
+// AdminCancelTalk flips an Accepted proposal back to TheyDecline —
+// the path for "speaker pulls out after confirming". Surfaced only
+// on /{conf}/admin/applicants (not the review queue) and only when
+// the row is in the Accepted state. No letter is sent: the speaker
+// initiated the cancellation externally; admin is just recording it.
+//
+// Path: POST /{conf}/admin/applicants/{proposalID}/cancel
+func AdminCancelTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	proposalID := mux.Vars(r)["proposalID"]
+	if proposalID == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Missing+proposal", conf.Tag), http.StatusSeeOther)
+		return
+	}
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=Proposal+not+found", conf.Tag), http.StatusSeeOther)
+		return
+	}
+	if proposal.Status != StatusAccepted {
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=%s",
+				conf.Tag,
+				url.QueryEscape(fmt.Sprintf("Only Accepted talks can be cancelled (was %q)", proposal.Status))),
+			http.StatusSeeOther)
+		return
+	}
+
+	if err := getters.UpdateProposalStatus(ctx, proposalID, "TheyDecline"); err != nil {
+		ctx.Err.Printf("/%s/admin/applicants/%s/cancel update status: %s", conf.Tag, proposalID, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=%s",
+				conf.Tag,
+				url.QueryEscape("Cancel failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r,
+		fmt.Sprintf("/%s/admin/applicants?flash=%s",
+			conf.Tag,
+			url.QueryEscape(fmt.Sprintf("Cancelled — %q is now TheyDecline.", proposal.Title))),
+		http.StatusSeeOther)
+}
+
 // AdminResendSpeakerTickets walks every Accepted proposal for a conf
 // and issues a complimentary "speaker"-type ticket to each attached
 // speaker who doesn't already have a registration for that conf

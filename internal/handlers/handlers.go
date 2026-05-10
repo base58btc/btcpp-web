@@ -1004,6 +1004,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/applicants/resend-tickets", func(w http.ResponseWriter, r *http.Request) {
 		AdminResendSpeakerTickets(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/applicants/{proposalID}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		AdminCancelTalk(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/speakers/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
