@@ -446,17 +446,24 @@ func DispatchShiftICSCancelForVol(ctx *config.AppContext, shift *types.WorkShift
 // DispatchOrientICS sends a volunteer-orientation invite to one
 // volunteer. State is tracked at the conf level on
 // Conf.OrientCalNotif (a "UID:Sequence:Hashbytes" triple in the
-// same shape as ConfTalk.CalNotif) so a re-send after the
-// orientation time changes actually propagates to attendees'
-// calendars — SEQUENCE bumps and the new time overrides the old
-// one.
+// same shape as ConfTalk.CalNotif) so the per-vol UID + SEQUENCE
+// stay coherent across signups.
 //
 // All volunteers share the same UID per conf (one logical event;
 // the recipient's calendar matches against UID, not who the
-// invite was addressed to). Hash includes start + end + conf-tag
-// + a stable "Volunteer Orientation" title so a time change
-// triggers a re-send for every volunteer the next time their
-// shift-signup runs through scheduledFlow.
+// invite was addressed to). Each volunteer is sent the event
+// exactly once at signup — the email is NOT hash-gated here
+// (every new vol needs their first-send email even when the
+// orientation time hasn't changed). The hash-gate only kicks in
+// on the bulk BroadcastOrientICS path triggered by the volcoord
+// "Resend orientation invite" button.
+//
+// State writeback bumps SEQUENCE only when the content hash has
+// drifted since the last per-vol send — so a new vol signing up
+// AFTER an admin edits the orientation time gets the new state
+// stamped (UID stable, seq+1) and the new time. Already-invited
+// vols don't get an automatic update; the volcoord broadcast
+// button covers that case.
 func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attendee, start, end time.Time) error {
 	if conf == nil {
 		return fmt.Errorf("dispatchOrientICS: nil conf")
@@ -476,13 +483,26 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 	// start / end times.
 	title := fmt.Sprintf("Volunteer Orientation: %s", conf.Desc)
 	newHash := ics.ContentHash(start, end, conf.Tag, title)
-	seq, send := ics.NextSeq(prev, prevValid, newHash, false)
-	if !send {
-		// Already sent at this time + with this UID; nothing
-		// new to broadcast. Skipping avoids spamming an extra
-		// email at each new volunteer signup.
-		ctx.Infos.Printf("dispatchOrientICS %s: hash unchanged, skipping", conf.Tag)
-		return nil
+
+	// Pick seq + decide whether to stamp:
+	//   - No prior state → seq=0, stamp the initial UID/hash.
+	//   - Hash matches → use stored seq, no stamp needed (state
+	//     is already current).
+	//   - Hash drifted → seq+1, stamp the new state so future
+	//     vols see the new time.
+	// In all three cases we send the email — this is the per-vol
+	// first-send path, every volunteer needs their copy.
+	var seq int
+	stamp := false
+	switch {
+	case !prevValid:
+		seq = 0
+		stamp = true
+	case prev.HashHex == newHash:
+		seq = prev.Sequence
+	default:
+		seq = prev.Sequence + 1
+		stamp = true
 	}
 
 	event := ics.Event{
@@ -522,12 +542,14 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 		return err
 	}
 
-	// Stamp the bumped state back so the next volunteer signing
-	// up sees the same (seq, hash) and skips a re-send unless
-	// the orientation time has shifted.
-	stamp := ics.CalNotif{UID: uid, Sequence: seq, HashHex: newHash}.String()
-	if err := getters.ConfUpdateOrientCalNotif(ctx.Notion, conf.Ref, stamp); err != nil {
-		ctx.Err.Printf("dispatchOrientICS %s calnotif writeback: %s", conf.Tag, err)
+	// Stamp state only when we initialized (first send) or
+	// advanced (orientation time drifted) — hash-matched sends
+	// reuse the existing CalNotif unchanged.
+	if stamp {
+		s := ics.CalNotif{UID: uid, Sequence: seq, HashHex: newHash}.String()
+		if err := getters.ConfUpdateOrientCalNotif(ctx.Notion, conf.Ref, s); err != nil {
+			ctx.Err.Printf("dispatchOrientICS %s calnotif writeback: %s", conf.Tag, err)
+		}
 	}
 	return nil
 }
