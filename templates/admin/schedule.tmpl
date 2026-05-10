@@ -140,7 +140,7 @@
                    data-closes-min="{{ $day.ClosesMin }}"
                    style="height: {{ $day.HeightPx }}px;">
                 <div class="sticky top-0 z-10 bg-gray-50 border-b border-gray-200 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider">
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded {{ venueChipClass $venue }}">{{ $venue }}</span>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded {{ venueChipClass $venue }}">{{ venueLabel $venue }}</span>
                 </div>
                 {{/* Hour gridlines */}}
                 {{ range hourLabels $day.OpensMin $day.ClosesMin }}

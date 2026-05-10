@@ -250,6 +250,17 @@ func loadTemplates(ctx *config.AppContext) error {
 		"formatHourMin":   FormatHourMin,
 		"hourLabels":      HourLabels,
 		"venueChipClass":  VenueChipClasses,
+		"venueLabel": func(raw string) string {
+			// Resolves the raw venue slug ("one" / "two" / "three")
+			// to the human-readable stage label. Falls back to the
+			// raw value when the mapping doesn't recognize it, so
+			// custom venues from older confs still render
+			// something sensible.
+			if label := ics.MapVenue(raw); label != "" {
+				return label
+			}
+			return raw
+		},
 		"navConfs": func() NavConfList {
 			return buildNavConfList(ctx)
 		},
