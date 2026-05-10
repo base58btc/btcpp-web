@@ -13,19 +13,98 @@ import (
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/ics"
 	"btcpp-web/internal/types"
 )
+
+// computeScheduleDrift returns true when the ConfTalk's CalNotif
+// hash doesn't match the freshly-computed ContentHash of the
+// current data — i.e. the schedule UI shows a state that hasn't
+// been propagated to attendees' calendars yet. False when there's
+// no prior CalNotif (no baseline to drift from — talk hasn't been
+// invited out yet) or when the hashes match (in sync).
+func computeScheduleDrift(ct *types.ConfTalk, p *types.Proposal, conf *types.Conf) bool {
+	if ct == nil || ct.Sched == nil || ct.Sched.End == nil {
+		return false
+	}
+	prev, ok := ics.ParseCalNotif(ct.CalNotif)
+	if !ok || prev.HashHex == "" {
+		return false
+	}
+	cur := ics.ContentHash(ct.Sched.Start, *ct.Sched.End, conf.Tag, p.Title)
+	return cur != prev.HashHex
+}
+
+// ScheduleSendCalUpdates handles the "Send Cal Updates" button on
+// the /admin/schedule page. Iterates every Scheduled-status
+// proposal whose ConfTalk drifted (current hash != CalNotif hash)
+// and fires a force=false REQUEST. The hash check inside dispatch
+// re-confirms drift; matching cards skip silently.
+//
+// Path: POST /{conf}/admin/schedule/sendcal-updates
+func ScheduleSendCalUpdates(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	proposals := loadConfProposals(ctx, conf)
+	var sent, skippedClean, failed int
+	for _, p := range proposals {
+		if p == nil {
+			continue
+		}
+		// Updates only fire for Scheduled talks. Accepted-with-
+		// CalNotif shouldn't happen (the only way to set
+		// CalNotif is via the per-proposal sendcal which
+		// flips Accepted → Scheduled), but skip defensively.
+		if p.Status != StatusScheduled {
+			continue
+		}
+		ct := getters.FetchConfTalkByProposal(p.ID)
+		if ct == nil || !computeScheduleDrift(ct, p, conf) {
+			skippedClean++
+			continue
+		}
+		speakers := proposalSpeakers(p)
+		if err := DispatchTalkICSForProposal(ctx, p, conf, speakers, false); err != nil {
+			ctx.Err.Printf("/%s/admin/schedule/sendcal-updates %q: %s", conf.Tag, p.Title, err)
+			failed++
+			continue
+		}
+		sent++
+	}
+
+	flash := fmt.Sprintf("Cal updates: %d drifted talks resent · %d clean", sent, skippedClean)
+	if failed > 0 {
+		flash = fmt.Sprintf("%s · %d failed (see logs)", flash, failed)
+	}
+	http.Redirect(w, r,
+		fmt.Sprintf("/%s/admin/schedule?flash=%s",
+			conf.Tag, url.QueryEscape(flash)),
+		http.StatusSeeOther)
+}
 
 // schedulableStatuses lists the proposal statuses that should appear
 // on the schedule UI. Anything terminal (rejected/declined) is filtered
 // out — those talks won't run, no point dragging them around.
+//
+// Scheduled is included so already-invited talks stay visible (and
+// editable — drag/resize on the grid is allowed; the per-card drift
+// indicator + "Send Cal Updates" button is how those mutations
+// propagate to attendees' calendars).
 var schedulableStatuses = map[string]bool{
-	"":           true, // pending review
-	"Applied":    true,
-	"InReview":   true,
-	"Waitlisted": true,
-	"Invited":    true,
-	"Accepted":   true,
+	"":              true, // pending review
+	"Applied":       true,
+	"InReview":      true,
+	"Waitlisted":    true,
+	"Invited":       true,
+	StatusAccepted:  true,
+	StatusScheduled: true,
 }
 
 // schedulePxPerMin is the grid's vertical scale. 2 px/min → a 30-minute
@@ -146,12 +225,12 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
-	// Auto-fire calendar invite. First placement → seq=0
-	// REQUEST; re-placement of an already-invited talk →
-	// seq+1 update. The hash check inside dispatch suppresses
-	// emails when neither time nor title actually shifted.
-	// Best-effort: log on error, don't fail the schedule write.
-	dispatchTalkCalAfterScheduleChange(ctx, conf, req.ProposalID, "place")
+	// No auto-fire. Schedule edits are draft-mode work; the
+	// admin commits to attendees by clicking "Send Cal Invite"
+	// on the proposal card (Accepted → Scheduled) or "Send Cal
+	// Updates" on the schedule page (re-fan-out drifted
+	// Scheduled talks). Drift is surfaced visually via the
+	// orange tint on each card.
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -205,10 +284,8 @@ func ScheduleResize(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
 	}
 
-	// Resize → talk's end time changed → hash bump → speakers
-	// get a SEQUENCE+1 update (or first invite if they hadn't
-	// been sent one yet).
-	dispatchTalkCalAfterScheduleChange(ctx, conf, req.ProposalID, "resize")
+	// No auto-fire — drift is surfaced visually; updates
+	// propagate via the explicit "Send Cal Updates" button.
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -249,17 +326,14 @@ func ScheduleUnplace(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	// CANCEL must fire BEFORE the ConfTalk row is archived: once
-	// it's gone, the cache lookup in dispatch returns nil and we
-	// can't address the existing UID anymore. Best-effort send,
-	// then delete regardless of email outcome — the row is going
-	// away either way.
-	if proposal, err := getters.GetProposal(ctx, req.ProposalID); err == nil && proposal != nil {
-		speakers := proposalSpeakers(proposal)
-		if err := DispatchTalkICSCancelForProposal(ctx, proposal, conf, speakers); err != nil {
-			ctx.Err.Printf("/%s/admin/schedule unplace cancel %s: %s", conf.Tag, ct.ID, err)
-		}
-	}
+	// No auto-CANCEL on unplace either. The schedule UI is
+	// draft work; if the talk was previously Scheduled and is
+	// being yanked off the grid, the admin should explicitly
+	// Decline / Cancel it from the proposal card to fan a
+	// CANCEL out to attendees. Otherwise the unplaced talk's
+	// existing CalNotif stays attached to the (now archived)
+	// row and re-placement / re-send still produces a coherent
+	// SEQUENCE diff.
 
 	if err := getters.DeleteConfTalk(ctx, ct.ID); err != nil {
 		ctx.Err.Printf("/%s/admin/schedule delete %s: %s", conf.Tag, ct.ID, err)
@@ -267,24 +341,6 @@ func ScheduleUnplace(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-}
-
-// dispatchTalkCalAfterScheduleChange is the place/resize auto-fire
-// shim: load the proposal, resolve speakers, hand off to the
-// dispatch chokepoint. force=false so the hash check inside the
-// pipeline silently skips when the grid landed in the same spot.
-// Best-effort — logs and returns; the schedule write is the
-// authoritative side-effect.
-func dispatchTalkCalAfterScheduleChange(ctx *config.AppContext, conf *types.Conf, proposalID, action string) {
-	proposal, err := getters.GetProposal(ctx, proposalID)
-	if err != nil || proposal == nil {
-		ctx.Err.Printf("/%s/admin/schedule %s cal-fire: proposal lookup failed: %s", conf.Tag, action, err)
-		return
-	}
-	speakers := proposalSpeakers(proposal)
-	if err := DispatchTalkICSForProposal(ctx, proposal, conf, speakers, false); err != nil {
-		ctx.Err.Printf("/%s/admin/schedule %s cal-fire %q: %s", conf.Tag, action, proposal.Title, err)
-	}
 }
 
 // addTalkAllowedTypes is the set of TalkType values the "Add talk"
@@ -494,6 +550,7 @@ func buildSchedulePage(ctx *config.AppContext, conf *types.Conf) (*AdminSchedule
 		}
 		sp.TopPx = (sp.StartMin - d.OpensMin) * schedulePxPerMin
 		sp.HeightPx = sp.ActualMin * schedulePxPerMin
+		sp.HasDrift = computeScheduleDrift(ct, p, conf)
 		d.Placed[ct.Venue] = append(d.Placed[ct.Venue], sp)
 	}
 

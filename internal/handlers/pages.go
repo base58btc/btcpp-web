@@ -485,6 +485,15 @@ type ScheduleProposal struct {
         // means we couldn't resolve any availability data at all.
         AvailDays   []string
         NoAvail     bool
+        // HasDrift means the ConfTalk's current content (start /
+        // end / title / conf-tag) hashes to something different
+        // from the value stamped in CalNotif — i.e. attendees'
+        // calendars are out-of-sync with the schedule UI. Drives
+        // the orange tint on the card so the admin can spot which
+        // talks need a "Send Cal Updates" click.
+        // True only for Scheduled proposals (no CalNotif → no
+        // baseline to drift from).
+        HasDrift    bool
 }
 
 // EventBlock collects every relationship the dashboard's user has with
