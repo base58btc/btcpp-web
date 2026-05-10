@@ -21,6 +21,38 @@ const (
 	kindCancel
 )
 
+// DispatchTalkICSForProposal looks up the ConfTalk for a proposal,
+// builds a synthetic Talk view, and dispatches one calendar
+// invite to each speaker on the proposal. Used by the per-card
+// "Send / Resend / Update cal invite" button on the proposals
+// admin page.
+//
+// Returns an error when the proposal isn't scheduled yet (no
+// ConfTalk row, or no Sched.End) — caller should surface that as
+// a flash so the admin knows nothing went out.
+func DispatchTalkICSForProposal(ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, speakers []*types.Speaker, force bool) error {
+	if proposal == nil {
+		return fmt.Errorf("dispatchTalkICSForProposal: nil proposal")
+	}
+	ct := getters.FetchConfTalkByProposal(proposal.ID)
+	if ct == nil {
+		return fmt.Errorf("proposal %q is not scheduled (no ConfTalk row)", proposal.Title)
+	}
+	if ct.Sched == nil || ct.Sched.End == nil {
+		return fmt.Errorf("proposal %q has no scheduled time", proposal.Title)
+	}
+	talk := &types.Talk{
+		ID:          ct.ID,
+		Name:        proposal.Title,
+		Description: proposal.Description,
+		Sched:       ct.Sched,
+		Speakers:    speakers,
+		Venue:       ct.Venue,
+		CalNotif:    ct.CalNotif,
+	}
+	return DispatchTalkICSForTalk(ctx, talk, conf, kindRequest, force)
+}
+
 func (k dispatchKind) method() string {
 	if k == kindCancel {
 		return ics.MethodCancel

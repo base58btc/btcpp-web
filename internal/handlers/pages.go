@@ -689,9 +689,37 @@ type RegistrationsAdminPage struct {
         EmailCompose  *EmailComposeData
 }
 
+// ProposalAdminRow is one card on /{conf}/admin/applicants. The
+// "Talk Proposals" view shows every proposal scheduled for the
+// conf as a labeled card with speakers, venue, talktime, and a
+// status-aware calendar-invite button.
 type ProposalAdminRow struct {
         Proposal *types.Proposal
+        // Speaker is the FIRST resolved speaker on the proposal —
+        // kept for back-compat with the existing email-compose
+        // template data (which expects a single .Speaker). For
+        // display, Speakers is the full list.
         Speaker  *types.Speaker
+        Speakers []*types.Speaker
+        // ConfTalk is the scheduled-talk row when one exists; nil
+        // for proposals that haven't been scheduled yet (or have
+        // moved to a terminal-decline status post-schedule).
+        ConfTalk *types.ConfTalk
+        // Display-only derived fields. VenueLabel is the human-
+        // readable stage label resolved via ics.MapVenue. Time
+        // labels render in the conf's local timezone. Durations
+        // are in minutes.
+        VenueLabel        string
+        StartLabel        string
+        EndLabel          string
+        DurationActualMin int
+        DurationDesiredMin int
+        // CalState drives the per-card cal-invite button:
+        //   ""        — proposal isn't scheduled, no button
+        //   "none"    — scheduled but no CalNotif yet ("Send cal invite")
+        //   "fresh"   — CalNotif present, hash matches ("Resend cal invite")
+        //   "stale"   — CalNotif present, hash differs ("Update cal invite")
+        CalState string
 }
 
 type ProposalAdminPage struct {

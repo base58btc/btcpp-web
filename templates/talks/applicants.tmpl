@@ -1,169 +1,185 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>speaker applicants @ bitcoin++</title>
+    <title>talk proposals @ bitcoin++</title>
     {{ block "header" . }} {{ end }}
     {{ template "admin_favicon" .Conf }}
   </head>
-  <body>
+  <body class="bg-gray-50">
     {{ block "mainnav" . }} {{ end }}
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div class="mx-auto max-w-5xl">
-            <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
-            <section id="topline" class="mt-2 mb-6">
-                <div class="overflow-hidden sm:rounded-lg bg-white shadow">
-                    <div class="px-4 py-5 sm:p-6 flex items-center justify-between gap-4">
-                        <div>
-                            <h1 class="text-xl font-bold text-gray-900">Speaker Applicants</h1>
-                            <p class="text-sm text-gray-500">{{ .Conf.Desc }} - {{ .Conf.DateDesc }}</p>
-                        </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <a href="/{{ .Conf.Tag }}/admin/invite-speaker"
-                               class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                                Invite a speaker
-                            </a>
-                            <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/resend-tickets">
-                                <button type="submit"
-                                        onclick="return confirm('Issue speaker tickets for every Accepted proposal whose speakers don't already have a ticket for this conf?');"
-                                        class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
-                                    Resend tickets
-                                </button>
-                            </form>
-                        </div>
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+        <section id="topline" class="mt-2 mb-6">
+            <div class="overflow-hidden sm:rounded-lg bg-white shadow">
+                <div class="px-4 py-5 sm:p-6 flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 class="text-xl font-bold text-gray-900">Talk Proposals</h1>
+                        <p class="text-sm text-gray-500">{{ .Conf.Desc }} · {{ .Conf.DateDesc }}</p>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <a href="/{{ .Conf.Tag }}/admin/invite-speaker"
+                           class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
+                            Invite a speaker
+                        </a>
+                        <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/resend-tickets">
+                            <button type="submit"
+                                    onclick="return confirm('Issue speaker tickets for every Accepted proposal whose speakers don\'t already have a ticket for this conf?');"
+                                    class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                                Resend tickets
+                            </button>
+                        </form>
                     </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            {{ if .FlashMessage }}
-            <section class="mb-6">
-                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
-                    {{ .FlashMessage }}
-                </div>
-            </section>
-            {{ end }}
+        {{ if .FlashMessage }}
+        <section class="mb-6">
+            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg">
+                {{ .FlashMessage }}
+            </div>
+        </section>
+        {{ end }}
 
-            {{ if .Rows }}
-            <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/email">
-            <section id="applicants-table" class="mb-6">
-                <div class="bg-white shadow rounded-lg overflow-hidden">
-                    <table class="min-w-full sm:divide-y sm:divide-gray-200">
-                        <thead class="bg-gray-50 hidden sm:table-header-group">
-                            <tr>
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
-                                    <input type="checkbox" onclick="toggleAll(this)" class="rounded border-gray-300">
-                                </th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talk</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white sm:divide-y sm:divide-gray-200">
-                            {{ range .Rows }}
-                            <tr class="hover:bg-gray-50 block sm:table-row border-b sm:border-0 border-gray-200 px-4 py-4 sm:p-0">
-                                <td class="block sm:table-cell sm:px-3 sm:py-4 pb-2 sm:pb-4">
-                                    <label class="inline-flex items-center gap-2 sm:gap-0">
-                                        <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}" class="app-checkbox rounded border-gray-300">
-                                        <span class="text-xs uppercase text-gray-500 sm:hidden">Select</span>
-                                    </label>
-                                </td>
-                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-900">
-                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Name:</span>{{ if .Speaker }}{{ .Speaker.Name }}{{ end }}
-                                </td>
-                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-900 break-all">
-                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Email:</span>{{ if .Speaker }}{{ .Speaker.Email }}{{ end }}
-                                </td>
-                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-500">
-                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Talk:</span>{{ .Proposal.Title }}
-                                </td>
-                                <td class="block sm:table-cell sm:px-6 sm:py-4 text-sm text-gray-500">
-                                    <span class="text-xs uppercase text-gray-500 sm:hidden mr-1">Status:</span>{{ .Proposal.Status }}
-                                </td>
-                                <td class="block sm:table-cell sm:px-6 sm:py-4 sm:text-right pt-2 sm:pt-4">
-                                    {{ $invite := inviteLink .Proposal }}
-                                    {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
-                                    <span class="flex flex-wrap items-center gap-2 sm:justify-end">
-                                        {{ if $invite }}
-                                        <button type="button"
-                                                data-invite-url="{{ $invite }}"
-                                                class="copy-invite-btn inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
-                                            Copy invite
-                                        </button>
-                                        {{ end }}
-                                        {{ if $terminal }}
-                                        {{ if eq .Proposal.Status "Accepted" }}
-                                        <button type="submit"
-                                            formaction="/{{ $.Conf.Tag }}/admin/applicants/{{ .Proposal.ID }}/cancel"
-                                            formmethod="POST"
-                                            onclick="return confirm('Cancel this talk? Status will be set to TheyDecline. This is for the case where the speaker pulls out after confirming.');"
-                                            class="inline-flex items-center rounded-md bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700">
-                                            Cancel
-                                        </button>
-                                        {{ else }}{{ if not $invite }}
-                                        <span class="text-xs text-gray-400">—</span>
-                                        {{ end }}{{ end }}
-                                        {{ else }}
-                                        {{ if ne .Proposal.Status "Invited" }}
-                                        <button type="submit"
-                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/invite?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
-                                            formmethod="POST"
-                                            class="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-700">
-                                            Invite
-                                        </button>
-                                        {{ end }}
-                                        {{ if and (ne .Proposal.Status "Waitlisted") (ne .Proposal.Status "Invited") }}
-                                        <button type="submit"
-                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/waitlist?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
-                                            formmethod="POST"
-                                            class="inline-flex items-center rounded-md bg-yellow-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-yellow-600">
-                                            Waitlist
-                                        </button>
-                                        {{ end }}
-                                        <button type="submit"
-                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/decline?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
-                                            formmethod="POST"
-                                            class="inline-flex items-center rounded-md bg-gray-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-gray-700">
-                                            Decline
-                                        </button>
-                                        <button type="submit"
-                                            formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/confirm?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
-                                            formmethod="POST"
-                                            class="text-xs text-gray-500 hover:text-gray-800 underline bg-transparent border-0 p-0">
-                                            Mark Confirmed
-                                        </button>
-                                        {{ end }}
-                                    </span>
-                                </td>
-                            </tr>
+        {{ if .Rows }}
+        <form method="POST" action="/{{ .Conf.Tag }}/admin/applicants/email">
+            <div class="mb-3 flex items-center gap-2 flex-wrap">
+                <label class="inline-flex items-center gap-1 text-xs text-gray-600">
+                    <input type="checkbox" id="select-all" onclick="toggleAll(this)" class="rounded border-gray-300">
+                    Select all
+                </label>
+                <span class="text-xs text-gray-400">{{ len .Rows }} proposals</span>
+            </div>
+
+            <section id="proposals-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {{ range .Rows }}
+                {{ $row := . }}
+                {{ $invite := inviteLink .Proposal }}
+                {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
+                <article class="bg-white shadow rounded-lg p-4 flex flex-col gap-2">
+                    <div class="flex items-start gap-2">
+                        <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}"
+                               class="app-checkbox mt-1 rounded border-gray-300 shrink-0">
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-sm font-semibold text-gray-900 leading-snug break-words">{{ .Proposal.Title }}</h2>
+                            {{ if .Speakers }}
+                            <p class="mt-0.5 text-xs text-gray-700 break-words">
+                                {{ range $i, $sp := .Speakers }}{{ if $i }}, {{ end }}{{ $sp.Name }}{{ end }}
+                            </p>
                             {{ end }}
-                        </tbody>
-                    </table>
-                    <div class="px-6 py-3 bg-gray-50 text-sm text-gray-500">
-                        {{ len .Rows }} applicants
+                            <p class="mt-1 text-xs">
+                                <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{{ .Proposal.Status }}</span>
+                            </p>
+                        </div>
                     </div>
-                </div>
+
+                    <dl class="text-xs text-gray-600 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                        {{ if .StartLabel }}
+                        <dt class="font-medium text-gray-500">When:</dt>
+                        <dd class="break-words">{{ .StartLabel }}{{ if .EndLabel }} – {{ .EndLabel }}{{ end }}</dd>
+                        {{ else }}
+                        <dt class="font-medium text-gray-500">When:</dt>
+                        <dd class="text-gray-400 italic">not scheduled</dd>
+                        {{ end }}
+
+                        {{ if .VenueLabel }}
+                        <dt class="font-medium text-gray-500">Where:</dt>
+                        <dd class="break-words">{{ .VenueLabel }}</dd>
+                        {{ end }}
+
+                        <dt class="font-medium text-gray-500">Duration:</dt>
+                        <dd>
+                            {{ if .DurationActualMin }}{{ .DurationActualMin }}m scheduled{{ else }}—{{ end }}
+                            {{ if .DurationDesiredMin }}<span class="text-gray-400">· {{ .DurationDesiredMin }}m desired</span>{{ end }}
+                        </dd>
+                    </dl>
+
+                    <div class="flex items-center gap-2 flex-wrap pt-1">
+                        {{/* Cal-invite button: only renders when the proposal has a ConfTalk with a scheduled end. */}}
+                        {{ if .CalState }}
+                        <button type="submit"
+                            formaction="/{{ $.Conf.Tag }}/admin/proposals/{{ .Proposal.ID }}/sendcal"
+                            formmethod="POST"
+                            class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold text-white {{ if eq .CalState "none" }}bg-blue-600 hover:bg-blue-700{{ else if eq .CalState "stale" }}bg-orange-600 hover:bg-orange-700{{ else }}bg-gray-500 hover:bg-gray-600{{ end }}">
+                            {{ if eq .CalState "none" }}📅 Send cal invite
+                            {{ else if eq .CalState "stale" }}📅 Update cal invite
+                            {{ else }}📅 Resend cal invite{{ end }}
+                        </button>
+                        {{ end }}
+
+                        {{/* Per-proposal status actions. Pull from the existing applicants surface so the proposals page stays a one-stop admin view. */}}
+                        {{ if $invite }}
+                        <button type="button"
+                                data-invite-url="{{ $invite }}"
+                                class="copy-invite-btn inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700">
+                            Copy invite
+                        </button>
+                        {{ end }}
+
+                        {{ if not $terminal }}
+                            {{ if ne .Proposal.Status "Invited" }}
+                            <button type="submit"
+                                formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/invite?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
+                                formmethod="POST"
+                                class="inline-flex items-center rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-green-700">
+                                Invite
+                            </button>
+                            {{ end }}
+                            {{ if and (ne .Proposal.Status "Waitlisted") (ne .Proposal.Status "Invited") }}
+                            <button type="submit"
+                                formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/waitlist?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
+                                formmethod="POST"
+                                class="inline-flex items-center rounded-md bg-yellow-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-yellow-600">
+                                Waitlist
+                            </button>
+                            {{ end }}
+                            <button type="submit"
+                                formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/decline?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
+                                formmethod="POST"
+                                class="inline-flex items-center rounded-md bg-gray-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-gray-700">
+                                Decline
+                            </button>
+                            <button type="submit"
+                                formaction="/{{ $.Conf.Tag }}/admin/review/{{ .Proposal.ID }}/confirm?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
+                                formmethod="POST"
+                                class="text-xs text-gray-500 hover:text-gray-800 underline bg-transparent border-0 p-0">
+                                Mark Confirmed
+                            </button>
+                        {{ end }}
+
+                        {{ if eq .Proposal.Status "Accepted" }}
+                        <button type="submit"
+                            formaction="/{{ $.Conf.Tag }}/admin/applicants/{{ .Proposal.ID }}/cancel"
+                            formmethod="POST"
+                            onclick="return confirm('Cancel this talk? Status will be set to TheyDecline. This is for the case where the speaker pulls out after confirming.');"
+                            class="inline-flex items-center rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700">
+                            Cancel
+                        </button>
+                        {{ end }}
+                    </div>
+                </article>
+                {{ end }}
             </section>
 
             {{ template "email_compose" .EmailCompose }}
-            </form>
-            {{ else }}
-            <section class="mb-6">
-                <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6 text-center text-gray-500">
-                    No applicants found for this event.
-                </div>
-            </section>
-            {{ end }}
-        </div>
+        </form>
+        {{ else }}
+        <section class="mb-6">
+            <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6 text-center text-gray-500">
+                No proposals found for this event.
+            </div>
+        </section>
+        {{ end }}
     </div>
     <script>
     function toggleAll(source) {
         var checkboxes = document.querySelectorAll('.app-checkbox');
         checkboxes.forEach(function(cb) { cb.checked = source.checked; });
     }
-    // Per-row Copy invite buttons. data-invite-url carries the speaker's
-    // pre-built magic link so we don't string-build at click time;
-    // server-rendered to keep the template in charge of URL shape.
+    // Per-card Copy invite buttons. data-invite-url carries the
+    // speaker's pre-built magic link so we don't string-build at
+    // click time; server-rendered to keep the template in charge
+    // of URL shape.
     (function () {
       document.querySelectorAll('.copy-invite-btn').forEach(function (btn) {
         btn.addEventListener('click', function () {

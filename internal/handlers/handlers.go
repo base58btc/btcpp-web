@@ -1002,6 +1002,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/applicants/{proposalID}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		AdminCancelTalk(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/proposals/{proposalID}/sendcal", func(w http.ResponseWriter, r *http.Request) {
+		AdminProposalSendCal(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/speakers/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfAdmin(w, r, app); id == nil {
 			return
@@ -5456,10 +5459,16 @@ func ProposalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 }
 
-// loadProposalRowsForConf returns one ProposalAdminRow per Proposal whose
-// ScheduleFor matches conf, joined to the Speaker that filed it via the
-// SpeakerProposal link table. Rows for proposals with no SpeakerProposal
-// (and thus no speaker) still appear, with Speaker == nil.
+// loadProposalRowsForConf returns one ProposalAdminRow per Proposal
+// whose ScheduleFor matches conf, joined to the Speakers that filed
+// it via the SpeakerProposal link table and to the ConfTalk (when
+// scheduled). Rows whose proposal has no SpeakerProposal still
+// appear with Speakers == nil.
+//
+// Each row carries pre-computed display labels (StartLabel,
+// VenueLabel, …) and a CalState flag derived from the stored
+// CalNotif vs the freshly-computed content hash. CalState drives
+// the per-card "Send / Resend / Update cal invite" button.
 func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*ProposalAdminRow, error) {
 	proposals, err := getters.ListProposals(ctx)
 	if err != nil {
@@ -5491,8 +5500,8 @@ func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*Propo
 	}
 
 	// Each SpeakerConf carries one or more Proposals (multi-relation `talk`).
-	// Build proposalID → first-Speaker for the admin row display.
-	speakerByProposal := make(map[string]*types.Speaker, len(proposalMap))
+	// Build proposalID → []*Speaker so each card can list all collaborators.
+	speakersByProposal := make(map[string][]*types.Speaker, len(proposalMap))
 	for _, sp := range sps {
 		if sp.Speaker == nil {
 			continue
@@ -5501,21 +5510,66 @@ func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*Propo
 			if p == nil {
 				continue
 			}
-			if _, ok := speakerByProposal[p.ID]; ok {
-				continue
-			}
-			speakerByProposal[p.ID] = sp.Speaker
+			speakersByProposal[p.ID] = append(speakersByProposal[p.ID], sp.Speaker)
 		}
 	}
 
+	loc := conf.Loc()
 	rows := make([]*ProposalAdminRow, 0, len(proposalMap))
 	for _, p := range proposalMap {
-		rows = append(rows, &ProposalAdminRow{
-			Proposal: p,
-			Speaker:  speakerByProposal[p.ID],
+		spList := speakersByProposal[p.ID]
+		// Stable order so the "first speaker" picked for the
+		// email-compose .Speaker field is deterministic.
+		sort.SliceStable(spList, func(i, j int) bool {
+			return strings.ToLower(spList[i].Name) < strings.ToLower(spList[j].Name)
 		})
+		row := &ProposalAdminRow{
+			Proposal:           p,
+			Speakers:           spList,
+			DurationDesiredMin: p.DesiredDuration,
+		}
+		if len(spList) > 0 {
+			row.Speaker = spList[0]
+		}
+
+		// Pull the ConfTalk if this proposal has been scheduled.
+		// FetchConfTalkByProposal hits the warm cache; nil when
+		// the proposal isn't in the schedule yet.
+		if ct := getters.FetchConfTalkByProposal(p.ID); ct != nil {
+			row.ConfTalk = ct
+			if ct.Sched != nil {
+				row.StartLabel = ct.Sched.Start.In(loc).Format("Mon Jan 2 · 3:04 PM")
+				if ct.Sched.End != nil {
+					row.EndLabel = ct.Sched.End.In(loc).Format("3:04 PM")
+					row.DurationActualMin = int(ct.Sched.End.Sub(ct.Sched.Start).Minutes())
+				}
+			}
+			row.VenueLabel = ics.MapVenue(ct.Venue)
+			row.CalState = computeCalState(ct, p, conf)
+		}
+		rows = append(rows, row)
 	}
 	return rows, nil
+}
+
+// computeCalState classifies a ConfTalk's CalNotif against its
+// current content for the per-card cal-invite button. Returns one of
+// "none" (no CalNotif yet), "fresh" (CalNotif matches current data —
+// idempotent re-send), or "stale" (data changed since last send,
+// re-send will bump SEQUENCE).
+func computeCalState(ct *types.ConfTalk, p *types.Proposal, conf *types.Conf) string {
+	if ct == nil || ct.Sched == nil || ct.Sched.End == nil {
+		return ""
+	}
+	prev, ok := ics.ParseCalNotif(ct.CalNotif)
+	if !ok || prev.HashHex == "" {
+		return "none"
+	}
+	cur := ics.ContentHash(ct.Sched.Start, *ct.Sched.End, conf.Tag, p.Title)
+	if cur == prev.HashHex {
+		return "fresh"
+	}
+	return "stale"
 }
 
 func speakerName(sp *types.Speaker) string {
@@ -5523,6 +5577,78 @@ func speakerName(sp *types.Speaker) string {
 		return ""
 	}
 	return sp.Name
+}
+
+// AdminProposalSendCal handles the per-card "Send / Resend /
+// Update cal invite" button on /{conf}/admin/applicants. Looks up
+// the proposal's ConfTalk + speakers and fires
+// DispatchTalkICSForProposal. force=true is implied — clicking the
+// button means the admin wants a send regardless of whether the
+// content hash changed (the button label tells the admin which
+// state they're in; the backend always honors the click).
+//
+// Path: POST /{conf}/admin/proposals/{proposalID}/sendcal
+func AdminProposalSendCal(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	proposalID := mux.Vars(r)["proposalID"]
+	if proposalID == "" {
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=Missing+proposal", conf.Tag),
+			http.StatusSeeOther)
+		return
+	}
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=Proposal+not+found", conf.Tag),
+			http.StatusSeeOther)
+		return
+	}
+
+	speakers := proposalSpeakers(proposal)
+	if err := DispatchTalkICSForProposal(ctx, proposal, conf, speakers, true); err != nil {
+		ctx.Err.Printf("/%s/admin/proposals/%s/sendcal: %s", conf.Tag, proposalID, err)
+		http.Redirect(w, r,
+			fmt.Sprintf("/%s/admin/applicants?flash=%s",
+				conf.Tag, url.QueryEscape("Cal invite failed: "+err.Error())),
+			http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r,
+		fmt.Sprintf("/%s/admin/applicants?flash=%s",
+			conf.Tag,
+			url.QueryEscape(fmt.Sprintf("Cal invite sent for %q to %d speaker(s).", proposal.Title, len(speakers)))),
+		http.StatusSeeOther)
+}
+
+// proposalSpeakers walks proposal.SpeakerConfRefs through the
+// warm SpeakerConf cache and returns the *Speaker for each. Used
+// by per-proposal cal-invite dispatch where the page-level
+// speakers map isn't already in scope. Distinct from
+// resolveProposalSpeakers (admin_review.go), which returns
+// SpeakerConf wrappers — here we only need the bare Speaker.
+func proposalSpeakers(proposal *types.Proposal) []*types.Speaker {
+	if proposal == nil {
+		return nil
+	}
+	out := make([]*types.Speaker, 0, len(proposal.SpeakerConfRefs))
+	for _, ref := range proposal.SpeakerConfRefs {
+		sc := getters.FetchSpeakerConfByID(ref)
+		if sc == nil || sc.Speaker == nil {
+			continue
+		}
+		out = append(out, sc.Speaker)
+	}
+	return out
 }
 
 func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
