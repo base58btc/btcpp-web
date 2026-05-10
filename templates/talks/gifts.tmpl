@@ -94,7 +94,7 @@
         var blob = new Blob([csv], {type: 'text/csv'});
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'speaker_canvases.csv';
+        a.download = '{{ .Conf.Tag }}_canvases.csv';
         a.click();
     }
     </script>
