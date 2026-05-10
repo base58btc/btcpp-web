@@ -40,6 +40,7 @@
                             <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Load Talks</button>
                             {{ if .Rows }}
                             <button type="button" onclick="downloadCSV()" class="px-3 py-1.5 text-sm rounded-md text-white bg-green-600 hover:bg-green-700">Download CSV</button>
+                            <a href="/talks/gifts/clipart.zip?conf={{ .Conf.Tag }}" class="px-3 py-1.5 text-sm rounded-md text-white bg-blue-600 hover:bg-blue-700">Download clipart</a>
                             {{ end }}
                         </div>
                     </form>
