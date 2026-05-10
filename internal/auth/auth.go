@@ -7,10 +7,12 @@
 //   - Each Speaker row has zero or more role tags in the Roles
 //     multi-select. Each tag is "{scope}-{role}" where scope is a
 //     conf tag ("vienna") or the literal "global", and role is one
-//     of "admin" / "volcoord".
+//     of "admin" / "staff" / "volcoord".
 //
-//   - admin > volcoord at the same scope: a vienna-admin can do
-//     anything a vienna-volcoord can do.
+//   - admin > volcoord and admin > staff at the same scope: a
+//     vienna-admin can do anything a vienna-volcoord or vienna-staff
+//     can do. staff and volcoord are orthogonal — neither covers
+//     the other; users carrying both tags get the union.
 //
 //   - global-X grants the X role for every conf.
 //
@@ -46,9 +48,14 @@ const SessionEmailKey = "auth_email"
 // GlobalScope is the scope tag that means "every conf".
 const GlobalScope = "global"
 
-// RoleAdmin / RoleVolcoord are the two role names supported.
+// RoleAdmin / RoleStaff / RoleVolcoord are the role names supported.
+//
+// Coverage hierarchy (see covers): admin > staff, admin > volcoord.
+// staff and volcoord are independent — having one does NOT imply the
+// other; a user with both gets the union of their permissions.
 const (
 	RoleAdmin    = "admin"
+	RoleStaff    = "staff"
 	RoleVolcoord = "volcoord"
 )
 
@@ -143,12 +150,14 @@ func (id *Identity) IsGlobalAdmin() bool {
 }
 
 // covers checks whether `have` is enough for `want`. admin covers
-// volcoord; otherwise names must match exactly.
+// both volcoord and staff; otherwise names must match exactly. staff
+// and volcoord do NOT cover each other — they're orthogonal slices
+// of permissions, and a user needs both tags to get both.
 func covers(have, want string) bool {
 	if have == want {
 		return true
 	}
-	if have == RoleAdmin && want == RoleVolcoord {
+	if have == RoleAdmin && (want == RoleVolcoord || want == RoleStaff) {
 		return true
 	}
 	return false
@@ -169,7 +178,7 @@ func ParseRoles(tags []string) []Role {
 		}
 		scope := t[:idx]
 		name := t[idx+1:]
-		if name != RoleAdmin && name != RoleVolcoord {
+		if name != RoleAdmin && name != RoleVolcoord && name != RoleStaff {
 			continue
 		}
 		if scope == "" {

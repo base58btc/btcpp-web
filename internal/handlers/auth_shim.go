@@ -33,6 +33,19 @@ func requireConfVolcoord(w http.ResponseWriter, r *http.Request, ctx *config.App
 	})
 }
 
+// requireConfStaff gates a per-conf staff route on the request's
+// {conf} mux var. admin covers staff, so a vienna-admin can access
+// any vienna-staff path. staff is the read-mostly tier — pages
+// gated here surface info (run-of-show, speakers, registrations,
+// hotels, downloads) but mutating actions like email blasts and
+// calendar fan-outs stay behind requireConfAdmin.
+func requireConfStaff(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) *auth.Identity {
+	return auth.RequireRole(w, r, ctx, auth.Spec{
+		Conf: mux.Vars(r)["conf"],
+		Role: auth.RoleStaff,
+	})
+}
+
 // requireGlobalAdmin gates a route that isn't scoped to a single
 // conf (org list, missives DB, etc). Only a global-admin satisfies.
 func requireGlobalAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) *auth.Identity {
