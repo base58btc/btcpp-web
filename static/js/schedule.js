@@ -86,7 +86,7 @@
 
         if (finalDur === startMin) return;
         try {
-          const resp = await fetch(`/admin/conf/${confTag}/schedule/resize`, {
+          const resp = await fetch(`/${confTag}/admin/schedule/resize`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ proposalID, durationMin: finalDur }),
@@ -233,7 +233,7 @@
       morphToPlaced(card, venueEl, topPx);
 
       try {
-        const resp = await fetch(`/admin/conf/${confTag}/schedule/place`, {
+        const resp = await fetch(`/${confTag}/admin/schedule/place`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -281,7 +281,7 @@
       morphToSidebar(card);
 
       try {
-        const resp = await fetch(`/admin/conf/${confTag}/schedule/unplace`, {
+        const resp = await fetch(`/${confTag}/admin/schedule/unplace`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ proposalID }),
