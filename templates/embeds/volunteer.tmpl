@@ -54,11 +54,12 @@
                     <div class="sm:col-span-2">
                         <label for="Hometown" class="block text-sm/6 font-semibold text-gray-900">I'll be traveling from... *</label>
                         <div class="mt-2.5">
-                            <input 
-                            name="Hometown" id="Hometown" type="text" 
+                            <input
+                            name="Hometown" id="Hometown" type="text"
                             autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false"
                             placeholder="Hometown, USA"
                             required
+                            {{ if .PrefillHometown }}value="{{ .PrefillHometown }}"{{ end }}
                             class="block w-full rounded-md bg-white px-3.5 py-2 text-base text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-bitcoin" />
                         </div>
                     </div>

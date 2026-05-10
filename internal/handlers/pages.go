@@ -115,6 +115,12 @@ type VolunteerPage struct {
         // already know about them. Nil when the form is opened
         // anonymously from the public conf page.
         Prefill   *types.Speaker
+        // PrefillHometown comes from SpeakerConf.ComingFrom for
+        // this conf when one exists — the speaker has already
+        // told us where they're traveling from for this event.
+        // Empty when there's no SpeakerConf or the field's blank;
+        // template treats that the same as "no pre-fill".
+        PrefillHometown string
         Year      uint
 }
 

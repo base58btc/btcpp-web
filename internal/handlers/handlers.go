@@ -1780,10 +1780,33 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                 // Silent fallback when params are absent / wrong /
                 // the user has no Speakers row — public visitors
                 // get the blank form.
+                //
+                // Hometown rides along from the SpeakerConf for
+                // THIS conf when one exists (the speaker has
+                // already volunteered Hometown there); falls back
+                // to blank otherwise.
                 var prefill *types.Speaker
+                var prefillHome string
                 if email, _, vErr := validateVolEmail(r, ctx); vErr == nil {
-                        if sps, sErr := getters.GetSpeakersByEmail(ctx.Notion, email); sErr == nil && len(sps) > 0 {
+                        sps, scs, sErr := getters.GetSpeakerConfsByEmail(ctx, email)
+                        if sErr == nil && len(sps) > 0 {
                                 prefill = sps[0]
+                        }
+                        if sErr == nil {
+                                for _, sc := range scs {
+                                        if sc == nil || sc.ComingFrom == "" {
+                                                continue
+                                        }
+                                        for _, p := range sc.Proposals {
+                                                if p != nil && p.ScheduleFor != nil && p.ScheduleFor.Ref == conf.Ref {
+                                                        prefillHome = sc.ComingFrom
+                                                        break
+                                                }
+                                        }
+                                        if prefillHome != "" {
+                                                break
+                                        }
+                                }
                         }
                 }
                 err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
@@ -1794,6 +1817,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
                         ConfItems: helpers.GetOtherConfs(confs, *conf),
                         DaysList:  conf.DaysList("days-", true),
                         Prefill:   prefill,
+                        PrefillHometown: prefillHome,
                         Year: helpers.CurrentYear(),
                 })
 
