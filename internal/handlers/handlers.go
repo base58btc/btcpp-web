@@ -870,6 +870,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		TalksGiftsClipartZip(w, r, app)
 	}).Methods("GET")
 
+	// Dev-only smoke endpoint for the self-hosted ICS pipeline.
+	// Production registrations of the route are blocked at the
+	// handler boundary (TrialCalInvite checks ctx.Env.Prod).
+	r.HandleFunc("/trial-cal-invite", func(w http.ResponseWriter, r *http.Request) {
+		TrialCalInvite(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/admin/orgs", func(w http.ResponseWriter, r *http.Request) {
 		OrgList(w, r, app)
 	}).Methods("GET")
