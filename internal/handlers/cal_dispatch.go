@@ -25,18 +25,21 @@ const (
 // builds a synthetic Talk view, and dispatches one calendar
 // invite to each speaker on the proposal. Used by the per-card
 // "Send / Resend / Update cal invite" button on the proposals
-// admin page.
+// admin page and by the auto-fire hooks (schedule changes,
+// speaker-add).
 //
-// Returns an error when the proposal isn't scheduled yet (no
-// ConfTalk row, or no Sched.End) — caller should surface that as
-// a flash so the admin knows nothing went out.
+// Returns nil when the proposal has no ConfTalk yet (auto-fire
+// callers blast through every status transition; "no ConfTalk →
+// nothing to invite" is the common case, not an error). Returns
+// an error only when a ConfTalk exists but is missing scheduled
+// times (a real misconfiguration).
 func DispatchTalkICSForProposal(ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, speakers []*types.Speaker, force bool) error {
 	if proposal == nil {
 		return fmt.Errorf("dispatchTalkICSForProposal: nil proposal")
 	}
 	ct := getters.FetchConfTalkByProposal(proposal.ID)
 	if ct == nil {
-		return fmt.Errorf("proposal %q is not scheduled (no ConfTalk row)", proposal.Title)
+		return nil // not scheduled — no calendar-side state to update
 	}
 	if ct.Sched == nil || ct.Sched.End == nil {
 		return fmt.Errorf("proposal %q has no scheduled time", proposal.Title)
@@ -51,6 +54,110 @@ func DispatchTalkICSForProposal(ctx *config.AppContext, proposal *types.Proposal
 		CalNotif:    ct.CalNotif,
 	}
 	return DispatchTalkICSForTalk(ctx, talk, conf, kindRequest, force)
+}
+
+// DispatchTalkICSCancelForProposal fires CANCEL ICS to every
+// speaker on a proposal whose ConfTalk currently has a non-empty
+// CalNotif. Used by the terminal-decline status transitions
+// (WeDecline / Rejected / TheyDecline) and by the schedule-unplace
+// path. Silent no-op when no CalNotif is set — that means no
+// invite was ever sent, so there's nothing to cancel.
+func DispatchTalkICSCancelForProposal(ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, speakers []*types.Speaker) error {
+	if proposal == nil {
+		return nil
+	}
+	ct := getters.FetchConfTalkByProposal(proposal.ID)
+	if ct == nil || ct.CalNotif == "" {
+		return nil
+	}
+	if ct.Sched == nil || ct.Sched.End == nil {
+		// CalNotif present but no scheduled times — odd state,
+		// but a CANCEL needs DTSTART/DTEND so we skip rather
+		// than render an invalid VEVENT.
+		ctx.Infos.Printf("dispatchTalkICSCancelForProposal %q: CalNotif set but no Sched.End — skipping CANCEL", proposal.Title)
+		return nil
+	}
+	talk := &types.Talk{
+		ID:          ct.ID,
+		Name:        proposal.Title,
+		Description: proposal.Description,
+		Sched:       ct.Sched,
+		Speakers:    speakers,
+		Venue:       ct.Venue,
+		CalNotif:    ct.CalNotif,
+	}
+	return DispatchTalkICSForTalk(ctx, talk, conf, kindCancel, false)
+}
+
+// DispatchTalkICSRemoved handles the speaker-removal flow:
+//
+//  1. Send a CANCEL ICS to the removed speaker so the event
+//     vanishes from their calendar.
+//  2. Send a force-bumped REQUEST to the remaining speakers so
+//     their copy of the event picks up the new (smaller) ATTENDEE
+//     list with an incremented SEQUENCE.
+//
+// `removedEmail` is the address to send the CANCEL to;
+// `remaining` is the slice of speakers still on the proposal
+// after the removal landed. Caller is responsible for filtering
+// out the removed speaker from `remaining` before calling.
+//
+// Silent no-op when the proposal has no ConfTalk or no CalNotif —
+// the removed speaker was never invited, nothing to cancel.
+func DispatchTalkICSRemoved(ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, removedEmail string, removedName string, remaining []*types.Speaker) error {
+	if proposal == nil {
+		return nil
+	}
+	ct := getters.FetchConfTalkByProposal(proposal.ID)
+	if ct == nil || ct.CalNotif == "" {
+		return nil
+	}
+	if ct.Sched == nil || ct.Sched.End == nil {
+		return nil
+	}
+
+	// CANCEL to the removed speaker. Build a single-attendee Talk
+	// view so DispatchTalkICSForTalk's per-recipient loop only
+	// fans to the one removed address.
+	if removedEmail != "" {
+		removedSpeaker := &types.Speaker{Email: removedEmail, Name: removedName}
+		cancelTalk := &types.Talk{
+			ID:          ct.ID,
+			Name:        proposal.Title,
+			Description: proposal.Description,
+			Sched:       ct.Sched,
+			Speakers:    []*types.Speaker{removedSpeaker},
+			Venue:       ct.Venue,
+			CalNotif:    ct.CalNotif,
+		}
+		if err := DispatchTalkICSForTalk(ctx, cancelTalk, conf, kindCancel, false); err != nil {
+			ctx.Err.Printf("dispatchTalkICSRemoved CANCEL %q → %s: %s", proposal.Title, removedEmail, err)
+			// Non-fatal — still try the REQUEST update below.
+		}
+	}
+
+	// REQUEST(force=true) to the remaining speakers so their
+	// copy of the event reflects the trimmed ATTENDEE list and
+	// advances SEQUENCE. The CANCEL above already bumped the
+	// sequence stored on CalNotif; re-fetching ensures we
+	// compose against the freshly-stamped state.
+	if len(remaining) == 0 {
+		return nil
+	}
+	updatedCT := getters.FetchConfTalkByProposal(proposal.ID)
+	if updatedCT == nil {
+		updatedCT = ct
+	}
+	updateTalk := &types.Talk{
+		ID:          updatedCT.ID,
+		Name:        proposal.Title,
+		Description: proposal.Description,
+		Sched:       updatedCT.Sched,
+		Speakers:    remaining,
+		Venue:       updatedCT.Venue,
+		CalNotif:    updatedCT.CalNotif,
+	}
+	return DispatchTalkICSForTalk(ctx, updateTalk, conf, kindRequest, true)
 }
 
 func (k dispatchKind) method() string {
@@ -309,6 +416,32 @@ func DispatchShiftICS(ctx *config.AppContext, shift *types.WorkShift, conf *type
 			shift.Name, method, seq, sentCount, len(recipients), stampHash)
 	}
 	return nil
+}
+
+// DispatchShiftICSCancelForVol fires a CANCEL ICS to one
+// volunteer for one shift. Used by the volunteer-unassign paths
+// (vol self-remove, vol declines volunteering, admin removes vol)
+// so the dropped shift vanishes from that volunteer's calendar
+// without disturbing the other assignees still on it.
+//
+// Silent no-op when the shift has no CalNotif (it was never
+// invited out) or when the volunteer's email is unknown.
+func DispatchShiftICSCancelForVol(ctx *config.AppContext, shift *types.WorkShift, conf *types.Conf, volEmail, volName string) error {
+	if shift == nil || conf == nil {
+		return nil
+	}
+	if shift.CalNotif == "" {
+		return nil
+	}
+	if volEmail == "" {
+		return nil
+	}
+	if shift.ShiftTime == nil || shift.ShiftTime.End == nil {
+		return nil
+	}
+	return DispatchShiftICS(ctx, shift, conf,
+		[]ics.Attendee{{Email: volEmail, Name: volName}},
+		kindCancel, false)
 }
 
 // DispatchOrientICS sends a one-off volunteer-orientation invite.
