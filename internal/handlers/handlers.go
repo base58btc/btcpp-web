@@ -167,36 +167,17 @@ func loadTemplates(ctx *config.AppContext) error {
 			// Group with thousands separators so "1,234,567 sats"
 			// reads more easily than "1234567". Negative values
 			// keep the minus before the digits.
-			neg := sats < 0
-			if neg {
-				sats = -sats
-			}
-			str := strconv.FormatInt(sats, 10)
-			n := len(str)
-			if n <= 3 {
-				if neg {
-					return "-" + str
-				}
-				return str
-			}
-			var b strings.Builder
-			pre := n % 3
-			if pre > 0 {
-				b.WriteString(str[:pre])
-				if n > pre {
-					b.WriteByte(',')
-				}
-			}
-			for i := pre; i < n; i += 3 {
-				b.WriteString(str[i : i+3])
-				if i+3 < n {
-					b.WriteByte(',')
-				}
-			}
-			if neg {
-				return "-" + b.String()
-			}
-			return b.String()
+			return groupSatsCommas(sats)
+		},
+		"satsBitcoin": func(sats int64) template.HTML {
+			// Same comma grouping as `sats`, but pads to 8 digits
+			// (BTC's sub-unit width) and wraps the leading zeros
+			// + their separator commas in <span class="text-gray-400">
+			// so the dashboard's affiliate amounts read as
+			// "00,012,345" with the meaningful "12,345" tail
+			// inheriting whatever color the surrounding paragraph
+			// uses (green for saved, indigo for earned).
+			return formatBitcoinAmount(sats)
 		},
 		"siteStats": func() siteStatsView {
 			return formatSiteStats(getters.FetchSiteStats(ctx))
@@ -1214,6 +1195,109 @@ func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, 
 	if err != nil {
 		ctx.Err.Printf("affiliate usage record %s for %s: %s", disc.CodeName, disc.AffiliateEmail, err)
 	}
+}
+
+// groupSatsCommas formats an int64 sat amount with thousands
+// separators, e.g. 1234567 → "1,234,567". Negative values keep the
+// minus before the grouped digits.
+func groupSatsCommas(sats int64) string {
+	neg := sats < 0
+	if neg {
+		sats = -sats
+	}
+	str := strconv.FormatInt(sats, 10)
+	n := len(str)
+	if n <= 3 {
+		if neg {
+			return "-" + str
+		}
+		return str
+	}
+	var b strings.Builder
+	pre := n % 3
+	if pre > 0 {
+		b.WriteString(str[:pre])
+		if n > pre {
+			b.WriteByte(',')
+		}
+	}
+	for i := pre; i < n; i += 3 {
+		b.WriteString(str[i : i+3])
+		if i+3 < n {
+			b.WriteByte(',')
+		}
+	}
+	if neg {
+		return "-" + b.String()
+	}
+	return b.String()
+}
+
+// formatBitcoinAmount renders a sat amount as a fixed-width 8-digit
+// comma-grouped string ("00,012,345"), with the leading zeros + their
+// adjacent commas wrapped in <span class="text-gray-400"> so the
+// surrounding paragraph color (e.g. text-green-700) only reaches the
+// significant digits. Amounts ≥ 1 BTC (≥ 1e8 sats) overflow the
+// 8-digit pad and render in full color, no leading-zero span.
+func formatBitcoinAmount(sats int64) template.HTML {
+	const padWidth = 8
+	neg := sats < 0
+	if neg {
+		sats = -sats
+	}
+	digits := strconv.FormatInt(sats, 10)
+	if len(digits) < padWidth {
+		digits = strings.Repeat("0", padWidth-len(digits)) + digits
+	}
+	grouped := groupDigitString(digits)
+
+	// Find first non-zero rune (commas excluded).
+	splitIdx := -1
+	for i := 0; i < len(grouped); i++ {
+		c := grouped[i]
+		if c >= '1' && c <= '9' {
+			splitIdx = i
+			break
+		}
+	}
+	prefix := ""
+	if neg {
+		prefix = "-"
+	}
+	if splitIdx < 0 {
+		// All zeros.
+		return template.HTML(fmt.Sprintf(`%s<span class="text-gray-400">%s</span>`, prefix, grouped))
+	}
+	if splitIdx == 0 {
+		return template.HTML(prefix + grouped)
+	}
+	return template.HTML(fmt.Sprintf(`%s<span class="text-gray-400">%s</span>%s`, prefix, grouped[:splitIdx], grouped[splitIdx:]))
+}
+
+// groupDigitString inserts thousands separators into a digits-only
+// string, leaving any leading zeros in place. groupSatsCommas drops
+// leading zeros via FormatInt; this variant preserves them so the
+// padded BTC display ("00,012,345") groups correctly.
+func groupDigitString(digits string) string {
+	n := len(digits)
+	if n <= 3 {
+		return digits
+	}
+	var b strings.Builder
+	pre := n % 3
+	if pre > 0 {
+		b.WriteString(digits[:pre])
+		if n > pre {
+			b.WriteByte(',')
+		}
+	}
+	for i := pre; i < n; i += 3 {
+		b.WriteString(digits[i : i+3])
+		if i+3 < n {
+			b.WriteByte(',')
+		}
+	}
+	return b.String()
 }
 
 func calcTixHMAC(ctx *config.AppContext, conf *types.Conf, tixPrice uint, discountPrice uint, discountCode string) string {
