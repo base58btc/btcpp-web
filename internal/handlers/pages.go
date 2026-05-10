@@ -274,17 +274,22 @@ type AffiliateStats struct {
 }
 
 // OrganizerDashboardPage drives /admin/conf/{tag}/ — the per-event
-// organizer landing.
+// organizer landing. Tiles are conditionally rendered against the
+// IsConf* flags so a staff user lands on a slimmer page than an
+// admin (no review/applicants/sponsors/social/email).
 type OrganizerDashboardPage struct {
         Conf            *types.Conf
         PendingCount    int
         DecisionedCount int
         FlashMessage    string
         // IsGlobalAdmin gates a couple of tiles (e.g. speaker gifts
-        // CSV) whose destination route is global-admin only — hide
-        // the link rather than render a tile that 404s for a
-        // conf-only admin.
+        // CSV) whose destination is global-admin only.
         IsGlobalAdmin   bool
+        // IsConfAdmin: full per-conf admin tier — sees every tile.
+        IsConfAdmin     bool
+        // IsConfVolcoord: surface the volcoord tile. admin implies
+        // volcoord at the same scope, so admins always have this.
+        IsConfVolcoord  bool
         Year            uint
 }
 
@@ -673,6 +678,9 @@ type RegistrationsAdminPage struct {
         Conf          *types.Conf
         Registrations []*types.Registration
         FlashMessage  string
+        // IsConfAdmin gates the email composer. Staff get the
+        // attendee roster (read-only) but no bulk-email power.
+        IsConfAdmin   bool
         Year          uint
         EmailCompose  *EmailComposeData
 }
@@ -694,6 +702,10 @@ type SpeakerAdminPage struct {
         Conf           *types.Conf
         Rows           []*SpeakerRow
         FlashMessage   string
+        // IsConfAdmin gates the email composer + send-calendar
+        // buttons. Staff (read-only) see the speaker roster but
+        // can't email or fan out calendar invites.
+        IsConfAdmin    bool
         Year           uint
         EmailCompose   *EmailComposeData
 }

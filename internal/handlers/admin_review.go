@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
@@ -55,7 +56,10 @@ type reviewAction struct {
 // /admin/conf/{tag}/. Hub for everything organizer-y for one
 // conference: review applications today, more tools as we add them.
 func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	id := requireConfAdmin(w, r, ctx)
+	// staff is the lowest tier that should land here; admins/
+	// volcoords also satisfy. The template uses the IsConfAdmin /
+	// IsConfVolcoord flags below to gate sensitive tiles.
+	id := requireConfStaff(w, r, ctx)
 	if id == nil {
 		return
 	}
@@ -65,7 +69,16 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		return
 	}
 
-	pending, decisioned := splitProposalsByPending(loadConfProposals(ctx, conf))
+	// Pending-review counts are admin-only data (a staff visitor
+	// shouldn't see "12 talks pending decision"). Skip the load
+	// when they don't have the role.
+	isAdmin := id.HasRoleForConf(conf.Tag, auth.RoleAdmin)
+	var pendingCount, decisionedCount int
+	if isAdmin {
+		pending, decisioned := splitProposalsByPending(loadConfProposals(ctx, conf))
+		pendingCount = len(pending)
+		decisionedCount = len(decisioned)
+	}
 
 	// Populate countdown bounds (doors-open / doors-close) on a
 	// shallow copy of conf so the cached pointer isn't mutated.
@@ -79,10 +92,12 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "admin/conf_dashboard.tmpl", &OrganizerDashboardPage{
 		Conf:            &confCopy,
-		PendingCount:    len(pending),
-		DecisionedCount: len(decisioned),
+		PendingCount:    pendingCount,
+		DecisionedCount: decisionedCount,
 		FlashMessage:    r.URL.Query().Get("flash"),
 		IsGlobalAdmin:   id.IsGlobalAdmin(),
+		IsConfAdmin:     isAdmin,
+		IsConfVolcoord:  id.HasRoleForConf(conf.Tag, auth.RoleVolcoord),
 		Year:            helpers.CurrentYear(),
 	})
 	if err != nil {

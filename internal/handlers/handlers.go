@@ -26,6 +26,7 @@ import (
 	"btcpp-web/external/getters"
 	"btcpp-web/external/google"
 	"btcpp-web/external/spaces"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/helpers"
@@ -5111,7 +5112,8 @@ func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 }
 
 func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	id := requireConfStaff(w, r, ctx)
+	if id == nil {
 		return
 	}
 
@@ -5152,6 +5154,7 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		Conf:         conf,
 		Rows:         rows,
 		FlashMessage: r.URL.Query().Get("flash"),
+		IsConfAdmin:  id.HasRoleForConf(conf.Tag, auth.RoleAdmin),
 		Year:         helpers.CurrentYear(),
 		EmailCompose: &EmailComposeData{
 			Title:            "Email Selected Speakers",
@@ -5270,7 +5273,8 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 }
 
 func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	id := requireConfStaff(w, r, ctx)
+	if id == nil {
 		return
 	}
 
@@ -5316,6 +5320,7 @@ func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		Conf:          conf,
 		Registrations: unique,
 		FlashMessage:  r.URL.Query().Get("flash"),
+		IsConfAdmin:   id.HasRoleForConf(conf.Tag, auth.RoleAdmin),
 		Year:          helpers.CurrentYear(),
 		EmailCompose: &EmailComposeData{
 			Title:            "Email Attendees",

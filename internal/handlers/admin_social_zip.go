@@ -26,7 +26,7 @@ import (
 // with the same slug, or a speaker on multiple talks) are suffixed
 // "-2", "-3" so nothing overwrites.
 func AdminSocialCardsZip(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	if id := requireConfStaff(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)

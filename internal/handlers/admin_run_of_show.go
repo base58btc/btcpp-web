@@ -57,7 +57,7 @@ func venueLabel(confTag, raw string) string {
 // timeline table interleaving ConfInfo events (doors, coffee, lunch),
 // volunteer shifts, and conference talks. Read-only; no writes.
 func RunOfShowAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	if id := requireConfStaff(w, r, ctx); id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)

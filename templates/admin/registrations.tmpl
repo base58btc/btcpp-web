@@ -37,15 +37,17 @@
                 </div>
             </section>
 
-            <form method="POST" action="/{{ .Conf.Tag }}/admin/registrations/email">
+            {{ if .IsConfAdmin }}<form method="POST" action="/{{ .Conf.Tag }}/admin/registrations/email">{{ end }}
             <section id="registrations-table" class="mb-6">
                 <div class="bg-white shadow rounded-lg overflow-hidden">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                {{ if .IsConfAdmin }}
                                 <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
                                     <input type="checkbox" onclick="toggleAll(this)" class="rounded border-gray-300">
                                 </th>
+                                {{ end }}
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ticket</th>
@@ -54,9 +56,11 @@
                         <tbody class="bg-white divide-y divide-gray-200">
                             {{ range .Registrations }}
                             <tr class="hover:bg-gray-50">
+                                {{ if $.IsConfAdmin }}
                                 <td class="px-3 py-4">
                                     <input type="checkbox" name="reg_emails" value="{{ .Email }}" class="reg-checkbox rounded border-gray-300">
                                 </td>
+                                {{ end }}
                                 <td class="px-6 py-4 text-sm text-gray-900">{{ .Email }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ .Type }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ .ItemBought }}</td>
@@ -70,8 +74,10 @@
                 </div>
             </section>
 
+            {{ if .IsConfAdmin }}
             {{ template "email_compose" .EmailCompose }}
             </form>
+            {{ end }}
             {{ else }}
             <section class="mb-6">
                 <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6 text-center text-gray-500">

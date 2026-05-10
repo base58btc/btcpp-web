@@ -11,6 +11,7 @@ import (
 
 	"btcpp-web/external/getters"
 	"btcpp-web/external/spaces"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/imgproc"
@@ -30,6 +31,10 @@ type HotelAdminPage struct {
 	Slots        []*HotelSlot
 	FlashMessage string
 	FlashError   string
+	// IsConfAdmin gates the edit form. Staff get a read-only view
+	// of the same four rows; the Save / Upload / Delete controls
+	// only render for admins (and the POST handlers gate too).
+	IsConfAdmin  bool
 	Year         uint
 }
 
@@ -43,9 +48,13 @@ type HotelSlot struct {
 	SuggestedOrder int
 }
 
-// HotelsAdmin renders the manager page.
+// HotelsAdmin renders the manager page. Read access only — saves +
+// image uploads stay behind requireConfAdmin (HotelsAdminSave,
+// HotelImageUpload), so staff can view the booking matrix without
+// being able to overwrite it.
 func HotelsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireConfAdmin(w, r, ctx); id == nil {
+	id := requireConfStaff(w, r, ctx)
+	if id == nil {
 		return
 	}
 	conf, err := helpers.FindConf(r, ctx)
@@ -60,6 +69,7 @@ func HotelsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		Slots:        buildHotelSlots(hotels),
 		FlashMessage: r.URL.Query().Get("flash"),
 		FlashError:   r.URL.Query().Get("error"),
+		IsConfAdmin:  id.HasRoleForConf(conf.Tag, auth.RoleAdmin),
 		Year:         helpers.CurrentYear(),
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/hotels.tmpl", page); err != nil {
