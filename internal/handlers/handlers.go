@@ -24,7 +24,6 @@ import (
 
 	"btcpp-web/external/coingecko"
 	"btcpp-web/external/getters"
-	"btcpp-web/external/google"
 	"btcpp-web/external/spaces"
 	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
@@ -599,23 +598,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/check-in/{ticket}", func(w http.ResponseWriter, r *http.Request) {
 		CheckIn(w, r, app)
 	}).Methods("GET", "POST")
-
-	r.HandleFunc("/auth-login", func(w http.ResponseWriter, r *http.Request) {
-		redirectTo := app.Session.GetString(r.Context(), "r")
-		app.Infos.Printf("login called, redirect to %s", redirectTo)
-		google.HandleLogin(w, r, app, redirectTo)
-	}).Methods("GET")
-
-	r.HandleFunc("/gcal-callback", func(w http.ResponseWriter, r *http.Request) {
-		redirectTo := app.Session.GetString(r.Context(), "r")
-		app.Infos.Printf("gcal-callback called, redirect to %s", redirectTo)
-
-		ok := google.HandleLoginCallback(w, r, app)
-		if ok {
-			http.Redirect(w, r, redirectTo, http.StatusFound)
-		}
-		// FIXME: what if not ok to login?
-	}).Methods("GET")
 
 	r.HandleFunc("/i/{conf}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfAdmin(w, r, app); id == nil {

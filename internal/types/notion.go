@@ -24,7 +24,6 @@ type (
 		DiscountsDb  string
 		NewsletterDb string
 		MissivesDb   string
-		TokenDb      string
 		HotelsDb     string
 		VolunteerDb  string
 		JobTypeDb    string

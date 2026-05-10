@@ -27,7 +27,6 @@ type (
 		LogFile           string
 		Notion            NotionConfig
 		SendGrid          SendGridConfig
-		Google            GoogleConfig
 		OpenNode          OpenNodeConfig
 		Host              string
 		LocalExternal     string
@@ -36,11 +35,6 @@ type (
 		BufferAPI         string
 		Spaces            SpacesConfig
 		CacheTTLSec       int
-	}
-
-	GoogleConfig struct {
-		Key    string
-		Config string
 	}
 
 	Conf struct {
@@ -373,12 +367,6 @@ type (
 	}
 
 	ShirtSize string
-
-	AuthToken struct {
-		CreatedAt *time.Time
-		Token     string
-	}
-	AuthTokens []*AuthToken
 
 	DayTime int
 
@@ -921,28 +909,6 @@ func (s ConfTickets) Less(i, j int) bool {
 	return s[i].Expires.Start.Before(s[j].Expires.Start)
 }
 
-/* Functions to sort AuthTokens */
-func (at AuthTokens) Len() int {
-	return len(at)
-}
-
-func (at AuthTokens) Swap(i, j int) {
-	at[i], at[j] = at[j], at[i]
-}
-
-/* I want most recent first */
-func (at AuthTokens) Less(i, j int) bool {
-	/* Sort by time */
-	if at[i].CreatedAt == nil && at[j].CreatedAt == nil {
-		return false
-	} else if at[j].CreatedAt == nil {
-		return true
-	} else if at[i].CreatedAt == nil {
-		return false
-	}
-
-	return (*at[j].CreatedAt).Before(*at[i].CreatedAt)
-}
 
 /* Functions to sort Speakers */
 func (s Speakers) Len() int {

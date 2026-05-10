@@ -12,7 +12,6 @@ import (
 
 	"btcpp-web/external/buffer"
 	"btcpp-web/external/getters"
-	"btcpp-web/external/google"
 	"btcpp-web/external/spaces"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
@@ -71,7 +70,6 @@ func loadConfig() *types.EnvConfig {
 			DiscountsDb:  os.Getenv("NOTION_DISCOUNT_DB"),
 			NewsletterDb: os.Getenv("NOTION_NEWSLETTER_DB"),
 			MissivesDb:   os.Getenv("NOTION_MISSIVES_DB"),
-			TokenDb:      os.Getenv("NOTION_TOKEN_DB"),
 			HotelsDb:     os.Getenv("NOTION_HOTEL_DB"),
 			VolunteerDb:     os.Getenv("NOTION_VOLUNTEER_DB"),
 			JobTypeDb:     os.Getenv("NOTION_JOBTYPE_DB"),
@@ -87,11 +85,6 @@ func loadConfig() *types.EnvConfig {
 			SocialPostsDb:  os.Getenv("NOTION_SOCIAL_POSTS_DB"),
 			AffiliateUsageDb: os.Getenv("NOTION_AFFILIATE_USE_DB"),
 		}
-		config.Google = types.GoogleConfig{
-			Key:    os.Getenv("GOOGLE_KEY"),
-			Config: os.Getenv("GOOGLE_CONFIG"),
-		}
-
 		config.BufferAPI = os.Getenv("BUFFER_KEY")
 
 		config.Spaces = types.SpacesConfig{
@@ -145,9 +138,6 @@ func main() {
 	/* Load cached data */
 	getters.WaitFetch(&app)
 	getters.StartWorkPool(&app)
-
-	/* Start up Google stuffs */
-	google.InitOauth(&app)
 
 	/* Start up Buffer */
 	buffer.Init(app.Env.BufferAPI)
