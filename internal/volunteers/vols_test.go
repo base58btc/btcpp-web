@@ -1,6 +1,7 @@
 package volunteers
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -315,4 +316,102 @@ func refsOf(vols []*types.Volunteer) []string {
 		refs[i] = v.Ref
 	}
 	return refs
+}
+
+// volWithCreatedAt builds a bare Volunteer used by the
+// volsByShiftCount.Less tests. nil createdAt is allowed — the
+// purpose of the test is to confirm the comparator doesn't deref
+// nil pointers (regression: berlin26 auto-assign crash).
+func volWithCreatedAt(ref string, shifts int, createdAt *time.Time) *types.Volunteer {
+	work := make([]*types.WorkShift, shifts)
+	return &types.Volunteer{
+		Ref:        ref,
+		WorkShifts: work,
+		CreatedAt:  createdAt,
+	}
+}
+
+// TestVolsByShiftCount_NilCreatedAtNoPanic confirms the
+// nil-CreatedAt guards in volsByShiftCount.Less. Pre-fix this
+// crashed sort.pdqsort when running auto-assign against a
+// volunteer set where any row had CreatedAt == nil.
+func TestVolsByShiftCount_NilCreatedAtNoPanic(t *testing.T) {
+	jan := tmPtr(2026, 1, 15, 9, 0)
+	feb := tmPtr(2026, 2, 15, 9, 0)
+
+	cases := []struct {
+		name string
+		vols []*types.Volunteer
+		// wantFirst is the ref of the volunteer that should
+		// land in position 0 after the sort, used to confirm
+		// the "nils sort last" tie-breaker. Empty when the
+		// shift-count diff alone fixes the order.
+		wantFirst string
+	}{
+		{
+			name: "both CreatedAt nil — comparator must not deref",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("a", 1, nil),
+				volWithCreatedAt("b", 1, nil),
+			},
+		},
+		{
+			name: "i nil, j set — nil-i sorts after j",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("nil-i", 1, nil),
+				volWithCreatedAt("has-j", 1, jan),
+			},
+			wantFirst: "has-j",
+		},
+		{
+			name: "i set, j nil — non-nil-i sorts before nil-j",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("has-i", 1, jan),
+				volWithCreatedAt("nil-j", 1, nil),
+			},
+			wantFirst: "has-i",
+		},
+		{
+			name: "both set, earlier wins",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("later", 1, feb),
+				volWithCreatedAt("earlier", 1, jan),
+			},
+			wantFirst: "earlier",
+		},
+		{
+			name: "mixed nils across a wider slice — sort must not panic",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("a", 2, jan),
+				volWithCreatedAt("nil-1", 2, nil),
+				volWithCreatedAt("b", 2, feb),
+				volWithCreatedAt("nil-2", 2, nil),
+				volWithCreatedAt("c", 2, tmPtr(2026, 3, 1, 9, 0)),
+			},
+			wantFirst: "a",
+		},
+		{
+			name: "shift-count diff dominates over CreatedAt; nil still safe",
+			vols: []*types.Volunteer{
+				volWithCreatedAt("few-nil", 1, nil),
+				volWithCreatedAt("many", 3, feb),
+			},
+			wantFirst: "many",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("comparator panicked: %v", r)
+				}
+			}()
+			sort.Sort(volsByShiftCount(tc.vols))
+			if tc.wantFirst != "" && tc.vols[0].Ref != tc.wantFirst {
+				t.Errorf("got first=%q want %q (full order: %v)",
+					tc.vols[0].Ref, tc.wantFirst, refsOf(tc.vols))
+			}
+		})
+	}
 }
