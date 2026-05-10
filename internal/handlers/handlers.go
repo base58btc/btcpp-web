@@ -823,6 +823,13 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		http.Redirect(w, r, target, http.StatusFound)
 	}).Methods("GET", "POST")
 
+	r.HandleFunc("/dashboard/vol/{shiftRef}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
+		DashboardVolShiftICS(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/vol/{conf}/shifts/resend-invites", func(w http.ResponseWriter, r *http.Request) {
+		DashboardVolShiftsResend(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/vols/shift/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerShiftSignup(w, r, app)
 	}).Methods("GET")

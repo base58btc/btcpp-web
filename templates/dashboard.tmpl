@@ -438,6 +438,7 @@
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                 <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
+                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"><span class="sr-only">Calendar</span></th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -449,6 +450,16 @@
                   {{ .Name }}
                   {{ if .Type }}
                   <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">{{ .Type.Title }}</span>
+                  {{ end }}
+                </td>
+                <td class="px-4 py-2 whitespace-nowrap text-right">
+                  {{ if and .ShiftTime .ShiftTime.End (isFuture .ShiftTime.Start) }}
+                  <a href="/dashboard/vol/{{ .Ref }}/calendar.ics?hr={{ $.HMAC }}&em={{ $.Email }}"
+                     title="Add this shift to your calendar"
+                     class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-600 text-white hover:bg-teal-700">
+                    <span aria-hidden="true">📅</span>
+                    <span class="hidden sm:inline">Add to calendar</span>
+                  </a>
                   {{ end }}
                 </td>
               </tr>
@@ -467,6 +478,15 @@
              class="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50">View/edit shifts</a>
           <a href="/ticket/{{ $vol.TicketRef }}/pdf?type=volunteer&conf={{ $conf.Ref }}"
              class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded text-orange-700 bg-orange-100 hover:bg-orange-200">Download volunteer ticket</a>
+          {{ if $vol.WorkShifts }}
+          <form method="POST" action="/dashboard/vol/{{ $conf.Tag }}/shifts/resend-invites?hr={{ $.HMAC }}&em={{ $.Email }}" class="inline">
+            <button type="submit"
+                    class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded text-white bg-teal-600 hover:bg-teal-700"
+                    onclick="return confirm('Re-send the calendar invite emails for all your shifts at {{ $conf.Desc }}?');">
+              📅 Resend Cal Invites for Shifts
+            </button>
+          </form>
+          {{ end }}
           {{ else if eq $vol.Status "Applied" }}
           <p class="text-sm text-gray-600">Your application has been received! Shift selection will open soon.</p>
           {{ else if eq $vol.Status "Waitlist" }}
