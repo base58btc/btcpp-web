@@ -613,21 +613,21 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 
 	/* /conf/* legacy paths — 301 to the new short form. Captures
-	   /{tag}, /{tag}/talks, /{tag}/talk/{anchor}/calendar.ics,
-	   /{tag}/success. The handler relocates the leading "/conf"
+	   /conf/{tag}, /conf/{tag}/talks, /conf/{tag}/talk/{anchor}/calendar.ics,
+	   /conf/{tag}/success. The handler relocates the leading "/conf"
 	   prefix; any preserved query string + hash fragment carries
 	   through (the fragment never reaches the server but the
 	   browser preserves it across a 301). */
-	r.HandleFunc("/{conf}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
 		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-	r.HandleFunc("/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/conf/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
 		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-	r.HandleFunc("/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/conf/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
 		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-	r.HandleFunc("/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/conf/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
 		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
 
