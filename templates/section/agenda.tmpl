@@ -142,7 +142,7 @@
     {{ if .Sched }}{{ .Sched.Start.Format "3:04 pm" }}{{ end }}
   </div>
   <div class="min-w-0 flex-1">
-    <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" class="text-sm font-semibold text-gray-900 hover:text-gray-700 block truncate">{{ .Name }}</a>
+    <a href="/{{ .ConfTag }}/talks#{{ .AnchorTag }}" class="text-sm font-semibold text-gray-900 hover:text-gray-700 block truncate">{{ .Name }}</a>
     {{ if .Speakers }}
     <div class="mt-1 flex items-center gap-2">
       <div class="flex -space-x-1.5 shrink-0">
@@ -167,7 +167,7 @@
       "StartISO" (rfc3339 .Sched.Start)
       "EndISO"   (rfc3339 .Sched.End)
       "Location" (mapVenue .Venue)
-      "ICSURL"   (printf "/conf/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
+      "ICSURL"   (printf "/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
       "Compact"  true
     ) }}
     {{ end }}

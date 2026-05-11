@@ -3,11 +3,44 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
 )
+
+// staticCache wraps an http.Handler with a 1-hour Cache-Control
+// header so browsers can serve repeat-visitor /static/* assets from
+// cache without revalidating. http.FileServer still emits
+// Last-Modified, so a deploy invalidates stale assets via a
+// conditional GET → 304 cycle once the hour elapses.
+//
+// Short max-age (3600s) is deliberate: mini.css has no content-hash
+// in the filename, so a longer window could leave visitors on stale
+// CSS after a Tailwind rebuild. Move to a fingerprinted-filename
+// strategy if we want to push max-age much higher.
+func staticCache(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		h.ServeHTTP(w, r)
+	})
+}
+
+// redirectStripConfPrefix 301-redirects from the legacy `/{tag}*`
+// URL form to the canonical `/{tag}*` short form. The handler only
+// rewrites the path; query string carries through, and the browser
+// preserves the hash fragment across the redirect on its own.
+func redirectStripConfPrefix(w http.ResponseWriter, r *http.Request) {
+	target := strings.TrimPrefix(r.URL.Path, "/conf")
+	if target == "" || target[0] != '/' {
+		target = "/" + target
+	}
+	if r.URL.RawQuery != "" {
+		target = target + "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusMovedPermanently)
+}
 
 // SEOHost is the canonical absolute base used in robots.txt + sitemap
 // + OG tags. Hardcoded to match what's already baked into the
@@ -31,7 +64,7 @@ func Robots(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 // daily changefreq and higher priority, ended confs a monthly /
 // lower priority so crawl budget skews to current campaigns.
 //
-// Conf-talks page (`/conf/{tag}/talks`) is only included when at
+// Conf-talks page (`/{tag}/talks`) is only included when at
 // least one of the conf's talks is Status=Scheduled — same gate as
 // the nav-bar link, so the sitemap never points at a soft-empty
 // page.
@@ -74,13 +107,13 @@ func Sitemap(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			prio = "0.9"
 			freq = "daily"
 		}
-		writeSitemapURL(w, SEOHost+"/conf/"+c.Tag, today, freq, prio)
+		writeSitemapURL(w, SEOHost+"/"+c.Tag, today, freq, prio)
 		// Talks page is gated on Conf.HasAgenda — populated at
 		// render time, not on the cached Conf, so compute it here
 		// against the live talks slice.
 		talks, _ := getters.GetTalksFor(ctx, c.Tag)
 		if anyScheduledTalk(talks) {
-			writeSitemapURL(w, SEOHost+"/conf/"+c.Tag+"/talks", today, freq, "0.6")
+			writeSitemapURL(w, SEOHost+"/"+c.Tag+"/talks", today, freq, "0.6")
 		}
 	}
 

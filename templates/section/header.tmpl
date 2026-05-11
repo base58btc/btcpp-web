@@ -9,15 +9,17 @@
     <script>
       // Salvage misplaced ?code= from the URL fragment. Visitors
       // who hand-build share links sometimes write
-      //   /conf/{tag}#tickets?code=X
+      //   /{tag}#tickets?code=X
       // instead of the standard
-      //   /conf/{tag}?code=X#tickets.
+      //   /{tag}?code=X#tickets.
       // The server only sees the query string (not the fragment),
       // so the misplaced form would silently lose the discount.
       // Detect on load and bounce to the canonical shape so the
       // server-side stash logic (RenderConf) picks it up.
       (function () {
-        if (!window.location.pathname.startsWith('/conf/')) return;
+        // No path-prefix gate — code= in the hash is a no-op on any
+        // page that isn't a conf landing, and the inner regex bails
+        // when no code is present, so running everywhere is cheap.
         const m = window.location.hash.match(/[#?&]code=([^#?&]+)/);
         if (!m) return;
         const code = decodeURIComponent(m[1]);

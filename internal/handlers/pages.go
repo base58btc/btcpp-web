@@ -57,6 +57,12 @@ type ConfPage struct {
 	// scheduled talks yet.
 	AgendaDays []*AgendaDay
 
+	// ScheduledSessions is AgendaDays' .All flattened into a single
+	// chrono-ordered slice — used by the JSON-LD Event subEvent[]
+	// emission so the template can comma-separate without nested-
+	// range gymnastics. Nil when no talks are Scheduled yet.
+	ScheduledSessions []*types.Session
+
 	Year uint
 }
 
@@ -75,7 +81,7 @@ type TixFormPage struct {
 	DiscountPrice uint
 	DiscountRef   string
 	// AffiliateCode is the silent (`%0`) referral code stashed
-	// from a /conf/{tag}?code= visit. Carried through the form
+	// from a /{tag}?code= visit. Carried through the form
 	// as a hidden input — the visible Discount field stays empty
 	// for silent codes, but the affiliate still gets credit on
 	// successful checkout. Buyer typing a code into Discount
@@ -270,7 +276,7 @@ type DashboardPage struct {
         AffiliateStats *AffiliateStats
         // BaseURI is the absolute site root used to build full
         // affiliate share URLs the user can copy from per-event
-        // cards (e.g. https://btcpp.dev/conf/vienna?code=NIFTY10).
+        // cards (e.g. https://btcpp.dev/vienna?code=NIFTY10).
         BaseURI        string
 
         Year uint
@@ -287,7 +293,7 @@ type AffiliateStats struct {
         EarnedSats  int64
 }
 
-// OrganizerDashboardPage drives /admin/conf/{tag}/ — the per-event
+// OrganizerDashboardPage drives /admin/{tag}/ — the per-event
 // organizer landing. Tiles are conditionally rendered against the
 // IsConf* flags so a staff user lands on a slimmer page than an
 // admin (no review/applicants/sponsors/social/email).
@@ -385,7 +391,7 @@ type RunOfShowRow struct {
         VenueTag string // raw venue tag for per-venue visibility toggle
 }
 
-// ReviewProposalPage drives /admin/conf/{tag}/review — the
+// ReviewProposalPage drives /admin/{tag}/review — the
 // walkthrough page for individual proposal decisions. Current is nil
 // when the queue is empty (template renders an empty state).
 type ReviewProposalPage struct {
@@ -400,7 +406,7 @@ type ReviewProposalPage struct {
         Year         uint
 }
 
-// AdminInviteSpeakerPage drives /admin/conf/{tag}/invite-speaker —
+// AdminInviteSpeakerPage drives /admin/{tag}/invite-speaker —
 // the form an organizer uses to originate a speaker invitation.
 // PresentationTypes is the talk-length enum reused from the public
 // apply form; AttachableProposals is the conf's current Invited /
@@ -435,7 +441,7 @@ type AdminInviteSpeakerSentPage struct {
         Year        uint
 }
 
-// AdminSchedulePage drives /admin/conf/{tag}/schedule — the drag-and-drop
+// AdminSchedulePage drives /admin/{tag}/schedule — the drag-and-drop
 // schedule editor.
 type AdminSchedulePage struct {
         Conf         *types.Conf

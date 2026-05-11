@@ -4,6 +4,7 @@
 	<title>{{ .Conf.Desc }} || {{ .Conf.DateDesc }}</title>
     {{ block "header" . }} {{ end }}
     {{ block "og_tags" .Conf }} {{ end }}
+    {{ block "event_jsonld" . }} {{ end }}
   </head>
 <body>
 {{ block "conf_nav" .Conf }} {{ end }}

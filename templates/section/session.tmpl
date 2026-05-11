@@ -23,7 +23,7 @@
             "StartISO" (rfc3339 .Sched.Start)
             "EndISO"   (rfc3339 .Sched.End)
             "Location" (mapVenue .Venue)
-            "ICSURL"   (printf "/conf/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
+            "ICSURL"   (printf "/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
             "IconOnly" true
           ) }}
         </div>
@@ -61,7 +61,7 @@
           </div>
           {{ end }}
         </div>
-        <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" class="shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin">
+        <a href="/{{ .ConfTag }}/talks#{{ .AnchorTag }}" class="shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bitcoin">
         <h3 class="mt-3 text-lg font-semibold leading-6 text-white">
             <span class="absolute inset-0"></span>
             {{ .Name }}

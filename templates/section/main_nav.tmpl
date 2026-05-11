@@ -169,7 +169,7 @@
               </button>
               <div class="mt-2 space-y-2" role="mobile-flyout-current">
                 {{ range $nav.Upcoming }}
-                <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">
+                <a onclick="toggleMenu(this)" href="/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-gray-900 hover:bg-gray-50">
                   <span class="text-lg leading-none">{{ .EmojiOrDefault }}</span>
                   <span>{{ .Desc }} | {{ .DateDesc }}</span>
                 </a>
@@ -184,7 +184,7 @@
               </button>
               <div class="hidden mt-2 space-y-2" role="mobile-flyout-past">
                 {{ range $nav.Past }}
-                <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">
+                <a onclick="toggleMenu(this)" href="/{{ .Tag }}" class="flex items-center gap-2 rounded-lg py-2 pl-6 pr-3 text-sm font-semibold leading-7 text-neutral-600 hover:bg-gray-50">
                   <span class="text-lg leading-none">{{ .EmojiOrDefault }}</span>
                   <span>{{ .Desc }} | {{ .DateDesc }}</span>
                 </a>
@@ -212,7 +212,7 @@
   lines: title / tagline / date.
 */}}
 {{ define "nav_conf_card" }}
-<a href="/conf/{{ .Tag }}" class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
+<a href="/{{ .Tag }}" class="group relative rounded-lg p-3 text-sm leading-6 hover:bg-orange-50 flex items-start gap-3">
   <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-50 group-hover:bg-white text-lg">
     {{ .EmojiOrDefault }}
   </div>

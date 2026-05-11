@@ -10,7 +10,7 @@ import (
 // adminPathRedirects 301-redirects every legacy admin path to its
 // new home under /{conf}/{role}/...:
 //
-//	/admin/conf/{conf}/...        →  /{conf}/admin/...
+//	/admin/{conf}/...        →  /{conf}/admin/...
 //	/admin/applicants/{conf}/...  →  /{conf}/admin/applicants/...
 //	/admin/speakers/{conf}/...    →  /{conf}/admin/speakers/...
 //	/admin/registrations/{conf}/...→ /{conf}/admin/registrations/...
@@ -28,7 +28,7 @@ func adminPathRedirects() []struct {
 	old, new string
 } {
 	return []struct{ old, new string }{
-		{"/admin/conf/{conf}", "/{conf}/admin"},
+		{"/admin/{conf}", "/{conf}/admin"},
 		{"/admin/applicants/{conf}", "/{conf}/admin/applicants"},
 		{"/admin/speakers/{conf}", "/{conf}/admin/speakers"},
 		{"/admin/registrations/{conf}", "/{conf}/admin/registrations"},

@@ -1,0 +1,71 @@
+{{/*
+  event_jsonld — Schema.org Event JSON-LD for conf pages. Lets Google
+  surface the conference (and each scheduled talk as a SubEvent) in
+  rich SERP cards + the Search Console "Events" report.
+
+  Takes the full *ConfPage as data (uses .Conf + .EventSpeakers +
+  .ScheduledSessions). Safe to render unconditionally: subEvent[] is
+  emitted only when ScheduledSessions is non-empty, and performer[]
+  only when EventSpeakers is non-empty.
+
+  String fields go through {{ jsonStr }} (JSON encode + quote);
+  timestamps go through {{ jsonDate }} (RFC 3339 or `null`).
+*/}}
+{{ define "event_jsonld" }}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Event",
+  "name": {{ jsonStr .Conf.Desc }},
+  "description": {{ jsonStr .Conf.OGFlavor }},
+  "startDate": {{ jsonDate .Conf.StartDate }},
+  "endDate": {{ jsonDate .Conf.EndDate }},
+  "eventStatus": "https://schema.org/EventScheduled",
+  "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+  "location": {
+    "@type": "Place",
+    "name": {{ jsonStr .Conf.Venue }},
+    "address": {{ jsonStr .Conf.Location }}{{ if .Conf.VenueWebsite }},
+    "url": {{ jsonStr .Conf.VenueWebsite }}{{ end }}
+  },
+  "image": {{ jsonStr (printf "https://btcpp.dev/static/img/%s/og_card_standard.png" .Conf.Tag) }},
+  "url": {{ jsonStr (printf "https://btcpp.dev/%s" .Conf.Tag) }},
+  "organizer": {
+    "@type": "Organization",
+    "name": "bitcoin++",
+    "url": "https://btcpp.dev"
+  }{{ if .EventSpeakers }},
+  "performer": [{{ range $i, $sp := .EventSpeakers }}{{ if $i }},{{ end }}
+    {
+      "@type": "Person",
+      "name": {{ jsonStr $sp.Name }}{{ if $sp.Company }},
+      "affiliation": {
+        "@type": "Organization",
+        "name": {{ jsonStr $sp.Company }}
+      }{{ end }}
+    }{{ end }}
+  ]{{ end }}{{ if .ScheduledSessions }},
+  "subEvent": [{{ range $i, $s := .ScheduledSessions }}{{ if $i }},{{ end }}
+    {
+      "@type": "Event",
+      "name": {{ jsonStr $s.Name }},
+      "startDate": {{ jsonDate $s.Sched.Start }}{{ if $s.Sched.End }},
+      "endDate": {{ jsonDate $s.Sched.End }}{{ end }},
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "location": {
+        "@type": "Place",
+        "name": {{ jsonStr (or (mapVenue $s.Venue) $.Conf.Venue) }},
+        "address": {{ jsonStr $.Conf.Location }}
+      }{{ if $s.Speakers }},
+      "performer": [{{ range $j, $sp := $s.Speakers }}{{ if $j }},{{ end }}
+        {
+          "@type": "Person",
+          "name": {{ jsonStr $sp.Name }}
+        }{{ end }}
+      ]{{ end }}
+    }{{ end }}
+  ]{{ end }}
+}
+</script>
+{{ end }}

@@ -114,7 +114,7 @@ const schedulePxPerMin = 2
 const scheduleSnapMin = 15
 
 // ScheduleConf renders the drag-and-drop schedule page at
-// /admin/conf/{tag}/schedule.
+// /admin/{tag}/schedule.
 func ScheduleConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return

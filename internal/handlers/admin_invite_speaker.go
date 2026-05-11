@@ -13,7 +13,7 @@ import (
 	"btcpp-web/internal/types"
 )
 
-// AdminInviteSpeaker renders the form at /admin/conf/{tag}/invite-speaker.
+// AdminInviteSpeaker renders the form at /admin/{tag}/invite-speaker.
 // Organizers use it to originate a speaker invitation: a fresh proposal
 // with placeholder Title/Description lands in Invited status, the
 // speaker gets a magic-link email, and the admin sees the same link on

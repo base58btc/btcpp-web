@@ -36,14 +36,14 @@ var speakerPostTmpl = template.Must(template.New("speaker").Parse(
                 `{{ if .Org }}of {{ .Org }} {{ end }}` +
                 `to speak at {{.Conf.Desc}} this coming {{ .Conf.DateDesc }}` +
 		`{{if .TalkName}}` + "\n\n" + `~~{{.TalkName}}{{end}}~~` +
-		"\n\n" + `Join us 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
+		"\n\n" + `Join us 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 var talkPostTmpl = template.Must(template.New("talk").Parse(
 	`JUST SCHEDULED {{ .Conf.Emoji }}: "{{.TalkName}}"` +
 		` by{{range .Speakers }}` +
                 ` {{ .Name }}{{ if .Twitter }} (@{{ .TwitterHandle }}) {{ end}}` +
 		`{{ end }}` +
-		"\n\n" + `Don't miss it. Join us in {{ .Conf.Location }} this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
+		"\n\n" + `Don't miss it. Join us in {{ .Conf.Location }} this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 type speakerPostData struct {
 	SpeakerName   string
@@ -64,7 +64,7 @@ var sponsorPostTmpl = template.Must(template.New("sponsor").Parse(
 	`{{if ne .Twitter.Handle "" }}({{.Twitter.Mention }}) {{end}}` +
         `to sponsor {{.Conf.Desc}} {{.Conf.Emoji}}` +
         `{{ if .Level }} as our {{ .Level }} sponsor{{ end }}` +
-        "\n\n" + `Join us this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/conf/{{.Conf.Tag}}#tickets`))
+        "\n\n" + `Join us this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 type sponsorPostData struct {
 	OrgName string

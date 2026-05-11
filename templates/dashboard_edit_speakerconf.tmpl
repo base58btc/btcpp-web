@@ -24,7 +24,7 @@
     </div>
     {{ end }}
 
-    <form method="POST" action="/dashboard/conf/{{ .Conf.Tag }}/edit?hr={{ .HMAC }}&em={{ .Email }}"
+    <form method="POST" action="/dashboard/{{ .Conf.Tag }}/edit?hr={{ .HMAC }}&em={{ .Email }}"
           enctype="multipart/form-data"
           class="mt-8 space-y-6">
 

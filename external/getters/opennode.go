@@ -36,7 +36,7 @@ func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice, preDiscountPrice uin
 		Description:   conf.Desc,
 		Currency:      tix.Currency,
 		CallbackURL:   domain + "/callback/opennode",
-		SuccessURL:    domain + "/conf/" + conf.Tag + "/success",
+		SuccessURL:    domain + "/" + conf.Tag + "/success",
 		AutoSettle:    false,
 		TTL:           360,
 		Metadata:      metadata,

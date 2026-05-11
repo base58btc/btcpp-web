@@ -170,7 +170,7 @@
          scrim so the title text stays legible on any photo. Anchor
          takes the user to the public conf page. */}}
     <div class="relative">
-      <a href="/conf/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
+      <a href="/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
         <picture>
           <source srcset="/static/img/{{ $conf.Tag }}/leading.avif" type="image/avif" />
           <img src="/static/img/{{ $conf.Tag }}/leading.png" alt="{{ $conf.Desc }}"
@@ -206,7 +206,7 @@
           Share your <code class="font-mono font-semibold">{{ $.AffiliateCode.CodeName }}</code> link for {{ $conf.Desc }}
         </span>
         <button type="button"
-                data-share-url="{{ $.BaseURI }}/conf/{{ $conf.Tag }}?code={{ $.AffiliateCode.CodeName }}"
+                data-share-url="{{ $.BaseURI }}/{{ $conf.Tag }}?code={{ $.AffiliateCode.CodeName }}"
                 class="affiliate-share-btn shrink-0 inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 font-semibold text-white hover:bg-indigo-700">
           Copy link
         </button>
@@ -214,7 +214,7 @@
       {{ end }}
       {{ if and $eb.SpeakerConf $conf.CanInvite }}
       <div class="flex justify-end -mt-2 mb-2">
-        <a href="/dashboard/conf/{{ $conf.Tag }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
+        <a href="/dashboard/{{ $conf.Tag }}/edit?hr={{ $.HMAC }}&em={{ $.Email }}"
            class="text-xs font-medium text-gray-600 hover:text-gray-900">
           Edit speaker info &rarr;
         </a>
@@ -343,7 +343,7 @@
                   "EndISO"      (rfc3339 .ConfTalk.Sched.End)
                   "Description" .Description
                   "Location"    (or (mapVenue .ConfTalk.Venue) $conf.Venue)
-                  "ICSURL"      (printf "/conf/%s/talk/%s/calendar.ics" $conf.Tag .ConfTalk.AnchorOrID)
+                  "ICSURL"      (printf "/%s/talk/%s/calendar.ics" $conf.Tag .ConfTalk.AnchorOrID)
                 ) }}
                 {{ end }}
                 {{ if and (and $conf $conf.CanInvite) (not (or (eq .Status "TheyDecline") (eq .Status "WeDecline") (eq .Status "Rejected"))) }}
@@ -561,7 +561,7 @@
       {{/* ---- Buy more / get a ticket CTA ---- */}}
       {{ if $eb.CanBuy }}
       <div class="mt-5">
-        <a href="/conf/{{ $conf.Tag }}#tickets"
+        <a href="/{{ $conf.Tag }}#tickets"
            class="inline-flex items-center text-sm font-medium text-orange-600 hover:text-orange-700">
           {{ if $eb.Tickets }}+ Buy another ticket{{ else }}+ Get a ticket{{ end }} for {{ $conf.Desc }} &rarr;
         </a>
@@ -599,7 +599,7 @@
   {{ range .DiscoverConfs }}
   {{ $conf := . }}
   <div class="bg-white shadow rounded-lg overflow-hidden">
-    <a href="/conf/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
+    <a href="/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200">
       <picture>
         <source srcset="/static/img/{{ $conf.Tag }}/leading.avif" type="image/avif" />
         <img src="/static/img/{{ $conf.Tag }}/leading.png" alt="{{ $conf.Desc }}"
@@ -616,7 +616,7 @@
     </a>
 
     <div class="px-4 py-4 sm:px-6 flex flex-wrap gap-2">
-      <a href="/conf/{{ $conf.Tag }}#tickets"
+      <a href="/{{ $conf.Tag }}#tickets"
          class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-white bg-orange-600 hover:bg-orange-700">
         Get a ticket
       </a>

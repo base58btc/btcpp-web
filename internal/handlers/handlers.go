@@ -178,6 +178,37 @@ func loadTemplates(ctx *config.AppContext) error {
 		// block can render a meaningful Location instead of leaking
 		// the internal slug.
 		"mapVenue": ics.MapVenue,
+		// jsonStr returns a JSON-encoded, double-quoted string —
+		// used by event_jsonld.tmpl to safely embed user-supplied
+		// titles / descriptions / venue names into a <script
+		// type="application/ld+json"> block. template.JS bypasses
+		// html/template's JS-context escaping; the JSON itself is
+		// already script-safe.
+		"jsonStr": func(s string) template.JS {
+			b, _ := json.Marshal(s)
+			return template.JS(b)
+		},
+		// jsonDate formats a time.Time / *time.Time as a
+		// JSON-encoded RFC 3339 string, or `null` when zero / nil.
+		"jsonDate": func(t interface{}) template.JS {
+			format := func(tt time.Time) template.JS {
+				if tt.IsZero() {
+					return template.JS("null")
+				}
+				b, _ := json.Marshal(tt.Format(time.RFC3339))
+				return template.JS(b)
+			}
+			switch v := t.(type) {
+			case time.Time:
+				return format(v)
+			case *time.Time:
+				if v == nil {
+					return template.JS("null")
+				}
+				return format(*v)
+			}
+			return template.JS("null")
+		},
 		// rfc3339 formats a time.Time / *time.Time as RFC 3339.
 		// Returns "" for a nil pointer or zero time so templates can
 		// safely emit it into a data-* attribute without leaking
@@ -559,65 +590,45 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		}).Methods("GET")
 	}
 
-	/* Legacy redirects! */
-	r.HandleFunc("/berlin23", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/berlin23", http.StatusSeeOther)
-	}).Methods("GET")
+	/* Theme aliases — keyword URLs that map to a specific edition
+	   ("ecash" was Berlin 24, "mempool" was ATX 25, etc.). Kept
+	   alive for legacy share links and for vanity URLs that don't
+	   match a conf tag. Self-aliases (berlin23 → /conf/berlin23,
+	   etc.) used to live here too but now resolve natively via the
+	   /{conf} catch-all registered near the end of this router. */
 	r.HandleFunc("/ecash", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/berlin24", http.StatusSeeOther)
+		http.Redirect(w, r, "/berlin24", http.StatusMovedPermanently)
 	}).Methods("GET")
 	r.HandleFunc("/mempool", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/atx25", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/atx24", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/atx24", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/riga", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/riga", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/conf/lightning", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/berlin25", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/privacy", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/riga", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/istanbul", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/istanbul", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/taipei", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/taipei", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/nairobi", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/nairobi", http.StatusSeeOther)
+		http.Redirect(w, r, "/atx25", http.StatusMovedPermanently)
 	}).Methods("GET")
 	r.HandleFunc("/lightning", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/berlin25", http.StatusSeeOther)
+		http.Redirect(w, r, "/berlin25", http.StatusMovedPermanently)
 	}).Methods("GET")
-	r.HandleFunc("/ba24", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/ba24", http.StatusSeeOther)
-	}).Methods("GET")
-	r.HandleFunc("/berlin23/talks", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/berlin23/talks", http.StatusSeeOther)
+	r.HandleFunc("/exploits", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/floripa26", http.StatusMovedPermanently)
 	}).Methods("GET")
 	r.HandleFunc("/talks", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 	}).Methods("GET")
 
-	r.HandleFunc("/exploits", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/conf/floripa26", http.StatusSeeOther)
+	/* /conf/* legacy paths — 301 to the new short form. Captures
+	   /{tag}, /{tag}/talks, /{tag}/talk/{anchor}/calendar.ics,
+	   /{tag}/success. The handler relocates the leading "/conf"
+	   prefix; any preserved query string + hash fragment carries
+	   through (the fragment never reaches the server but the
+	   browser preserves it across a 301). */
+	r.HandleFunc("/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-
-	r.HandleFunc("/conf/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
-		RenderConfSuccess(w, r, app)
+	r.HandleFunc("/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
+		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-	r.HandleFunc("/conf/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
-		RenderTalks(w, r, app)
+	r.HandleFunc("/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
+		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
-	r.HandleFunc("/conf/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
-		TalkPublicICS(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/conf/{conf}", func(w http.ResponseWriter, r *http.Request) {
-		RenderConf(w, r, app)
+	r.HandleFunc("/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
+		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
 
         r.HandleFunc("/volunteer", func (w http.ResponseWriter, r *http.Request) {
@@ -789,7 +800,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		LogoutHandler(w, r, app)
 	}).Methods("POST")
 
-	r.HandleFunc("/dashboard/conf/{confTag}/edit", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/dashboard/{confTag}/edit", func(w http.ResponseWriter, r *http.Request) {
 		DashboardEditSpeakerConf(w, r, app)
 	}).Methods("GET", "POST")
 
@@ -1089,14 +1100,36 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		http.Redirect(w, r, "/"+confTag+"/admin/speakers?flash=Calendar+invites+sent", http.StatusFound)
 	}).Methods("GET", "POST")
 
-	// 301-redirect every legacy admin URL (/admin/conf/{tag}/...,
+	// 301-redirect every legacy admin URL (/admin/{tag}/...,
 	// /vols/admin/{tag}/..., etc.) to the new /{conf}/{role}/...
 	// shape. Registered last so it doesn't shadow live routes.
 	RegisterAdminRedirects(r)
 
-	// Create a file server to serve static files from the "static" directory
+	// Public conf routes — canonical short form `/{tag}`. Registered
+	// last among single-segment routes so the literal entries above
+	// (/dashboard, /login, /talk, /sponsor, /privacy, the theme
+	// aliases, ...) win first. Unknown {conf} falls through to a
+	// clean 404 via the handlers' FindConf branch.
+	r.HandleFunc("/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		RenderConf(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/talks", func(w http.ResponseWriter, r *http.Request) {
+		RenderTalks(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/talk/{anchor}/calendar.ics", func(w http.ResponseWriter, r *http.Request) {
+		TalkPublicICS(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/success", func(w http.ResponseWriter, r *http.Request) {
+		RenderConfSuccess(w, r, app)
+	}).Methods("GET")
+
+	// Create a file server to serve static files from the "static" directory.
+	// Wrap with a Cache-Control: max-age=3600 header so browsers
+	// can serve cached copies without revalidating. http.FileServer
+	// already emits Last-Modified, so deployments still invalidate
+	// stale assets within the hour via conditional GET / 304s.
 	fs := http.FileServer(http.Dir("static"))
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", staticCache(fs)))
 	err = addFaviconRoutes(r)
 
 	if err != nil {
@@ -1167,7 +1200,7 @@ func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 // discountSessionKey is the SCS session key under which a per-conf
-// discount code from a /conf/{tag}?code= visit is stashed. Per-conf
+// discount code from a /{tag}?code= visit is stashed. Per-conf
 // scoping keeps codes from one event from leaking into another's
 // checkout flow when a visitor browses multiple confs in the same
 // session.
@@ -1552,7 +1585,7 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/conf/%s/success ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+		ctx.Err.Printf("/%s/success ExecuteTemplate failed ! %s", conf.Tag, err.Error())
 		return
 	}
 }
@@ -2082,6 +2115,17 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 	agendaDays := buildAgendaDays(conf, talks, infosByDay)
 
+	// Flatten AgendaDays into a single chrono-ordered slice for the
+	// JSON-LD subEvent[] emission. Each day's .All is already
+	// status-filtered + sorted by buildAgendaDays.
+	var scheduledSessions []*types.Session
+	for _, d := range agendaDays {
+		if d == nil {
+			continue
+		}
+		scheduledSessions = append(scheduledSessions, d.All...)
+	}
+
 	// Populate countdown bounds + HasAgenda for the conf_nav widget
 	// + agenda section. Shallow-copy first so we don't mutate the
 	// cached Conf seen by other readers (FetchConfsCached returns a
@@ -2114,8 +2158,9 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		EventSpeakers: evSpeakers,
 		Buckets:       buckets,
 		Days:          days,
-		AgendaDays:    agendaDays,
-		Year:          helpers.CurrentYear(),
+		AgendaDays:        agendaDays,
+		ScheduledSessions: scheduledSessions,
+		Year:              helpers.CurrentYear(),
 	})
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -2592,7 +2637,7 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 			})
 			if err != nil {
 				http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-				ctx.Err.Printf("/conf/check-in ExecuteTemplate failed ! %s", err.Error())
+				ctx.Err.Printf("/check-in ExecuteTemplate failed ! %s", err.Error())
 				return
 			}
 			ctx.Err.Printf("/check-in wrong pin submitted! %s", pin)
@@ -2618,7 +2663,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/conf/check-in ExecuteTemplate failed ! %s", err.Error())
+			ctx.Err.Printf("/check-in ExecuteTemplate failed ! %s", err.Error())
 		}
 		return
 	}
@@ -2631,7 +2676,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-			ctx.Err.Printf("/conf/check-in ExecuteTemplate failed ! %s", err.Error())
+			ctx.Err.Printf("/check-in ExecuteTemplate failed ! %s", err.Error())
 		}
 		return
 	}
@@ -2659,7 +2704,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-		ctx.Err.Printf("/conf/check-in ExecuteTemplate failed ! %s", err.Error())
+		ctx.Err.Printf("/check-in ExecuteTemplate failed ! %s", err.Error())
 	}
 }
 
@@ -3111,8 +3156,8 @@ func StripeInitWithDiscount(w http.ResponseWriter, r *http.Request, ctx *config.
 			}},
 		Metadata:     metadata,
 		Mode:         stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:   stripe.String(domain + "/conf/" + conf.Tag + "/success"),
-		CancelURL:    stripe.String(domain + "/conf/" + conf.Tag),
+		SuccessURL:   stripe.String(domain + "/" + conf.Tag + "/success"),
+		CancelURL:    stripe.String(domain + "/" + conf.Tag),
 		AutomaticTax: &stripe.CheckoutSessionAutomaticTaxParams{Enabled: stripe.Bool(true)},
 	}
 
@@ -3155,8 +3200,8 @@ func StripeInit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, 
 			}},
 		Metadata:            metadata,
 		Mode:                stripe.String(string(stripe.CheckoutSessionModePayment)),
-		SuccessURL:          stripe.String(domain + "/conf/" + conf.Tag + "/success"),
-		CancelURL:           stripe.String(domain + "/conf/" + conf.Tag),
+		SuccessURL:          stripe.String(domain + "/" + conf.Tag + "/success"),
+		CancelURL:           stripe.String(domain + "/" + conf.Tag),
 		AutomaticTax:        &stripe.CheckoutSessionAutomaticTaxParams{Enabled: stripe.Bool(true)},
 		AllowPromotionCodes: stripe.Bool(true),
 	}

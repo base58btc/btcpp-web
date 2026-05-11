@@ -26,7 +26,7 @@ import (
 // speaker invite already populated their calendar under a
 // different UID).
 //
-// Path: GET /conf/{conf}/talk/{anchor}/calendar.ics
+// Path: GET /{conf}/talk/{anchor}/calendar.ics
 //
 // Returns 404 when the conf or talk isn't found OR when the
 // talk's scheduled end is already in the past — back-dated
@@ -42,7 +42,7 @@ func TalkPublicICS(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 
 	confs, err := getters.FetchConfsCached(ctx)
 	if err != nil {
-		ctx.Err.Printf("/conf/%s/talk/%s/calendar.ics confs: %s", confTag, anchor, err)
+		ctx.Err.Printf("/%s/talk/%s/calendar.ics confs: %s", confTag, anchor, err)
 		http.Error(w, "Unable to load conference", http.StatusInternalServerError)
 		return
 	}
@@ -60,7 +60,7 @@ func TalkPublicICS(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 
 	talks, err := getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
-		ctx.Err.Printf("/conf/%s/talk/%s/calendar.ics talks: %s", confTag, anchor, err)
+		ctx.Err.Printf("/%s/talk/%s/calendar.ics talks: %s", confTag, anchor, err)
 		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
 		return
 	}

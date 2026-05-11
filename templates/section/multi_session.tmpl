@@ -2,7 +2,7 @@
 <li class="flex-row py-8">
   <div class="flex">
     <div class="mb-4 flex-shrink-0 sm:mb-0 sm:mr-4">
-     <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}" target="_blank">
+     <a href="/{{ .ConfTag }}/talks#{{ .AnchorTag }}" target="_blank">
      <picture>
        <source srcset="{{ talkClipart .TalkAvif }}" type="image/avif"/>
        <img src="{{ talkClipart .TalkPhoto }}" alt="" class="inline-block h-28 w-28 rounded-md"/>
@@ -11,7 +11,7 @@
     </div>
    <div class="ml-3">
        <h4 class="text-left text-xl font-medium text-gray-900 hover:text-gray-600">
-       <a href="/conf/{{ .ConfTag }}/talks#{{ .AnchorTag }}">{{ .Name }}</a></h4>
+       <a href="/{{ .ConfTag }}/talks#{{ .AnchorTag }}">{{ .Name }}</a></h4>
           {{ $spkCount := len .Speakers }}
           {{ range .Speakers }}
           <div class="-ml-4 flex items-center gap-x-4">

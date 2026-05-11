@@ -13,7 +13,7 @@
 */}}
 {{ define "conf_hero" }}
 {{ $conf := . }}
-<a href="/conf/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200 rounded-lg overflow-hidden shadow">
+<a href="/{{ $conf.Tag }}" class="block relative h-36 sm:h-40 group bg-gray-200 rounded-lg overflow-hidden shadow">
   <picture>
     <source srcset="/static/img/{{ $conf.Tag }}/leading.avif" type="image/avif" />
     <img src="/static/img/{{ $conf.Tag }}/leading.png" alt="{{ $conf.Desc }}"

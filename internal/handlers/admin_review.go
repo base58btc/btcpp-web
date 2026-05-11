@@ -53,7 +53,7 @@ type reviewAction struct {
 }
 
 // OrganizerDashboard is the per-event admin landing at
-// /admin/conf/{tag}/. Hub for everything organizer-y for one
+// /admin/{tag}/. Hub for everything organizer-y for one
 // conference: review applications today, more tools as we add them.
 func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	// staff is the lowest tier that should land here; admins/
@@ -118,7 +118,7 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 }
 
 // ReviewProposals walks through one pending proposal at a time at
-// /admin/conf/{tag}/review. Optional `?id=<proposalID>` jumps to a
+// /admin/{tag}/review. Optional `?id=<proposalID>` jumps to a
 // specific row (after-action redirect uses this to advance to the next
 // pending). With no id we pick the first by creation order.
 func ReviewProposals(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -166,7 +166,7 @@ func ReviewProposals(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 // fans out the onlyfor letter, and redirects back to the next pending
 // proposal in the queue.
 //
-// Path: /admin/conf/{tag}/review/{proposalID}/{action}
+// Path: /admin/{tag}/review/{proposalID}/{action}
 //
 // `action` is one of: invite / confirm / waitlist / decline / reject
 // — see reviewActions for the full mapping to (status, onlyfor tag).
@@ -411,7 +411,7 @@ func emailHasConfRegistration(ctx *config.AppContext, email, confRef string) (bo
 // to (and after) the conf, so they can patch in last-minute speaker
 // substitutions.
 //
-// Path: GET /admin/conf/{tag}/proposal/{proposalID}/invite
+// Path: GET /admin/{tag}/proposal/{proposalID}/invite
 func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
@@ -460,7 +460,7 @@ func AdminProposalInviteLink(w http.ResponseWriter, r *http.Request, ctx *config
 // without the CanInvite / "can't remove the last speaker" /
 // terminal-status gates — admins are trusted to know when to override.
 //
-// Path: POST /admin/conf/{tag}/proposal/{proposalID}/speakers/{speakerConfID}/remove
+// Path: POST /admin/{tag}/proposal/{proposalID}/speakers/{speakerConfID}/remove
 func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return

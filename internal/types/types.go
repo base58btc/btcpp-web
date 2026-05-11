@@ -146,7 +146,7 @@ type (
 		Discount      string
 		// AffiliateCode is the silent referral that hitches a
 		// ride through the form when the visitor came in via a
-		// /conf/{tag}?code= link tied to a `%0` affiliate code.
+		// /{tag}?code= link tied to a `%0` affiliate code.
 		// On POST the visible Discount wins — typing a different
 		// code drops the silent affiliate's credit.
 		AffiliateCode string
