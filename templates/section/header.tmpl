@@ -17,13 +17,19 @@
       // Detect on load and bounce to the canonical shape so the
       // server-side stash logic (RenderConf) picks it up.
       (function () {
-        // No path-prefix gate — code= in the hash is a no-op on any
-        // page that isn't a conf landing, and the inner regex bails
-        // when no code is present, so running everywhere is cheap.
+        // Bail when code= is already in the query string — otherwise
+        // each reload appends another &code= and the page never
+        // settles. (Belt and braces against the regex below: the
+        // replace step strips the matched separator, but if anything
+        // ever leaves a stray code= behind we don't want to spin.)
+        if (/[?&]code=/.test(window.location.search)) return;
         const m = window.location.hash.match(/[#?&]code=([^#?&]+)/);
         if (!m) return;
         const code = decodeURIComponent(m[1]);
-        let newHash = window.location.hash.replace(/[?&]code=[^#?&]+/, '');
+        // Match regex accepts # as a separator; replace must too,
+        // otherwise a bare `#code=X` hash survives the rewrite and
+        // the next page-load matches the same hash again → loop.
+        let newHash = window.location.hash.replace(/[#?&]code=[^#?&]+/, '');
         if (newHash === '#') newHash = '';
         const sep = window.location.search ? '&' : '?';
         window.location.replace(
