@@ -60,8 +60,12 @@ type (
 		// email sender before template render so the body can do
 		// {{ .Conf.DoorsOpen }} without round-tripping ConfInfo.
 		DoorsOpen     string
-		ShowAgenda    bool
-		ShowTalks     bool
+		// HasAgenda is a derived boolean — true when at least one of
+		// the conf's talks has Status == "Scheduled". Populated at
+		// request time (shallow-copy + set in RenderConf / RenderTalks),
+		// never stored in Notion. Drives both the nav-bar "agenda" /
+		// "talks" links and the per-conf-template agenda section.
+		HasAgenda     bool
 		ShowHackathon bool
 		HasSatellites bool
 		Tickets       []*ConfTicket
@@ -356,6 +360,12 @@ type (
 		// rows that pre-date the field.
 		Amount     float64
 		Currency   string
+		// Revoked is the Notion "Revoked" checkbox. When true, the
+		// ticket is voided (refund / chargeback / admin reversal)
+		// and should be hidden from the buyer's dashboard. Stays in
+		// the cache so admin-side reporting / staffing decisions
+		// can still see it.
+		Revoked    bool
 	}
 
 	Item struct {
@@ -558,6 +568,22 @@ func (ct *ConfTalk) AnchorTag() string {
                 return ct.Clipart
         }
         return ct.Clipart[:len(ct.Clipart)-4]
+}
+
+// AnchorOrID returns AnchorTag when the conftalk has a clipart, and
+// the raw page ID otherwise. Lets the "Add to calendar" download URL
+// resolve before an admin has uploaded a clipart — important on the
+// dashboard where a Scheduled talk should always offer the cal-invite
+// fallback, clipart or not. The TalkPublicICS handler matches on
+// either form.
+func (ct *ConfTalk) AnchorOrID() string {
+        if ct == nil {
+                return ""
+        }
+        if a := ct.AnchorTag(); a != "" {
+                return a
+        }
+        return ct.ID
 }
 
 func (t *Talk) ClipartAvif() string {

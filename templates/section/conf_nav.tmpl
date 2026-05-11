@@ -18,10 +18,8 @@
         {{ if .HasSchedule }}
 	      <a href="/conf/{{ .Tag }}#schedule" class="text-sm font-semibold leading-6 text-gray-900">schedule</a>
         {{ end }}
-        {{ if .ShowAgenda }}
+        {{ if .HasAgenda }}
 	      <a href="/conf/{{ .Tag }}#agenda" class="text-sm font-semibold leading-6 text-gray-900">agenda</a>
-        {{ end }}
-        {{ if .ShowTalks }}
 	      <a href="/conf/{{ .Tag }}/talks" class="text-sm font-semibold leading-6 text-gray-900">talks</a>
         {{ end }}
         {{ if .HasSatellites }}
@@ -57,10 +55,8 @@
                   {{ if .HasSchedule }}
 		            <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#schedule" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">schedule</a>
                   {{ end }}
-                {{ if .ShowAgenda }}
+                {{ if .HasAgenda }}
 	              <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}#agenda" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">agenda</a>
-                {{ end }}
-                {{ if .ShowTalks }}
                 <a onclick="toggleMenu(this)" href="/conf/{{ .Tag }}/talks" class="-mx-3 block rounded-lg py-2 px-3 text-base font-semibold leading-7 text-gray-900 hover:bg-gray-50">talks</a>
                 {{ end }}
                 {{ if .HasSatellites }}

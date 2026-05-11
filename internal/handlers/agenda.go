@@ -35,6 +35,11 @@ type AgendaDay struct {
 // dropped — a 4-day conf with talks only on days 1/2/4 yields 3
 // AgendaDays, not 4.
 //
+// Only Status=="Scheduled" talks contribute. Accepted-but-not-yet-
+// Scheduled talks may have a draft Sched on the schedule grid; they
+// stay off the public agenda until cal invites go out (which is
+// what flips Status to Scheduled).
+//
 // infosByDay is indexed by 1-based Day matching ConfInfo.Day; days
 // without an entry leave AgendaDay.Info nil.
 func buildAgendaDays(conf *types.Conf, talks []*types.Talk, infosByDay map[int]*types.ConfInfo) []*AgendaDay {
@@ -46,7 +51,7 @@ func buildAgendaDays(conf *types.Conf, talks []*types.Talk, infosByDay map[int]*
 
 	byDay := make(map[int][]*types.Talk)
 	for _, t := range talks {
-		if t == nil || t.Sched == nil {
+		if t == nil || t.Sched == nil || t.Status != StatusScheduled {
 			continue
 		}
 		idx := dayIndex(startDate, t.Sched.Start, loc)
@@ -171,6 +176,18 @@ func bucketByBreaks(ad *AgendaDay, sessions []*types.Session) {
 			ad.Morning = append(ad.Morning, s)
 		}
 	}
+}
+
+// anyScheduledTalk reports whether at least one talk in the slice has
+// Status=="Scheduled". Drives Conf.HasAgenda — once a single talk
+// reaches that state, the conf's public agenda + /talks page light up.
+func anyScheduledTalk(talks []*types.Talk) bool {
+	for _, t := range talks {
+		if t != nil && t.Status == StatusScheduled {
+			return true
+		}
+	}
+	return false
 }
 
 // confInfosByDay flattens a tag-keyed map (the dashboard's existing

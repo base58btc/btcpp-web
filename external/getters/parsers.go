@@ -330,9 +330,7 @@ func parseConf(pageID string, props map[string]notion.PropertyValue) *types.Conf
 		Venue:         parseRichText("Venue", props),
 		VenueMap:      props["VenueMap"].URL,
 		VenueWebsite:  props["VenueWebsite"].URL,
-		ShowAgenda:    parseCheckbox(props["Show Agenda"].Checkbox),
 		ShowHackathon: parseCheckbox(props["Show Hacks"].Checkbox),
-		ShowTalks:     parseCheckbox(props["Show Talks"].Checkbox),
 		HasSatellites: parseCheckbox(props["Has Satellites"].Checkbox),
 		OrientCalNotif: parseRichText("OrientCalNotif", props),
 	}
@@ -396,6 +394,7 @@ func parseRegistration(props map[string]notion.PropertyValue) *types.Registratio
 		ItemBought: parseRichText("Item Bought", props),
 		Amount:     props["Amount Paid"].Number,
 		Currency:   parseSelect("Currency", props),
+		Revoked:    parseCheckbox(props["Revoked"].Checkbox),
 	}
 	if len(props["conf"].Relation) > 0 {
 		regis.ConfRef = props["conf"].Relation[0].ID

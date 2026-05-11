@@ -1429,12 +1429,24 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		return
 	}
 
-	var talks types.TalkTime
-	talks, err = getters.GetTalksFor(ctx, conf.Tag)
+	allTalks, err := getters.GetTalksFor(ctx, conf.Tag)
 	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to fetch talks from Notion!! %s", err.Error())
 		return
+	}
+
+	// Page renders every approved talk — Accepted (admin draft) and
+	// Scheduled (cal invite sent). Declined/Rejected variants drop
+	// off so retracted talks don't linger on the public list.
+	var talks types.TalkTime
+	for _, t := range allTalks {
+		if t == nil {
+			continue
+		}
+		if t.Status == StatusAccepted || t.Status == StatusScheduled {
+			talks = append(talks, t)
+		}
 	}
 
 	var evSpeakers types.Speakers
@@ -1442,6 +1454,10 @@ func RenderTalks(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 	sort.Sort(talks)
 	sort.Sort(evSpeakers)
+
+	confCopy := *conf
+	confCopy.HasAgenda = anyScheduledTalk(allTalks)
+	conf = &confCopy
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "sched.tmpl", &ConfPage{
 		Talks:         talks,
@@ -2008,11 +2024,13 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 	agendaDays := buildAgendaDays(conf, talks, infosByDay)
 
-	// Populate countdown bounds for the conf_nav widget. Shallow-
-	// copy first so we don't mutate the cached Conf seen by other
-	// readers (FetchConfsCached returns a shared slice).
+	// Populate countdown bounds + HasAgenda for the conf_nav widget
+	// + agenda section. Shallow-copy first so we don't mutate the
+	// cached Conf seen by other readers (FetchConfsCached returns a
+	// shared slice).
 	confCopy := *conf
 	confCopy.CountdownStart, confCopy.CountdownEnd = computeCountdownBounds(&confCopy, infosByDay)
+	confCopy.HasAgenda = anyScheduledTalk(talks)
 	conf = &confCopy
 
 	confHotels := helpers.HotelsForConf(ctx, conf)

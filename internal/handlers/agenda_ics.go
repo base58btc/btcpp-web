@@ -65,12 +65,16 @@ func TalkPublicICS(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
+	// Match on the clipart-derived AnchorTag first (pretty URL),
+	// fall back to the raw ConfTalk ID so the dashboard's "Add to
+	// calendar" download keeps working for Scheduled talks that
+	// haven't had a clipart uploaded yet.
 	var talk *types.Talk
 	for _, t := range talks {
 		if t == nil || t.Sched == nil {
 			continue
 		}
-		if t.AnchorTag() == anchor {
+		if t.AnchorTag() == anchor || t.ID == anchor {
 			talk = t
 			break
 		}

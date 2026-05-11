@@ -893,6 +893,9 @@ func GetConfTalkByProposal(ctx *config.AppContext, proposalID string) (*types.Co
 // — the cache invalidation only resets the staleness timer, so without
 // the eager mutation the dashboard's immediate redirect-back would
 // still render the old status until the next periodic refresh tick.
+// We also patch the derived `talks` slice so conf-page reads of
+// Talk.Status (e.g. Conf.HasAgenda) see the flip without waiting on
+// the async talks-cache rebuild.
 func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) error {
 	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), proposalID,
 		map[string]*notion.PropertyValue{
@@ -906,6 +909,7 @@ func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) err
 			p.Status = status
 		}
 		proposalCacheMu.Unlock()
+		patchTalksStatusForProposal(proposalID, status)
 	}
 	return err
 }

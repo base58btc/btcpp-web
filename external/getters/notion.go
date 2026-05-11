@@ -818,6 +818,33 @@ func InvalidateTalksCache() {
 	lastTalksFetch = time.Time{}
 }
 
+// patchTalksStatusForProposal eagerly updates Talk.Status for every
+// cached Talk whose underlying ConfTalk belongs to the given
+// proposal. Talk is a denormalized snapshot — talk.Status is copied
+// from proposal.Status at listTalks time — so a proposal-status flip
+// (Accepted → Scheduled via Send Cal Invites) leaves the derived
+// talks slice stale until the next refresh tick. Without this,
+// Conf.HasAgenda / agenda visibility lag behind by a refresh
+// interval.
+func patchTalksStatusForProposal(proposalID, status string) {
+	confTalkCacheMu.RLock()
+	ctIDs := make(map[string]bool)
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.Proposal != nil && ct.Proposal.ID == proposalID {
+			ctIDs[ct.ID] = true
+		}
+	}
+	confTalkCacheMu.RUnlock()
+	if len(ctIDs) == 0 {
+		return
+	}
+	for _, t := range talks {
+		if t != nil && ctIDs[t.ID] {
+			t.Status = status
+		}
+	}
+}
+
 func getDiscounts(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting discounts...")

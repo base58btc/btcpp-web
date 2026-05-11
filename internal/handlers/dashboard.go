@@ -122,6 +122,20 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if regErr != nil {
 		ctx.Err.Printf("/dashboard listregs failed (continuing): %s", regErr)
 	}
+	// Drop revoked tickets — refunds / chargebacks / admin reversals
+	// stay in the cache for staff reporting but shouldn't show on the
+	// buyer's own dashboard. Filter once here so every downstream
+	// helper (upcomingTickets, buildEventBlocks, ...) sees the
+	// already-clean slice.
+	if len(regs) > 0 {
+		live := regs[:0]
+		for _, r := range regs {
+			if r != nil && !r.Revoked {
+				live = append(live, r)
+			}
+		}
+		regs = live
+	}
 
 	if scErr != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
@@ -506,7 +520,13 @@ func enrichProposal(ctx *config.AppContext, p *types.Proposal, scCache map[strin
 		}
 	}
 
-	if p.Status != StatusAccepted {
+	// Both Accepted (admin draft) and Scheduled (cal invite sent)
+	// have a ConfTalk row that the dashboard wants to surface — clipart
+	// in the card thumbnail and the "Add to calendar" picker for the
+	// Scheduled branch. Pre-Accepted statuses have no ConfTalk yet;
+	// terminal-decline statuses keep one but we don't need the
+	// enrichment for them.
+	if p.Status != StatusAccepted && p.Status != StatusScheduled {
 		return
 	}
 	ct, err := getters.GetConfTalkByProposal(ctx, p.ID)

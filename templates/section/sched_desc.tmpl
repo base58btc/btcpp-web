@@ -2,8 +2,13 @@
 <article class="relative isolate flex flex-col gap-8 lg:flex-row" id="{{ .AnchorTag }}">
 <div class="relative aspect-[2/1] lg:aspect-square lg:w-64 lg:shrink-0">
     <picture>
+      {{ if .Clipart }}
       <source srcset="{{ talkClipart .ClipartAvif }}" type="image/avif"/>
       <img src="{{ talkClipart .Clipart }}" alt="" class="absolute inset-0 h-full w-full rounded-2xl bg-gray-50 object-cover"/>
+      {{ else }}
+      <source srcset="/static/img/{{ .Event }}/leading.avif" type="image/avif"/>
+      <img src="/static/img/{{ .Event }}/leading.png" alt="" class="absolute inset-0 h-full w-full rounded-2xl bg-gray-50 object-cover"/>
+      {{ end }}
     </picture>
     <div class="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10"></div>
   </div>
