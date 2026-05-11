@@ -1,0 +1,31 @@
+User-agent: *
+Allow: /
+
+# Auth-gated dashboards and admin tooling — not for crawlers.
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /login
+Disallow: /vols/
+Disallow: /i/
+Disallow: /trial-cal-invite
+Disallow: /sendcal
+Disallow: /conf-reload
+Disallow: /auth-
+
+# Per-conf admin / volcoord routes are namespaced under the conf tag,
+# e.g. /vienna/admin/applicants. Wildcard match drops them all.
+Disallow: /*/admin
+Disallow: /*/volcoord
+
+# One-off attendee / transaction flows.
+Disallow: /tix/
+Disallow: /ticket/
+Disallow: /check-in/
+Disallow: /callback/
+Disallow: /webhook/
+
+# Calendar downloads — not pages, not indexable content.
+Disallow: /conf/*/talk/*/calendar.ics
+Disallow: /dashboard/vol/*
+
+Sitemap: https://btcpp.dev/sitemap.xml

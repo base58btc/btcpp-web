@@ -541,6 +541,15 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		RenderPage(w, r, app, "index")
 	}).Methods("GET")
 
+	// SEO endpoints — robots policy at site root + dynamic sitemap
+	// rebuilt from the confs cache on each request.
+	r.HandleFunc("/robots.txt", func(w http.ResponseWriter, r *http.Request) {
+		Robots(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
+		Sitemap(w, r, app)
+	}).Methods("GET")
+
 	/* List of 'normie' pages */
 	for _, page := range pages {
 		/* Normie Pages */
