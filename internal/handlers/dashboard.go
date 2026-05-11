@@ -235,13 +235,27 @@ func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		topSpeaker = speakers[0]
 	}
 	// Decorate event blocks with the user's admin role for each conf
-	// — drives the "Admin" / "Vol coord" link on conf cards. Build
-	// once per request from the topSpeaker's Roles list. globalAdmin
-	// also gates the role-manager panel below.
-	var idRoles []auth.Role
-	if topSpeaker != nil {
-		idRoles = auth.ParseRoles(topSpeaker.Roles)
+	// — drives the "Admin" / "Vol coord" link on conf cards. Union
+	// the Roles tags across every Speaker row that matches this
+	// email, not just speakers[0]: duplicate Speaker pages are common
+	// (a person reapplies under a fresh row before an admin merges)
+	// and the role tags often live on only one of the pages, so
+	// picking just the first row silently drops admin/staff/volcoord
+	// access. Dedupe by raw tag to keep ParseRoles' output stable.
+	rawRoles := map[string]bool{}
+	for _, sp := range speakers {
+		if sp == nil {
+			continue
+		}
+		for _, raw := range sp.Roles {
+			rawRoles[raw] = true
+		}
 	}
+	rawList := make([]string, 0, len(rawRoles))
+	for r := range rawRoles {
+		rawList = append(rawList, r)
+	}
+	idRoles := auth.ParseRoles(rawList)
 	id := &auth.Identity{Speaker: topSpeaker, Roles: idRoles}
 	if topSpeaker != nil {
 		id.Email = topSpeaker.Email
