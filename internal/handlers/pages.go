@@ -827,7 +827,6 @@ type SocialAdminPage struct {
 }
 
 type TalksGiftsPage struct {
-        Confs         []*types.Conf
         Conf          *types.Conf
         Rows          []*GiftRow
         FilePath      string

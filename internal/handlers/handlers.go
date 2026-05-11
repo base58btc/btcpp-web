@@ -859,11 +859,11 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 
 
-	r.HandleFunc("/talks/gifts", func(w http.ResponseWriter, r *http.Request) {
-		TalksGifts(w, r, app)
+	r.HandleFunc("/{conf}/admin/gifts", func(w http.ResponseWriter, r *http.Request) {
+		AdminGifts(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/talks/gifts/clipart.zip", func(w http.ResponseWriter, r *http.Request) {
-		TalksGiftsClipartZip(w, r, app)
+	r.HandleFunc("/{conf}/admin/gifts/clipart.zip", func(w http.ResponseWriter, r *http.Request) {
+		AdminGiftsClipartZip(w, r, app)
 	}).Methods("GET")
 
 	// Dev-only smoke endpoint for the self-hosted ICS pipeline.
@@ -5167,98 +5167,107 @@ func dispatchShiftCalAfterReschedule(ctx *config.AppContext, conf *types.Conf, s
 	}
 }
 
-func TalksGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	id := giftsRequireConfAccess(w, r, ctx)
-	if id == nil {
+// AdminGifts renders /{conf}/admin/gifts — the per-event Speaker
+// Gifts list. Conf is in the URL (no dropdown), auth gated by
+// requireConfStaff. Each row is one speaker (deduped — a speaker
+// on multiple talks appears once, with the clipart from their
+// "most interesting" talk: fewer co-speakers wins, so a solo keynote
+// outranks a panel appearance). Ties break on first-encountered, with
+// a non-empty clipart beating an empty one. {conf}-staff volunteers
+// also appear, using the conf's leading.png as their gift clipart.
+func AdminGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfStaff(w, r, ctx); id == nil {
 		return
 	}
-
-	allConfs, err := getters.FetchConfsCached(ctx)
-	if err != nil {
-		http.Error(w, "Unable to load conferences", http.StatusInternalServerError)
-		ctx.Err.Printf("/talks/gifts failed to get confs: %s", err.Error())
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil || conf == nil {
+		handle404(w, r, ctx)
 		return
 	}
-	confs := visibleGiftConfs(id, allConfs)
-
-	confTag := r.URL.Query().Get("conf")
 	filePath := r.URL.Query().Get("filepath")
 
-	var selectedConf *types.Conf
-	var talks []*types.Talk
-	var rows []*GiftRow
+	talks, err := getters.GetTalksFor(ctx, conf.Tag)
+	if err != nil {
+		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
+		ctx.Err.Printf("/%s/admin/gifts get talks: %s", conf.Tag, err)
+		return
+	}
 
-	if confTag != "" {
-		// Per-conf gate: the requested conf must be one this user
-		// has staff-or-above for. Hides cross-tenant peeking even
-		// if the user manually crafts the URL.
-		if !id.HasRoleForConf(confTag, auth.RoleStaff) {
-			ctx.Infos.Printf("auth deny /talks/gifts ?conf=%s for %s", confTag, id.Email)
-			http.Redirect(w, r, "/dashboard?error="+url.QueryEscape("You don't have access to that event's gifts CSV."), http.StatusSeeOther)
-			return
+	// Pick the smallest-panel talk per speaker. Key on Speaker.ID
+	// when available, fall back to lower-cased name (older rows
+	// may lack stable IDs).
+	type pick struct {
+		name     string
+		clipart  string
+		panelN   int
+	}
+	best := map[string]*pick{}
+	for _, talk := range talks {
+		if talk == nil {
+			continue
 		}
-		for _, conf := range confs {
-			if conf.Tag == confTag {
-				selectedConf = conf
-				break
+		n := len(talk.Speakers)
+		for _, sp := range talk.Speakers {
+			if sp == nil {
+				continue
 			}
-		}
-		if selectedConf != nil {
-			talks, err = getters.GetTalksFor(ctx, selectedConf.Tag)
-			if err != nil {
-				http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-				ctx.Err.Printf("/talks/gifts failed to get talks for %s: %s", confTag, err.Error())
-				return
+			key := sp.ID
+			if key == "" {
+				key = "name:" + strings.ToLower(strings.TrimSpace(sp.Name))
 			}
-
-			seenNames := map[string]bool{}
-			for _, talk := range talks {
-				for _, speaker := range talk.Speakers {
-					rows = append(rows, &GiftRow{
-						Clipart:     talk.Clipart,
-						SpeakerName: speaker.Name,
-					})
-					seenNames[strings.ToLower(strings.TrimSpace(speaker.Name))] = true
-				}
+			prev, ok := best[key]
+			if !ok {
+				best[key] = &pick{name: sp.Name, clipart: talk.Clipart, panelN: n}
+				continue
 			}
-
-			// {conf}-staff users get a row too, with the conf's
-			// leading.png as their clipart. Speaker-already
-			// takes precedence — anyone in seenNames is skipped
-			// to avoid duplicating a speaker who's also tagged
-			// staff.
-			staff := staffSpeakersForConf(ctx, selectedConf.Tag)
-			for _, sp := range staff {
-				if sp == nil {
-					continue
-				}
-				key := strings.ToLower(strings.TrimSpace(sp.Name))
-				if key == "" || seenNames[key] {
-					continue
-				}
-				seenNames[key] = true
-				rows = append(rows, &GiftRow{
-					Clipart:     "leading.png",
-					SpeakerName: sp.Name,
-				})
+			// Fewer co-speakers wins. On tie, prefer the
+			// non-empty clipart so a panel-with-art doesn't
+			// lose to a same-size panel-without-art.
+			if n < prev.panelN || (n == prev.panelN && prev.clipart == "" && talk.Clipart != "") {
+				prev.clipart = talk.Clipart
+				prev.panelN = n
+				prev.name = sp.Name
 			}
-
-			sort.SliceStable(rows, func(i, j int) bool {
-				return rows[i].SpeakerName < rows[j].SpeakerName
-			})
 		}
 	}
 
-	err = ctx.TemplateCache.ExecuteTemplate(w, "talks/gifts.tmpl", &TalksGiftsPage{
-		Confs:    confs,
-		Conf:     selectedConf,
+	rows := make([]*GiftRow, 0, len(best))
+	for _, p := range best {
+		rows = append(rows, &GiftRow{Clipart: p.clipart, SpeakerName: p.name})
+	}
+
+	// {conf}-staff Speakers row too — leading.png as their
+	// clipart, skipped if they're already on a talk.
+	for _, sp := range staffSpeakersForConf(ctx, conf.Tag) {
+		if sp == nil {
+			continue
+		}
+		key := sp.ID
+		if key == "" {
+			key = "name:" + strings.ToLower(strings.TrimSpace(sp.Name))
+		}
+		if _, ok := best[key]; ok {
+			continue
+		}
+		best[key] = &pick{} // mark to dedupe across staff list itself
+		rows = append(rows, &GiftRow{
+			Clipart:     "leading.png",
+			SpeakerName: sp.Name,
+		})
+	}
+
+	sort.SliceStable(rows, func(i, j int) bool {
+		return strings.ToLower(rows[i].SpeakerName) < strings.ToLower(rows[j].SpeakerName)
+	})
+
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "talks/gifts.tmpl", &TalksGiftsPage{
+		Conf:     conf,
 		Rows:     rows,
 		FilePath: filePath,
 		Year:     helpers.CurrentYear(),
-	})
-	if err != nil {
+	}); err != nil {
 		http.Error(w, "Unable to load page", http.StatusInternalServerError)
-		ctx.Err.Printf("/talks/gifts template failed: %s", err.Error())
+		ctx.Err.Printf("/%s/admin/gifts template: %s", conf.Tag, err)
 	}
 }
 
