@@ -162,12 +162,14 @@
   <div class="shrink-0 flex items-center gap-2">
     {{ template "venue_chip" . }}
     {{ if and .Sched (isFuture .Sched.Start) .AnchorTag }}
-    <a href="/conf/{{ .ConfTag }}/talk/{{ .AnchorTag }}/calendar.ics"
-       title="Add this talk to your calendar"
-       class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-600 text-white hover:bg-teal-700">
-      <span aria-hidden="true">📅</span>
-      <span class="hidden sm:inline">Add to calendar</span>
-    </a>
+    {{ template "cal_picker" (dict
+      "Title"    .Name
+      "StartISO" (rfc3339 .Sched.Start)
+      "EndISO"   (rfc3339 .Sched.End)
+      "Location" (mapVenue .Venue)
+      "ICSURL"   (printf "/conf/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
+      "Compact"  true
+    ) }}
     {{ end }}
     {{ if .YTLink }}
     <a href="{{ .YTLink }}" target="_blank" rel="noopener noreferrer"

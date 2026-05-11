@@ -152,6 +152,55 @@ func loadTemplates(ctx *config.AppContext) error {
 			return false
 		},
 		"hasPrefix": strings.HasPrefix,
+		// dict builds a map[string]any from variadic key/value pairs
+		// — enables passing named params to template blocks (e.g.
+		// {{ template "cal_picker" (dict "Title" .Name "Start" ...) }}).
+		// Errors out at template-exec time on an odd number of args
+		// or a non-string key, so misuse fails loudly instead of
+		// silently truncating.
+		"dict": func(values ...interface{}) (map[string]interface{}, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict requires an even number of arguments")
+			}
+			m := make(map[string]interface{}, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				k, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict key %d not a string", i)
+				}
+				m[k] = values[i+1]
+			}
+			return m, nil
+		},
+		// mapVenue resolves the raw venue slug ("one"/"two"/...) to
+		// the human-readable label ("Main Stage" / ...). Thin
+		// template-side wrapper around ics.MapVenue so the cal_picker
+		// block can render a meaningful Location instead of leaking
+		// the internal slug.
+		"mapVenue": ics.MapVenue,
+		// rfc3339 formats a time.Time / *time.Time as RFC 3339.
+		// Returns "" for a nil pointer or zero time so templates can
+		// safely emit it into a data-* attribute without leaking
+		// "0001-01-01T00:00:00Z". Used by the cal_picker block to
+		// hand structured timestamps to the JS picker.
+		"rfc3339": func(t interface{}) string {
+			switch v := t.(type) {
+			case nil:
+				return ""
+			case time.Time:
+				if v.IsZero() {
+					return ""
+				}
+				return v.Format(time.RFC3339)
+			case *time.Time:
+				if v == nil || v.IsZero() {
+					return ""
+				}
+				return v.Format(time.RFC3339)
+			default:
+				return ""
+			}
+		},
 		"dollars": func(cents int64) string {
 			// "%.2f" with the dollars+cents split keeps negative
 			// values rendering correctly (e.g. -$1.50). Used by

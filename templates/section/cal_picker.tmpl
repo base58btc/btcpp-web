@@ -1,0 +1,59 @@
+{{/*
+  cal_picker — drop-in "Add to calendar" button + provider dropdown.
+  Takes a dict with:
+    Title       string  — event name (required)
+    StartISO    string  — RFC 3339 start timestamp (required)
+    EndISO      string  — RFC 3339 end timestamp (required)
+    Description string  — body text (optional)
+    Location    string  — venue text (optional)
+    ICSURL      string  — download URL for the .ics fallback (required)
+    Compact     bool    — when true, hide the "Add to calendar" label on
+                          narrow viewports (used in dense table cells)
+    IconOnly    bool    — when true, hide the label entirely and render
+                          a circular white-on-dark icon button (used on
+                          the desktop image-card agenda variant)
+
+  Behavior lives in /static/js/cal-picker.js: click toggles the menu,
+  per-provider URLs are assembled client-side from the data-* attrs.
+  Apple / Outlook desktop go through the same .ics download the
+  current button uses today.
+*/}}
+{{ define "cal_picker" }}
+<div class="relative inline-block cal-picker">
+  <button type="button"
+          data-cal-trigger
+          title="Add to calendar"
+          data-cal-title="{{ .Title }}"
+          data-cal-start="{{ .StartISO }}"
+          data-cal-end="{{ .EndISO }}"
+          data-cal-description="{{ .Description }}"
+          data-cal-location="{{ .Location }}"
+          data-cal-ics="{{ .ICSURL }}"
+          {{ if .IconOnly }}
+          class="inline-flex items-center justify-center size-7 rounded-full bg-white/90 text-gray-900 hover:bg-white shadow-md ring-1 ring-black/5">
+          {{ else }}
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-teal-600 text-white hover:bg-teal-700">
+          {{ end }}
+    <span aria-hidden="true"{{ if .IconOnly }} class="text-sm leading-none"{{ end }}>&#128197;</span>
+    {{ if not .IconOnly }}
+    <span{{ if .Compact }} class="hidden sm:inline"{{ end }}>Add to calendar</span>
+    {{ end }}
+  </button>
+  {{/*
+    Menu uses position:fixed so it escapes any ancestor's
+    overflow-hidden (e.g. the dashboard shift-table wrapper that
+    clips the rounded corners). JS computes top/right from the
+    trigger's bounding rect on open and clears them on close.
+  */}}
+  <div class="cal-picker-menu hidden fixed w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50 text-left">
+    <a href="#" data-cal-target="google" target="_blank" rel="noopener noreferrer"
+       class="block px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-t-md">Google Calendar</a>
+    <a href="#" data-cal-target="outlook" target="_blank" rel="noopener noreferrer"
+       class="block px-3 py-2 text-xs text-gray-700 hover:bg-gray-100">Outlook.com</a>
+    <a href="#" data-cal-target="office365" target="_blank" rel="noopener noreferrer"
+       class="block px-3 py-2 text-xs text-gray-700 hover:bg-gray-100">Office 365</a>
+    <a href="#" data-cal-target="ics"
+       class="block px-3 py-2 text-xs text-gray-700 hover:bg-gray-100 rounded-b-md border-t border-gray-100">Apple / .ics download</a>
+  </div>
+</div>
+{{ end }}

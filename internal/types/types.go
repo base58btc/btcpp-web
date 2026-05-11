@@ -570,6 +570,16 @@ func (ct *ConfTalk) AnchorTag() string {
         return ct.Clipart[:len(ct.Clipart)-4]
 }
 
+// TypeLongDesc returns this shift's JobType.LongDesc when set, "" otherwise.
+// Lets templates pull a Description for cal-invite UI without inline nil
+// checks against the optional *JobType pointer.
+func (s *WorkShift) TypeLongDesc() string {
+        if s == nil || s.Type == nil {
+                return ""
+        }
+        return s.Type.LongDesc
+}
+
 // AnchorOrID returns AnchorTag when the conftalk has a clipart, and
 // the raw page ID otherwise. Lets the "Add to calendar" download URL
 // resolve before an admin has uploaded a clipart — important on the

@@ -8,6 +8,27 @@
         <div class="absolute inset-0 -z-10 bg-gradient-to-t from-gray-900 via-gray-900/40"></div>
         <div class="absolute inset-0 -z-10 rounded-2xl ring-1 ring-inset ring-gray-900/10"></div>
 
+        {{/*
+          Cal-picker sits inside the article at top-right. The picker's
+          dropdown menu uses position:fixed (see cal_picker.tmpl) so it
+          escapes the article's overflow-hidden — only the button needs
+          to live inside. z-30 keeps the button above the title link's
+          inset-0 click-target span; the JS handler also stopPropagates
+          so the click never bubbles to the wrapping anchor.
+        */}}
+        {{ if and .Sched (isFuture .Sched.Start) .AnchorTag }}
+        <div class="absolute top-3 right-3 z-30">
+          {{ template "cal_picker" (dict
+            "Title"    .Name
+            "StartISO" (rfc3339 .Sched.Start)
+            "EndISO"   (rfc3339 .Sched.End)
+            "Location" (mapVenue .Venue)
+            "ICSURL"   (printf "/conf/%s/talk/%s/calendar.ics" .ConfTag .AnchorTag)
+            "IconOnly" true
+          ) }}
+        </div>
+        {{ end }}
+
         {{ if eq .Venue "one" }}
         <p class="text-left text-sm text-gray-300">
           Venue: <span class="font-medium text-orange-200">Main Stage</span>
