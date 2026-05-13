@@ -1020,6 +1020,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/proposal/{proposalID}/invite", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalInviteLink(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/proposal/{proposalID}/edit", func(w http.ResponseWriter, r *http.Request) {
+		AdminEditProposal(w, r, app)
+	}).Methods("GET", "POST")
 	r.HandleFunc("/{conf}/admin/proposal/{proposalID}/speakers/{speakerConfID}/remove", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalRemoveSpeaker(w, r, app)
 	}).Methods("POST")

@@ -102,6 +102,10 @@
                     </dl>
 
                     <div class="flex items-center gap-2 flex-wrap pt-1">
+                        <a href="/{{ $.Conf.Tag }}/admin/proposal/{{ .Proposal.ID }}/edit?return=%2F{{ $.Conf.Tag }}%2Fadmin%2Fapplicants"
+                           class="inline-flex items-center rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                            Edit
+                        </a>
                         {{/* Cal-invite button: only renders when the proposal has a ConfTalk with a scheduled end. */}}
                         {{ if .CalState }}
                         <button type="submit"

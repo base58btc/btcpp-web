@@ -203,6 +203,7 @@
   {{ end }}
   <p class="mt-0.5 text-[10px] text-gray-400">desired {{ $sp.DesiredMin }} min{{ if $p.TalkType }} · {{ $p.TalkType }}{{ end }}</p>
   {{ template "schedule_avail" $sp }}
+  {{ template "schedule_edit_link" $p }}
 </div>
 {{ end }}
 
@@ -238,12 +239,33 @@
     {{ if ne $sp.ActualMin $sp.DesiredMin }}<span class="text-gray-400">(desired {{ $sp.DesiredMin }})</span>{{ end }}
   </p>
   {{ template "schedule_avail" $sp }}
+  {{ template "schedule_edit_link" $p }}
   {{/* Resize grip — drag to change ActualMin. Mousedown handler in
        schedule.js hijacks the event so the parent's drag-to-move
        isn't triggered. */}}
   <div class="schedule-resize-handle absolute inset-x-0 bottom-0 h-1.5 cursor-ns-resize bg-indigo-300/0 hover:bg-indigo-400/60 transition-colors"
        title="Drag to resize"></div>
 </div>
+{{ end }}
+
+{{/*
+  schedule_edit_link — small "edit" anchor on a schedule talk card.
+  Takes a *Proposal directly (uses .ScheduleFor.Tag for the conf
+  segment) so the block stays self-contained — no need to thread the
+  page-level $.Conf through the data dict. Opens the admin edit
+  form in a new tab so the admin doesn't lose their scroll position
+  in the schedule grid. draggable=false + mousedown stopPropagation
+  keeps the click from triggering the parent card's HTML5
+  drag-and-drop handler.
+*/}}
+{{ define "schedule_edit_link" }}
+{{ if and .ScheduleFor .ScheduleFor.Tag }}
+<a href="/{{ .ScheduleFor.Tag }}/admin/proposal/{{ .ID }}/edit?return=%2F{{ .ScheduleFor.Tag }}%2Fadmin%2Fschedule"
+   target="_blank" rel="noopener noreferrer"
+   draggable="false"
+   onmousedown="event.stopPropagation()"
+   class="mt-1 inline-block text-[10px] text-indigo-600 hover:text-indigo-700 underline decoration-dotted">edit</a>
+{{ end }}
 {{ end }}
 
 {{/*
