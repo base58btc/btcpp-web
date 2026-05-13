@@ -934,6 +934,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/gifts/clipart.zip", func(w http.ResponseWriter, r *http.Request) {
 		AdminGiftsClipartZip(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/comp-tickets", func(w http.ResponseWriter, r *http.Request) {
+		AdminCompTickets(w, r, app)
+	}).Methods("GET", "POST")
 
 	// Dev-only smoke endpoint for the self-hosted ICS pipeline.
 	// Production registrations of the route are blocked at the

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Issue comp tickets - {{ .Conf.Desc }}</title>
+    {{ block "header" . }} {{ end }}
+    {{ template "admin_favicon" .Conf }}
+  </head>
+  <body>
+    {{ block "mainnav" . }} {{ end }}
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-2xl">
+        <div class="mb-4">
+          <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+        </div>
+
+        <section class="mb-6">
+          <div class="overflow-hidden sm:rounded-lg bg-white shadow">
+            <div class="px-4 py-5 sm:p-6">
+              <h1 class="text-xl font-bold text-gray-900">Issue comp tickets</h1>
+              <p class="text-sm text-gray-500">{{ .Conf.Desc }} &middot; {{ .Conf.DateDesc }}</p>
+              <p class="mt-3 text-xs text-gray-500">
+                Tickets are added to PurchasesDb with Amount Paid = 0 and Platform = admincomp.
+                The mailer's next tick (~minutes) emails each ticket as a PDF to the recipient.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {{ if .Flash }}
+        <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+          <p class="text-sm text-green-800">{{ .Flash }}</p>
+        </div>
+        {{ end }}
+        {{ if .FlashErr }}
+        <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+          <p class="text-sm text-red-800">{{ .FlashErr }}</p>
+        </div>
+        {{ end }}
+
+        <section class="mb-6">
+          <div class="bg-white shadow rounded-lg px-4 py-5 sm:p-6">
+            <form method="POST" action="/{{ .Conf.Tag }}/admin/comp-tickets" class="space-y-4">
+              <div>
+                <label for="email" class="block text-sm font-medium text-gray-700">Recipient email</label>
+                <input type="email" name="email" id="email" required
+                       value="{{ .Email }}"
+                       placeholder="alice@example.com"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label for="count" class="block text-sm font-medium text-gray-700">Number of tickets</label>
+                  <input type="number" name="count" id="count" required
+                         min="1" max="25"
+                         value="{{ if .Count }}{{ .Count }}{{ else }}1{{ end }}"
+                         class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                </div>
+                <div>
+                  <label for="type" class="block text-sm font-medium text-gray-700">Ticket type</label>
+                  <select name="type" id="type" required
+                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                    {{ $selected := .Type }}
+                    {{ range .Types }}
+                    <option value="{{ . }}" {{ if eq . $selected }}selected{{ end }}>{{ . }}</option>
+                    {{ end }}
+                  </select>
+                </div>
+              </div>
+
+              <div class="pt-2 flex items-center gap-3">
+                <button type="submit"
+                        onclick="return confirm('Issue ' + document.getElementById('count').value + ' ' + document.getElementById('type').value + ' ticket(s) to ' + document.getElementById('email').value + '?');"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                  Issue tickets
+                </button>
+                <a href="/{{ .Conf.Tag }}/admin" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+              </div>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>
