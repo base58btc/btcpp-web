@@ -800,6 +800,28 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		LogoutHandler(w, r, app)
 	}).Methods("POST")
 
+	// /dashboard/affiliate/* MUST be registered before
+	// /dashboard/{confTag}/edit below, otherwise mux's first-match
+	// rule has /dashboard/affiliate/edit eaten by the speakerconf
+	// route (confTag="affiliate" → DashboardEditSpeakerConf can't
+	// find the conf, silently bounces the visitor back to
+	// /dashboard with no flash).
+	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateNew(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateCreate(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateEdit(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateUpdate(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/dashboard/affiliate/disable", func(w http.ResponseWriter, r *http.Request) {
+		AffiliateDisable(w, r, app)
+	}).Methods("POST")
+
 	r.HandleFunc("/dashboard/{confTag}/edit", func(w http.ResponseWriter, r *http.Request) {
 		DashboardEditSpeakerConf(w, r, app)
 	}).Methods("GET", "POST")
@@ -816,22 +838,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("GET")
 	r.HandleFunc("/dashboard/admin/roles", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerRolesUpdate(w, r, app)
-	}).Methods("POST")
-
-	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
-		AffiliateNew(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/dashboard/affiliate/new", func(w http.ResponseWriter, r *http.Request) {
-		AffiliateCreate(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
-		AffiliateEdit(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/dashboard/affiliate/edit", func(w http.ResponseWriter, r *http.Request) {
-		AffiliateUpdate(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/dashboard/affiliate/disable", func(w http.ResponseWriter, r *http.Request) {
-		AffiliateDisable(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
