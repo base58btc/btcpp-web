@@ -2120,10 +2120,13 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 					Name: item.Type,
 				},
 			},
-			"Amount Paid": {
-				Type:   notion.PropertyNumber,
-				Number: float64(item.Total) / 100,
-			},
+			// Amount Paid is built below — go-notion's
+			// `Number float64 json:omitempty` would elide a
+			// zero-value float from the PATCH body, leaving
+			// the property with type=number but no `number`
+			// sub-field, which Notion 400s on. For free comp
+			// tickets we just leave the column unset (Notion
+			// treats it as null).
 			"Currency": {
 				Type: notion.PropertySelect,
 				Select: &notion.SelectOption{
@@ -2144,6 +2147,13 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 					{Type: notion.RichTextText,
 						Text: &notion.Text{Content: entry.ID}},
 				}...),
+		}
+
+		if item.Total > 0 {
+			vals["Amount Paid"] = &notion.PropertyValue{
+				Type:   notion.PropertyNumber,
+				Number: float64(item.Total) / 100,
+			}
 		}
 
 		if entry.DiscountRef != "" {
