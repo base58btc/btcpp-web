@@ -36,26 +36,32 @@ func AdminCliparts(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
-	talks, err := getters.GetTalksFor(ctx, conf.Tag)
-	if err != nil {
-		ctx.Err.Printf("/%s/admin/cliparts list talks: %s", conf.Tag, err)
-		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-		return
-	}
-
-	rows := make([]*ClipartRow, 0, len(talks))
-	for _, t := range talks {
-		if t == nil {
+	// Iterate Proposals (filtered to Accepted + Scheduled), not the
+	// derived talks slice — ConfTalks are lazy-created when an admin
+	// first places a talk on the schedule grid, so an Accepted talk
+	// that hasn't been scheduled yet has no ConfTalk row and would
+	// silently disappear from a talks-slice-based listing. The
+	// upload handler lazy-creates the ConfTalk on first save.
+	proposals := loadConfProposals(ctx, conf)
+	rows := make([]*ClipartRow, 0, len(proposals))
+	for _, p := range proposals {
+		if p == nil {
+			continue
+		}
+		if p.Status != StatusAccepted && p.Status != StatusScheduled {
 			continue
 		}
 		row := &ClipartRow{
-			TalkID:         t.ID,
-			TalkTitle:      t.Name,
-			CurrentClipart: t.Clipart,
-			SuggestedName:  suggestClipartName(conf.Tag, t.Name),
+			ProposalID:    p.ID,
+			TalkTitle:     p.Title,
+			Status:        p.Status,
+			SuggestedName: suggestClipartName(conf.Tag, p.Title),
 		}
-		if t.Clipart != "" {
-			row.ClipartURL = spaces.PublicURL("talks/" + t.Clipart)
+		if ct := getters.FetchConfTalkByProposal(p.ID); ct != nil {
+			row.CurrentClipart = ct.Clipart
+			if ct.Clipart != "" {
+				row.ClipartURL = spaces.PublicURL("talks/" + ct.Clipart)
+			}
 		}
 		rows = append(rows, row)
 	}
@@ -112,12 +118,38 @@ func AdminClipartsUpload(w http.ResponseWriter, r *http.Request, ctx *config.App
 		handle404(w, r, ctx)
 		return
 	}
-	talkID := mux.Vars(r)["talkID"]
+	proposalID := mux.Vars(r)["proposalID"]
 	bail := func(msg string) {
-		ctx.Err.Printf("/%s/admin/cliparts/%s upload: %s", conf.Tag, talkID, msg)
+		ctx.Err.Printf("/%s/admin/cliparts/%s upload: %s", conf.Tag, proposalID, msg)
 		http.Redirect(w, r,
 			fmt.Sprintf("/%s/admin/cliparts?error=%s", conf.Tag, url.QueryEscape(msg)),
 			http.StatusSeeOther)
+	}
+	if proposalID == "" {
+		bail("Missing proposal ID.")
+		return
+	}
+
+	// Resolve (or lazy-create) the ConfTalk for this proposal. The
+	// schedule grid normally creates one on first place; the cliparts
+	// page is the only flow where admins might assign artwork before
+	// scheduling, so accept the cost of a CreateConfTalk here when
+	// the row doesn't exist yet.
+	confTalkID := ""
+	if ct := getters.FetchConfTalkByProposal(proposalID); ct != nil {
+		confTalkID = ct.ID
+	}
+	if confTalkID == "" {
+		newID, err := getters.CreateConfTalk(ctx.Notion, getters.ConfTalkInput{
+			ConfTag:    conf.Tag,
+			ProposalID: proposalID,
+		})
+		if err != nil {
+			bail("Couldn't create ConfTalk: " + err.Error())
+			return
+		}
+		confTalkID = newID
+		getters.InvalidateConfTalksCache()
 	}
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
@@ -177,7 +209,7 @@ func AdminClipartsUpload(w http.ResponseWriter, r *http.Request, ctx *config.App
 	}
 	InvalidateTalkManifest()
 
-	if err := getters.ConfTalkSetClipart(ctx.Notion, talkID, clean+".png"); err != nil {
+	if err := getters.ConfTalkSetClipart(ctx.Notion, confTalkID, clean+".png"); err != nil {
 		bail("Patch Notion ConfTalk.Clipart: " + err.Error())
 		return
 	}

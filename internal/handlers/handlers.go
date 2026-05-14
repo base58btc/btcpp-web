@@ -1053,7 +1053,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/cliparts", func(w http.ResponseWriter, r *http.Request) {
 		AdminCliparts(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/{conf}/admin/cliparts/{talkID}", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/{conf}/admin/cliparts/{proposalID}", func(w http.ResponseWriter, r *http.Request) {
 		AdminClipartsUpload(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/social-cards.zip", func(w http.ResponseWriter, r *http.Request) {

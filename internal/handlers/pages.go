@@ -355,10 +355,15 @@ type AdminClipartsPage struct {
         Year         uint
 }
 
-// ClipartRow carries a single talk's clipart-upload row.
+// ClipartRow carries a single talk's clipart-upload row. ProposalID
+// is the source-of-truth identifier — ConfTalks are lazy-created on
+// first upload, so Accepted proposals that haven't been placed on
+// the schedule grid yet still get a row here. Status (Accepted /
+// Scheduled) is rendered as a pill so the admin can prioritise.
 type ClipartRow struct {
-        TalkID         string
+        ProposalID     string
         TalkTitle      string
+        Status         string
         CurrentClipart string // bare filename ("vienna_bitcoin.png") or empty
         SuggestedName  string // `{conftag}_<keyword>` minus extension
         ClipartURL     string // Spaces URL of CurrentClipart, "" when empty

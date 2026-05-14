@@ -72,13 +72,16 @@
               </td>
               <td class="px-4 py-3 align-middle text-sm">
                 <p class="font-medium text-gray-900">{{ .TalkTitle }}</p>
+                {{ if .Status }}
+                <span class="mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {{ if eq .Status "Scheduled" }}bg-blue-100 text-blue-800{{ else }}bg-green-100 text-green-800{{ end }}">{{ .Status }}</span>
+                {{ end }}
                 {{ if .CurrentClipart }}
                 <p class="text-xs text-gray-500 font-mono">{{ .CurrentClipart }}</p>
                 {{ end }}
               </td>
               <td class="px-4 py-3 align-middle">
                 <form method="POST"
-                      action="/{{ $.Conf.Tag }}/admin/cliparts/{{ .TalkID }}"
+                      action="/{{ $.Conf.Tag }}/admin/cliparts/{{ .ProposalID }}"
                       enctype="multipart/form-data"
                       class="clipart-form flex flex-col gap-1">
                   <div class="flex items-center gap-1">
