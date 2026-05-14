@@ -980,6 +980,34 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		TrialCalInvite(w, r, app)
 	}).Methods("GET")
 
+	// Recordings: longform YouTube + X uploader. Lives outside any
+	// {conf} scope because a recording's home conf is recoverable
+	// from the ConfTalk relation. Auth: requireGlobalAdmin.
+	r.HandleFunc("/admin/recordings", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminList(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/recordings/oauth/youtube/start", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthStart(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/recordings/oauth/youtube/callback", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthCallback(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/recordings/oauth/youtube/disconnect", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthDisconnect(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/recordings/{id}", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminDetail(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/recordings/{id}/upload-yt", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminUploadYT(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/recordings/{id}/x", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminSaveXLink(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/recordings/{id}/status", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminJobStatus(w, r, app)
+	}).Methods("GET")
+
 	r.HandleFunc("/admin/orgs", func(w http.ResponseWriter, r *http.Request) {
 		OrgList(w, r, app)
 	}).Methods("GET")

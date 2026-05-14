@@ -12,6 +12,8 @@ import (
 	"btcpp-web/external/buffer"
 	"btcpp-web/external/getters"
 	"btcpp-web/external/spaces"
+	"btcpp-web/external/tokens"
+	youtubepkg "btcpp-web/external/youtube"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/handlers"
@@ -103,6 +105,15 @@ func loadConfig() *types.EnvConfig {
 			}
 		}
 
+		// YouTube OAuth — uploader is disabled when any of these are
+		// blank; main flow stays alive so the rest of the app keeps
+		// running.
+		config.YouTube = types.YouTubeConfig{
+			ClientID:     os.Getenv("YOUTUBE_CLIENT_ID"),
+			ClientSecret: os.Getenv("YOUTUBE_CLIENT_SECRET"),
+			RedirectURL:  os.Getenv("YOUTUBE_REDIRECT_URL"),
+		}
+
 		config.HMACKey, err = types.DeriveHMACKey(os.Getenv("HMAC_SECRET"))
 		if err != nil {
 			log.Fatal(err)
@@ -142,6 +153,12 @@ func main() {
 
 	/* Start up Spaces (S3-compatible storage) */
 	spaces.Init(app.Env.Spaces)
+
+	/* OAuth token store (YouTube today; X tomorrow when chromedp lands) */
+	if err := tokens.Init("tokens.bolt"); err != nil {
+		app.Err.Fatalf("open tokens.bolt: %s", err)
+	}
+	youtubepkg.Init(app.Env.YouTube.ClientID, app.Env.YouTube.ClientSecret, app.Env.YouTube.RedirectURL)
 
 	/* Load cached data */
 	getters.WaitFetch(&app)

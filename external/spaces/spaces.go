@@ -199,6 +199,34 @@ func Get(key string) ([]byte, error) {
 	return io.ReadAll(result.Body)
 }
 
+// GetStream returns a streaming reader + content length for an object,
+// without buffering the body. Required by the YouTube uploader so a
+// multi-GB longform video doesn't have to fit in process memory.
+// Caller must Close the returned ReadCloser.
+//
+// Returns ErrNotConfigured when Init hasn't been called; an S3
+// NotFound-style error when the key doesn't exist; or a length of -1
+// when the bucket didn't return Content-Length (some S3-compatible
+// stores omit it on chunked transfers — callers should treat -1 as
+// "unknown" and pass it through to the uploader as-is).
+func GetStream(key string) (io.ReadCloser, int64, error) {
+	if client == nil {
+		return nil, 0, fmt.Errorf("spaces not configured")
+	}
+	result, err := client.GetObject(context.Background(), &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	var size int64 = -1
+	if result.ContentLength != nil {
+		size = *result.ContentLength
+	}
+	return result.Body, size, nil
+}
+
 // Exists checks if an object exists in the bucket
 func Exists(key string) bool {
 	if client == nil {

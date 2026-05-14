@@ -543,6 +543,20 @@ func FetchConfTalkByProposal(proposalID string) *types.ConfTalk {
 	return confTalkByProposal[proposalID]
 }
 
+// FetchConfTalkByID walks the warm cache for a ConfTalk with the given
+// page ID. Linear scan because the cache isn't indexed by ID today —
+// fine for admin-list page sizes (low hundreds).
+func FetchConfTalkByID(id string) *types.ConfTalk {
+	confTalkCacheMu.RLock()
+	defer confTalkCacheMu.RUnlock()
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.ID == id {
+			return ct
+		}
+	}
+	return nil
+}
+
 func InvalidateConfTalksCache() {
 	confTalkCacheMu.Lock()
 	lastConfTalkFetch = time.Time{}

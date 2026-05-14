@@ -35,6 +35,17 @@ type (
 		BufferAPI         string
 		Spaces            SpacesConfig
 		CacheTTLSec       int
+		YouTube           YouTubeConfig
+	}
+
+	// YouTubeConfig holds the OAuth client + redirect that backs the
+	// admin recordings uploader. Empty fields → uploader is disabled
+	// (the admin page surfaces a "set env vars" warning rather than
+	// crashing on a nil oauth2.Config).
+	YouTubeConfig struct {
+		ClientID     string
+		ClientSecret string
+		RedirectURL  string
 	}
 
 	Conf struct {
@@ -290,11 +301,20 @@ type (
 
         // Recording is a row in RecordingsDb — one per ConfTalk that has
         // a YouTube link (and eventually other recording metadata).
+        //
+        // FileURI is the Spaces object key for the source video (rich_text
+        // column "FileURI" on Notion). Populated by the admin before the
+        // longform-upload tool can publish to YouTube / X.
+        //
+        // XLink is the X.com (Twitter) post URL — written back when the
+        // admin posts the recording to X. Empty until then.
         Recording struct {
                 ID         string
                 ConfTalkID string
                 TalkName   string
                 YTLink     string
+                XLink      string
+                FileURI    string
         }
 
 	Talk struct {

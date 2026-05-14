@@ -239,6 +239,8 @@ func parseRecording(pageID string, props map[string]notion.PropertyValue) *types
 		ID:       pageID,
 		TalkName: parseRichText("TalkName", props),
 		YTLink:   props["YTLink"].URL,
+		XLink:    props["XLink"].URL,
+		FileURI:  parseRichText("FileURI", props),
 	}
 	for _, ref := range props["talk"].Relation {
 		if ref != nil && ref.ID != "" {

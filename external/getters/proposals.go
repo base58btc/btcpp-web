@@ -874,6 +874,80 @@ func GetRecordingByConfTalk(ctx *config.AppContext, confTalkID string) (*types.R
 	return parseRecording(pages[0].ID, pages[0].Properties), nil
 }
 
+// FetchRecordingByID returns the cached Recording with the given page ID,
+// or nil. The Recordings cache is by-ConfTalkID; this helper walks the
+// slice so the admin-recordings page can address rows by their own ID.
+func FetchRecordingByID(recordingID string) *types.Recording {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	for _, r := range cacheRecordings {
+		if r != nil && r.ID == recordingID {
+			return r
+		}
+	}
+	return nil
+}
+
+// ListRecordingsCached returns the warm Recordings slice. Returns nil
+// before the first fetch completes; callers can treat that as
+// "still booting" and render an empty list rather than a hard error.
+func ListRecordingsCached() []*types.Recording {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	if cacheRecordings == nil {
+		return nil
+	}
+	out := make([]*types.Recording, len(cacheRecordings))
+	copy(out, cacheRecordings)
+	return out
+}
+
+// UpdateRecordingYTLink patches the YTLink URL property on a Recording row
+// and mirrors the value into the warm cache so the next render sees it
+// without waiting on a refresh tick. Mirrors TalkUpdateCalNotif's pattern.
+func UpdateRecordingYTLink(ctx *config.AppContext, recordingID, ytLink string) error {
+	n := ctx.Notion
+	_, err := n.Client.UpdatePageProperties(context.Background(), recordingID,
+		map[string]*notion.PropertyValue{
+			"YTLink": notion.NewURLPropertyValue(ytLink),
+		})
+	if err != nil {
+		return fmt.Errorf("notion update YTLink: %w", err)
+	}
+	recordingCacheMu.Lock()
+	for _, r := range cacheRecordings {
+		if r != nil && r.ID == recordingID {
+			r.YTLink = ytLink
+			break
+		}
+	}
+	recordingCacheMu.Unlock()
+	return nil
+}
+
+// UpdateRecordingXLink patches the XLink URL property on a Recording row
+// and mirrors the value into the warm cache. Symmetric to
+// UpdateRecordingYTLink — different column.
+func UpdateRecordingXLink(ctx *config.AppContext, recordingID, xLink string) error {
+	n := ctx.Notion
+	_, err := n.Client.UpdatePageProperties(context.Background(), recordingID,
+		map[string]*notion.PropertyValue{
+			"XLink": notion.NewURLPropertyValue(xLink),
+		})
+	if err != nil {
+		return fmt.Errorf("notion update XLink: %w", err)
+	}
+	recordingCacheMu.Lock()
+	for _, r := range cacheRecordings {
+		if r != nil && r.ID == recordingID {
+			r.XLink = xLink
+			break
+		}
+	}
+	recordingCacheMu.Unlock()
+	return nil
+}
+
 // GetConfTalkByProposal looks up the ConfTalk linked to a proposal via its
 // `proposal` relation. Cache-first — when the ConfTalks cache is warm,
 // a missing entry is authoritative ("no ConfTalk exists yet") and we
