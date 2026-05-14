@@ -248,4 +248,3 @@ func Upload(ctx context.Context, p UploadParams, src io.Reader, size int64) (str
 	}
 	return fmt.Sprintf("https://youtu.be/%s", resp.Id), nil
 }
-

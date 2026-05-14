@@ -41,23 +41,23 @@ var lastOrgFetch time.Time
 // Maps are rebuilt fully on every refresh (cheap) and protected by a single
 // mutex per kind because the slice may be replaced atomically.
 var (
-	cacheProposals   []*types.Proposal
-	proposalByID     map[string]*types.Proposal
+	cacheProposals    []*types.Proposal
+	proposalByID      map[string]*types.Proposal
 	lastProposalFetch time.Time
-	proposalCacheMu  sync.RWMutex
+	proposalCacheMu   sync.RWMutex
 
-	cacheSpeakerConfs   []*types.SpeakerConf
-	speakerConfByID     map[string]*types.SpeakerConf
-	speakerConfBySpkID  map[string][]*types.SpeakerConf // indexed by Speaker.ID
+	cacheSpeakerConfs    []*types.SpeakerConf
+	speakerConfByID      map[string]*types.SpeakerConf
+	speakerConfBySpkID   map[string][]*types.SpeakerConf // indexed by Speaker.ID
 	lastSpeakerConfFetch time.Time
-	speakerConfCacheMu  sync.RWMutex
+	speakerConfCacheMu   sync.RWMutex
 
-	cacheConfTalks      []*types.ConfTalk
-	confTalkByProposal  map[string]*types.ConfTalk
-	lastConfTalkFetch   time.Time
-	confTalkCacheMu     sync.RWMutex
+	cacheConfTalks     []*types.ConfTalk
+	confTalkByProposal map[string]*types.ConfTalk
+	lastConfTalkFetch  time.Time
+	confTalkCacheMu    sync.RWMutex
 
-	cacheRecordings    []*types.Recording
+	cacheRecordings     []*types.Recording
 	recordingByConfTalk map[string]*types.Recording
 	lastRecordingFetch  time.Time
 	recordingCacheMu    sync.RWMutex
@@ -115,6 +115,7 @@ func queueRefresh(j JobType) bool {
 		return false
 	}
 }
+
 var cacheTTL time.Duration
 
 type TalksCallback func(ctx *config.AppContext, talks []*types.Talk)
@@ -146,30 +147,46 @@ func CloseWorkPool() {
 }
 
 func loadFromCache() bool {
-        loaded := true
-        if !readCache("confs", &confs) { loaded = false }
-        if !readCache("speakers", &cacheSpeakers) { loaded = false }
-        if !readCache("talks", &talks) { loaded = false }
-        if !readCache("discounts", &discounts) { loaded = false }
-        if !readCache("hotels", &hotels) { loaded = false }
-        if !readCache("jobs", &jobs) { loaded = false }
-        if !readCache("shifts", &shifts) { loaded = false }
-        if !readCache("orgs", &orgs) { loaded = false }
+	loaded := true
+	if !readCache("confs", &confs) {
+		loaded = false
+	}
+	if !readCache("speakers", &cacheSpeakers) {
+		loaded = false
+	}
+	if !readCache("talks", &talks) {
+		loaded = false
+	}
+	if !readCache("discounts", &discounts) {
+		loaded = false
+	}
+	if !readCache("hotels", &hotels) {
+		loaded = false
+	}
+	if !readCache("jobs", &jobs) {
+		loaded = false
+	}
+	if !readCache("shifts", &shifts) {
+		loaded = false
+	}
+	if !readCache("orgs", &orgs) {
+		loaded = false
+	}
 
-        if loaded {
-                now := time.Now()
-                lastConfsFetch = now
-                lastSpeakerFetch = now
-                lastTalksFetch = now
-                lastDiscountFetch = now
-                lastHotelFetch = now
-                lastJobTypeFetch = now
-                lastShiftFetch = now
-                lastOrgFetch = now
-                return true
-        }
+	if loaded {
+		now := time.Now()
+		lastConfsFetch = now
+		lastSpeakerFetch = now
+		lastTalksFetch = now
+		lastDiscountFetch = now
+		lastHotelFetch = now
+		lastJobTypeFetch = now
+		lastShiftFetch = now
+		lastOrgFetch = now
+		return true
+	}
 
-        return false
+	return false
 }
 
 // diskCacheBootstrapped tracks whether we've already attempted to bootstrap
@@ -256,7 +273,7 @@ func runJob(ctx *config.AppContext, job JobType) {
 		getDiscounts(ctx)
 	case JobHotels:
 		getHotels(ctx)
-        case JobJobs:
+	case JobJobs:
 		getJobs(ctx)
 	case JobShifts:
 		getShifts(ctx)
@@ -772,7 +789,7 @@ func getSpeakers(ctx *config.AppContext) {
 	} else {
 		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
 		writeCache("speakers", cacheSpeakers)
-                ctx.Infos.Printf("there are %d callbacks", len(onSpeakersRefresh))
+		ctx.Infos.Printf("there are %d callbacks", len(onSpeakersRefresh))
 		for _, cb := range onSpeakersRefresh {
 			cb(ctx, cacheSpeakers)
 		}
@@ -1703,7 +1720,6 @@ func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs
 	return err
 }
 
-
 func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	var discounts []*types.DiscountCode
 
@@ -1841,10 +1857,10 @@ func CheckIn(n *types.Notion, ticket string) (string, bool, error) {
 
 	page := pages[0]
 
-        revoked := page.Properties["Revoked"].Checkbox
-        if revoked != nil && *revoked {
-                return "", true, fmt.Errorf("Ticket was revoked")
-        }
+	revoked := page.Properties["Revoked"].Checkbox
+	if revoked != nil && *revoked {
+		return "", true, fmt.Errorf("Ticket was revoked")
+	}
 
 	if len(page.Properties["Checked In"].RichText) == 0 {
 		/* Update to checked in at time.now() */
@@ -2048,11 +2064,11 @@ func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.
 }
 
 func LookupTicketPages(n *types.Notion, lookupID string) ([]*notion.Page, error) {
-        return TicketPages(n, "Lookup ID", lookupID)
+	return TicketPages(n, "Lookup ID", lookupID)
 }
 
 func RefTicketPages(n *types.Notion, refid string) ([]*notion.Page, error) {
-        return TicketPages(n, "RefID", refid)
+	return TicketPages(n, "RefID", refid)
 }
 
 func TicketPages(n *types.Notion, field, uniqID string) ([]*notion.Page, error) {
@@ -2066,27 +2082,27 @@ func TicketPages(n *types.Notion, field, uniqID string) ([]*notion.Page, error) 
 			},
 		})
 
-        return pages, err
+	return pages, err
 }
 
 func ToggleTicketBlock(n *types.Notion, pageID string, block bool) error {
-        _, err := n.Client.UpdatePageProperties(context.Background(), pageID,
-                map[string]*notion.PropertyValue{
-                        "Revoked": {
-                                Type: notion.PropertyCheckbox,
-                                Checkbox: &block,
-                        },
-                })
-        return err
+	_, err := n.Client.UpdatePageProperties(context.Background(), pageID,
+		map[string]*notion.PropertyValue{
+			"Revoked": {
+				Type:     notion.PropertyCheckbox,
+				Checkbox: &block,
+			},
+		})
+	return err
 }
 
 func RevokeTicket(n *types.Notion, lookupID string) error {
-        pages, err := LookupTicketPages(n, lookupID)
+	pages, err := LookupTicketPages(n, lookupID)
 
-        for _, page := range pages {
-                ToggleTicketBlock(n, page.ID, true)
-        } 
-        return err
+	for _, page := range pages {
+		ToggleTicketBlock(n, page.ID, true)
+	}
+	return err
 }
 
 func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
@@ -2095,19 +2111,19 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 	for i, item := range entry.Items {
 		uniqID := types.UniqueID(entry.Email, entry.ID, int32(i))
 
-                /* Check for existing ticket already */
-                pages, err := RefTicketPages(n, uniqID)
-                if err != nil {
-                        return err
-                }
-                if len(pages) > 0 {
-                        /* Set each page to unrevoked */
-                        for _, page := range pages {
-                                ToggleTicketBlock(n, page.ID, false)
-                        }
-                        continue
-                }
-         
+		/* Check for existing ticket already */
+		pages, err := RefTicketPages(n, uniqID)
+		if err != nil {
+			return err
+		}
+		if len(pages) > 0 {
+			/* Set each page to unrevoked */
+			for _, page := range pages {
+				ToggleTicketBlock(n, page.ID, false)
+			}
+			continue
+		}
+
 		vals := map[string]*notion.PropertyValue{
 			"RefID": notion.NewTitlePropertyValue(
 				[]*notion.RichText{
@@ -2184,178 +2200,177 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 	return nil
 }
 
-func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) (error) {
+func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) error {
 	parent := notion.NewDatabaseParent(n.Config.VolunteerDb)
 
-        // multiselect
-        availability := make([]*notion.SelectOption, len(vol.Availability))
-        for i, av := range vol.Availability {
-                availability[i] = &notion.SelectOption{
-                        Name: av,
-                }
-        }
+	// multiselect
+	availability := make([]*notion.SelectOption, len(vol.Availability))
+	for i, av := range vol.Availability {
+		availability[i] = &notion.SelectOption{
+			Name: av,
+		}
+	}
 
-        // relation
-        workYes := make([]*notion.ObjectReference, len(vol.WorkYes))
-        for i, wy := range vol.WorkYes {
-                workYes[i] = &notion.ObjectReference{
-                        Object: notion.ObjectPage,
-                        ID: wy.Ref,
-                }
-        }
-        workNo := make([]*notion.ObjectReference, len(vol.WorkNo))
-        for i, wn := range vol.WorkNo {
-                workNo[i] = &notion.ObjectReference{
-                        Object: notion.ObjectPage,
-                        ID: wn.Ref,
-                }
-        }
-        otherEvents := make([]*notion.ObjectReference, len(vol.OtherEvents))
-        for i, oe := range vol.OtherEvents {
-                otherEvents[i] = &notion.ObjectReference{
-                        Object: notion.ObjectPage,
-                        ID: oe.Ref,
-                }
-        }
+	// relation
+	workYes := make([]*notion.ObjectReference, len(vol.WorkYes))
+	for i, wy := range vol.WorkYes {
+		workYes[i] = &notion.ObjectReference{
+			Object: notion.ObjectPage,
+			ID:     wy.Ref,
+		}
+	}
+	workNo := make([]*notion.ObjectReference, len(vol.WorkNo))
+	for i, wn := range vol.WorkNo {
+		workNo[i] = &notion.ObjectReference{
+			Object: notion.ObjectPage,
+			ID:     wn.Ref,
+		}
+	}
+	otherEvents := make([]*notion.ObjectReference, len(vol.OtherEvents))
+	for i, oe := range vol.OtherEvents {
+		otherEvents[i] = &notion.ObjectReference{
+			Object: notion.ObjectPage,
+			ID:     oe.Ref,
+		}
+	}
 
-        vals := map[string]*notion.PropertyValue{
-                "Name": notion.NewTitlePropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                Text: &notion.Text{Content: vol.Name}},
-                        }...),
-                "Email": notion.NewEmailPropertyValue(vol.Email),
-                "Phone": notion.NewPhoneNumberPropertyValue(vol.Phone),
-                "Availability":  &notion.PropertyValue {
-                        Type: notion.PropertyMultiSelect,
-                        MultiSelect: &availability,
-                },
-                "Signal": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: vol.Signal}},
-                        }...),
-                "ContactAt": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: vol.ContactAt}},
-                        }...),
-                "DiscoveredVia": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: vol.DiscoveredVia}},
-                        }...),
-                "ScheduleFor": notion.NewRelationPropertyValue(
-                        []*notion.ObjectReference{{ID: vol.ScheduleFor[0].Ref}}...,
-                ),
-                "FirstEvent": {
-                        Type: notion.PropertyCheckbox,
-                        Checkbox: &vol.FirstEvent,
-                },
-                "Hometown": notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                        Text: &notion.Text{Content: vol.Hometown}},
-                        }...),
-                "Shirt": {
-                        Type: notion.PropertySelect,
-                        Select: &notion.SelectOption{
-                                Name: vol.Shirt,
-                        },
-                },
-                "Status": {
-                        Type: notion.PropertySelect,
-                        Select: &notion.SelectOption{
-                                Name: "Applied",
-                        },
-                },
+	vals := map[string]*notion.PropertyValue{
+		"Name": notion.NewTitlePropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Name}},
+			}...),
+		"Email": notion.NewEmailPropertyValue(vol.Email),
+		"Phone": notion.NewPhoneNumberPropertyValue(vol.Phone),
+		"Availability": &notion.PropertyValue{
+			Type:        notion.PropertyMultiSelect,
+			MultiSelect: &availability,
+		},
+		"Signal": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Signal}},
+			}...),
+		"ContactAt": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.ContactAt}},
+			}...),
+		"DiscoveredVia": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.DiscoveredVia}},
+			}...),
+		"ScheduleFor": notion.NewRelationPropertyValue(
+			[]*notion.ObjectReference{{ID: vol.ScheduleFor[0].Ref}}...,
+		),
+		"FirstEvent": {
+			Type:     notion.PropertyCheckbox,
+			Checkbox: &vol.FirstEvent,
+		},
+		"Hometown": notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Hometown}},
+			}...),
+		"Shirt": {
+			Type: notion.PropertySelect,
+			Select: &notion.SelectOption{
+				Name: vol.Shirt,
+			},
+		},
+		"Status": {
+			Type: notion.PropertySelect,
+			Select: &notion.SelectOption{
+				Name: "Applied",
+			},
+		},
+	}
 
-        }
+	if len(vol.WorkYes) != 0 {
+		vals["WorkYes"] = &notion.PropertyValue{
+			Type:     notion.PropertyRelation,
+			Relation: workYes,
+		}
+	}
 
-        if len(vol.WorkYes) != 0 {
-                vals["WorkYes"] = &notion.PropertyValue{
-                        Type: notion.PropertyRelation,
-                        Relation: workYes,
-                }
-        }
+	if len(vol.WorkNo) != 0 {
+		vals["WorkNo"] = &notion.PropertyValue{
+			Type:     notion.PropertyRelation,
+			Relation: workNo,
+		}
+	}
 
-        if len(vol.WorkNo) != 0 {
-                vals["WorkNo"] = &notion.PropertyValue{
-                        Type: notion.PropertyRelation,
-                        Relation: workNo,
-                }
-        }
+	if len(vol.OtherEvents) != 0 {
+		vals["OtherEvents"] = &notion.PropertyValue{
+			Type:     notion.PropertyRelation,
+			Relation: otherEvents,
+		}
+	}
 
-        if len(vol.OtherEvents) != 0 {
-                vals["OtherEvents"] = &notion.PropertyValue{
-                        Type: notion.PropertyRelation,
-                        Relation: otherEvents,
-                }
-        }
+	if vol.Twitter.Handle != "" {
+		vals["Twitter"] = notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Twitter.Handle}},
+			}...)
+	}
 
-        if vol.Twitter.Handle != "" {
-                vals["Twitter"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: vol.Twitter.Handle}},
-                        }...)
-        }
+	if vol.Nostr != "" {
+		vals["npub"] = notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Nostr}},
+			}...)
+	}
 
-        if vol.Nostr != "" {
-                vals["npub"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: vol.Nostr}},
-                        }...)
-        }
+	if vol.Comments != "" {
+		vals["Comments"] = notion.NewRichTextPropertyValue(
+			[]*notion.RichText{
+				{Type: notion.RichTextText,
+					Text: &notion.Text{Content: vol.Comments}},
+			}...)
+	}
 
-        if vol.Comments != "" {
-                vals["Comments"] = notion.NewRichTextPropertyValue(
-                        []*notion.RichText{
-                                {Type: notion.RichTextText,
-                                 Text: &notion.Text{Content: vol.Comments}},
-                        }...)
-        }
-
-        _, err := n.Client.CreatePage(context.Background(), parent, vals)
+	_, err := n.Client.CreatePage(context.Background(), parent, vals)
 
 	return err
 }
 
 func GetVolInfo(ctx *config.AppContext, confRef string) (*types.VolInfo, error) {
-        infos, err := GetVolInfos(ctx, confRef)
-        if err != nil {
-                return nil, err
-        }
+	infos, err := GetVolInfos(ctx, confRef)
+	if err != nil {
+		return nil, err
+	}
 
-        if len(infos) == 0 {
-                return nil, fmt.Errorf("Invalid confref for volinfos %s", confRef)
-        }
+	if len(infos) == 0 {
+		return nil, fmt.Errorf("Invalid confref for volinfos %s", confRef)
+	}
 
-        return infos[0], nil
+	return infos[0], nil
 }
 
 func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
-        vmap := make(map[string]*types.VolInfo)
-        volinfos, err := GetVolInfos(ctx, "")
-        if err != nil {
-                return vmap, err
-        }
+	vmap := make(map[string]*types.VolInfo)
+	volinfos, err := GetVolInfos(ctx, "")
+	if err != nil {
+		return vmap, err
+	}
 
 	confs, err = FetchConfsCached(ctx)
-        if err != nil {
-                return vmap, err
-        }
-        for _, vi := range volinfos {
-                for _, conf := range confs {
-                        if conf.Ref == vi.ConfRef {
-                                vmap[conf.Tag] = vi
-                                break
-                        }
-                }
-        }
+	if err != nil {
+		return vmap, err
+	}
+	for _, vi := range volinfos {
+		for _, conf := range confs {
+			if conf.Ref == vi.ConfRef {
+				vmap[conf.Tag] = vi
+				break
+			}
+		}
+	}
 
-        return vmap, nil
+	return vmap, nil
 }
 
 // ListConfInfos fetches every row in ConfInfoDb, optionally filtered to a
@@ -2371,67 +2386,67 @@ func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
 // empty time fields rather than dropping out — useful for admin tools
 // that want to surface orphan rows.
 func ListConfInfos(ctx *config.AppContext, confTag string) ([]*types.ConfInfo, error) {
-        confs, err := FetchConfsCached(ctx)
-        if err != nil {
-                return nil, err
-        }
-        confByTag := make(map[string]*types.Conf, len(confs))
-        for _, c := range confs {
-                if c != nil && c.Tag != "" {
-                        confByTag[c.Tag] = c
-                }
-        }
+	confs, err := FetchConfsCached(ctx)
+	if err != nil {
+		return nil, err
+	}
+	confByTag := make(map[string]*types.Conf, len(confs))
+	for _, c := range confs {
+		if c != nil && c.Tag != "" {
+			confByTag[c.Tag] = c
+		}
+	}
 
-        n := ctx.Notion
-        db := ctx.Env.Notion.ConfInfoDb
-        if db == "" {
-                return nil, nil
-        }
+	n := ctx.Notion
+	db := ctx.Env.Notion.ConfInfoDb
+	if db == "" {
+		return nil, nil
+	}
 
-        var out []*types.ConfInfo
-        hasMore := true
-        nextCursor := ""
-        for hasMore {
-                pages, next, more, err := n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
-                        StartCursor: nextCursor,
-                })
-                if err != nil {
-                        return nil, err
-                }
-                nextCursor = next
-                hasMore = more
-                for _, page := range pages {
-                        ci := parseConfInfo(page.ID, page.Properties, confByTag)
-                        if confTag != "" && ci.ConfTag != confTag {
-                                continue
-                        }
-                        out = append(out, ci)
-                }
-        }
-        return out, nil
+	var out []*types.ConfInfo
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(), db, notion.QueryDatabaseParam{
+			StartCursor: nextCursor,
+		})
+		if err != nil {
+			return nil, err
+		}
+		nextCursor = next
+		hasMore = more
+		for _, page := range pages {
+			ci := parseConfInfo(page.ID, page.Properties, confByTag)
+			if confTag != "" && ci.ConfTag != confTag {
+				continue
+			}
+			out = append(out, ci)
+		}
+	}
+	return out, nil
 }
 
 // GetConfInfoMap returns a Tag → []*ConfInfo map, sorted by Day within
 // each conf. Convenient for templates that want "the schedule strip for
 // this conf" without sifting by tag manually.
 func GetConfInfoMap(ctx *config.AppContext) (map[string][]*types.ConfInfo, error) {
-        infos, err := ListConfInfos(ctx, "")
-        if err != nil {
-                return nil, err
-        }
-        out := make(map[string][]*types.ConfInfo)
-        for _, ci := range infos {
-                if ci.ConfTag == "" {
-                        continue
-                }
-                out[ci.ConfTag] = append(out[ci.ConfTag], ci)
-        }
-        for tag := range out {
-                sort.Slice(out[tag], func(i, j int) bool {
-                        return out[tag][i].Day < out[tag][j].Day
-                })
-        }
-        return out, nil
+	infos, err := ListConfInfos(ctx, "")
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string][]*types.ConfInfo)
+	for _, ci := range infos {
+		if ci.ConfTag == "" {
+			continue
+		}
+		out[ci.ConfTag] = append(out[ci.ConfTag], ci)
+	}
+	for tag := range out {
+		sort.Slice(out[tag], func(i, j int) bool {
+			return out[tag][i].Day < out[tag][j].Day
+		})
+	}
+	return out, nil
 }
 
 func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
@@ -2552,21 +2567,21 @@ func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Vol
 }
 
 func UploadFile(n *types.Notion, contentType, filename string, data []byte) (string, error) {
-        upload, err := n.Client.CreateFileUpload(context.Background())
-        if err != nil {
-                return "", err
-        }
+	upload, err := n.Client.CreateFileUpload(context.Background())
+	if err != nil {
+		return "", err
+	}
 
-        upload.Filename = filename
-        upload.ContentType = contentType
-        result, err := n.Client.UploadFile(context.Background(), upload, data)
-        if err != nil {
-                return "", err
-        }
+	upload.Filename = filename
+	upload.ContentType = contentType
+	result, err := n.Client.UploadFile(context.Background(), upload, data)
+	if err != nil {
+		return "", err
+	}
 
-        if result.Status != notion.FileStatusUploaded {
-                return "", fmt.Errorf("Unable to upload file. %v", result)
-        }
+	if result.Status != notion.FileStatusUploaded {
+		return "", fmt.Errorf("Unable to upload file. %v", result)
+	}
 
-        return result.ID, nil
+	return result.ID, nil
 }

@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-        "net/url"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -49,28 +49,28 @@ type (
 	}
 
 	Conf struct {
-		Ref           string
-		UID           uint64
-		Tag           string
-		Active        bool
-		Desc          string
-		Tagline       string
-		DateDesc      string
-		StartDate     time.Time
-		EndDate       time.Time
-		Location      string
-		Venue         string
+		Ref       string
+		UID       uint64
+		Tag       string
+		Active    bool
+		Desc      string
+		Tagline   string
+		DateDesc  string
+		StartDate time.Time
+		EndDate   time.Time
+		Location  string
+		Venue     string
 		// VenueMap is a Google Maps / OpenStreetMap link to the
 		// venue's location; rendered in the ticket email.
-		VenueMap      string
+		VenueMap string
 		// VenueWebsite is the venue's official site; rendered in
 		// the ticket email so attendees can read about it directly.
-		VenueWebsite  string
+		VenueWebsite string
 		// DoorsOpen is the human-readable check-in time string —
 		// not a Notion field, populated just-in-time by the ticket
 		// email sender before template render so the body can do
 		// {{ .Conf.DoorsOpen }} without round-tripping ConfInfo.
-		DoorsOpen     string
+		DoorsOpen string
 		// HasAgenda is a derived boolean — true when at least one of
 		// the conf's talks has Status == "Scheduled". Populated at
 		// request time (shallow-copy + set in RenderConf / RenderTalks),
@@ -88,11 +88,11 @@ type (
 		// the Notion ConfsDb "Timezone" field. Empty when the field
 		// hasn't been filled in for this conf yet — callers should
 		// fall back via Conf.Loc() rather than reading TZ directly.
-		Timezone      string
+		Timezone string
 		// TZ is the parsed *time.Location of Timezone, or nil when
 		// Timezone is empty / unparseable. Populated once at parseConf
 		// time so hot paths don't pay LoadLocation per request.
-		TZ            *time.Location
+		TZ *time.Location
 
 		// CountdownStart / CountdownEnd are the conf's doors-open-
 		// day-1 and doors-close-last-day timestamps, populated at
@@ -112,40 +112,40 @@ type (
 		OrientCalNotif string
 	}
 
-        // ConfInfo is the per-day schedule strip for a conference: when
-        // doors open, when meals are served, when the coffee break is.
-        // One row per conference-day; resolved against Conf.StartDate so
-        // the times carry the conf's timezone.
-        //
-        // The Notion-side row identifies its conf by Tag string (e.g.
-        // "atx25") rather than a relation, so ConfTag holds the tag and
-        // resolution is a Tag → *Conf lookup at parse time.
-        ConfInfo struct {
-                ID        string
-                ConfTag   string
-                Day       int    // 1-indexed day-of-conference (Day 1 = StartDate)
-                Doors     *Times
-                Breakfast *Times
-                Lunch     *Times
-                Coffee    *Times
-                // Venues is the multiselect on the Notion ConfInfo row
-                // — the rooms/stages a talk can be scheduled into for
-                // this day. Drives the columns of the schedule grid.
-                Venues    []string
-        }
+	// ConfInfo is the per-day schedule strip for a conference: when
+	// doors open, when meals are served, when the coffee break is.
+	// One row per conference-day; resolved against Conf.StartDate so
+	// the times carry the conf's timezone.
+	//
+	// The Notion-side row identifies its conf by Tag string (e.g.
+	// "atx25") rather than a relation, so ConfTag holds the tag and
+	// resolution is a Tag → *Conf lookup at parse time.
+	ConfInfo struct {
+		ID        string
+		ConfTag   string
+		Day       int // 1-indexed day-of-conference (Day 1 = StartDate)
+		Doors     *Times
+		Breakfast *Times
+		Lunch     *Times
+		Coffee    *Times
+		// Venues is the multiselect on the Notion ConfInfo row
+		// — the rooms/stages a talk can be scheduled into for
+		// this day. Drives the columns of the schedule grid.
+		Venues []string
+	}
 
 	ConfTicket struct {
-		ID       string
-		ConfRef  string
-		Tier     string
-		Local    uint
-		BTC      uint
-		USD      uint
-		Expires  *Times
-		Max      uint
-		Currency string
-		Symbol   string
-		PostSymbol   string
+		ID         string
+		ConfRef    string
+		Tier       string
+		Local      uint
+		BTC        uint
+		USD        uint
+		Expires    *Times
+		Max        uint
+		Currency   string
+		Symbol     string
+		PostSymbol string
 	}
 	ConfTickets []*ConfTicket
 
@@ -169,9 +169,9 @@ type (
 	DiscountCode struct {
 		Ref       string
 		CodeName  string
-		Discount  string   // raw expression (e.g. "%50", "$10:50", "=25:70")
+		Discount  string // raw expression (e.g. "%50", "$10:50", "=25:70")
 		ConfRef   []string
-		UsesCount uint     // current usage count from Notion
+		UsesCount uint // current usage count from Notion
 		// AffiliateEmail is set when the code is owned by a
 		// dashboard self-service affiliate. Webhooks read this
 		// to decide whether to record an AffiliateUsage row.
@@ -204,118 +204,118 @@ type (
 	}
 
 	Speaker struct {
-		ID         string
-		Name       string
-		Photo      string
-		Email      string
-		Signal     string
-                Phone      string
-                Telegram   string
-		Twitter    Twitter
-		Nostr      string
-		Github     string
-                Instagram  string
-                LinkedIn   string
-		Website    string
-		Company    string
-                OrgLogo    string
-                AvailToHire bool
-                LookingToHire bool
-		TShirt     string
+		ID            string
+		Name          string
+		Photo         string
+		Email         string
+		Signal        string
+		Phone         string
+		Telegram      string
+		Twitter       Twitter
+		Nostr         string
+		Github        string
+		Instagram     string
+		LinkedIn      string
+		Website       string
+		Company       string
+		OrgLogo       string
+		AvailToHire   bool
+		LookingToHire bool
+		TShirt        string
 		// Roles drives admin-panel access. Each entry is the raw
 		// multi-select tag from the Speakers DB Roles column —
 		// e.g. "vienna-admin", "global-volcoord". Parsed by the
 		// auth package; an empty slice means no admin access.
-		Roles      []string
+		Roles []string
 	}
 	Speakers []*Speaker
 
-        Proposal struct {
-                ID          string
-		Name        string
-                Title       string
-		Description string
-		Setup       string
-                Comments    string
-                TalkType    string
-                Status      string
-                DesiredDuration int
-                AvailDuration   int
-                ScheduleFor *Conf
-                // SpeakerConfRefs is the raw page-ID list from the
-                // "speakers" multi-relation on Proposal. Resolution into
-                // *SpeakerConf objects happens at the consumer layer.
-                SpeakerConfRefs []string
-                Speakers        []*SpeakerConf
+	Proposal struct {
+		ID              string
+		Name            string
+		Title           string
+		Description     string
+		Setup           string
+		Comments        string
+		TalkType        string
+		Status          string
+		DesiredDuration int
+		AvailDuration   int
+		ScheduleFor     *Conf
+		// SpeakerConfRefs is the raw page-ID list from the
+		// "speakers" multi-relation on Proposal. Resolution into
+		// *SpeakerConf objects happens at the consumer layer.
+		SpeakerConfRefs []string
+		Speakers        []*SpeakerConf
 
-                // InviteToken authenticates the public co-speaker invite
-                // link. Empty means "no active invitation"; admins clear
-                // or rotate the field in Notion to revoke an outstanding
-                // share link.
-                InviteToken     string
+		// InviteToken authenticates the public co-speaker invite
+		// link. Empty means "no active invitation"; admins clear
+		// or rotate the field in Notion to revoke an outstanding
+		// share link.
+		InviteToken string
 
-                // Optional attachments populated by the dashboard enricher
-                // for the talk-card render. Nil unless explicitly fetched.
-                ConfTalk        *ConfTalk
-                Recording       *Recording
-        }
+		// Optional attachments populated by the dashboard enricher
+		// for the talk-card render. Nil unless explicitly fetched.
+		ConfTalk  *ConfTalk
+		Recording *Recording
+	}
 
-        SpeakerConf struct {
-                ID            string
-                ComingFrom    string
-                Speaker       *Speaker
-                // Proposals is the multi-relation `talk` on SpeakerConf —
-                // every proposal this speaker is delivering at this conf.
-                Proposals     []*Proposal
-                Availability  []string
-                RecordOK      string
-                Visa          string
-                FirstEvent    bool
-                DinnerRSVP    bool
-                Sponsor       bool
-                Company       string
-                OrgPhoto      string
-                OtherEvents   []*Conf
-                // Invite-flow audit trail: set by the admin "Invite a
-                // Speaker" flow and the magic-link landing page.
-                // InvitedAt is when the admin sent the invite, ViewedAt
-                // is the first time the speaker opened the magic link,
-                // AcceptedAt is when they clicked Accept.
-                InvitedAt     *time.Time
-                ViewedAt      *time.Time
-                AcceptedAt    *time.Time
-        }
+	SpeakerConf struct {
+		ID         string
+		ComingFrom string
+		Speaker    *Speaker
+		// Proposals is the multi-relation `talk` on SpeakerConf —
+		// every proposal this speaker is delivering at this conf.
+		Proposals    []*Proposal
+		Availability []string
+		RecordOK     string
+		Visa         string
+		FirstEvent   bool
+		DinnerRSVP   bool
+		Sponsor      bool
+		Company      string
+		OrgPhoto     string
+		OtherEvents  []*Conf
+		// Invite-flow audit trail: set by the admin "Invite a
+		// Speaker" flow and the magic-link landing page.
+		// InvitedAt is when the admin sent the invite, ViewedAt
+		// is the first time the speaker opened the magic link,
+		// AcceptedAt is when they clicked Accept.
+		InvitedAt  *time.Time
+		ViewedAt   *time.Time
+		AcceptedAt *time.Time
+	}
 
-        ConfTalk struct {
-                ID          string
-                Conf        *Conf
-                Proposal    *Proposal
-		Clipart     string
-		Sched       *Times
-                ProductionNotes string
-                Venue       string
-                Section     string
-		CalNotif    string
-                SocialCard  string
-        }
+	ConfTalk struct {
+		ID              string
+		Conf            *Conf
+		Proposal        *Proposal
+		Clipart         string
+		Sched           *Times
+		ProductionNotes string
+		Venue           string
+		Section         string
+		CalNotif        string
+		SocialCard      string
+	}
 
-        // Recording is a row in RecordingsDb — one per ConfTalk that has
-        // a YouTube link (and eventually other recording metadata).
-        //
-        // FileURI is the Spaces object key for the source video (rich_text
-        // column "FileURI" on Notion). Populated by the admin before the
-        // longform-upload tool can publish to YouTube / X.
-        //
-        // XLink is the X.com (Twitter) post URL — written back when the
-        // admin posts the recording to X. Empty until then.
-        Recording struct {
-                ID         string
-                ConfTalkID string
-                TalkName   string
-                YTLink     string
-                XLink      string
-                FileURI    string
-        }
+	// Recording is a row in RecordingsDb — one per ConfTalk that has
+	// a YouTube link (and eventually other recording metadata).
+	//
+	// FileURI is the Spaces object key for the source video (rich_text
+	// column "FileURI" on Notion). Populated by the admin before the
+	// longform-upload tool can publish to YouTube / X.
+	//
+	// XLink is the X.com (Twitter) post URL — written back when the
+	// admin posts the recording to X. Empty until then.
+	Recording struct {
+		ID         string
+		ConfTalkID string
+		TalkName   string
+		YTLink     string
+		XLink      string
+		FileURI    string
+	}
 
 	Talk struct {
 		ID          string
@@ -336,11 +336,11 @@ type (
 		// page's speaker list can filter to Accepted-only without
 		// re-fetching proposals. Empty when this Talk wasn't sourced
 		// from a Proposal (defensive).
-		Status      string
+		Status string
 		// YTLink is the YouTube URL when a Recording row exists for
 		// this talk's ConfTalk. Drives the "Watch" badge on the
 		// agenda + /talks pages.
-		YTLink      string
+		YTLink string
 	}
 
 	Session struct {
@@ -378,14 +378,14 @@ type (
 		// already pre-divided by 100. Currency is the ISO code as
 		// chosen at checkout. Both can be zero / blank for legacy
 		// rows that pre-date the field.
-		Amount     float64
-		Currency   string
+		Amount   float64
+		Currency string
 		// Revoked is the Notion "Revoked" checkbox. When true, the
 		// ticket is voided (refund / chargeback / admin reversal)
 		// and should be hidden from the buyer's dashboard. Stays in
 		// the cache so admin-side reporting / staffing decisions
 		// can still see it.
-		Revoked    bool
+		Revoked bool
 	}
 
 	Item struct {
@@ -426,105 +426,104 @@ type (
 		Order int
 	}
 
-        VolInfo struct {
-                Ref         string
-                ConfRef     string
-                OrientLink  string
-                OrientTimes *Times
-                Notes       string
-        }
+	VolInfo struct {
+		Ref         string
+		ConfRef     string
+		OrientLink  string
+		OrientTimes *Times
+		Notes       string
+	}
 
-        Volunteer struct {
-                Ref           string
-                Name          string
-                Email         string
-                Phone         string
-                Signal        string
-                Availability  []string
-                ContactAt     string
-                Comments      string
-                DiscoveredVia string
-                ScheduleFor   []*Conf
-                OtherEvents   []*Conf
-                WorkYes       []*JobType
-                WorkNo        []*JobType
-                FirstEvent    bool
-                Hometown      string
-                Twitter       Twitter
-                Nostr         string
-                Shirt         string
-                WorkShifts    []*WorkShift
-                Captcha       int
-                Subscribe     bool
-                Status        string
-                CreatedAt     *time.Time
-        }
+	Volunteer struct {
+		Ref           string
+		Name          string
+		Email         string
+		Phone         string
+		Signal        string
+		Availability  []string
+		ContactAt     string
+		Comments      string
+		DiscoveredVia string
+		ScheduleFor   []*Conf
+		OtherEvents   []*Conf
+		WorkYes       []*JobType
+		WorkNo        []*JobType
+		FirstEvent    bool
+		Hometown      string
+		Twitter       Twitter
+		Nostr         string
+		Shirt         string
+		WorkShifts    []*WorkShift
+		Captcha       int
+		Subscribe     bool
+		Status        string
+		CreatedAt     *time.Time
+	}
 
-        WorkShift struct {
-                Ref string
-                Name string
-                MaxVols uint
-                // TODO: change to Volunteers?
-                AssigneesRef []string
-                ShiftLeaderRef string
-                Type *JobType
-                Conf *Conf
-                ShiftTime *Times
-                Priority uint
-                CalNotif string
-        }
+	WorkShift struct {
+		Ref     string
+		Name    string
+		MaxVols uint
+		// TODO: change to Volunteers?
+		AssigneesRef   []string
+		ShiftLeaderRef string
+		Type           *JobType
+		Conf           *Conf
+		ShiftTime      *Times
+		Priority       uint
+		CalNotif       string
+	}
 
-        JobType struct {
-                Ref      string
-                Tag      string
-                DisplayOrder int
-                Title    string 
-                Tooltip  string
-                LongDesc string
-                Show     bool
-        }
+	JobType struct {
+		Ref          string
+		Tag          string
+		DisplayOrder int
+		Title        string
+		Tooltip      string
+		LongDesc     string
+		Show         bool
+	}
 
-        TalkApp struct {
-                Ref           string
-                Status        string
-                Name          string
-                Phone         string
-                Email         string
-                Signal        string
-                Telegram      string
-                ContactAt     string
-                Hometown      string
-                Twitter       Twitter
-                Nostr         string
-                Github        string
-                Website       string
-                Visa          string
-                Pic           string
-                NormPhoto     string
-                Org           string
-                Sponsor       bool
-                OrgTwitter    Twitter
-                OrgNostr      string
-                OrgSite       string
-                OrgLogo       string
-                TalkTitle     string
-                Description   string
-                PresType      string
-                Recording     string
-                Setup         string
-                TalkSetup     bool
-                DinnerRSVP    bool
-                Availability  []string
-                DiscoveredVia string
-                Shirt         string
-                ScheduleFor   *Conf
-                OtherEvents   []*Conf
-                Comments      string
-                FirstEvent    bool
-                Subscribe     bool
-                Captcha       int
-
-        }
+	TalkApp struct {
+		Ref           string
+		Status        string
+		Name          string
+		Phone         string
+		Email         string
+		Signal        string
+		Telegram      string
+		ContactAt     string
+		Hometown      string
+		Twitter       Twitter
+		Nostr         string
+		Github        string
+		Website       string
+		Visa          string
+		Pic           string
+		NormPhoto     string
+		Org           string
+		Sponsor       bool
+		OrgTwitter    Twitter
+		OrgNostr      string
+		OrgSite       string
+		OrgLogo       string
+		TalkTitle     string
+		Description   string
+		PresType      string
+		Recording     string
+		Setup         string
+		TalkSetup     bool
+		DinnerRSVP    bool
+		Availability  []string
+		DiscoveredVia string
+		Shirt         string
+		ScheduleFor   *Conf
+		OtherEvents   []*Conf
+		Comments      string
+		FirstEvent    bool
+		Subscribe     bool
+		Captcha       int
+	}
 )
 
 const (
@@ -570,10 +569,10 @@ func (p *Proposal) Desc() string {
 }
 
 func (t *Talk) AnchorTag() string {
-        if len(t.Clipart) <= 4 {
-                return t.Clipart
-        }
-        return t.Clipart[:len(t.Clipart)-4]
+	if len(t.Clipart) <= 4 {
+		return t.Clipart
+	}
+	return t.Clipart[:len(t.Clipart)-4]
 }
 
 // AnchorTag returns the same value as Talk.AnchorTag would for
@@ -581,23 +580,23 @@ func (t *Talk) AnchorTag() string {
 // templates that have the ConfTalk handy but not the derived
 // Talk struct.
 func (ct *ConfTalk) AnchorTag() string {
-        if ct == nil || len(ct.Clipart) <= 4 {
-                if ct == nil {
-                        return ""
-                }
-                return ct.Clipart
-        }
-        return ct.Clipart[:len(ct.Clipart)-4]
+	if ct == nil || len(ct.Clipart) <= 4 {
+		if ct == nil {
+			return ""
+		}
+		return ct.Clipart
+	}
+	return ct.Clipart[:len(ct.Clipart)-4]
 }
 
 // TypeLongDesc returns this shift's JobType.LongDesc when set, "" otherwise.
 // Lets templates pull a Description for cal-invite UI without inline nil
 // checks against the optional *JobType pointer.
 func (s *WorkShift) TypeLongDesc() string {
-        if s == nil || s.Type == nil {
-                return ""
-        }
-        return s.Type.LongDesc
+	if s == nil || s.Type == nil {
+		return ""
+	}
+	return s.Type.LongDesc
 }
 
 // AnchorOrID returns AnchorTag when the conftalk has a clipart, and
@@ -607,13 +606,13 @@ func (s *WorkShift) TypeLongDesc() string {
 // fallback, clipart or not. The TalkPublicICS handler matches on
 // either form.
 func (ct *ConfTalk) AnchorOrID() string {
-        if ct == nil {
-                return ""
-        }
-        if a := ct.AnchorTag(); a != "" {
-                return a
-        }
-        return ct.ID
+	if ct == nil {
+		return ""
+	}
+	if a := ct.AnchorTag(); a != "" {
+		return a
+	}
+	return ct.ID
 }
 
 func (t *Talk) ClipartAvif() string {
@@ -745,15 +744,14 @@ func (t *Times) Day() string {
 }
 
 func (t *Times) FmtRange() string {
-        start := t.Desc()
-        end := ""
-        if t.End != nil {
-                end = t.End.Format("- 3:04pm")
-        }
-        tz, _ := t.Start.Zone()
-        return start + end + " " + tz
+	start := t.Desc()
+	end := ""
+	if t.End != nil {
+		end = t.End.Format("- 3:04pm")
+	}
+	tz, _ := t.Start.Zone()
+	return start + end + " " + tz
 }
-
 
 func (t *Times) LenStr() string {
 	if t.End == nil {
@@ -775,11 +773,11 @@ func (t *Times) LenStr() string {
 }
 
 func datesBetween(start, end time.Time) []time.Time {
-        var dates []time.Time
-        for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
-                dates = append(dates, d)
-        }
-        return dates
+	var dates []time.Time
+	for d := start; !d.After(end); d = d.AddDate(0, 0, 1) {
+		dates = append(dates, d)
+	}
+	return dates
 }
 
 // Loc returns the conference's local timezone. Prefers the explicit
@@ -788,27 +786,27 @@ func datesBetween(start, end time.Time) []time.Time {
 // have a Timezone yet — same behavior as before this field existed.
 // Always non-nil so callers can use it directly with time.Date.
 func (c *Conf) Loc() *time.Location {
-        if c.TZ != nil {
-                return c.TZ
-        }
-        return c.StartDate.Location()
+	if c.TZ != nil {
+		return c.TZ
+	}
+	return c.StartDate.Location()
 }
 
 func (c *Conf) InFuture() bool {
-        return c.StartDate.After(time.Now())
+	return c.StartDate.After(time.Now())
 }
 
 func (c *Conf) WithinTwoWeeks() bool {
-        return time.Until(c.StartDate) <= 12 * 24 * time.Hour
+	return time.Until(c.StartDate) <= 12*24*time.Hour
 }
 
 // HasEnded reports whether the conf is over (EndDate is in the past).
 // Used by the dashboard to fold past confs into a collapsed section.
 func (c *Conf) HasEnded() bool {
-        if c.EndDate.IsZero() {
-                return false
-        }
-        return c.EndDate.Before(time.Now())
+	if c.EndDate.IsZero() {
+		return false
+	}
+	return c.EndDate.Before(time.Now())
 }
 
 // CanInvite reports whether co-speaker invites are still meaningful for
@@ -816,7 +814,7 @@ func (c *Conf) HasEnded() bool {
 // that window the schedule is locked and adding speakers creates more
 // problems than it solves.
 func (c *Conf) CanInvite() bool {
-        return c.Active && time.Until(c.StartDate) > 4*24*time.Hour
+	return c.Active && time.Until(c.StartDate) > 4*24*time.Hour
 }
 
 // TalksDueDays returns the number of days before StartDate at which talk
@@ -825,65 +823,65 @@ func (c *Conf) CanInvite() bool {
 // Centralized here so dashboard, the apply form, and any deadline-checking
 // code stay in sync.
 func (c *Conf) TalksDueDays() int {
-        if c.Tag == "nairobi" {
-                return 35
-        }
-        return 45
+	if c.Tag == "nairobi" {
+		return 35
+	}
+	return 45
 }
 
 // TalksDueDate returns the absolute time at which talk applications close.
 func (c *Conf) TalksDueDate() time.Time {
-        return c.StartDate.AddDate(0, 0, -c.TalksDueDays())
+	return c.StartDate.AddDate(0, 0, -c.TalksDueDays())
 }
 
 // TalksOpen reports whether talk applications are currently being accepted
 // for this conf — Active and before TalksDueDate.
 func (c *Conf) TalksOpen() bool {
-        return c.Active && time.Now().Before(c.TalksDueDate())
+	return c.Active && time.Now().Before(c.TalksDueDate())
 }
 
 // EmojiOrDefault returns the conf's emoji, or a sparkles fallback when
 // the field is empty so the dashboard never renders a blank tile.
 func (c *Conf) EmojiOrDefault() string {
-        if c.Emoji == "" {
-                return "✨"
-        }
-        return c.Emoji
+	if c.Emoji == "" {
+		return "✨"
+	}
+	return c.Emoji
 }
 
 func (c *Conf) DateBeforeStart(daysbefore int) string {
-        start := c.StartDate.AddDate(0, 0, daysbefore * -1)
-        return start.Format("Mon. Jan 2, 2006")
+	start := c.StartDate.AddDate(0, 0, daysbefore*-1)
+	return start.Format("Mon. Jan 2, 2006")
 }
 
 func (c *Conf) DaysList(prefix string, addone bool) []CheckItem {
-        /* Add an setup day before the event starts */
-        delta := 0
-        if addone {
-                delta = -1
-        }
-        start := c.StartDate.AddDate(0, 0, delta)
+	/* Add an setup day before the event starts */
+	delta := 0
+	if addone {
+		delta = -1
+	}
+	start := c.StartDate.AddDate(0, 0, delta)
 
-        dates := datesBetween(start, c.EndDate)
-        items := make([]CheckItem, len(dates))
+	dates := datesBetween(start, c.EndDate)
+	items := make([]CheckItem, len(dates))
 
-        for i, d := range dates {
-                items[i] = CheckItem{
-                        ItemID: prefix + d.Format("01/02/2006"),
-                        ItemDesc: d.Format("Mon. Jan 2, 2006"),
-                        Checked: true,
-                }
-        }
+	for i, d := range dates {
+		items[i] = CheckItem{
+			ItemID:   prefix + d.Format("01/02/2006"),
+			ItemDesc: d.Format("Mon. Jan 2, 2006"),
+			Checked:  true,
+		}
+	}
 
-        return items
+	return items
 }
 
 func RegistrationHash(prefix, confRef, email string) string {
 	h := sha256.New()
 	h.Write([]byte(email))
-        h.Write([]byte(confRef))
+	h.Write([]byte(confRef))
 	infohash := hex.EncodeToString(h.Sum(nil)[:18])
-        return fmt.Sprintf("btcpp-%s-%s", prefix, infohash)
+	return fmt.Sprintf("btcpp-%s-%s", prefix, infohash)
 }
 
 func UniqueID(email string, ref string, counter int32) string {
@@ -898,9 +896,9 @@ func UniqueID(email string, ref string, counter int32) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (vol *Volunteer) RegisID() (string) {
-        conf := vol.ScheduleFor[0]
-        return RegistrationHash("volreg", conf.Ref, vol.Email)
+func (vol *Volunteer) RegisID() string {
+	conf := vol.ScheduleFor[0]
+	return RegistrationHash("volreg", conf.Ref, vol.Email)
 }
 
 // SpeakerRegisID is the deterministic ID for a speaker's
@@ -908,38 +906,37 @@ func (vol *Volunteer) RegisID() (string) {
 // second self-confirm or admin Mark Confirmed click upserts the same
 // row instead of duplicating tickets.
 func SpeakerRegisID(confRef, email string) string {
-        return RegistrationHash("spkreg", confRef, email)
+	return RegistrationHash("spkreg", confRef, email)
 }
 
-func (vol *Volunteer) TicketRef() (string) {
-        tixID := vol.RegisID()
+func (vol *Volunteer) TicketRef() string {
+	tixID := vol.RegisID()
 	return UniqueID(vol.Email, tixID, int32(0))
 }
 
-func (vol *Volunteer) ParseAvailability(prefix string, form url.Values) (error) {
-        if vol.Availability == nil {
-                vol.Availability = make([]string, 0)
-        }
-        for k, _ := range form { 
-                if strings.HasPrefix(k, prefix) {
-                        vol.Availability = append(vol.Availability, k[len(prefix):])
-                }
-        }
-        return nil
+func (vol *Volunteer) ParseAvailability(prefix string, form url.Values) error {
+	if vol.Availability == nil {
+		vol.Availability = make([]string, 0)
+	}
+	for k, _ := range form {
+		if strings.HasPrefix(k, prefix) {
+			vol.Availability = append(vol.Availability, k[len(prefix):])
+		}
+	}
+	return nil
 }
 
-func (talkapp *TalkApp) ParseAvailability(prefix string, form url.Values) (error) {
-        if talkapp.Availability == nil {
-                talkapp.Availability = make([]string, 0)
-        }
-        for k, _ := range form { 
-                if strings.HasPrefix(k, prefix) {
-                        talkapp.Availability = append(talkapp.Availability, k[len(prefix):])
-                }
-        }
-        return nil
+func (talkapp *TalkApp) ParseAvailability(prefix string, form url.Values) error {
+	if talkapp.Availability == nil {
+		talkapp.Availability = make([]string, 0)
+	}
+	for k, _ := range form {
+		if strings.HasPrefix(k, prefix) {
+			talkapp.Availability = append(talkapp.Availability, k[len(prefix):])
+		}
+	}
+	return nil
 }
-
 
 const (
 	Small ShirtSize = "small"
@@ -988,7 +985,6 @@ func (s ConfTickets) Less(i, j int) bool {
 	return s[i].Expires.Start.Before(s[j].Expires.Start)
 }
 
-
 /* Functions to sort Speakers */
 func (s Speakers) Len() int {
 	return len(s)
@@ -1007,7 +1003,7 @@ func (s *Speaker) TwitterHandle() string {
 }
 
 func (j *JobType) IsWildcard() bool {
-        return j.Tag == "wildcard"
+	return j.Tag == "wildcard"
 }
 
 func (ws *WorkShift) DayOf() string {
@@ -1051,59 +1047,59 @@ func (ws *WorkShift) IsAssigned(volRef string) bool {
 }
 
 func (v *Volunteer) AvailableOn(ws *WorkShift) bool {
-        shiftDay := ws.DayOf()
-        for _, day := range v.Availability {
-                if day == shiftDay {
-                        return true
-                }
-        }
-        return false
+	shiftDay := ws.DayOf()
+	for _, day := range v.Availability {
+		if day == shiftDay {
+			return true
+		}
+	}
+	return false
 }
 
 func (v *Volunteer) WillWork(job *JobType) bool {
-        for _, yjob := range v.WorkYes {
-                if yjob.Ref == job.Ref {
-                        return true
-                }
-        }
-        return false
+	for _, yjob := range v.WorkYes {
+		if yjob.Ref == job.Ref {
+			return true
+		}
+	}
+	return false
 }
 
 func (v *Volunteer) WillNotWork(job *JobType) bool {
-        for _, njob := range v.WorkNo {
-                if njob.Ref == job.Ref {
-                        return true
-                }
-        }
-        return false
+	for _, njob := range v.WorkNo {
+		if njob.Ref == job.Ref {
+			return true
+		}
+	}
+	return false
 }
 
 func (ws *WorkShift) Intersects(shifts []*WorkShift) bool {
-        if ws.ShiftTime == nil {
-                return false
-        }
+	if ws.ShiftTime == nil {
+		return false
+	}
 
-        for _, shift := range shifts {
-                if shift.ShiftTime == nil {
-                        continue
-                }
-                /* this shift starts after other ends, ok */
-                if shift.ShiftTime.End == nil {
-                        continue
-                }
-                if ws.ShiftTime.Start.After(*shift.ShiftTime.End) {
-                        continue
-                }
-                if ws.ShiftTime.End == nil {
-                        continue
-                }
-                /* other shift starts after other ends, ok */
-                if shift.ShiftTime.Start.After(*ws.ShiftTime.End) {
-                        continue
-                }
+	for _, shift := range shifts {
+		if shift.ShiftTime == nil {
+			continue
+		}
+		/* this shift starts after other ends, ok */
+		if shift.ShiftTime.End == nil {
+			continue
+		}
+		if ws.ShiftTime.Start.After(*shift.ShiftTime.End) {
+			continue
+		}
+		if ws.ShiftTime.End == nil {
+			continue
+		}
+		/* other shift starts after other ends, ok */
+		if shift.ShiftTime.Start.After(*ws.ShiftTime.End) {
+			continue
+		}
 
-                return true
-        }
+		return true
+	}
 
-        return false
+	return false
 }

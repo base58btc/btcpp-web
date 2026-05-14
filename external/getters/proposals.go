@@ -519,7 +519,6 @@ func FetchSpeakerConfWithSpeaker(ctx *config.AppContext, speakerConfID string) (
 	return parseSpeakerConf(ctx, page.ID, page.Properties, speakerMap, nil), nil
 }
 
-
 // ListSpeakerConfs fetches every SpeakerConf page, resolving Speaker and
 // Proposals (multi-relation `talk`) via the supplied maps. Pass nil for
 // either map to leave that side unresolved.
