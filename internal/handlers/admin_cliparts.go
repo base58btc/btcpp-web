@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
@@ -68,16 +70,26 @@ func AdminCliparts(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 			continue
 		}
 		row := &ClipartRow{
-			ProposalID:    p.ID,
-			TalkTitle:     p.Title,
-			Status:        p.Status,
-			SuggestedName: suggestClipartName(conf.Tag, p.Title),
+			ProposalID: p.ID,
+			TalkTitle:  p.Title,
+			Status:     p.Status,
 		}
 		if ct != nil {
 			row.CurrentClipart = ct.Clipart
 			if ct.Clipart != "" {
 				row.ClipartURL = spaces.PublicURL("talks/" + ct.Clipart)
 			}
+		}
+		// Pre-fill the filename input with the existing clipart
+		// name (sans extension) so re-uploads default to
+		// overwriting the same Spaces key + Notion field. New
+		// rows fall through to the suggester, which now bakes
+		// 2 hex bytes of proposal-ID uniqueness into the name
+		// to avoid two talks sharing a suggestion.
+		if row.CurrentClipart != "" {
+			row.SuggestedName = strings.TrimSuffix(row.CurrentClipart, filepath.Ext(row.CurrentClipart))
+		} else {
+			row.SuggestedName = suggestClipartName(conf.Tag, p.Title, p.ID)
 		}
 		rows = append(rows, row)
 	}
@@ -258,23 +270,37 @@ func sanitizeClipartName(raw string) string {
 }
 
 // suggestClipartName picks a default filename for a talk: the
-// conf-tag prefix + the first non-trivial word of the talk title.
-// "Why Bitcoin++ Matters" → "vienna_bitcoin". The suggestion is a
-// hint admins can override in the form's filename input.
-func suggestClipartName(confTag, title string) string {
+// conf-tag prefix + the first non-trivial word of the talk title +
+// 4 hex chars derived from the proposal ID. The hex suffix is
+// deterministic (sha1 of the proposal ID, truncated) so repeated
+// renders of the page suggest the same name, but distinct across
+// talks even when titles collide (a "Closing keynote" panel at two
+// confs would otherwise both suggest "{tag}_closing"). The
+// suggestion is just a hint — admins can override in the form's
+// filename input.
+func suggestClipartName(confTag, title, proposalID string) string {
+	base := confTag + "_clipart"
 	clean := strings.ToLower(strings.TrimSpace(title))
 	clean = clipartNameStrip.ReplaceAllString(clean, " ")
 	for _, w := range strings.Fields(clean) {
 		if len(w) >= 4 && !clipartStopword(w) {
-			return confTag + "_" + w
+			base = confTag + "_" + w
+			break
 		}
 	}
-	for _, w := range strings.Fields(clean) {
-		if len(w) >= 3 {
-			return confTag + "_" + w
+	if base == confTag+"_clipart" {
+		for _, w := range strings.Fields(clean) {
+			if len(w) >= 3 {
+				base = confTag + "_" + w
+				break
+			}
 		}
 	}
-	return confTag + "_clipart"
+	if proposalID == "" {
+		return base
+	}
+	h := sha1.Sum([]byte(proposalID))
+	return base + "_" + hex.EncodeToString(h[:2])
 }
 
 // clipartStopword filters words that aren't useful as filename
