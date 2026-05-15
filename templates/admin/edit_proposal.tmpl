@@ -64,6 +64,37 @@
         </a>
         {{ end }}
       </div>
+      {{/*
+        Add-existing-speaker search box. Hits /api/speakers/search
+        (returns up to 10 JSON matches by name/email substring),
+        renders a dropdown, posts the picked speaker ID to the
+        attach handler. No invite-token round-trip, no email — just
+        wires the SpeakerConf onto the proposal. If the talk is
+        Scheduled the handler also fires a force=true REQUEST so
+        the new attendee gets a calendar invite.
+      */}}
+      <div class="relative mb-3" data-speaker-picker>
+        <form method="POST"
+              action="/{{ .Conf.Tag }}/admin/proposal/{{ .Proposal.ID }}/speakers/attach"
+              class="flex items-center gap-2">
+          <input type="hidden" name="speakerID" data-speaker-id>
+          <input type="text"
+                 data-speaker-q
+                 placeholder="Add speaker by name or email…"
+                 autocomplete="off"
+                 class="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-xs focus:outline-2 focus:outline-bitcoin" />
+          <button type="submit"
+                  data-speaker-submit
+                  disabled
+                  class="inline-flex items-center rounded-md bg-green-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+            Attach
+          </button>
+        </form>
+        <ul data-speaker-results
+            class="hidden absolute z-10 mt-1 w-full max-h-60 overflow-auto rounded-md border border-gray-200 bg-white shadow-lg text-xs">
+        </ul>
+      </div>
+
       {{ if .Speakers }}
       <ul class="divide-y divide-gray-100 border border-gray-100 rounded-md">
         {{ range .Speakers }}
@@ -160,6 +191,69 @@
     </form>
   </div>
   <script>
+    // Speaker picker: debounced search against /api/speakers/search,
+    // renders a dropdown of matches; click → fill hidden speakerID
+    // and enable the Attach submit. Free-form text without a pick
+    // keeps the submit disabled to dodge accidental attaches.
+    (function () {
+      var picker = document.querySelector('[data-speaker-picker]');
+      if (!picker) return;
+      var qInput  = picker.querySelector('[data-speaker-q]');
+      var idInput = picker.querySelector('[data-speaker-id]');
+      var submit  = picker.querySelector('[data-speaker-submit]');
+      var results = picker.querySelector('[data-speaker-results]');
+      var timer = null;
+
+      function setPicked(id, label) {
+        idInput.value = id;
+        if (label) qInput.value = label;
+        submit.disabled = !id;
+        results.classList.add('hidden');
+      }
+
+      function render(hits) {
+        results.innerHTML = '';
+        if (!hits || !hits.length) {
+          results.classList.add('hidden');
+          return;
+        }
+        hits.forEach(function (h) {
+          var li = document.createElement('li');
+          li.className = 'cursor-pointer px-3 py-2 hover:bg-gray-100 border-b border-gray-100 last:border-b-0';
+          li.innerHTML = '<div class="font-medium text-gray-900"></div>' +
+                         '<div class="text-gray-500 font-mono"></div>';
+          li.firstChild.textContent = h.name + (h.company ? ' · ' + h.company : '');
+          li.lastChild.textContent = h.email;
+          li.addEventListener('click', function () {
+            setPicked(h.id, h.name + ' <' + h.email + '>');
+          });
+          results.appendChild(li);
+        });
+        results.classList.remove('hidden');
+      }
+
+      qInput.addEventListener('input', function () {
+        idInput.value = '';
+        submit.disabled = true;
+        var q = qInput.value.trim();
+        if (timer) clearTimeout(timer);
+        if (q.length < 2) {
+          results.classList.add('hidden');
+          return;
+        }
+        timer = setTimeout(function () {
+          fetch('/api/speakers/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+            .then(function (r) { return r.ok ? r.json() : []; })
+            .then(render)
+            .catch(function () { results.classList.add('hidden'); });
+        }, 200);
+      });
+
+      document.addEventListener('click', function (e) {
+        if (!picker.contains(e.target)) results.classList.add('hidden');
+      });
+    })();
+
     // Copy invite link to clipboard. Mirrors the dashboard's
     // affiliate-share button click handler, scoped to this page
     // so we don't depend on a shared <script src=> load.

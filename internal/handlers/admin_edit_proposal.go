@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/config"
@@ -169,6 +170,94 @@ func adminTalkTypes(current string) []string {
 		}
 	}
 	return append([]string{current}, out...)
+}
+
+// AdminEditProposalAttachSpeaker attaches an existing Speaker
+// directly to a proposal — no invite-link round-trip, no email
+// letter, no InvitedAt stamp. Lets admins patch a panel together
+// quickly when both speakers are already in the Speakers DB.
+//
+// Pipeline:
+//
+//  1. Upsert SpeakerConf for (speaker, conf, proposal). Reuses
+//     any existing row for that speaker+conf rather than
+//     duplicating.
+//  2. Wire the SpeakerConf onto Proposal.speakers (mirror the
+//     relation so admin queues see the new co-speaker without
+//     waiting on Notion's two-way backfill).
+//  3. If the proposal is already Scheduled, fire a force=true
+//     REQUEST so the new speaker gets a cal invite and the
+//     existing speakers see the updated attendee list.
+//
+// Path: POST /{conf}/admin/proposal/{proposalID}/speakers/attach
+func AdminEditProposalAttachSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil || conf == nil {
+		handle404(w, r, ctx)
+		return
+	}
+	proposalID := mux.Vars(r)["proposalID"]
+	if proposalID == "" {
+		http.Error(w, "missing proposalID", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	speakerID := strings.TrimSpace(r.PostForm.Get("speakerID"))
+	editURL := fmt.Sprintf("/%s/admin/proposal/%s/edit", conf.Tag, proposalID)
+	bail := func(msg string) {
+		ctx.Err.Printf("/%s/admin/proposal/%s/speakers/attach: %s", conf.Tag, proposalID, msg)
+		http.Redirect(w, r, editURL+"?error="+url.QueryEscape(msg), http.StatusSeeOther)
+	}
+	if speakerID == "" {
+		bail("No speaker selected.")
+		return
+	}
+
+	proposal, err := getters.GetProposal(ctx, proposalID)
+	if err != nil || proposal == nil {
+		bail("Proposal not found.")
+		return
+	}
+
+	scID, err := getters.UpsertSpeakerConf(ctx, getters.SpeakerConfInput{
+		SpeakerID:  speakerID,
+		ConfTag:    conf.Tag,
+		ProposalID: proposalID,
+	})
+	if err != nil {
+		bail("Couldn't upsert SpeakerConf: " + err.Error())
+		return
+	}
+	if err := getters.AddSpeakerConfToProposal(ctx, proposalID, scID); err != nil {
+		// Non-fatal: Notion's two-way relation usually backfills,
+		// but log it so we know if the admin queue lags.
+		ctx.Err.Printf("/%s/admin/proposal/%s/speakers/attach add to proposal: %s", conf.Tag, proposalID, err)
+	}
+
+	// Scheduled talks need a cal-invite update so the new
+	// attendee shows up on everyone's calendar and the new
+	// speaker actually gets their REQUEST. force=true bumps the
+	// SEQUENCE so the existing-speaker calendars treat it as
+	// the same event with a new attendee list.
+	if proposal.Status == StatusScheduled {
+		// Re-fetch so SpeakerConfRefs has the new attachment.
+		if fresh, ferr := getters.GetProposal(ctx, proposalID); ferr == nil && fresh != nil {
+			speakers := proposalSpeakers(fresh)
+			if dErr := DispatchTalkICSForProposal(ctx, fresh, conf, speakers, true); dErr != nil {
+				ctx.Err.Printf("/%s/admin/proposal/%s/speakers/attach cal-fire: %s", conf.Tag, proposalID, dErr)
+			}
+		}
+	}
+
+	http.Redirect(w, r,
+		editURL+"?flash="+url.QueryEscape("Speaker attached."),
+		http.StatusSeeOther)
 }
 
 // safeAdminReturn whitelists return-URL prefixes — guards against
