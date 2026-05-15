@@ -70,9 +70,20 @@
                         <div class="min-w-0 flex-1">
                             <h2 class="text-sm font-semibold text-gray-900 leading-snug break-words">{{ .Proposal.Title }}</h2>
                             {{ if .Speakers }}
-                            <p class="mt-0.5 text-xs text-gray-700 break-words">
-                                {{ range $i, $sp := .Speakers }}{{ if $i }}, {{ end }}{{ $sp.Name }}{{ end }}
-                            </p>
+                            <div class="mt-1 flex flex-wrap items-center gap-1">
+                                {{ range .Speakers }}
+                                <span class="inline-flex items-center gap-1 rounded-full bg-gray-50 border border-gray-200 pl-0.5 pr-2 py-0.5 text-[11px] text-gray-700"
+                                      title="{{ .Name }}{{ if .Email }} — {{ .Email }}{{ end }}{{ if .Company }} ({{ .Company }}){{ end }}">
+                                    <img src="{{ if .Photo }}{{ speakerPhoto .Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+                                         alt=""
+                                         class="size-4 rounded-full object-cover bg-gray-100 shrink-0" />
+                                    <span class="truncate max-w-[8rem]">{{ .Name }}</span>
+                                </span>
+                                {{ end }}
+                                <span class="text-[10px] text-gray-400 ml-1">{{ len .Speakers }} speaker{{ if ne (len .Speakers) 1 }}s{{ end }}</span>
+                            </div>
+                            {{ else }}
+                            <p class="mt-1 text-[11px] italic text-amber-700">No speakers attached</p>
                             {{ end }}
                             <p class="mt-1 text-xs">
                                 <span class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-700">{{ .Proposal.Status }}</span>
