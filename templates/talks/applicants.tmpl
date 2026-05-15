@@ -88,6 +88,14 @@
                     <option value="1">Has scheduled time</option>
                     <option value="0">No scheduled time</option>
                 </select>
+                <select id="filter-talktype" class="rounded border border-gray-300 px-2 py-1 text-xs">
+                    <option value="">Any type</option>
+                    <option value="talk">talk</option>
+                    <option value="workshop">workshop</option>
+                    <option value="panel">panel</option>
+                    <option value="keynote">keynote</option>
+                    <option value="hackathon">hackathon</option>
+                </select>
                 <button type="button" id="filter-clear"
                         class="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
                     Clear
@@ -102,6 +110,7 @@
                 <article class="proposal-card shadow rounded-lg p-4 flex flex-col gap-2 {{ if eq .CalState "stale" }}bg-amber-50 ring-1 ring-amber-300{{ else }}bg-white{{ end }}"
                          data-status="{{ .Proposal.Status }}"
                          data-placed="{{ if .StartLabel }}1{{ else }}0{{ end }}"
+                         data-talktype="{{ .Proposal.TalkType }}"
                          data-search="{{ .Proposal.Title }}{{ range .Speakers }} {{ .Name }} {{ .Email }}{{ end }}">
                     <div class="flex items-start gap-2">
                         <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}"
@@ -269,11 +278,12 @@
     // Pure DOM filter: no XHR, no server reload; cheap for the
     // applicants page's bounded proposal count.
     (function () {
-      var q       = document.getElementById('filter-q');
-      var status  = document.getElementById('filter-status');
-      var placed  = document.getElementById('filter-placed');
-      var clear   = document.getElementById('filter-clear');
-      var counter = document.getElementById('filter-count');
+      var q        = document.getElementById('filter-q');
+      var status   = document.getElementById('filter-status');
+      var placed   = document.getElementById('filter-placed');
+      var talktype = document.getElementById('filter-talktype');
+      var clear    = document.getElementById('filter-clear');
+      var counter  = document.getElementById('filter-count');
       if (!q || !status || !placed) return;
       var cards = Array.prototype.slice.call(
         document.querySelectorAll('.proposal-card')
@@ -284,13 +294,15 @@
         var needle = (q.value || '').trim().toLowerCase();
         var st     = status.value;
         var pl     = placed.value;
+        var tt     = talktype ? talktype.value : '';
         var shown = 0;
         for (var i = 0; i < cards.length; i++) {
           var c = cards[i];
           var matchSt = !st || c.dataset.status === st;
           var matchPl = !pl || c.dataset.placed === pl;
+          var matchTT = !tt || c.dataset.talktype === tt;
           var matchQ  = !needle || (c.dataset.search || '').toLowerCase().indexOf(needle) !== -1;
-          var visible = matchSt && matchPl && matchQ;
+          var visible = matchSt && matchPl && matchTT && matchQ;
           c.style.display = visible ? '' : 'none';
           if (visible) shown++;
         }
@@ -304,11 +316,13 @@
       q.addEventListener('input', apply);
       status.addEventListener('change', apply);
       placed.addEventListener('change', apply);
+      if (talktype) talktype.addEventListener('change', apply);
       if (clear) {
         clear.addEventListener('click', function () {
           q.value = '';
           status.value = '';
           placed.value = '';
+          if (talktype) talktype.value = '';
           apply();
           q.focus();
         });
