@@ -56,6 +56,42 @@
                     Select all
                 </label>
                 <span class="text-xs text-gray-400">{{ len .Rows }} proposals</span>
+                <span class="text-xs text-gray-400" id="filter-count" data-total="{{ len .Rows }}"></span>
+            </div>
+
+            {{/*
+              Client-side filter bar — keeps the page render server-
+              side cheap (one big slice; the dashboard is bounded by
+              the conf's proposal count). data-status / data-placed /
+              data-search attributes on each card drive the JS at the
+              bottom of the template; no XHR / server round-trip per
+              keystroke.
+            */}}
+            <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                <input type="search" id="filter-q" placeholder="Search title or speaker…"
+                       class="flex-1 min-w-[12rem] rounded border border-gray-300 px-2 py-1 text-xs focus:outline-2 focus:outline-bitcoin" />
+                <select id="filter-status" class="rounded border border-gray-300 px-2 py-1 text-xs">
+                    <option value="">All statuses</option>
+                    <option value="">─────────</option>
+                    <option value="Applied">Applied</option>
+                    <option value="InReview">In review</option>
+                    <option value="Waitlisted">Waitlisted</option>
+                    <option value="Invited">Invited</option>
+                    <option value="Accepted">Accepted</option>
+                    <option value="Scheduled">Scheduled</option>
+                    <option value="TheyDecline">TheyDecline</option>
+                    <option value="WeDecline">WeDecline</option>
+                    <option value="Rejected">Rejected</option>
+                </select>
+                <select id="filter-placed" class="rounded border border-gray-300 px-2 py-1 text-xs">
+                    <option value="">Any placement</option>
+                    <option value="1">Has scheduled time</option>
+                    <option value="0">No scheduled time</option>
+                </select>
+                <button type="button" id="filter-clear"
+                        class="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
+                    Clear
+                </button>
             </div>
 
             <section id="proposals-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -63,7 +99,10 @@
                 {{ $row := . }}
                 {{ $invite := inviteLink .Proposal }}
                 {{ $terminal := or (eq .Proposal.Status "Accepted") (eq .Proposal.Status "Scheduled") (eq .Proposal.Status "TheyDecline") (eq .Proposal.Status "WeDecline") (eq .Proposal.Status "Rejected") }}
-                <article class="shadow rounded-lg p-4 flex flex-col gap-2 {{ if eq .CalState "stale" }}bg-amber-50 ring-1 ring-amber-300{{ else }}bg-white{{ end }}">
+                <article class="proposal-card shadow rounded-lg p-4 flex flex-col gap-2 {{ if eq .CalState "stale" }}bg-amber-50 ring-1 ring-amber-300{{ else }}bg-white{{ end }}"
+                         data-status="{{ .Proposal.Status }}"
+                         data-placed="{{ if .StartLabel }}1{{ else }}0{{ end }}"
+                         data-search="{{ .Proposal.Title }}{{ range .Speakers }} {{ .Name }} {{ .Email }}{{ end }}">
                     <div class="flex items-start gap-2">
                         <input type="checkbox" name="proposal_refs" value="{{ .Proposal.ID }}"
                                class="app-checkbox mt-1 rounded border-gray-300 shrink-0">
@@ -223,6 +262,58 @@
           });
         });
       });
+    })();
+
+    // Proposal-card filter bar — hide cards whose
+    // data-{status,placed,search} don't match the three inputs.
+    // Pure DOM filter: no XHR, no server reload; cheap for the
+    // applicants page's bounded proposal count.
+    (function () {
+      var q       = document.getElementById('filter-q');
+      var status  = document.getElementById('filter-status');
+      var placed  = document.getElementById('filter-placed');
+      var clear   = document.getElementById('filter-clear');
+      var counter = document.getElementById('filter-count');
+      if (!q || !status || !placed) return;
+      var cards = Array.prototype.slice.call(
+        document.querySelectorAll('.proposal-card')
+      );
+      var total = cards.length;
+
+      function apply() {
+        var needle = (q.value || '').trim().toLowerCase();
+        var st     = status.value;
+        var pl     = placed.value;
+        var shown = 0;
+        for (var i = 0; i < cards.length; i++) {
+          var c = cards[i];
+          var matchSt = !st || c.dataset.status === st;
+          var matchPl = !pl || c.dataset.placed === pl;
+          var matchQ  = !needle || (c.dataset.search || '').toLowerCase().indexOf(needle) !== -1;
+          var visible = matchSt && matchPl && matchQ;
+          c.style.display = visible ? '' : 'none';
+          if (visible) shown++;
+        }
+        if (counter) {
+          counter.textContent = shown === total
+            ? ''
+            : '· ' + shown + ' of ' + total + ' shown';
+        }
+      }
+
+      q.addEventListener('input', apply);
+      status.addEventListener('change', apply);
+      placed.addEventListener('change', apply);
+      if (clear) {
+        clear.addEventListener('click', function () {
+          q.value = '';
+          status.value = '';
+          placed.value = '';
+          apply();
+          q.focus();
+        });
+      }
+      apply();
     })();
     </script>
   </body>
