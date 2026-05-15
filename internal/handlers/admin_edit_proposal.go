@@ -240,13 +240,17 @@ func AdminEditProposalAttachSpeaker(w http.ResponseWriter, r *http.Request, ctx 
 		ctx.Err.Printf("/%s/admin/proposal/%s/speakers/attach add to proposal: %s", conf.Tag, proposalID, err)
 	}
 
-	// Scheduled talks need a cal-invite update so the new
-	// attendee shows up on everyone's calendar and the new
-	// speaker actually gets their REQUEST. force=true bumps the
-	// SEQUENCE so the existing-speaker calendars treat it as
-	// the same event with a new attendee list.
-	if proposal.Status == StatusScheduled {
-		// Re-fetch so SpeakerConfRefs has the new attachment.
+	// Only fire a cal-invite update when the ConfTalk's CalNotif
+	// is already populated — i.e. an invite has been sent at
+	// least once for this talk. Otherwise the talk is in
+	// "draft" mode (admin hasn't sent the first REQUEST yet) and
+	// emailing the new speaker would surprise them ahead of the
+	// rest of the speaker cohort. force=true bumps SEQUENCE so
+	// existing-speaker calendars treat the same event as having
+	// a new attendee list.
+	if ct := getters.FetchConfTalkByProposal(proposalID); ct != nil && ct.CalNotif != "" {
+		// Re-fetch the proposal so SpeakerConfRefs has the
+		// new attachment.
 		if fresh, ferr := getters.GetProposal(ctx, proposalID); ferr == nil && fresh != nil {
 			speakers := proposalSpeakers(fresh)
 			if dErr := DispatchTalkICSForProposal(ctx, fresh, conf, speakers, true); dErr != nil {
