@@ -706,10 +706,30 @@ type GiftRow struct {
 }
 
 type SpeakerRow struct {
-        ID     string
-        Name   string
-        Email  string
-        Signal string
+        ID            string
+        Name          string
+        Email         string
+        Signal        string
+        Photo         string // bare filename in Spaces speakers/, "" if unset
+        // Per-conf info from the matching SpeakerConf row. Empty
+        // when the speaker has no SpeakerConf for this conf yet
+        // (admin-imported speaker, freshly attached, etc.).
+        SpeakerConfID string
+        ComingFrom    string
+        Company       string
+        OrgLogo       string // bare filename in Spaces sponsors/, "" if unset
+        // Talks on this conf that the speaker is on. One entry per
+        // proposal, with the per-talk status pill source.
+        Talks         []*SpeakerRowTalk
+}
+
+// SpeakerRowTalk is one chip in a speaker's row — the talks they're
+// attached to for this conf. ProposalID is the Notion page ID, used
+// to link to the admin edit page.
+type SpeakerRowTalk struct {
+        ProposalID string
+        Title      string
+        Status     string
 }
 
 type RegistrationsAdminPage struct {

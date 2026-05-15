@@ -5419,27 +5419,55 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		return
 	}
 
-	talks, err := getters.GetTalksFor(ctx, conf.Tag)
-	if err != nil {
-		http.Error(w, "Unable to load talks", http.StatusInternalServerError)
-		ctx.Err.Printf("/%s/admin/speakers failed to get talks: %s", conf.Tag, err.Error())
-		return
-	}
-
-	var rows []*SpeakerRow
-	seen := make(map[string]bool)
-	for _, talk := range talks {
-		for _, speaker := range talk.Speakers {
-			if !seen[speaker.ID] {
-				seen[speaker.ID] = true
-				rows = append(rows, &SpeakerRow{
-					ID:     speaker.ID,
-					Name:   speaker.Name,
-					Email:  speaker.Email,
-					Signal: speaker.Signal,
-				})
-			}
+	// Iterate Proposals (filtered to this conf) so each row carries
+	// the proposal IDs directly — Talk struct doesn't expose the
+	// underlying Proposal.ID, and the admin edit-talk route needs
+	// it. Each SpeakerConf on a proposal contributes one (speaker,
+	// talk) pair; first-seen also pulls per-conf overrides from the
+	// SpeakerConf (ComingFrom, Company, OrgPhoto override the
+	// Speaker-level values).
+	proposals := loadConfProposals(ctx, conf)
+	rowByID := make(map[string]*SpeakerRow)
+	for _, p := range proposals {
+		if p == nil {
+			continue
 		}
+		for _, sc := range resolveProposalSpeakers(p) {
+			if sc == nil || sc.Speaker == nil {
+				continue
+			}
+			sp := sc.Speaker
+			row, ok := rowByID[sp.ID]
+			if !ok {
+				row = &SpeakerRow{
+					ID:            sp.ID,
+					Name:          sp.Name,
+					Email:         sp.Email,
+					Signal:        sp.Signal,
+					Photo:         sp.Photo,
+					Company:       sp.Company,
+					OrgLogo:       sp.OrgLogo,
+					SpeakerConfID: sc.ID,
+					ComingFrom:    sc.ComingFrom,
+				}
+				if sc.Company != "" {
+					row.Company = sc.Company
+				}
+				if sc.OrgPhoto != "" {
+					row.OrgLogo = sc.OrgPhoto
+				}
+				rowByID[sp.ID] = row
+			}
+			row.Talks = append(row.Talks, &SpeakerRowTalk{
+				ProposalID: p.ID,
+				Title:      p.Title,
+				Status:     p.Status,
+			})
+		}
+	}
+	rows := make([]*SpeakerRow, 0, len(rowByID))
+	for _, r := range rowByID {
+		rows = append(rows, r)
 	}
 
 	sort.SliceStable(rows, func(i, j int) bool {

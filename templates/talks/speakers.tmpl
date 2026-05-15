@@ -47,40 +47,90 @@
 
             {{ if .Rows }}
             {{ if .IsConfAdmin }}<form id="speaker-email-form" method="POST" action="/{{ .Conf.Tag }}/admin/speakers/email">{{ end }}
-            <section id="speakers-table" class="mb-6">
-                <div class="bg-white shadow rounded-lg overflow-hidden">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                {{ if .IsConfAdmin }}
-                                <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">
-                                    <input type="checkbox" onclick="toggleAllSpeakers(this)" class="rounded border-gray-300">
-                                </th>
-                                {{ end }}
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-                            {{ range .Rows }}
-                            <tr class="hover:bg-gray-50" data-speaker-name="{{ .Name }}" data-speaker-email="{{ .Email }}">
-                                {{ if $.IsConfAdmin }}
-                                <td class="px-3 py-4">
-                                    <input type="checkbox" name="speaker_refs" value="{{ .ID }}" class="speaker-checkbox rounded border-gray-300">
-                                </td>
-                                {{ end }}
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ .Name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ .Email }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ .Signal }}</td>
-                            </tr>
+
+            <div class="mb-3 flex items-center gap-2 flex-wrap">
+                {{ if .IsConfAdmin }}
+                <label class="inline-flex items-center gap-1 text-xs text-gray-600">
+                    <input type="checkbox" onclick="toggleAllSpeakers(this)" class="rounded border-gray-300">
+                    Select all
+                </label>
+                {{ end }}
+                <span class="text-xs text-gray-400">{{ len .Rows }} speakers</span>
+            </div>
+
+            <section id="speakers-table" class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {{ range .Rows }}
+                <article class="speaker-card bg-white shadow rounded-lg p-4 flex flex-col gap-2"
+                         data-speaker-name="{{ .Name }}"
+                         data-speaker-email="{{ .Email }}">
+                    <div class="flex items-start gap-2">
+                        {{ if $.IsConfAdmin }}
+                        <input type="checkbox" name="speaker_refs" value="{{ .ID }}"
+                               class="speaker-checkbox mt-1 rounded border-gray-300 shrink-0">
+                        {{ end }}
+                        <img src="{{ if .Photo }}{{ speakerPhoto .Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+                             alt="{{ .Name }}"
+                             class="size-10 rounded-full object-cover bg-gray-100 shrink-0" />
+                        <div class="min-w-0 flex-1">
+                            <h2 class="text-sm font-semibold text-gray-900 leading-snug break-words">{{ .Name }}</h2>
+                            {{ if .Email }}
+                            <p class="text-xs text-gray-600 font-mono break-all">{{ .Email }}</p>
                             {{ end }}
-                        </tbody>
-                    </table>
-                    <div class="px-6 py-3 bg-gray-50 text-sm text-gray-500">
-                        {{ len .Rows }} speakers
+                            {{ if .Signal }}
+                            <p class="text-[11px] text-gray-500">Signal: <span class="font-mono">{{ .Signal }}</span></p>
+                            {{ end }}
+                        </div>
                     </div>
-                </div>
+
+                    <dl class="text-xs text-gray-600 grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+                        {{ if .ComingFrom }}
+                        <dt class="font-medium text-gray-500">From:</dt>
+                        <dd class="break-words">{{ .ComingFrom }}</dd>
+                        {{ end }}
+                        {{ if .Company }}
+                        <dt class="font-medium text-gray-500">Org:</dt>
+                        <dd class="flex items-center gap-1 break-words">
+                            {{ if .OrgLogo }}
+                            <img src="/static/img/sponsors/{{ .OrgLogo }}" alt="" class="size-4 rounded bg-gray-50 object-contain shrink-0" />
+                            {{ end }}
+                            <span>{{ .Company }}</span>
+                        </dd>
+                        {{ end }}
+                    </dl>
+
+                    {{ if .Talks }}
+                    <div class="flex flex-wrap items-center gap-1">
+                        {{ range .Talks }}
+                        <a href="/{{ $.Conf.Tag }}/admin/proposal/{{ .ProposalID }}/edit"
+                           class="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2 py-0.5 text-[11px] text-indigo-900 hover:bg-indigo-100"
+                           title="{{ .Title }} · {{ .Status }}">
+                            <span class="truncate max-w-[10rem]">{{ .Title }}</span>
+                            {{ if .Status }}
+                            <span class="text-[9px] uppercase tracking-wide text-indigo-500">{{ .Status }}</span>
+                            {{ end }}
+                        </a>
+                        {{ end }}
+                    </div>
+                    {{ else }}
+                    <p class="text-[11px] italic text-amber-700">No talks attached</p>
+                    {{ end }}
+
+                    <div class="mt-1 flex items-center gap-3 text-[11px]">
+                        <a href="https://www.notion.so/{{ .ID }}"
+                           target="_blank" rel="noopener noreferrer"
+                           class="text-indigo-600 hover:text-indigo-700">
+                            Speaker &rarr;
+                        </a>
+                        {{ if .SpeakerConfID }}
+                        <a href="https://www.notion.so/{{ .SpeakerConfID }}"
+                           target="_blank" rel="noopener noreferrer"
+                           class="text-indigo-600 hover:text-indigo-700">
+                            SpeakerConf &rarr;
+                        </a>
+                        {{ end }}
+                    </div>
+                </article>
+                {{ end }}
             </section>
 
             {{ if .IsConfAdmin }}
@@ -99,13 +149,13 @@
     {{ if .Rows }}
     <script>
     function downloadCSV() {
-        var rows = document.querySelectorAll('#speakers-table tbody tr');
+        var cards = document.querySelectorAll('.speaker-card');
         var csv = 'Name,Email\n';
-        rows.forEach(function(row) {
-            // data-speaker-* attrs avoid index drift when the
-            // staff-tier render hides the checkbox column.
-            var name = '"' + (row.dataset.speakerName || '').replace(/"/g, '""') + '"';
-            var email = '"' + (row.dataset.speakerEmail || '').replace(/"/g, '""') + '"';
+        cards.forEach(function(card) {
+            // data-speaker-* attrs are on each card so the CSV
+            // doesn't have to peer into the markup of the row.
+            var name = '"' + (card.dataset.speakerName || '').replace(/"/g, '""') + '"';
+            var email = '"' + (card.dataset.speakerEmail || '').replace(/"/g, '""') + '"';
             csv += name + ',' + email + '\n';
         });
         var blob = new Blob([csv], {type: 'text/csv'});
