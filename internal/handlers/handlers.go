@@ -5467,6 +5467,21 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 	rows := make([]*SpeakerRow, 0, len(rowByID))
 	for _, r := range rowByID {
+		// Mark speakers whose only attachments are soft statuses
+		// so the page-level filter can collapse them. Zero-talk
+		// rows stay onlySoft=false — they're a distinct edge
+		// case (admin-imported but unattached) that we surface
+		// separately via the "No talks attached" tag.
+		if len(r.Talks) > 0 {
+			allSoft := true
+			for _, t := range r.Talks {
+				if t.Status != "Waitlisted" && t.Status != "Invited" {
+					allSoft = false
+					break
+				}
+			}
+			r.OnlySoftStatuses = allSoft
+		}
 		rows = append(rows, r)
 	}
 

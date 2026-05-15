@@ -721,6 +721,12 @@ type SpeakerRow struct {
         // Talks on this conf that the speaker is on. One entry per
         // proposal, with the per-talk status pill source.
         Talks         []*SpeakerRowTalk
+        // OnlySoftStatuses is true when the speaker has at least
+        // one talk AND every one of those talks is in {Waitlisted,
+        // Invited}. Drives the admin filter "hide speakers with
+        // only soft-status proposals" — useful for narrowing the
+        // roster to the confirmed-ish cohort.
+        OnlySoftStatuses bool
 }
 
 // SpeakerRowTalk is one chip in a speaker's row — the talks they're

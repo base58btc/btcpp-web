@@ -56,13 +56,35 @@
                 </label>
                 {{ end }}
                 <span class="text-xs text-gray-400">{{ len .Rows }} speakers</span>
+                <span class="text-xs text-gray-400" id="speaker-filter-count" data-total="{{ len .Rows }}"></span>
+            </div>
+
+            {{/*
+              Client-side filter bar — same pattern as the applicants
+              page. Each card carries data-{search, only-soft, has-talks}
+              attributes; the JS at the bottom hides cards whose attrs
+              don't match.
+            */}}
+            <div class="mb-3 flex flex-wrap items-center gap-2 rounded-md bg-gray-50 border border-gray-200 px-3 py-2">
+                <input type="search" id="speaker-filter-q" placeholder="Search name, email, org, hometown…"
+                       class="flex-1 min-w-[14rem] rounded border border-gray-300 px-2 py-1 text-xs focus:outline-2 focus:outline-bitcoin" />
+                <label class="inline-flex items-center gap-1 text-xs text-gray-700">
+                    <input type="checkbox" id="speaker-filter-hidesoft" class="rounded border-gray-300">
+                    Hide invited/waitlisted-only
+                </label>
+                <button type="button" id="speaker-filter-clear"
+                        class="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100">
+                    Clear
+                </button>
             </div>
 
             <section id="speakers-table" class="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {{ range .Rows }}
                 <article class="speaker-card bg-white shadow rounded-lg p-4 flex flex-col gap-2"
                          data-speaker-name="{{ .Name }}"
-                         data-speaker-email="{{ .Email }}">
+                         data-speaker-email="{{ .Email }}"
+                         data-only-soft="{{ if .OnlySoftStatuses }}1{{ else }}0{{ end }}"
+                         data-search="{{ .Name }} {{ .Email }} {{ .Company }} {{ .ComingFrom }}">
                     <div class="flex items-start gap-2">
                         {{ if $.IsConfAdmin }}
                         <input type="checkbox" name="speaker_refs" value="{{ .ID }}"
@@ -168,6 +190,48 @@
         var checkboxes = document.querySelectorAll('.speaker-checkbox');
         checkboxes.forEach(function(cb) { cb.checked = source.checked; });
     }
+
+    // Card filter: substring search + hide-only-soft toggle.
+    // Hides cards whose data-* attrs don't match; counter shows
+    // "M of N shown" when any filter is active.
+    (function () {
+      var q        = document.getElementById('speaker-filter-q');
+      var hideSoft = document.getElementById('speaker-filter-hidesoft');
+      var clear    = document.getElementById('speaker-filter-clear');
+      var counter  = document.getElementById('speaker-filter-count');
+      if (!q || !hideSoft) return;
+      var cards = Array.prototype.slice.call(document.querySelectorAll('.speaker-card'));
+      var total = cards.length;
+
+      function apply() {
+        var needle = (q.value || '').trim().toLowerCase();
+        var hs     = hideSoft.checked;
+        var shown = 0;
+        for (var i = 0; i < cards.length; i++) {
+          var c = cards[i];
+          var matchQ  = !needle || (c.dataset.search || '').toLowerCase().indexOf(needle) !== -1;
+          var matchHS = !hs || c.dataset.onlySoft !== '1';
+          var visible = matchQ && matchHS;
+          c.style.display = visible ? '' : 'none';
+          if (visible) shown++;
+        }
+        if (counter) {
+          counter.textContent = shown === total ? '' : '· ' + shown + ' of ' + total + ' shown';
+        }
+      }
+
+      q.addEventListener('input', apply);
+      hideSoft.addEventListener('change', apply);
+      if (clear) {
+        clear.addEventListener('click', function () {
+          q.value = '';
+          hideSoft.checked = false;
+          apply();
+          q.focus();
+        });
+      }
+      apply();
+    })();
     </script>
     {{ end }}
   </body>
