@@ -38,6 +38,66 @@
     </div>
     {{ end }}
 
+    {{/*
+      Speakers panel — separate from the content-edit form below
+      because Remove POSTs to a different endpoint. Each row is
+      its own <form> so the buttons don't nest illegally and the
+      content-edit Save button doesn't submit a remove by accident.
+      ?return= rides through so the remove handler bounces back
+      here on success rather than dropping into the review queue.
+    */}}
+    <section class="mb-6 bg-white shadow rounded-lg p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-semibold text-gray-900">Speakers ({{ len .Speakers }})</h2>
+        {{ if .InviteURL }}
+        <button type="button"
+                data-share-url="{{ .InviteURL }}"
+                class="affiliate-share-btn inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+                title="Copy the share-a-link URL — anyone with the link can join this talk as a co-speaker">
+          Copy invite link
+        </button>
+        {{ else }}
+        <a href="/{{ .Conf.Tag }}/admin/proposal/{{ .Proposal.ID }}/invite"
+           class="inline-flex items-center rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-700"
+           title="Mint a share-a-link URL so a new speaker can join this talk">
+          Generate invite link
+        </a>
+        {{ end }}
+      </div>
+      {{ if .Speakers }}
+      <ul class="divide-y divide-gray-100 border border-gray-100 rounded-md">
+        {{ range .Speakers }}
+        {{ if .Speaker }}
+        <li class="flex items-center justify-between gap-3 px-3 py-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <img src="{{ if .Speaker.Photo }}{{ speakerPhoto .Speaker.Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+                 alt="{{ .Speaker.Name }}"
+                 class="size-7 rounded-full object-cover bg-gray-100 shrink-0" />
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">{{ .Speaker.Name }}</p>
+              {{ if .Speaker.Email }}
+              <p class="text-xs text-gray-500 truncate font-mono">{{ .Speaker.Email }}</p>
+              {{ end }}
+            </div>
+          </div>
+          <form method="POST"
+                action="/{{ $.Conf.Tag }}/admin/proposal/{{ $.Proposal.ID }}/speakers/{{ .ID }}/remove?return=/{{ $.Conf.Tag }}/admin/proposal/{{ $.Proposal.ID }}/edit"
+                class="shrink-0">
+            <button type="submit"
+                    class="inline-flex items-center rounded-md border border-red-200 bg-white px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                    onclick="return confirm('Remove {{ .Speaker.Name }} from this talk? If the talk is Scheduled they get a CANCEL cal invite and the remaining speakers get an updated REQUEST.');">
+              Remove
+            </button>
+          </form>
+        </li>
+        {{ end }}
+        {{ end }}
+      </ul>
+      {{ else }}
+      <p class="text-xs text-gray-500 italic">No speakers on this talk yet. Share the invite link above so a speaker can join.</p>
+      {{ end }}
+    </section>
+
     <form method="POST" action="/{{ .Conf.Tag }}/admin/proposal/{{ .Proposal.ID }}/edit?return={{ .ReturnURL }}"
           class="space-y-6 bg-white shadow rounded-lg p-6">
 
@@ -99,5 +159,28 @@
       </div>
     </form>
   </div>
+  <script>
+    // Copy invite link to clipboard. Mirrors the dashboard's
+    // affiliate-share button click handler, scoped to this page
+    // so we don't depend on a shared <script src=> load.
+    (function () {
+      document.querySelectorAll('.affiliate-share-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var url = btn.getAttribute('data-share-url');
+          if (!url) return;
+          navigator.clipboard.writeText(url).then(function () {
+            var orig = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(function () { btn.textContent = orig; }, 1500);
+          }, function () {
+            // Clipboard API rejected (HTTP context, denied perm,
+            // etc) — fall back to a prompt so the admin can copy
+            // manually rather than silent failure.
+            window.prompt('Copy this URL:', url);
+          });
+        });
+      });
+    })();
+  </script>
 </body>
 </html>

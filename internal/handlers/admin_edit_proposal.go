@@ -24,6 +24,16 @@ type AdminEditProposalPage struct {
 	Proposal   *types.Proposal
 	TalkTypes  []string
 	Durations  []int
+	// Speakers is the SpeakerConf rows attached to this proposal,
+	// resolved from the warm cache so the edit page can show
+	// who's on the talk + offer per-row Remove buttons.
+	Speakers   []*types.SpeakerConf
+	// InviteURL is the share-a-link URL admins can copy and send
+	// to a new speaker. Empty when the proposal has no
+	// InviteToken minted yet — template falls back to a "Generate
+	// invite link" link that routes through the existing
+	// /{conf}/admin/proposal/{id}/invite page (which mints + shows).
+	InviteURL  string
 	Flash      string
 	FlashErr   string
 	Year       uint
@@ -91,11 +101,17 @@ func AdminEditProposal(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		}
 		if err := getters.UpdateProposal(ctx, proposalID, in); err != nil {
 			ctx.Err.Printf("/%s/admin/proposal/%s/edit update: %s", conf.Tag, proposalID, err)
+			inviteURL := ""
+			if proposal.InviteToken != "" {
+				inviteURL = helpers.InviteLink(ctx, proposal.ID, proposal.InviteToken)
+			}
 			renderAdminEditProposal(w, ctx, &AdminEditProposalPage{
 				Conf:      conf,
 				Proposal:  proposal,
 				TalkTypes: adminTalkTypes(proposal.TalkType),
 				Durations: adminTalkDurations,
+				Speakers:  resolveProposalSpeakers(proposal),
+				InviteURL: inviteURL,
 				FlashErr:  "Couldn't save — see server logs.",
 				ReturnURL: returnURL,
 				Year:      helpers.CurrentYear(),
@@ -108,12 +124,19 @@ func AdminEditProposal(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
+	inviteURL := ""
+	if proposal.InviteToken != "" {
+		inviteURL = helpers.InviteLink(ctx, proposal.ID, proposal.InviteToken)
+	}
 	renderAdminEditProposal(w, ctx, &AdminEditProposalPage{
 		Conf:      conf,
 		Proposal:  proposal,
 		TalkTypes: adminTalkTypes(proposal.TalkType),
 		Durations: adminTalkDurations,
+		Speakers:  resolveProposalSpeakers(proposal),
+		InviteURL: inviteURL,
 		Flash:     r.URL.Query().Get("flash"),
+		FlashErr:  r.URL.Query().Get("error"),
 		ReturnURL: returnURL,
 		Year:      helpers.CurrentYear(),
 	})

@@ -486,9 +486,28 @@ func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *con
 		removedName = sc.Speaker.Name
 	}
 
+	// ?return= lets the edit-talk form (and any future caller)
+	// land back on the page the admin came from instead of the
+	// default review queue. Whitelisted via safeAdminReturn to
+	// dodge open-redirect.
+	returnURL := r.URL.Query().Get("return")
+	if returnURL != "" && !safeAdminReturn(returnURL, conf.Tag) {
+		returnURL = ""
+	}
+
+	finish := func(flash string) {
+		if returnURL != "" {
+			http.Redirect(w, r,
+				returnURL+"?flash="+url.QueryEscape(flash),
+				http.StatusSeeOther)
+			return
+		}
+		redirectReview(w, r, conf, proposalID, flash)
+	}
+
 	if err := getters.RemoveProposalFromSpeakerConf(ctx, speakerConfID, proposalID); err != nil {
 		ctx.Err.Printf("/%s/admin/proposal/%s remove speaker %s: %s", conf.Tag, proposalID, speakerConfID, err)
-		redirectReview(w, r, conf, proposalID, "Remove failed: "+err.Error())
+		finish("Remove failed: " + err.Error())
 		return
 	}
 
@@ -502,7 +521,7 @@ func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *con
 		}
 	}
 
-	redirectReview(w, r, conf, proposalID, "Speaker removed from proposal.")
+	finish("Speaker removed from proposal.")
 }
 
 // loadConfProposals returns every Proposal whose ScheduleFor matches
