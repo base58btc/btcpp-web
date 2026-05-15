@@ -759,7 +759,24 @@ func ConfTalkSetClipart(n *types.Notion, confTalkID, filename string) error {
 		map[string]*notion.PropertyValue{
 			"Clipart": titleValue(filename),
 		})
-	return err
+	if err != nil {
+		return err
+	}
+	// Patch the warm ConfTalk caches in place. Without this, the
+	// admin redirect right after a clipart upload re-renders from
+	// stale cache (FetchConfTalkByProposal reads the map directly;
+	// InvalidateConfTalksCache only resets the staleness timer, it
+	// doesn't synchronously refetch). Same shape as the patch
+	// TalkUpdateCalNotif does for CalNotif writes.
+	confTalkCacheMu.Lock()
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.ID == confTalkID {
+			ct.Clipart = filename
+			break
+		}
+	}
+	confTalkCacheMu.Unlock()
+	return nil
 }
 
 // UpdateProposal applies a partial update to a Proposal page — only fields
