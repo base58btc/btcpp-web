@@ -1095,6 +1095,26 @@ func AddSpeakerConfToProposal(ctx *config.AppContext, proposalID, speakerConfID 
 		return fmt.Errorf("update proposal %s: %w", proposalID, err)
 	}
 	InvalidateProposalsCache()
+	// Patch the warm proposal cache in place. Without this, the
+	// immediate redirect-back after an admin attach-speaker click
+	// re-renders from stale SpeakerConfRefs (the timer-only
+	// invalidation doesn't synchronously refetch, and the cached
+	// pointer is what GetProposal returns). Same shape as the
+	// patch UpdateProposalStatus / ConfTalkSetClipart do.
+	proposalCacheMu.Lock()
+	if p := proposalByID[proposalID]; p != nil {
+		alreadyHas := false
+		for _, ref := range p.SpeakerConfRefs {
+			if ref == speakerConfID {
+				alreadyHas = true
+				break
+			}
+		}
+		if !alreadyHas {
+			p.SpeakerConfRefs = append(p.SpeakerConfRefs, speakerConfID)
+		}
+	}
+	proposalCacheMu.Unlock()
 	return nil
 }
 
