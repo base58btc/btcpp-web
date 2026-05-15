@@ -35,11 +35,20 @@ func computeScheduleDrift(ct *types.ConfTalk, p *types.Proposal, conf *types.Con
 	return cur != prev.HashHex
 }
 
-// ScheduleSendCalUpdates handles the "Send Cal Updates" button on
-// the /admin/schedule page. Iterates every Scheduled-status
-// proposal whose ConfTalk drifted (current hash != CalNotif hash)
-// and fires a force=false REQUEST. The hash check inside dispatch
-// re-confirms drift; matching cards skip silently.
+// ScheduleSendCalUpdates handles the "Send Cal Invites" button on
+// the /admin/schedule page. Does two things in one pass over every
+// proposal placed on the schedule grid:
+//
+//   - Accepted, ConfTalk.Sched != nil → first-send. Dispatch the
+//     REQUEST and flip Accepted → Scheduled so subsequent edits
+//     show up as drift.
+//   - Scheduled, drifted (hash != CalNotif hash) → update. Dispatch
+//     a force=false REQUEST; matching cards skip via the
+//     hash-unchanged short-circuit inside dispatch.
+//
+// Proposals that don't have a ConfTalk on the grid yet are ignored
+// — nothing to send for them. Everything else (Invited, Waitlisted,
+// terminal) is skipped defensively.
 //
 // Path: POST /{conf}/admin/schedule/sendcal-updates
 func ScheduleSendCalUpdates(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -53,20 +62,25 @@ func ScheduleSendCalUpdates(w http.ResponseWriter, r *http.Request, ctx *config.
 	}
 
 	proposals := loadConfProposals(ctx, conf)
-	var sent, skippedClean, failed int
+	var firstSent, updateSent, skippedClean, failed int
 	for _, p := range proposals {
 		if p == nil {
 			continue
 		}
-		// Updates only fire for Scheduled talks. Accepted-with-
-		// CalNotif shouldn't happen (the only way to set
-		// CalNotif is via the per-proposal sendcal which
-		// flips Accepted → Scheduled), but skip defensively.
-		if p.Status != StatusScheduled {
+		if p.Status != StatusAccepted && p.Status != StatusScheduled {
 			continue
 		}
 		ct := getters.FetchConfTalkByProposal(p.ID)
-		if ct == nil || !computeScheduleDrift(ct, p, conf) {
+		// Only act on talks that are placed on the grid —
+		// no Sched means no event to invite anyone to.
+		if ct == nil || ct.Sched == nil {
+			continue
+		}
+		isFirstSend := p.Status == StatusAccepted
+		// Already-Scheduled talks only fire when content drift
+		// is detected; otherwise the invite already in
+		// attendees' calendars is current.
+		if !isFirstSend && !computeScheduleDrift(ct, p, conf) {
 			skippedClean++
 			continue
 		}
@@ -76,10 +90,18 @@ func ScheduleSendCalUpdates(w http.ResponseWriter, r *http.Request, ctx *config.
 			failed++
 			continue
 		}
-		sent++
+		if isFirstSend {
+			firstSent++
+			if err := getters.UpdateProposalStatus(ctx, p.ID, StatusScheduled); err != nil {
+				ctx.Err.Printf("/%s/admin/schedule/sendcal-updates %q status flip: %s",
+					conf.Tag, p.Title, err)
+			}
+		} else {
+			updateSent++
+		}
 	}
 
-	flash := fmt.Sprintf("Cal updates: %d drifted talks resent · %d clean", sent, skippedClean)
+	flash := fmt.Sprintf("Cal invites: %d first-sends · %d drift updates · %d clean", firstSent, updateSent, skippedClean)
 	if failed > 0 {
 		flash = fmt.Sprintf("%s · %d failed (see logs)", flash, failed)
 	}
