@@ -948,12 +948,25 @@ func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, propos
 		}
 		remaining = append(remaining, ref.ID)
 	}
-	_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), speakerConfID,
-		map[string]*notion.PropertyValue{
-			"talk": relationValue(remaining),
-		})
-	if err != nil {
-		return fmt.Errorf("update speakerconf %s: %w", speakerConfID, err)
+	// go-notion's PropertyValue.Relation has `omitempty`, so an
+	// empty slice gets elided from the PATCH body and Notion
+	// rejects "talk" with no concrete sub-field. When the removal
+	// empties the relation entirely, fall back to the raw-HTTP
+	// clearRelationProperty path (same workaround
+	// UpdateAffiliateCode and the WorkShift Assignees clearing
+	// use).
+	if len(remaining) == 0 {
+		if err := clearRelationProperty(ctx.Notion.Config.Token, speakerConfID, "talk"); err != nil {
+			return fmt.Errorf("clear speakerconf %s talk: %w", speakerConfID, err)
+		}
+	} else {
+		_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), speakerConfID,
+			map[string]*notion.PropertyValue{
+				"talk": relationValue(remaining),
+			})
+		if err != nil {
+			return fmt.Errorf("update speakerconf %s: %w", speakerConfID, err)
+		}
 	}
 	InvalidateSpeakerConfsCache()
 	// Eagerly drop the proposal pointer from the cached SpeakerConf so
@@ -968,6 +981,24 @@ func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, propos
 		}
 		cached.Proposals = out
 	}
+	// Mirror the drop on the Proposal side. Notion's two-way
+	// relation will backfill this eventually, but the admin
+	// edit-page redirect renders before that propagates;
+	// resolveProposalSpeakers walks Proposal.SpeakerConfRefs and
+	// FetchSpeakerConfByID still returns a SpeakerConf row for
+	// the removed ref, so the speaker stays visible until the
+	// next cache refresh.
+	proposalCacheMu.Lock()
+	if p := proposalByID[proposalID]; p != nil {
+		out := p.SpeakerConfRefs[:0]
+		for _, ref := range p.SpeakerConfRefs {
+			if ref != speakerConfID {
+				out = append(out, ref)
+			}
+		}
+		p.SpeakerConfRefs = out
+	}
+	proposalCacheMu.Unlock()
 	return nil
 }
 
