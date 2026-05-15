@@ -36,19 +36,35 @@ func AdminCliparts(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 		return
 	}
 
-	// Iterate Proposals (filtered to Accepted + Scheduled), not the
-	// derived talks slice — ConfTalks are lazy-created when an admin
-	// first places a talk on the schedule grid, so an Accepted talk
-	// that hasn't been scheduled yet has no ConfTalk row and would
-	// silently disappear from a talks-slice-based listing. The
-	// upload handler lazy-creates the ConfTalk on first save.
+	// Iterate Proposals (filtered to talks that should have art
+	// queued up), not the derived talks slice — ConfTalks are
+	// lazy-created when an admin first places a talk on the
+	// schedule grid, so an Accepted talk that hasn't been scheduled
+	// yet has no ConfTalk row and would silently disappear from a
+	// talks-slice-based listing. The upload handler lazy-creates
+	// the ConfTalk on first save.
+	//
+	// Inclusion rules:
+	//   - Accepted / Scheduled: always — these are committed talks.
+	//   - Invited: only when the ConfTalk exists AND has a TalkTime
+	//     (Sched != nil). Lets admins pre-stage artwork for a
+	//     pencilled-in invitee they expect to confirm, without
+	//     flooding the page with every outstanding invite.
 	proposals := loadConfProposals(ctx, conf)
 	rows := make([]*ClipartRow, 0, len(proposals))
 	for _, p := range proposals {
 		if p == nil {
 			continue
 		}
-		if p.Status != StatusAccepted && p.Status != StatusScheduled {
+		ct := getters.FetchConfTalkByProposal(p.ID)
+		switch p.Status {
+		case StatusAccepted, StatusScheduled:
+			// always include — ConfTalk may not exist yet
+		case "Invited":
+			if ct == nil || ct.Sched == nil {
+				continue
+			}
+		default:
 			continue
 		}
 		row := &ClipartRow{
@@ -57,7 +73,7 @@ func AdminCliparts(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 			Status:        p.Status,
 			SuggestedName: suggestClipartName(conf.Tag, p.Title),
 		}
-		if ct := getters.FetchConfTalkByProposal(p.ID); ct != nil {
+		if ct != nil {
 			row.CurrentClipart = ct.Clipart
 			if ct.Clipart != "" {
 				row.ClipartURL = spaces.PublicURL("talks/" + ct.Clipart)

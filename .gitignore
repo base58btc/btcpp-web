@@ -21,3 +21,4 @@ sessions.bolt
 /backfill-speakername
 /swap-speakerconf-title
 /comingfrom.json
+.claude/
