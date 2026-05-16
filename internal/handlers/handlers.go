@@ -45,7 +45,7 @@ import (
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
-var pages []string = []string{"index", "vegas25"}
+var pages []string = []string{"index", "vegas25", "terms", "privacy"}
 
 func fieldGroup(name string, v interface{}, isRange bool) EmailFieldGroup {
 	fields := getStructFields(v)

@@ -92,6 +92,7 @@ func Sitemap(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		{"/sponsor", "monthly", "0.6"},
 		{"/contact", "monthly", "0.5"},
 		{"/privacy", "yearly", "0.2"},
+		{"/terms", "yearly", "0.2"},
 	}
 	for _, s := range static {
 		writeSitemapURL(w, SEOHost+s.Path, today, s.Freq, s.Prio)
