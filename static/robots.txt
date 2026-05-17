@@ -5,12 +5,19 @@ Allow: /
 Disallow: /dashboard
 Disallow: /admin
 Disallow: /login
+Disallow: /auth
+Disallow: /logout
+Disallow: /api/
 Disallow: /vols/
 Disallow: /i/
+Disallow: /invite-speaker/
 Disallow: /trial-cal-invite
+Disallow: /trial-email
+Disallow: /welcome-email
 Disallow: /sendcal
 Disallow: /conf-reload
 Disallow: /auth-
+Disallow: /media/
 
 # Per-conf admin / volcoord routes are namespaced under the conf tag,
 # e.g. /vienna/admin/applicants. Wildcard match drops them all.
@@ -26,6 +33,7 @@ Disallow: /webhook/
 
 # Calendar downloads — not pages, not indexable content.
 Disallow: /conf/*/talk/*/calendar.ics
+Disallow: /*/talk/*/calendar.ics
 Disallow: /dashboard/vol/*
 
 Sitemap: https://btcpp.dev/sitemap.xml

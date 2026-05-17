@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>talk at bitcoin++</title>
+    {{ template "site_seo" (dict "Title" (printf "Apply to speak at %s" .Conf.Desc) "Description" (printf "Apply to talk, present a workshop, or join a panel at %s, %s." .Conf.Desc .Conf.DateDesc) "Path" (printf "/talk/%s" .Conf.Tag) "Image" (confSocialImage .Conf.Tag "standard")) }}
     {{ block "header" . }} {{ end }}
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
   </head>

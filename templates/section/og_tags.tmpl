@@ -1,11 +1,13 @@
 {{ define "og_tags" }}
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ .Emoji }}</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>{{ .EmojiOrDefault }}</text></svg>">
 	<!-- facebook open graph tags -->
 	<meta property="og:type" content="website" />
+	<meta property="og:site_name" content="bitcoin++" />
 	<meta property="og:url" content="https://btcpp.dev/{{ .Tag }}" />
 	<meta property="og:title" content="{{ .Desc }} || {{ .DateDesc }}" />
 	<meta property="og:description" content="{{ .OGFlavor }}" />
-	<meta property="og:image" content="https://btcpp.dev/static/img/{{ .Tag }}/og_card_standard.png" />
+	<meta property="og:image" content="{{ confSocialImage .Tag "standard" }}" />
+	<meta property="og:image:alt" content="{{ .Desc }} || {{ .DateDesc }}" />
 
 	<!-- twitter card tags additive with the og: tags -->
 	<meta name="twitter:card" content="summary_large_image">
@@ -14,7 +16,8 @@
 	<meta name="twitter:url" content="https://btcpp.dev/{{ .Tag }}" />
 	<meta name="twitter:title" content="{{ .Desc }} || {{ .DateDesc }}" />
 	<meta name="twitter:description" content="{{ .OGFlavor }}" />
-	<meta name="twitter:image" content="https://btcpp.dev/static/img/{{ .Tag }}/og_card_twitter.png" />
+	<meta name="twitter:image" content="{{ confSocialImage .Tag "twitter" }}" />
+	<meta name="twitter:image:alt" content="{{ .Desc }} || {{ .DateDesc }}" />
 
 	<!-- meta tags -->
 	<meta name="description" content="{{ .OGFlavor }}" />

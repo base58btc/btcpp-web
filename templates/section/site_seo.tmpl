@@ -1,0 +1,25 @@
+{{ define "site_seo" }}
+    {{ $url := absoluteSEOURL .Path }}
+    {{ $image := absoluteSEOURL .Image }}
+    <title>{{ .Title }}</title>
+    <meta name="description" content="{{ .Description }}" />
+    <meta name="author" content="bitcoin++" />
+    <link rel="canonical" href="{{ $url }}" />
+
+    <meta property="og:type" content="{{ if .Type }}{{ .Type }}{{ else }}website{{ end }}" />
+    <meta property="og:site_name" content="bitcoin++" />
+    <meta property="og:url" content="{{ $url }}" />
+    <meta property="og:title" content="{{ .Title }}" />
+    <meta property="og:description" content="{{ .Description }}" />
+    <meta property="og:image" content="{{ $image }}" />
+    <meta property="og:image:alt" content="{{ .Title }}" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@btcplusplus" />
+    <meta name="twitter:domain" content="btcpp.dev" />
+    <meta name="twitter:url" content="{{ $url }}" />
+    <meta name="twitter:title" content="{{ .Title }}" />
+    <meta name="twitter:description" content="{{ .Description }}" />
+    <meta name="twitter:image" content="{{ $image }}" />
+    <meta name="twitter:image:alt" content="{{ .Title }}" />
+{{ end }}

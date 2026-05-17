@@ -8,10 +8,10 @@
 
 	<div class="relative px-6 py-32 sm:py-40 lg:px-8 lg:py-56 lg:pr-0">
 	  <div class="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl">
-	    <h1 class="text-4xl font-bold tracking-tight text-white lg:text-gray-900">
+	    <h2 class="text-4xl font-bold tracking-tight text-white lg:text-gray-900">
 	    <span class="font-bitcoin">
 	    {{ if eq .Tag "berlin25" }}lightning++{{ else }}bitcoin++{{ end }}
-	    </span> {{ .Tagline }}</h1>
+	    </span> {{ .Tagline }}</h2>
 	    <p class="mt-6 text-lg leading-8 text-gray-200 lg:text-gray-600">{{ .Location }} | {{ .DateDesc }}</p>
 	    {{ template "conf_countdown" . }}
 	    <div class="mt-10 flex flex-col justify-start gap-y-4">

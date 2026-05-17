@@ -1,10 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-	<title>{{ .Conf.Desc }} || {{ .Conf.DateDesc }}</title>
     {{ block "header" . }} {{ end }}
-    {{ block "og_tags" .Conf }} {{ end }}
-    {{ block "event_jsonld" . }} {{ end }}
+    {{ block "conf_seo" . }} {{ end }}
   </head>
 <body>
 {{ block "conf_nav" .Conf }} {{ end }}

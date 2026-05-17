@@ -1,0 +1,5 @@
+{{ define "conf_seo" }}
+    <title>{{ .Conf.Desc }} || {{ .Conf.DateDesc }}</title>
+    {{ block "og_tags" .Conf }} {{ end }}
+    {{ block "event_jsonld" . }} {{ end }}
+{{ end }}

@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>{{ .Conf.Desc }} talks!</title>
+  {{ template "site_seo" (dict "Title" (printf "%s talks · bitcoin++" .Conf.Desc) "Description" (printf "Workshops and talks at %s, %s." .Conf.Desc .Conf.DateDesc) "Path" (printf "/%s/talks" .Conf.Tag) "Image" (confSocialImage .Conf.Tag "standard")) }}
   <link rel="stylesheet" href="/static/css/mini.css">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="/static/js/script.js" type="text/javascript"></script>

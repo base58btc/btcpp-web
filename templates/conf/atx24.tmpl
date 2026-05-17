@@ -1,28 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>bitcoin++ austin!</title>
     {{ block "header" . }} {{ end }}
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐮</text></svg>">
-	<!-- facebook open graph tags -->
-	<meta property="og:type" content="website" />
-	<meta property="og:url" content="https://btcpp.dev/atx24" />
-	<meta property="og:title" content="bitcoin++ ATX || May 1-4" />
-	<meta property="og:description" content="Join us in Austin this May 1-4 for the bitcoin++ build//hack event for bitcoiners" />
-	<meta property="og:image" content="https://btcpp.dev/static/img/atxpromo.png" />
-
-	<!-- twitter card tags additive with the og: tags -->
-	<meta name="twitter:card" content="summary_large_image">
-	<meta name="twitter:site" content="@btcplusplus">
-	<meta name="twitter:domain" content="btcpp.dev" />
-	<meta name="twitter:url" content="https://btcpp.dev/atx24" />
-	<meta name="twitter:title" content="bitcoin++ ATX || May 1-4" />
-	<meta name="twitter:description" content="Join us in Austin this May 1-4 for the bitcoin++ build//hack event for bitcoiners" />
-	<meta name="twitter:image" content="https://btcpp.dev/static/img/atxpromo.png" />
-
-	<!-- meta tags -->
-	<meta name="description" content="Join us in Austin this May 1-4 for the bitcoin++ build//hack event for bitcoiners" />
-	<meta name="author" content="bitcoin++"/>
+    {{ block "conf_seo" . }} {{ end }}
   </head>
 <body>
 {{ block "conf_nav" .Conf }} {{ end }}

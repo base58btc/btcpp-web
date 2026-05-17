@@ -28,13 +28,20 @@
     "address": {{ jsonStr .Conf.Location }}{{ if .Conf.VenueWebsite }},
     "url": {{ jsonStr .Conf.VenueWebsite }}{{ end }}
   },
-  "image": {{ jsonStr (printf "https://btcpp.dev/static/img/%s/og_card_standard.png" .Conf.Tag) }},
+  "image": {{ jsonStr (confSocialImage .Conf.Tag "standard") }},
   "url": {{ jsonStr (printf "https://btcpp.dev/%s" .Conf.Tag) }},
   "organizer": {
     "@type": "Organization",
     "name": "bitcoin++",
     "url": "https://btcpp.dev"
-  }{{ if .EventSpeakers }},
+  }{{ if .Tix }},
+  "offers": {
+    "@type": "Offer",
+    "url": {{ jsonStr (printf "https://btcpp.dev/tix/%s+default+fiat" .Tix.ID) }},
+    "price": {{ .Tix.USD }},
+    "priceCurrency": {{ jsonStr (or .Tix.Currency "USD") }},
+    "availability": "https://schema.org/{{ if gt .TixLeft 0 }}InStock{{ else }}SoldOut{{ end }}"
+  }{{ end }}{{ if .EventSpeakers }},
   "performer": [{{ range $i, $sp := .EventSpeakers }}{{ if $i }},{{ end }}
     {
       "@type": "Person",

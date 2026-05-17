@@ -235,6 +235,8 @@ func loadTemplates(ctx *config.AppContext) error {
 			}
 			return template.JS("null")
 		},
+		"confSocialImage": confSocialImage,
+		"absoluteSEOURL":  absoluteSEOURL,
 		// rfc3339 formats a time.Time / *time.Time as RFC 3339.
 		// Returns "" for a nil pointer or zero time so templates can
 		// safely emit it into a data-* attribute without leaking
@@ -1178,7 +1180,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
-	return requestLog(app, r), nil
+	return requestLog(app, noIndexRobots(r)), nil
 }
 
 func getFaviconHandler(name string) func(http.ResponseWriter, *http.Request) {
@@ -1235,6 +1237,7 @@ func listJobs(w http.ResponseWriter, ctx *config.AppContext) []*types.JobType {
 }
 
 func handle404(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	w.Header().Set("X-Robots-Tag", "noindex, nofollow")
 	w.WriteHeader(http.StatusNotFound)
 	ctx.Infos.Printf("404'd: %s", r.URL.Path)
 
