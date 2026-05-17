@@ -36,6 +36,7 @@ type (
 		Spaces            SpacesConfig
 		CacheTTLSec       int
 		YouTube           YouTubeConfig
+		Recordings        RecordingsConfig
 	}
 
 	// YouTubeConfig holds the OAuth client + redirect that backs the
@@ -46,6 +47,29 @@ type (
 		ClientID     string
 		ClientSecret string
 		RedirectURL  string
+	}
+
+	// RecordingsConfig controls the scheduled recording publisher. The
+	// dashboard remains available when this is disabled; only the
+	// background autopublisher and browser automation are gated here.
+	RecordingsConfig struct {
+		AutopublishEnabled bool
+		PollSec            int
+		NotifyEmail        string
+		EncryptionKey      string
+		YouTubeTokenObject string
+		X                  XUploaderConfig
+	}
+
+	// XUploaderConfig holds the x.com browser automation settings.
+	// Chrome profiles are encrypted into Spaces so App Platform's
+	// ephemeral filesystem does not wipe login state on deploy.
+	XUploaderConfig struct {
+		Enabled        bool
+		ProfileObject  string
+		Headed         bool
+		PostTimeoutSec int
+		AuthWaitSec    int
 	}
 
 	Conf struct {
@@ -309,12 +333,22 @@ type (
 	// XLink is the X.com (Twitter) post URL — written back when the
 	// admin posts the recording to X. Empty until then.
 	Recording struct {
-		ID         string
-		ConfTalkID string
-		TalkName   string
-		YTLink     string
-		XLink      string
-		FileURI    string
+		ID                string
+		ConfTalkID        string
+		TalkName          string
+		YTLink            string
+		XLink             string
+		XReplyLink        string
+		FileURI           string
+		PublishAt         *time.Time
+		YTStatus          string
+		XStatus           string
+		YTError           string
+		XError            string
+		YTUploadedAt      *time.Time
+		XPostedAt         *time.Time
+		XNotifiedAt       *time.Time
+		XErrorFingerprint string
 	}
 
 	Talk struct {

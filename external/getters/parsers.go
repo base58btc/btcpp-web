@@ -40,6 +40,13 @@ func parseSelect(field string, props map[string]notion.PropertyValue) string {
 	return props[field].Select.Name
 }
 
+func parseSelectOrText(field string, props map[string]notion.PropertyValue) string {
+	if val := parseSelect(field, props); val != "" {
+		return val
+	}
+	return parseRichText(field, props)
+}
+
 func parseDate(field string, props map[string]notion.PropertyValue) *time.Time {
 	dd := props[field].Date
 	if dd != nil {
@@ -235,11 +242,21 @@ func lookupConfByTag(ctx *config.AppContext, tag string) *types.Conf {
 
 func parseRecording(pageID string, props map[string]notion.PropertyValue) *types.Recording {
 	rec := &types.Recording{
-		ID:       pageID,
-		TalkName: parseRichText("TalkName", props),
-		YTLink:   props["YTLink"].URL,
-		XLink:    props["XLink"].URL,
-		FileURI:  parseRichText("FileURI", props),
+		ID:                pageID,
+		TalkName:          parseRichText("TalkName", props),
+		YTLink:            props["YTLink"].URL,
+		XLink:             props["XLink"].URL,
+		XReplyLink:        props["XReplyLink"].URL,
+		FileURI:           parseRichText("FileURI", props),
+		PublishAt:         parseDate("PublishAt", props),
+		YTStatus:          parseSelectOrText("YTStatus", props),
+		XStatus:           parseSelectOrText("XStatus", props),
+		YTError:           parseRichText("YTError", props),
+		XError:            parseRichText("XError", props),
+		YTUploadedAt:      parseDate("YTUploadedAt", props),
+		XPostedAt:         parseDate("XPostedAt", props),
+		XNotifiedAt:       parseDate("XNotifiedAt", props),
+		XErrorFingerprint: parseRichText("XErrorFingerprint", props),
 	}
 	for _, ref := range props["talk"].Relation {
 		if ref != nil && ref.ID != "" {

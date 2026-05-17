@@ -21,6 +21,32 @@ func DeriveHMACKey(secret string) ([32]byte, error) {
 	return sha256.Sum256([]byte(secret)), nil
 }
 
+// ApplyDefaults fills operational defaults that are safe in both local
+// config.toml development and production env-var config.
+func (env *EnvConfig) ApplyDefaults() {
+	if env.CacheTTLSec == 0 {
+		env.CacheTTLSec = 300
+	}
+	if env.Recordings.PollSec == 0 {
+		env.Recordings.PollSec = 60
+	}
+	if strings.TrimSpace(env.Recordings.NotifyEmail) == "" {
+		env.Recordings.NotifyEmail = "nifty@btcpp.dev"
+	}
+	if strings.TrimSpace(env.Recordings.YouTubeTokenObject) == "" {
+		env.Recordings.YouTubeTokenObject = "private/social/youtube-token.json.enc"
+	}
+	if strings.TrimSpace(env.Recordings.X.ProfileObject) == "" {
+		env.Recordings.X.ProfileObject = "private/social/x-chrome-profile.tgz.enc"
+	}
+	if env.Recordings.X.PostTimeoutSec == 0 {
+		env.Recordings.X.PostTimeoutSec = 300
+	}
+	if env.Recordings.X.AuthWaitSec == 0 {
+		env.Recordings.X.AuthWaitSec = 300
+	}
+}
+
 // Validate checks the pieces that must be present before the HTTP server is
 // allowed to boot. Optional integrations can still be empty in development,
 // but production rejects missing secrets for public endpoints that would be
@@ -54,6 +80,17 @@ func (env *EnvConfig) Validate() error {
 			if strings.TrimSpace(value) == "" {
 				missing = append(missing, name)
 			}
+		}
+	}
+	if env.Recordings.X.Enabled {
+		if strings.TrimSpace(env.Recordings.EncryptionKey) == "" {
+			missing = append(missing, "SOCIAL_STATE_KEY or X_PROFILE_ARCHIVE_KEY")
+		}
+		if strings.TrimSpace(env.Spaces.Endpoint) == "" ||
+			strings.TrimSpace(env.Spaces.Bucket) == "" ||
+			strings.TrimSpace(env.Spaces.Key) == "" ||
+			strings.TrimSpace(env.Spaces.Secret) == "" {
+			missing = append(missing, "Spaces config for X uploader")
 		}
 	}
 	if len(missing) > 0 {
