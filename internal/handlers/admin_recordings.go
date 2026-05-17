@@ -583,16 +583,11 @@ func upsertRecordingSocialPost(ctx *config.AppContext, row *RecordingRow, platfo
 
 func buildRecordingRow(rec *types.Recording) *RecordingRow {
 	row := &RecordingRow{
-		Recording:         rec,
-		YTURL:             rec.YTLink,
-		XURL:              rec.XLink,
-		XReplyURL:         rec.XReplyLink,
-		YTStatus:          rec.YTStatus,
-		XStatus:           rec.XStatus,
-		YTError:           rec.YTError,
-		XError:            rec.XError,
-		XErrorFingerprint: rec.XErrorFingerprint,
-		HasFile:           rec.FileURI != "",
+		Recording: rec,
+		YTURL:     rec.YTLink,
+		XURL:      rec.XLink,
+		XReplyURL: rec.XReplyLink,
+		HasFile:   rec.FileURI != "",
 	}
 	if rec.ConfTalkID != "" {
 		row.ConfTalk = getters.FetchConfTalkByID(rec.ConfTalkID)

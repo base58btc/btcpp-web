@@ -333,22 +333,14 @@ type (
 	// XLink is the X.com (Twitter) post URL — written back when the
 	// admin posts the recording to X. Empty until then.
 	Recording struct {
-		ID                string
-		ConfTalkID        string
-		TalkName          string
-		YTLink            string
-		XLink             string
-		XReplyLink        string
-		FileURI           string
-		PublishAt         *time.Time
-		YTStatus          string
-		XStatus           string
-		YTError           string
-		XError            string
-		YTUploadedAt      *time.Time
-		XPostedAt         *time.Time
-		XNotifiedAt       *time.Time
-		XErrorFingerprint string
+		ID         string
+		ConfTalkID string
+		TalkName   string
+		YTLink     string
+		XLink      string
+		XReplyLink string
+		FileURI    string
+		PublishAt  *time.Time
 	}
 
 	SocialPost struct {
