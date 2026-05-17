@@ -21,28 +21,28 @@ import (
 // Admins can set keynote / hackathon (speaker-side form clamps to
 // talk / workshop / panel).
 type AdminEditProposalPage struct {
-	Conf       *types.Conf
-	Proposal   *types.Proposal
-	TalkTypes  []string
-	Durations  []int
+	Conf      *types.Conf
+	Proposal  *types.Proposal
+	TalkTypes []string
+	Durations []int
 	// Speakers is the SpeakerConf rows attached to this proposal,
 	// resolved from the warm cache so the edit page can show
 	// who's on the talk + offer per-row Remove buttons.
-	Speakers   []*types.SpeakerConf
+	Speakers []*types.SpeakerConf
 	// InviteURL is the share-a-link URL admins can copy and send
 	// to a new speaker. Empty when the proposal has no
 	// InviteToken minted yet — template falls back to a "Generate
 	// invite link" link that routes through the existing
 	// /{conf}/admin/proposal/{id}/invite page (which mints + shows).
-	InviteURL  string
-	Flash      string
-	FlashErr   string
-	Year       uint
+	InviteURL string
+	Flash     string
+	FlashErr  string
+	Year      uint
 	// ReturnURL is the page to bounce back to after a save —
 	// /{conf}/admin/applicants by default, /{conf}/admin/schedule
 	// when the admin came from the schedule grid. Threaded
 	// through ?return=…
-	ReturnURL  string
+	ReturnURL string
 }
 
 // AdminEditProposal serves the admin proposal editor. GET renders
@@ -82,6 +82,7 @@ func AdminEditProposal(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	}
 
 	if r.Method == http.MethodPost {
+		limitRequestBody(w, r, maxFormBodyBytes)
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "bad form", http.StatusBadRequest)
 			return
@@ -204,6 +205,7 @@ func AdminEditProposalAttachSpeaker(w http.ResponseWriter, r *http.Request, ctx 
 		http.Error(w, "missing proposalID", http.StatusBadRequest)
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return

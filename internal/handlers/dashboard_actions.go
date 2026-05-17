@@ -116,6 +116,7 @@ func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		http.Error(w, "Forbidden — only a global-admin can edit roles.", http.StatusForbidden)
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -250,6 +251,7 @@ func DashboardEditProposal(w http.ResponseWriter, r *http.Request, ctx *config.A
 			http.Redirect(w, r, dashboardRedirect(encHMAC, encEmail, "Edits are locked: "+lockReason), http.StatusSeeOther)
 			return
 		}
+		limitRequestBody(w, r, maxFormBodyBytes)
 		if err := r.ParseForm(); err != nil {
 			ctx.Err.Printf("/dashboard edit parseform: %s", err)
 			http.Error(w, "bad form", http.StatusBadRequest)
@@ -366,7 +368,8 @@ func DashboardEditSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *confi
 		}
 		// Multipart so we can accept an optional OrgLogoFile upload along
 		// with the other fields. 10MB cap mirrors the apply form.
-		if err := r.ParseMultipartForm(10 << 20); err != nil {
+		limitRequestBody(w, r, maxMultipartBodyBytes)
+		if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
 			ctx.Err.Printf("/dashboard edit-conf parseform: %s", err)
 			http.Error(w, "bad form", http.StatusBadRequest)
 			return
@@ -426,12 +429,12 @@ func DashboardEditSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *confi
 	}
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speakerconf.tmpl", &EditSpeakerConfPage{
-		SpeakerConf:         target,
-		Conf:                conf,
-		HMAC:                encHMAC,
-		Email:               encEmail,
-		Locked:              locked,
-		LockReason:          lockReason,
+		SpeakerConf: target,
+		Conf:        conf,
+		HMAC:        encHMAC,
+		Email:       encEmail,
+		Locked:      locked,
+		LockReason:  lockReason,
 		// No prefix — Notion stores Avails option values as bare dates
 		// (the apply form strips its "days-" prefix before saving), so
 		// the edit form matches that format directly for both the
@@ -478,7 +481,8 @@ func DashboardEditSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	}
 
 	if r.Method == http.MethodPost {
-		if err := r.ParseMultipartForm(8 << 20); err != nil {
+		limitRequestBody(w, r, maxMultipartBodyBytes)
+		if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
 			if err := r.ParseForm(); err != nil {
 				http.Error(w, "bad form", http.StatusBadRequest)
 				return
@@ -1142,7 +1146,8 @@ func InviteSpeakerDecline(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 // pipeline returns ErrSpeakerApp-shaped responses on failure so HTMX
 // renders the inline error block in the form.
 func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, proposal *types.Proposal, conf *types.Conf, confs []*types.Conf) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	limitRequestBody(w, r, maxMultipartBodyBytes)
+	if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
 		ctx.Err.Printf("/invite-speaker parseform: %s", err)
 		w.Write([]byte(helpers.ErrSpeakerApp("Error parsing form.")))
 		return

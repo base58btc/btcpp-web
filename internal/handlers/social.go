@@ -372,7 +372,11 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 
 	// Get target channels
 	allChannels, err := buffer.FetchChannels()

@@ -101,7 +101,11 @@ func SubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	params := mux.Vars(r)
 	newsletter := params["newsletter"]
 
-	r.ParseForm()
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	email := r.Form.Get("newsletter-email")
 
 	/* We're returning html */

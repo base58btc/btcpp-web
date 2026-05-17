@@ -27,6 +27,7 @@ type LoginPage struct {
 // keeps us from leaking whether an email is registered.
 func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if r.Method == http.MethodPost {
+		limitRequestBody(w, r, maxFormBodyBytes)
 		if err := r.ParseForm(); err != nil {
 			http.Error(w, "bad form", http.StatusBadRequest)
 			return

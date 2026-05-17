@@ -68,6 +68,7 @@ func AffiliateCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	if !ok {
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -165,6 +166,7 @@ func AffiliateUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	if !ok {
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return

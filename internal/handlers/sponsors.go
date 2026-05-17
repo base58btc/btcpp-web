@@ -40,11 +40,11 @@ type OrgNewPage struct {
 }
 
 type SponsorshipsPage struct {
-	Conf          *types.Conf
-	Sponsorships  []*types.Sponsorship
-	Orgs          []*types.Org
-	FlashMessage  string
-	Year          uint
+	Conf         *types.Conf
+	Sponsorships []*types.Sponsorship
+	Orgs         []*types.Org
+	FlashMessage string
+	Year         uint
 }
 
 func OrgList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -143,6 +143,7 @@ func OrgLogoUpload(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	if id := requireGlobalAdmin(w, r, ctx); id == nil {
 		return
 	}
+	limitRequestBody(w, r, maxMultipartBodyBytes)
 	raw, contentType, ext, err := readMultipartFile(r, "file")
 	if err != nil {
 		http.Error(w, "missing or unreadable file", http.StatusBadRequest)
@@ -170,7 +171,11 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 
 	org := &types.Org{
 		Name:      r.FormValue("Name"),
@@ -289,7 +294,11 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 
 	orgRef := r.FormValue("OrgRef")
 	level := r.FormValue("Level")
@@ -315,5 +324,5 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	http.Redirect(w, r, "/" + conf.Tag + "/admin/sponsors"+"?flash=Sponsorship+created", http.StatusFound)
+	http.Redirect(w, r, "/"+conf.Tag+"/admin/sponsors"+"?flash=Sponsorship+created", http.StatusFound)
 }

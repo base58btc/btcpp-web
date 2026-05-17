@@ -24,7 +24,11 @@ import (
 // POST with email → emails a magic link, redirects home.
 func Dashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if r.Method == http.MethodPost {
-		r.ParseForm()
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 		dec := newFormDecoder()
 		var form EmailForm
 		if err := dec.Decode(&form, r.PostForm); err != nil {

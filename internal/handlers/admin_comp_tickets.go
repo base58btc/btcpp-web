@@ -35,14 +35,14 @@ const compTicketMaxCount = 25
 // Loaded GET or after a failed POST so the user sees what they typed
 // + the error / flash banner.
 type CompTicketsPage struct {
-	Conf      *types.Conf
-	Types     []string // dropdown options, fixed list above
-	Email     string   // last submitted email (for re-render after error)
-	Count     int      // last submitted count
-	Type      string   // last submitted ticket type
-	Flash     string
-	FlashErr  string
-	Year      uint
+	Conf     *types.Conf
+	Types    []string // dropdown options, fixed list above
+	Email    string   // last submitted email (for re-render after error)
+	Count    int      // last submitted count
+	Type     string   // last submitted ticket type
+	Flash    string
+	FlashErr string
+	Year     uint
 }
 
 // AdminCompTickets renders the per-conf "issue complimentary tickets"
@@ -51,7 +51,8 @@ type CompTicketsPage struct {
 // attached, so we want a stricter gate than {conf}-staff.
 //
 // Path: GET /{conf}/admin/comp-tickets
-//       POST /{conf}/admin/comp-tickets
+//
+//	POST /{conf}/admin/comp-tickets
 func AdminCompTickets(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return
@@ -72,6 +73,7 @@ func AdminCompTickets(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 
 	if r.Method == http.MethodPost {
+		limitRequestBody(w, r, maxFormBodyBytes)
 		if err := r.ParseForm(); err != nil {
 			page.FlashErr = "Couldn't read form. Try again."
 			renderCompTicketsForm(w, r, ctx, page)

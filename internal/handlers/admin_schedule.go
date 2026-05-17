@@ -405,6 +405,7 @@ func ScheduleAddTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		handle404(w, r, ctx)
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -751,7 +752,6 @@ func breaksFor(ci *types.ConfInfo, opensMin int) []*ScheduleBreak {
 	add("Coffee", ci.Coffee)
 	return out
 }
-
 
 // dayOpenCloseMinutes returns the day's open/close as minute-of-day,
 // derived from ConfInfo.Doors. If Doors is missing, falls back to a

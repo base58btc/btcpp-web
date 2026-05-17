@@ -180,7 +180,8 @@ func AdminClipartsUpload(w http.ResponseWriter, r *http.Request, ctx *config.App
 		getters.InvalidateConfTalksCache()
 	}
 
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
+	limitRequestBody(w, r, maxMultipartBodyBytes)
+	if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
 		bail("Form parse failed: " + err.Error())
 		return
 	}

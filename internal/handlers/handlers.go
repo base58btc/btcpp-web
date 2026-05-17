@@ -10,8 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"io"
 	"io/ioutil"
-        "mime"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -46,6 +47,19 @@ import (
 )
 
 var pages []string = []string{"index", "vegas25", "terms", "privacy"}
+
+const (
+	maxFormBodyBytes      = 1 << 20  // 1 MiB
+	maxMultipartBodyBytes = 12 << 20 // 12 MiB
+	maxUploadFileBytes    = 10 << 20 // 10 MiB
+	maxWebhookBodyBytes   = 1 << 20  // 1 MiB
+)
+
+var errUploadTooLarge = errors.New("uploaded file is too large")
+
+func limitRequestBody(w http.ResponseWriter, r *http.Request, max int64) {
+	r.Body = http.MaxBytesReader(w, r.Body, max)
+}
 
 func fieldGroup(name string, v interface{}, isRange bool) EmailFieldGroup {
 	fields := getStructFields(v)
@@ -116,8 +130,20 @@ func loadTemplates(ctx *config.AppContext) error {
 
 	var err error
 	funcMap := template.FuncMap{
-		"safesrc": func(s string) template.HTMLAttr {
-			return template.HTMLAttr(fmt.Sprintf(`src="%s"`, s))
+		"safeURL": func(s string) template.URL {
+			u := strings.TrimSpace(s)
+			switch {
+			case u == "":
+				return ""
+			case strings.HasPrefix(u, "/"):
+				return template.URL(u)
+			case strings.HasPrefix(u, "https://") || strings.HasPrefix(u, "http://"):
+				return template.URL(u)
+			case strings.HasPrefix(u, "data:image/png;base64,"):
+				return template.URL(u)
+			default:
+				return ""
+			}
 		},
 		"css": func(s string) template.HTML {
 			return template.HTML(fmt.Sprintf(`<style type="text/css">%s</style>`, s))
@@ -326,9 +352,9 @@ func loadTemplates(ctx *config.AppContext) error {
 		"spacesURL": func(key string) string {
 			return spaces.PublicURL(key)
 		},
-		"formatHourMin":   FormatHourMin,
-		"hourLabels":      HourLabels,
-		"venueChipClass":  VenueChipClasses,
+		"formatHourMin":  FormatHourMin,
+		"hourLabels":     HourLabels,
+		"venueChipClass": VenueChipClasses,
 		"venueLabel": func(raw string) string {
 			// Resolves the raw venue slug ("one" / "two" / "three")
 			// to the human-readable stage label. Falls back to the
@@ -631,21 +657,21 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		redirectStripConfPrefix(w, r)
 	}).Methods("GET")
 
-        r.HandleFunc("/volunteer", func (w http.ResponseWriter, r *http.Request) {
-                RenderVolunteers(w, r, app)
-        }).Methods("GET")
+	r.HandleFunc("/volunteer", func(w http.ResponseWriter, r *http.Request) {
+		RenderVolunteers(w, r, app)
+	}).Methods("GET")
 
-        r.HandleFunc("/volunteer/{conf}", func (w http.ResponseWriter, r *http.Request) {
-                RenderVolunteerConf(w, r, app)
-        }).Methods("GET", "POST")
+	r.HandleFunc("/volunteer/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		RenderVolunteerConf(w, r, app)
+	}).Methods("GET", "POST")
 
-        r.HandleFunc("/talk", func (w http.ResponseWriter, r *http.Request) {
-                RenderSpeakers(w, r, app)
-        }).Methods("GET")
+	r.HandleFunc("/talk", func(w http.ResponseWriter, r *http.Request) {
+		RenderSpeakers(w, r, app)
+	}).Methods("GET")
 
-        r.HandleFunc("/talk/{conf}", func (w http.ResponseWriter, r *http.Request) {
-                RenderSpeakerConf(w, r, app)
-        }).Methods("GET", "POST")
+	r.HandleFunc("/talk/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		RenderSpeakerConf(w, r, app)
+	}).Methods("GET", "POST")
 
 	r.HandleFunc("/contact", func(w http.ResponseWriter, r *http.Request) {
 		ContactPage(w, r, app)
@@ -704,8 +730,7 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		OpenNodeCallback(w, r, app)
 	}).Methods("GET", "POST")
 
-
-        /* Internal pages */
+	/* Internal pages */
 	r.HandleFunc("/{conf}/volcoord", func(w http.ResponseWriter, r *http.Request) {
 		VolAdmin(w, r, app)
 	}).Methods("GET")
@@ -752,7 +777,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		VolAdminUpdateShift(w, r, app)
 	}).Methods("POST")
 
-
 	r.HandleFunc("/{conf}/volcoord/vol/{volRef}", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminDetails(w, r, app)
 	}).Methods("GET")
@@ -768,7 +792,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminUpdateWorkPrefs(w, r, app)
 	}).Methods("POST")
-
 
 	r.HandleFunc("/{conf}/volcoord/vol/{volRef}/add-shift", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminAddShift(w, r, app)
@@ -841,6 +864,11 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
+		id := auth.RequireOptional(r, app)
+		if id == nil || !id.IsGlobalAdmin() {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		out := map[string]interface{}{
 			"caches":       getters.CacheStats(),
@@ -932,7 +960,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/vols/shift/{conf}/work-prefs", func(w http.ResponseWriter, r *http.Request) {
 		VolunteerUpdateWorkPrefs(w, r, app)
 	}).Methods("POST")
-
 
 	r.HandleFunc("/{conf}/admin/gifts", func(w http.ResponseWriter, r *http.Request) {
 		AdminGifts(w, r, app)
@@ -1444,17 +1471,17 @@ func ReloadConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 // conf page's "Who's Coming" section. Unions two sources so the list
 // is complete even when one side is sparsely populated:
 //
-//   1. Speakers attached to ConfTalk-backed Talks for this conf with
-//      Proposal.Status == Accepted/Scheduled. This is the source the
-//      previous filterSpeakers used and remains the primary feed for
-//      events whose Proposal rows don't have ScheduleFor set
-//      (older confs / hand-entered ConfTalks pre-dating the
-//      proposal-flow).
+//  1. Speakers attached to ConfTalk-backed Talks for this conf with
+//     Proposal.Status == Accepted/Scheduled. This is the source the
+//     previous filterSpeakers used and remains the primary feed for
+//     events whose Proposal rows don't have ScheduleFor set
+//     (older confs / hand-entered ConfTalks pre-dating the
+//     proposal-flow).
 //
-//   2. Accepted/Scheduled Proposals whose ScheduleFor.Tag matches
-//      this conf. Picks up speakers attached to a freshly-Accepted
-//      proposal whose ConfTalk hasn't been provisioned yet (accept
-//      pipeline failure, status flipped manually in Notion, etc).
+//  2. Accepted/Scheduled Proposals whose ScheduleFor.Tag matches
+//     this conf. Picks up speakers attached to a freshly-Accepted
+//     proposal whose ConfTalk hasn't been provisioned yet (accept
+//     pipeline failure, status flipped manually in Notion, etc).
 //
 // Any status other than Accepted/Scheduled is filtered out (Applied
 // / InReview / Waitlisted / Invited / WeDecline / TheyDecline /
@@ -1606,10 +1633,10 @@ func RenderConfSuccess(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 }
 
 func RenderSpeakers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        confs := listConfs(w, ctx)
+	confs := listConfs(w, ctx)
 	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/speaker_select.tmpl", &VolunteerPage{
 		Confs: confs,
-		Year: helpers.CurrentYear(),
+		Year:  helpers.CurrentYear(),
 	})
 
 	if err != nil {
@@ -1620,31 +1647,31 @@ func RenderSpeakers(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 }
 
 func contentTypeFromFilename(filename string) string {
-        ext := filepath.Ext(filename) // e.g., ".png"
-        mimeType := mime.TypeByExtension(ext)
-        if mimeType == "" {
-                return "application/octet-stream" // fallback
-        }
-        return mimeType
+	ext := filepath.Ext(filename) // e.g., ".png"
+	mimeType := mime.TypeByExtension(ext)
+	if mimeType == "" {
+		return "application/octet-stream" // fallback
+	}
+	return mimeType
 }
 
 func processFileUpload(ctx *config.AppContext, r *http.Request, field string) (string, error) {
-        file, handler, err := r.FormFile(field)
-        if err != nil {
-                return "", err
-        }
-        defer file.Close()
+	file, handler, err := r.FormFile(field)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
 
-        // Read the file data
-        fileData, err := ioutil.ReadAll(file)
-        if err != nil {
-                return "", err
-        }
+	// Read the file data
+	fileData, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
 
-        filename := handler.Filename
-        contentType := contentTypeFromFilename(filename)
+	filename := handler.Filename
+	contentType := contentTypeFromFilename(filename)
 
-        return getters.UploadFile(ctx.Notion, contentType, filename, fileData)
+	return getters.UploadFile(ctx.Notion, contentType, filename, fileData)
 }
 
 // readMultipartFile reads a single named file from a multipart form and
@@ -1658,234 +1685,291 @@ func readMultipartFile(r *http.Request, field string) (raw []byte, contentType s
 		return nil, "", "", err
 	}
 	defer file.Close()
-	raw, err = ioutil.ReadAll(file)
+	raw, err = ioutil.ReadAll(io.LimitReader(file, maxUploadFileBytes+1))
 	if err != nil {
 		return nil, "", "", err
 	}
+	if int64(len(raw)) > maxUploadFileBytes {
+		return nil, "", "", errUploadTooLarge
+	}
+	if len(raw) == 0 {
+		return nil, "", "", errors.New("empty upload")
+	}
 	filename := handler.Filename
-	contentType = contentTypeFromFilename(filename)
+	contentType = detectedImageContentType(raw, filename)
+	if contentType == "" {
+		return nil, "", "", errors.New("unsupported image type")
+	}
 	ext = strings.ToLower(filepath.Ext(filename))
-	if ext == "" {
-		ext = ".jpg"
+	if ext == "" || contentTypeFromFilename(filename) != contentType {
+		ext = extForImageContentType(contentType)
 	}
 	return raw, contentType, ext, nil
+}
+
+func detectedImageContentType(raw []byte, filename string) string {
+	detected := http.DetectContentType(raw)
+	if allowedUploadImageType(detected) {
+		return detected
+	}
+	if strings.EqualFold(filepath.Ext(filename), ".avif") && isAVIF(raw) {
+		return "image/avif"
+	}
+	return ""
+}
+
+func isAVIF(raw []byte) bool {
+	if len(raw) < 12 || string(raw[4:8]) != "ftyp" {
+		return false
+	}
+	for i := 8; i+4 <= len(raw); i += 4 {
+		brand := string(raw[i : i+4])
+		if brand == "avif" || brand == "avis" {
+			return true
+		}
+	}
+	return false
+}
+
+func allowedUploadImageType(contentType string) bool {
+	switch strings.ToLower(strings.TrimSpace(contentType)) {
+	case "image/png", "image/jpeg", "image/gif", "image/webp", "image/avif":
+		return true
+	default:
+		return false
+	}
+}
+
+func extForImageContentType(contentType string) string {
+	switch strings.ToLower(contentType) {
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	case "image/avif":
+		return ".avif"
+	default:
+		return ".jpg"
+	}
 }
 
 // uploadSpeakerPic uploads PicFile to Notion (returning the file ID) and also
 // returns the raw bytes + content type + extension so the caller can mirror
 // the original to Spaces and generate AVIF derivatives.
 func uploadSpeakerPic(ctx *config.AppContext, r *http.Request) (notionID string, raw []byte, contentType string, ext string, err error) {
-        file, handler, err := r.FormFile("PicFile")
-        if err != nil {
-                return "", nil, "", "", err
-        }
-        defer file.Close()
+	file, handler, err := r.FormFile("PicFile")
+	if err != nil {
+		return "", nil, "", "", err
+	}
+	defer file.Close()
 
-        raw, err = ioutil.ReadAll(file)
-        if err != nil {
-                return "", nil, "", "", err
-        }
+	raw, err = ioutil.ReadAll(file)
+	if err != nil {
+		return "", nil, "", "", err
+	}
 
-        filename := handler.Filename
-        contentType = contentTypeFromFilename(filename)
-        ext = strings.ToLower(filepath.Ext(filename))
-        if ext == "" {
-                ext = ".jpg"
-        }
+	filename := handler.Filename
+	contentType = contentTypeFromFilename(filename)
+	ext = strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		ext = ".jpg"
+	}
 
-        notionID, err = getters.UploadFile(ctx.Notion, contentType, filename, raw)
-        return notionID, raw, contentType, ext, err
+	notionID, err = getters.UploadFile(ctx.Notion, contentType, filename, raw)
+	return notionID, raw, contentType, ext, err
 }
-
 
 func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := helpers.FindConf(r, ctx)
-        if err != nil {
-                handle404(w, r, ctx)
-                return
-        }
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
 
-        if !conf.Active {
-                handle404(w, r, ctx)
-                return
-        }
+	if !conf.Active {
+		handle404(w, r, ctx)
+		return
+	}
 
-        confs := listConfs(w, ctx)
+	confs := listConfs(w, ctx)
 
-        switch r.Method {
-        case http.MethodGet:
+	switch r.Method {
+	case http.MethodGet:
 
-                // Optional magic-link auth — when present and valid, pre-fill the
-                // form with the speaker's existing data so they don't re-type
-                // contact info / pfp / shirt size / etc.
-                var knownSpeaker *types.Speaker
-                var encodedHMAC, encodedEmail string
-                var subscribed, returning bool
-                if email, h, err := validateVolEmail(r, ctx); err == nil {
-                        encodedHMAC = h
-                        encodedEmail = r.URL.Query().Get("em")
-                        speakers, lerr := getters.GetSpeakersByEmail(ctx.Notion, email)
-                        if lerr == nil && len(speakers) == 1 {
-                                knownSpeaker = speakers[0]
-                        }
-                        // Best-effort lookups: failures just leave the
-                        // checkbox visible. The form still works.
-                        if s, err := getters.IsSubscribedTo(ctx.Notion, email, "newsletter"); err == nil {
-                                subscribed = s
-                        }
-                        if reg, err := getters.EmailHasRegistration(ctx, email); err == nil {
-                                returning = reg
-                        }
-                }
+		// Optional magic-link auth — when present and valid, pre-fill the
+		// form with the speaker's existing data so they don't re-type
+		// contact info / pfp / shirt size / etc.
+		var knownSpeaker *types.Speaker
+		var encodedHMAC, encodedEmail string
+		var subscribed, returning bool
+		if email, h, err := validateVolEmail(r, ctx); err == nil {
+			encodedHMAC = h
+			encodedEmail = r.URL.Query().Get("em")
+			speakers, lerr := getters.GetSpeakersByEmail(ctx.Notion, email)
+			if lerr == nil && len(speakers) == 1 {
+				knownSpeaker = speakers[0]
+			}
+			// Best-effort lookups: failures just leave the
+			// checkbox visible. The form still works.
+			if s, err := getters.IsSubscribedTo(ctx.Notion, email, "newsletter"); err == nil {
+				subscribed = s
+			}
+			if reg, err := getters.EmailHasRegistration(ctx, email); err == nil {
+				returning = reg
+			}
+		}
 
-                daylist := conf.DaysList("days-", true)
-                err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", &SpeakerPage{
-                        Conf: conf,
-                        Confs: confs,
-                        ConfItems: helpers.GetOtherConfs(confs, *conf),
-                        DueDate: conf.DateBeforeStart(conf.TalksDueDays()),
-                        DaysList:  daylist[1:],
-                        RSVPFor: daylist[0].ItemDesc,
-                        PresentationType: helpers.GetPresentationTypes(),
-                        RecordingOptions: helpers.GetRecordingOptions(),
-                        KnownSpeaker:           knownSpeaker,
-                        HMAC:                   encodedHMAC,
-                        Email:                  encodedEmail,
-                        IsNewsletterSubscriber: subscribed,
-                        IsReturningAttendee:    returning,
-                        Year:                   helpers.CurrentYear(),
-                })
+		daylist := conf.DaysList("days-", true)
+		err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/talk.tmpl", &SpeakerPage{
+			Conf:                   conf,
+			Confs:                  confs,
+			ConfItems:              helpers.GetOtherConfs(confs, *conf),
+			DueDate:                conf.DateBeforeStart(conf.TalksDueDays()),
+			DaysList:               daylist[1:],
+			RSVPFor:                daylist[0].ItemDesc,
+			PresentationType:       helpers.GetPresentationTypes(),
+			RecordingOptions:       helpers.GetRecordingOptions(),
+			KnownSpeaker:           knownSpeaker,
+			HMAC:                   encodedHMAC,
+			Email:                  encodedEmail,
+			IsNewsletterSubscriber: subscribed,
+			IsReturningAttendee:    returning,
+			Year:                   helpers.CurrentYear(),
+		})
 
-                if err != nil {
-                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
-                        return
-                }
-                        return
-        case http.MethodPost:
-                err = r.ParseMultipartForm(10 << 20) // Limit uploads to 10MB
-                if err != nil {
-			ctx.Err.Printf("/talk/{conf} unable to parse multipart form %s", err)
-                        w.Write([]byte(helpers.ErrSpeakerApp("Error parsing form.")))
+		if err != nil {
+			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
 			return
-                }
+		}
+		return
+	case http.MethodPost:
+		limitRequestBody(w, r, maxMultipartBodyBytes)
+		err = r.ParseMultipartForm(maxUploadFileBytes)
+		if err != nil {
+			ctx.Err.Printf("/talk/{conf} unable to parse multipart form %s", err)
+			w.Write([]byte(helpers.ErrSpeakerApp("Error parsing form.")))
+			return
+		}
 
 		dec := newFormDecoder()
 		var talkapp types.TalkApp
 		err = dec.Decode(&talkapp, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/speaker/{conf} unable to decode form %s", err)
-                        w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
+			w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
 			return
 		}
 
-                /* ten divided by two is five */
-                if talkapp.Captcha != 5 {
-                        w.Write([]byte(helpers.ErrSpeakerApp("Incorrect captcha. The answer is 5.")))
+		/* ten divided by two is five */
+		if talkapp.Captcha != 5 {
+			w.Write([]byte(helpers.ErrSpeakerApp("Incorrect captcha. The answer is 5.")))
 			return
-                }
+		}
 
-                talkapp.ParseAvailability("days-", r.PostForm)
-                dinneropt := r.PostForm.Get("DinnerOpt")
-                talkapp.DinnerRSVP = dinneropt == "Yes"
-                talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+		talkapp.ParseAvailability("days-", r.PostForm)
+		dinneropt := r.PostForm.Get("DinnerOpt")
+		talkapp.DinnerRSVP = dinneropt == "Yes"
+		talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
 
-                /* Read PicFile bytes (no Notion upload — cropped JPEG goes
-                   only to Spaces). Optional for returning speakers — when
-                   the form was rendered with KnownSpeaker, the upload field
-                   is hidden and Submit will keep the existing Photo. */
-                picRaw, picContentType, picExt, err := readMultipartFile(r, "PicFile")
-                hasNewPic := err == nil && len(picRaw) > 0
-                if err != nil && err != http.ErrMissingFile {
-                        ctx.Err.Printf("/talk/{conf} unable to read speaker profile pic %s", err)
-                        w.Write([]byte(helpers.ErrSpeakerApp("Error uploading pfp.")))
-                        return
-                }
-                if hasNewPic {
-                        picShortID := imgproc.ShortID(picRaw)
-                        talkapp.NormPhoto = picShortID + picExt
-                }
+		/* Read PicFile bytes (no Notion upload — cropped JPEG goes
+		   only to Spaces). Optional for returning speakers — when
+		   the form was rendered with KnownSpeaker, the upload field
+		   is hidden and Submit will keep the existing Photo. */
+		picRaw, picContentType, picExt, err := readMultipartFile(r, "PicFile")
+		hasNewPic := err == nil && len(picRaw) > 0
+		if err != nil && err != http.ErrMissingFile {
+			ctx.Err.Printf("/talk/{conf} unable to read speaker profile pic %s", err)
+			w.Write([]byte(helpers.ErrSpeakerApp("Error uploading pfp.")))
+			return
+		}
+		if hasNewPic {
+			picShortID := imgproc.ShortID(picRaw)
+			talkapp.NormPhoto = picShortID + picExt
+		}
 
-                /* Read OrgLogoFile if present (optional). */
-                logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
-                hasLogo := logoErr == nil && len(logoRaw) > 0
-                if logoErr != nil && logoErr != http.ErrMissingFile {
-                        ctx.Err.Printf("/talk/{conf} unable to read org logo %s", logoErr)
-                        w.Write([]byte(helpers.ErrSpeakerApp("Error uploading org logo.")))
-                        return
-                }
-                if hasLogo {
-                        logoShortID := imgproc.ShortID(logoRaw)
-                        talkapp.OrgLogo = logoShortID + logoExt
-                }
+		/* Read OrgLogoFile if present (optional). */
+		logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
+		hasLogo := logoErr == nil && len(logoRaw) > 0
+		if logoErr != nil && logoErr != http.ErrMissingFile {
+			ctx.Err.Printf("/talk/{conf} unable to read org logo %s", logoErr)
+			w.Write([]byte(helpers.ErrSpeakerApp("Error uploading org logo.")))
+			return
+		}
+		if hasLogo {
+			logoShortID := imgproc.ShortID(logoRaw)
+			talkapp.OrgLogo = logoShortID + logoExt
+		}
 
-                if talkapp.ScheduleFor == nil {
-                        talkapp.ScheduleFor = conf
-                }
+		if talkapp.ScheduleFor == nil {
+			talkapp.ScheduleFor = conf
+		}
 
-                ctx.Infos.Printf("parsed talkapp: %v", talkapp)
+		ctx.Infos.Printf("parsed talkapp: %v", talkapp)
 
-                submitResult, err := newSubmitPipeline(ctx).Submit(&talkapp)
-                if err != nil {
-                        ctx.Err.Printf("/talk/{conf} submit pipeline failed %s", err)
-                        if errors.Is(err, ErrDuplicateSpeakerEmail) {
-                                w.Write([]byte(helpers.ErrSpeakerApp("That email already has multiple speaker records — please contact us to resolve.")))
-                        } else {
-                                w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you.")))
-                        }
-                        return
-                }
+		submitResult, err := newSubmitPipeline(ctx).Submit(&talkapp)
+		if err != nil {
+			ctx.Err.Printf("/talk/{conf} submit pipeline failed %s", err)
+			if errors.Is(err, ErrDuplicateSpeakerEmail) {
+				w.Write([]byte(helpers.ErrSpeakerApp("That email already has multiple speaker records — please contact us to resolve.")))
+			} else {
+				w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you.")))
+			}
+			return
+		}
 
-                /* Mirror photo to Spaces — fire-and-forget so we don't block
-                   the user behind ffmpeg encodes. Skip when no new pic. */
-                if hasNewPic {
-                        go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
-                }
-                if hasLogo {
-                        go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
-                }
+		/* Mirror photo to Spaces — fire-and-forget so we don't block
+		   the user behind ffmpeg encodes. Skip when no new pic. */
+		if hasNewPic {
+			go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+		}
+		if hasLogo {
+			go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
+		}
 
-                /* Subscribe the applicant to the talkapp + per-conf
-                   talkapp lists (and the general newsletter when they
-                   opted in). We bypass NewSubs here so the
-                   subscription is recorded without firing the legacy
-                   list-welcome missives — the OnlyFor "talkapp"
-                   letter below is what they actually get. */
-                newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
-                if _, err := getters.SubscribeEmailList(ctx.Notion, talkapp.Email, newslist); err != nil {
-                        ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
-                }
+		/* Subscribe the applicant to the talkapp + per-conf
+		   talkapp lists (and the general newsletter when they
+		   opted in). We bypass NewSubs here so the
+		   subscription is recorded without firing the legacy
+		   list-welcome missives — the OnlyFor "talkapp"
+		   letter below is what they actually get. */
+		newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
+		if _, err := getters.SubscribeEmailList(ctx.Notion, talkapp.Email, newslist); err != nil {
+			ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
+		}
 
-                /* Send the application-received ack via the OnlyFor
-                   "talkapp" letter. */
-                sendTalkAppLetter(ctx, conf, submitResult, talkapp.Email)
+		/* Send the application-received ack via the OnlyFor
+		   "talkapp" letter. */
+		sendTalkAppLetter(ctx, conf, submitResult, talkapp.Email)
 
-                /* When the form was submitted from a magic-link-authed
-                   context (the dashboard's "Propose another talk" link
-                   sets ?hr= & ?em= on the form action), bounce the user
-                   back to the dashboard rather than dropping them on a
-                   standalone success page. HTMX consumes HX-Redirect to
-                   navigate the whole page. */
-                if encHMAC := r.URL.Query().Get("hr"); encHMAC != "" {
-                        encEmail := r.URL.Query().Get("em")
-                        flash := url.QueryEscape("Thanks — your talk proposal is in.")
-                        w.Header().Set("HX-Redirect",
-                                fmt.Sprintf("/dashboard?hr=%s&em=%s&flash=%s", encHMAC, encEmail, flash))
-                        w.WriteHeader(http.StatusOK)
-                        return
-                }
+		/* When the form was submitted from a magic-link-authed
+		   context (the dashboard's "Propose another talk" link
+		   sets ?hr= & ?em= on the form action), bounce the user
+		   back to the dashboard rather than dropping them on a
+		   standalone success page. HTMX consumes HX-Redirect to
+		   navigate the whole page. */
+		if encHMAC := r.URL.Query().Get("hr"); encHMAC != "" {
+			encEmail := r.URL.Query().Get("em")
+			flash := url.QueryEscape("Thanks — your talk proposal is in.")
+			w.Header().Set("HX-Redirect",
+				fmt.Sprintf("/dashboard?hr=%s&em=%s&flash=%s", encHMAC, encEmail, flash))
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 
-                w.Write([]byte(helpers.SuccessApp("Your speaker application has been submitted! We'll be in touch.")))
-                return
-        }
+		w.Write([]byte(helpers.SuccessApp("Your speaker application has been submitted! We'll be in touch.")))
+		return
+	}
 
 }
 
 func RenderVolunteers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        confs := listConfs(w, ctx)
+	confs := listConfs(w, ctx)
 	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer_select.tmpl", &VolunteerPage{
 		Confs: confs,
-		Year: helpers.CurrentYear(),
+		Year:  helpers.CurrentYear(),
 	})
 
 	if err != nil {
@@ -1897,132 +1981,136 @@ func RenderVolunteers(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 
 func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, err := helpers.FindConf(r, ctx)
-        if err != nil {
-                handle404(w, r, ctx)
-                return
-        }
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
 
-        if !conf.Active {
-                handle404(w, r, ctx)
-                return
-        }
+	if !conf.Active {
+		handle404(w, r, ctx)
+		return
+	}
 
-        jobs := listJobs(w, ctx)
-        confs := listConfs(w, ctx)
+	jobs := listJobs(w, ctx)
+	confs := listConfs(w, ctx)
 
-        switch r.Method {
-        case http.MethodGet:
-                // Pre-fill from the user's Speakers row when the
-                // form is opened from a /dashboard "Sign up to
-                // volunteer" link (hr+em query params verified).
-                // Silent fallback when params are absent / wrong /
-                // the user has no Speakers row — public visitors
-                // get the blank form.
-                //
-                // Hometown rides along from the SpeakerConf for
-                // THIS conf when one exists (the speaker has
-                // already volunteered Hometown there); falls back
-                // to blank otherwise.
-                var prefill *types.Speaker
-                var prefillHome string
-                if email, _, vErr := validateVolEmail(r, ctx); vErr == nil {
-                        sps, scs, sErr := getters.GetSpeakerConfsByEmail(ctx, email)
-                        if sErr == nil && len(sps) > 0 {
-                                prefill = sps[0]
-                        }
-                        if sErr == nil {
-                                for _, sc := range scs {
-                                        if sc == nil || sc.ComingFrom == "" {
-                                                continue
-                                        }
-                                        for _, p := range sc.Proposals {
-                                                if p != nil && p.ScheduleFor != nil && p.ScheduleFor.Ref == conf.Ref {
-                                                        prefillHome = sc.ComingFrom
-                                                        break
-                                                }
-                                        }
-                                        if prefillHome != "" {
-                                                break
-                                        }
-                                }
-                        }
-                }
-                err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
-                        Conf: conf,
-                        Confs: confs,
-                        YesJobs: helpers.BuildJobs("yjob-", jobs, true),
-                        NoJobs: helpers.BuildJobs("njob-", jobs, false),
-                        ConfItems: helpers.GetOtherConfs(confs, *conf),
-                        DaysList:  conf.DaysList("days-", true),
-                        Prefill:   prefill,
-                        PrefillHometown: prefillHome,
-                        Year: helpers.CurrentYear(),
-                })
+	switch r.Method {
+	case http.MethodGet:
+		// Pre-fill from the user's Speakers row when the
+		// form is opened from a /dashboard "Sign up to
+		// volunteer" link (hr+em query params verified).
+		// Silent fallback when params are absent / wrong /
+		// the user has no Speakers row — public visitors
+		// get the blank form.
+		//
+		// Hometown rides along from the SpeakerConf for
+		// THIS conf when one exists (the speaker has
+		// already volunteered Hometown there); falls back
+		// to blank otherwise.
+		var prefill *types.Speaker
+		var prefillHome string
+		if email, _, vErr := validateVolEmail(r, ctx); vErr == nil {
+			sps, scs, sErr := getters.GetSpeakerConfsByEmail(ctx, email)
+			if sErr == nil && len(sps) > 0 {
+				prefill = sps[0]
+			}
+			if sErr == nil {
+				for _, sc := range scs {
+					if sc == nil || sc.ComingFrom == "" {
+						continue
+					}
+					for _, p := range sc.Proposals {
+						if p != nil && p.ScheduleFor != nil && p.ScheduleFor.Ref == conf.Ref {
+							prefillHome = sc.ComingFrom
+							break
+						}
+					}
+					if prefillHome != "" {
+						break
+					}
+				}
+			}
+		}
+		err = ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer.tmpl", &VolunteerPage{
+			Conf:            conf,
+			Confs:           confs,
+			YesJobs:         helpers.BuildJobs("yjob-", jobs, true),
+			NoJobs:          helpers.BuildJobs("njob-", jobs, false),
+			ConfItems:       helpers.GetOtherConfs(confs, *conf),
+			DaysList:        conf.DaysList("days-", true),
+			Prefill:         prefill,
+			PrefillHometown: prefillHome,
+			Year:            helpers.CurrentYear(),
+		})
 
-                if err != nil {
-                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
-                        return
-                }
-                        return
-        case http.MethodPost:
-		r.ParseForm()
+		if err != nil {
+			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteer/%s ExecuteTemplate failed ! %s", conf.Tag, err.Error())
+			return
+		}
+		return
+	case http.MethodPost:
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 		dec := newFormDecoder()
 		var vol types.Volunteer
 		err = dec.Decode(&vol, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to decode form %s", err)
-                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
+			w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
 		}
 
-                /* ten divided by two is five */
-                if vol.Captcha != 5 {
-                        w.Write([]byte(helpers.ErrVolApp("Incorrect captcha. The answer is 5.")))
+		/* ten divided by two is five */
+		if vol.Captcha != 5 {
+			w.Write([]byte(helpers.ErrVolApp("Incorrect captcha. The answer is 5.")))
 			return
-                }
+		}
 
-                vol.ParseAvailability("days-", r.PostForm)
-                vol.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
-                vol.WorkYes = helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
-                vol.WorkNo = helpers.ParseFormJobs("njob-", r.PostForm, jobs)
-        
-                if len(vol.ScheduleFor) == 0 {
-                        vol.ScheduleFor = append(vol.ScheduleFor, conf)
-                }
+		vol.ParseAvailability("days-", r.PostForm)
+		vol.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)
+		vol.WorkYes = helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
+		vol.WorkNo = helpers.ParseFormJobs("njob-", r.PostForm, jobs)
 
-                err = getters.RegisterVolunteer(ctx.Notion, &vol)
-                if err != nil {
+		if len(vol.ScheduleFor) == 0 {
+			vol.ScheduleFor = append(vol.ScheduleFor, conf)
+		}
+
+		err = getters.RegisterVolunteer(ctx.Notion, &vol)
+		if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to register volunteer %s", err)
-                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
+			w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
-                }
+		}
 
-                /* Send application acknowledgment email */
-	        volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
-                if err != nil {
+		/* Send application acknowledgment email */
+		volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+		if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to fetch volinfos %s", err)
-                        w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
+			w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
-                }
+		}
 
-                _, err = emails.OnlyForVolApp(ctx, &vol, conf, volinfo)
-                if err != nil {
-                        ctx.Err.Printf("/volunteer/{conf} unable to send ack email: %s", err)
-                }
+		_, err = emails.OnlyForVolApp(ctx, &vol, conf, volinfo)
+		if err != nil {
+			ctx.Err.Printf("/volunteer/{conf} unable to send ack email: %s", err)
+		}
 
-                /* Register to mailing lists :) */
-                /* Note: this also sends pre-saved missives for the vol app list! */
-                newslist := missives.MakeApplicationSublist(conf.Tag, "volapp", vol.Subscribe)
-                err = missives.NewSubs(ctx, vol.Email, newslist)
+		/* Register to mailing lists :) */
+		/* Note: this also sends pre-saved missives for the vol app list! */
+		newslist := missives.MakeApplicationSublist(conf.Tag, "volapp", vol.Subscribe)
+		err = missives.NewSubs(ctx, vol.Email, newslist)
 
-                if err != nil {
-                        ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, vol)
-                }
+		if err != nil {
+			ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, vol)
+		}
 
-                w.Write([]byte(helpers.SuccessApp("Your volunteer application has been submitted! We'll be in touch.")))
-                return
-        }
+		w.Write([]byte(helpers.SuccessApp("Your volunteer application has been submitted! We'll be in touch.")))
+		return
+	}
 
 }
 
@@ -2163,16 +2251,16 @@ func RenderConf(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	}
 	tmplTag := fmt.Sprintf("conf/%s.tmpl", conf.Tag)
 	err = ctx.TemplateCache.ExecuteTemplate(w, tmplTag, &ConfPage{
-		Conf:          conf,
-		Hotels:        confHotels,
-		Tix:           currTix,
-		MaxTix:        maxTix,
-		Sold:          soldCount,
-		TixLeft:       tixLeft,
-		Talks:         talks,
-		EventSpeakers: evSpeakers,
-		Buckets:       buckets,
-		Days:          days,
+		Conf:              conf,
+		Hotels:            confHotels,
+		Tix:               currTix,
+		MaxTix:            maxTix,
+		Sold:              soldCount,
+		TixLeft:           tixLeft,
+		Talks:             talks,
+		EventSpeakers:     evSpeakers,
+		Buckets:           buckets,
+		Days:              days,
 		AgendaDays:        agendaDays,
 		ScheduledSessions: scheduledSessions,
 		Year:              helpers.CurrentYear(),
@@ -2227,7 +2315,11 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		}
 		return
 	case http.MethodPost:
-		r.ParseForm()
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 
 		name := r.FormValue("Name")
 		phone := r.FormValue("Phone")
@@ -2301,10 +2393,10 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				"<p><strong>Discovered via:</strong> %s</p>"+
 				"<hr/>"+
 				"<p><strong>Comments:</strong></p><p>%s</p>",
-			name, email, phone, signal, telegram, contactAt,
-			org, orgSite, orgTwitter, orgNostr,
-			budget, strings.Join(selectedConfs, ", "), strings.Join(selectedOpps, ", "),
-			discoveredVia, comments)
+			template.HTMLEscapeString(name), template.HTMLEscapeString(email), template.HTMLEscapeString(phone), template.HTMLEscapeString(signal), template.HTMLEscapeString(telegram), template.HTMLEscapeString(contactAt),
+			template.HTMLEscapeString(org), template.HTMLEscapeString(orgSite), template.HTMLEscapeString(orgTwitter), template.HTMLEscapeString(orgNostr),
+			template.HTMLEscapeString(budget), template.HTMLEscapeString(strings.Join(selectedConfs, ", ")), template.HTMLEscapeString(strings.Join(selectedOpps, ", ")),
+			template.HTMLEscapeString(discoveredVia), template.HTMLEscapeString(comments))
 
 		textBody := fmt.Sprintf(
 			"Sponsor Inquiry\n\nName: %s\nEmail: %s\nPhone: %s\nSignal: %s\nTelegram: %s\nBest way to contact: %s\n\n"+
@@ -2367,7 +2459,11 @@ func ContactPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		}
 		return
 	case http.MethodPost:
-		r.ParseForm()
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 
 		name := r.FormValue("Name")
 		phone := r.FormValue("Phone")
@@ -2399,7 +2495,7 @@ func ContactPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				"<p><strong>Best way to contact:</strong> %s</p>"+
 				"<hr/>"+
 				"<p>%s</p>",
-			name, email, phone, contactAt, message)
+			template.HTMLEscapeString(name), template.HTMLEscapeString(email), template.HTMLEscapeString(phone), template.HTMLEscapeString(contactAt), template.HTMLEscapeString(message))
 
 		textBody := fmt.Sprintf(
 			"Contact Form Submission\n\nName: %s\nEmail: %s\nPhone: %s\nBest way to contact: %s\n\n%s",
@@ -2641,7 +2737,11 @@ func CheckIn(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		CheckInGet(w, r, ctx)
 		return
 	case http.MethodPost:
-		r.ParseForm()
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 		pin := r.Form.Get("pin")
 		if pin != ctx.Env.RegistryPin {
 			w.WriteHeader(http.StatusBadRequest)
@@ -2741,12 +2841,13 @@ func computeHash(key, id string) string {
 
 func validHash(key, id, msgMAC string) bool {
 	actual := computeHash(key, id)
-	return msgMAC == actual
+	return hmac.Equal([]byte(msgMAC), []byte(actual))
 }
 
 var decoder = newFormDecoder()
 
 func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	limitRequestBody(w, r, maxWebhookBodyBytes)
 	err := r.ParseForm()
 	if err != nil {
 		ctx.Err.Printf("Error reading request body: %v", err)
@@ -2884,7 +2985,11 @@ func HandleDiscount(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	params := mux.Vars(r)
 	tixSlug := params["tix"]
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	discountCode := r.Form.Get("Discount")
 	affiliateCode := r.Form.Get("AffiliateCode")
 	discountPrice, err := getPrice(r.Form.Get("DiscountPrice"))
@@ -3056,7 +3161,11 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		}
 		return
 	case http.MethodPost:
-		r.ParseForm()
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 		dec := newFormDecoder()
 		var form types.TixForm
 		err = dec.Decode(&form, r.PostForm)
@@ -3068,7 +3177,7 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 		if form.Email == "" || form.Count < 1 {
 			http.Redirect(w, r, fmt.Sprintf("/tix/%s/checkout", tixSlug), http.StatusSeeOther)
-                        return
+			return
 		}
 
 		// Resolve the effective discount code: the typed one wins
@@ -3083,7 +3192,7 @@ func HandleCheckout(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		 *  effective code — typed vs. silent — that resolves on
 		 *  this submit). */
 		expectedHMAC := calcTixHMAC(ctx, conf, tixPrice, form.DiscountPrice, effectiveCode)
-		if expectedHMAC != form.HMAC {
+		if !hmac.Equal([]byte(expectedHMAC), []byte(form.HMAC)) {
 			ctx.Err.Printf("/tix/%s/checkout hmac mismatch. %s != %s", tixSlug, expectedHMAC, form.HMAC)
 			w.WriteHeader(http.StatusInternalServerError)
 			return
@@ -3363,65 +3472,69 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 }
 
 type EmailForm struct {
-        Email string
+	Email string
 }
 
 func RenderFindShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        switch r.Method {
-        case http.MethodGet: 
-                err := ctx.TemplateCache.ExecuteTemplate(w, "volunteers/findshift.tmpl", &VolShiftPage{
-                        Year: helpers.CurrentYear(),
-                })
+	switch r.Method {
+	case http.MethodGet:
+		err := ctx.TemplateCache.ExecuteTemplate(w, "volunteers/findshift.tmpl", &VolShiftPage{
+			Year: helpers.CurrentYear(),
+		})
 
-                if err != nil {
-                        http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteers/findshift ExecuteTemplate failed ! %s", err.Error())
-                        return
-                }
-        case http.MethodPost:
-		r.ParseForm()
+		if err != nil {
+			http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteers/findshift ExecuteTemplate failed ! %s", err.Error())
+			return
+		}
+	case http.MethodPost:
+		limitRequestBody(w, r, maxFormBodyBytes)
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
 		dec := newFormDecoder()
 		var form EmailForm
-                err := dec.Decode(&form, r.PostForm)
+		err := dec.Decode(&form, r.PostForm)
 		if err != nil {
 			ctx.Err.Printf("/vols/shift unable to decode email form %s", err)
-                        w.Write([]byte(helpers.ErrVolApp("Unable to send you email link.")))
+			w.Write([]byte(helpers.ErrVolApp("Unable to send you email link.")))
 			return
 		}
 
-                _, err = emails.OnlyForLogin(ctx, form.Email)
-                if err != nil {
-                        http.Error(w, "Unable to send login link via email", http.StatusInternalServerError)
-                        ctx.Err.Printf("/volunteers/findshift onlyforvollogin failed ! %s", err.Error())
-                        return
-                }
+		_, err = emails.OnlyForLogin(ctx, form.Email)
+		if err != nil {
+			http.Error(w, "Unable to send login link via email", http.StatusInternalServerError)
+			ctx.Err.Printf("/volunteers/findshift onlyforvollogin failed ! %s", err.Error())
+			return
+		}
 
-                /* We redirect to home on success */
-                http.Redirect(w, r, "/", http.StatusSeeOther)
-        }
+		/* We redirect to home on success */
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+	}
 }
 
 func calcStats(apps []*types.Volunteer) *ApplicationStats {
 
-        pending, accepted, totalShifts := 0, 0, 0
-        for _, app := range apps {
-                switch app.Status {
-                case "Applied":
-                case "PendingShifts":
-                case "Waitlist":
-                        pending += 1
-                case "Scheduled":
-                        accepted += 1
-                }
-                totalShifts += len(app.WorkShifts)
-        }
+	pending, accepted, totalShifts := 0, 0, 0
+	for _, app := range apps {
+		switch app.Status {
+		case "Applied":
+		case "PendingShifts":
+		case "Waitlist":
+			pending += 1
+		case "Scheduled":
+			accepted += 1
+		}
+		totalShifts += len(app.WorkShifts)
+	}
 
-        return &ApplicationStats{
-                Applied: len(apps),
-                Pending: pending,
-                Accepted: accepted,
-                TotalShifts: totalShifts,
-        }
+	return &ApplicationStats{
+		Applied:     len(apps),
+		Pending:     pending,
+		Accepted:    accepted,
+		TotalShifts: totalShifts,
+	}
 }
 
 func validateVolEmail(r *http.Request, ctx *config.AppContext) (string, string, error) {
@@ -3452,36 +3565,36 @@ func validateVolEmail(r *http.Request, ctx *config.AppContext) (string, string, 
 }
 
 func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        /* We put a hash + email in the link */
+	/* We put a hash + email in the link */
 	email, encodedHMAC, err := validateVolEmail(r, ctx)
-        if err != nil {
-                ctx.Infos.Printf("/vols/shift HMAC validation failed: %s", err.Error())
-                RenderFindShift(w, r, ctx)
-                return
-        }
-        ctx.Infos.Printf("/vols/shift validated email: %s", email)
+	if err != nil {
+		ctx.Infos.Printf("/vols/shift HMAC validation failed: %s", err.Error())
+		RenderFindShift(w, r, ctx)
+		return
+	}
+	ctx.Infos.Printf("/vols/shift validated email: %s", email)
 
-        /* Find volunteer signups */
-        volapps, err := getters.ListVolunteerApps(ctx, email)
-        if err != nil {
+	/* Find volunteer signups */
+	volapps, err := getters.ListVolunteerApps(ctx, email)
+	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/vol/shift listvolunteerapps failed ! %s", err.Error())
 		return
-        }
+	}
 
-        // fixme: add "sign up to volunteer" state :)
-        if len(volapps) == 0 {
+	// fixme: add "sign up to volunteer" state :)
+	if len(volapps) == 0 {
 		handle404(w, r, ctx)
 		return
-        }
+	}
 
 	// Populate WorkShifts and per-conf VolInfo for each volunteer application
 	volInfosByConf, err := getters.GetVolInfoMap(ctx)
-        if err != nil {
+	if err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("/vol/shift getvolinfomap failed ! %s", err.Error())
-                return
-        }
+		return
+	}
 
 	for _, vol := range volapps {
 		conf := vol.ScheduleFor[0]
@@ -3494,16 +3607,16 @@ func VolunteerShift(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 	}
 
 	encodedEmail := r.URL.Query().Get("em")
-        confs := listConfs(w, ctx)
+	confs := listConfs(w, ctx)
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/shift.tmpl", &VolShiftPage{
-                Name:     volapps[0].Name,
-                Hometown: volapps[0].Hometown,
-                Email:    encodedEmail,
-                HMAC:     encodedHMAC,
-                Stats:    calcStats(volapps),
-                VolApps:  volapps,
-	        Confs:    confs,
-                VolInfos: volInfosByConf,
+		Name:     volapps[0].Name,
+		Hometown: volapps[0].Hometown,
+		Email:    encodedEmail,
+		HMAC:     encodedHMAC,
+		Stats:    calcStats(volapps),
+		VolApps:  volapps,
+		Confs:    confs,
+		VolInfos: volInfosByConf,
 		Year:     helpers.CurrentYear(),
 	})
 
@@ -3724,7 +3837,11 @@ func VolunteerSelectShift(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	params := mux.Vars(r)
 	confTag := params["conf"]
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	shiftRef := r.Form.Get("shiftRef")
 
 	if shiftRef == "" {
@@ -3767,7 +3884,11 @@ func VolunteerRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	params := mux.Vars(r)
 	confTag := params["conf"]
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	shiftRef := r.Form.Get("shiftRef")
 
 	if shiftRef == "" {
@@ -4041,9 +4162,9 @@ func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.
 }
 
 func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        if id := requireConfVolcoord(w, r, ctx); id == nil {
-        	return
-        }
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
 
 	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
@@ -4152,9 +4273,9 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 }
 
 func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-        if id := requireConfVolcoord(w, r, ctx); id == nil {
-        	return
-        }
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
 
 	conf, err := helpers.FindConf(r, ctx)
 	if err != nil {
@@ -4162,7 +4283,11 @@ func VolAdminPromote(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	targetStatus := r.FormValue("target_status")
 	fromStatus := r.FormValue("from_status")
 
@@ -4362,7 +4487,11 @@ func VolunteerUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *co
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	var days []string
 	for k := range r.PostForm {
 		if strings.HasPrefix(k, "days-") {
@@ -4402,7 +4531,11 @@ func VolunteerUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *confi
 	}
 
 	jobs := listJobs(w, ctx)
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	yesJobs := helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
 	noJobs := helpers.ParseFormJobs("njob-", r.PostForm, jobs)
 
@@ -4612,7 +4745,11 @@ func VolAdminUpdateStatus(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	status := r.FormValue("status")
 	if status == "" {
 		http.Error(w, "Missing status", http.StatusBadRequest)
@@ -4639,7 +4776,11 @@ func VolAdminUpdateAvailability(w http.ResponseWriter, r *http.Request, ctx *con
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	var days []string
 	for k := range r.PostForm {
 		if strings.HasPrefix(k, "days-") {
@@ -4668,7 +4809,11 @@ func VolAdminUpdateWorkPrefs(w http.ResponseWriter, r *http.Request, ctx *config
 	}
 
 	jobs := listJobs(w, ctx)
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	yesJobs := helpers.ParseFormJobs("yjob-", r.PostForm, jobs)
 	noJobs := helpers.ParseFormJobs("njob-", r.PostForm, jobs)
 
@@ -4701,7 +4846,11 @@ func VolAdminAddShift(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	shiftRef := r.FormValue("shiftRef")
 	if shiftRef == "" {
 		http.Error(w, "Missing shiftRef", http.StatusBadRequest)
@@ -4728,7 +4877,11 @@ func VolAdminRemoveShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	shiftRef := r.FormValue("shiftRef")
 	if shiftRef == "" {
 		http.Error(w, "Missing shiftRef", http.StatusBadRequest)
@@ -4791,7 +4944,11 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	volRefs := r.Form["vol_refs"]
 
 	testEmail := r.FormValue("test_email")
@@ -4836,12 +4993,12 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 	}
 
 	sent := 0
-        title := r.FormValue("title")
-        body := r.FormValue("body")
-        if title == "" || body == "" {
-                http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
-                return
-        }
+	title := r.FormValue("title")
+	body := r.FormValue("body")
+	if title == "" || body == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=Title+and+body+required", conf.Tag), http.StatusSeeOther)
+		return
+	}
 
 	if isTest {
 		// Use first selected volunteer, or first available if none selected
@@ -4867,14 +5024,14 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-        for _, v := range targets {
-                _, err := emails.SendCustomToVol(ctx, v, conf, volinfo, title, body)
-                if err != nil {
-                        ctx.Err.Printf("/%s/volcoord/email custom -> %s failed: %s", conf.Tag, v.Email, err)
-                        continue
-                }
-                sent++
-        }
+	for _, v := range targets {
+		_, err := emails.SendCustomToVol(ctx, v, conf, volinfo, title, body)
+		if err != nil {
+			ctx.Err.Printf("/%s/volcoord/email custom -> %s failed: %s", conf.Tag, v.Email, err)
+			continue
+		}
+		sent++
+	}
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+volunteers", sent, len(targets))
 	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, flash), http.StatusSeeOther)
@@ -5111,7 +5268,11 @@ func VolAdminCreateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	name := r.FormValue("name")
 	jobTag := r.FormValue("job_type")
 	day := r.FormValue("day")
@@ -5157,7 +5318,11 @@ func VolAdminUpdateShift(w http.ResponseWriter, r *http.Request, ctx *config.App
 
 	shiftRef := mux.Vars(r)["shiftRef"]
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	name := r.FormValue("name")
 	jobTag := r.FormValue("job_type")
 	day := r.FormValue("day")
@@ -5333,9 +5498,9 @@ func AdminGifts(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	// when available, fall back to lower-cased name (older rows
 	// may lack stable IDs).
 	type pick struct {
-		name     string
-		clipart  string
-		panelN   int
+		name    string
+		clipart string
+		panelN  int
 	}
 	best := map[string]*pick{}
 	for _, talk := range talks {
@@ -5524,7 +5689,11 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	speakerRefs := r.Form["speaker_refs"]
 
 	title := r.FormValue("title")
@@ -5688,7 +5857,11 @@ func RegistrationsAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *co
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	selectedEmails := r.Form["reg_emails"]
 
 	title := r.FormValue("title")
@@ -6110,7 +6283,11 @@ func ProposalAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	proposalRefs := r.Form["proposal_refs"]
 	if len(proposalRefs) == 0 {
 		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=No+applicants+selected", conf.Tag), http.StatusSeeOther)
@@ -6196,7 +6373,11 @@ func ProposalAdminAccept(w http.ResponseWriter, r *http.Request, ctx *config.App
 		return
 	}
 
-	r.ParseForm()
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
 	proposalID := r.FormValue("proposal_ref")
 	if proposalID == "" {
 		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=No+proposal+selected", conf.Tag), http.StatusSeeOther)

@@ -17,7 +17,7 @@
 			<p class="mb-4">{{ .Conf.Venue }}</p>
 			<p class="mt-6">Thank you for registering. This QR code is your ticket!</p>
 			<div class="flex justify-center my-4">
-			<img {{ .QRCodeURI | safesrc }} width="250" height="250" alt="Ticket QR"/>
+			<img src="{{ .QRCodeURI | safeURL }}" width="250" height="250" alt="Ticket QR"/>
 			</div>
 			<p class="mb-4">Present this QR code at the conference registration desk to check in and receive your conference badge.</p>
 			<p class="mb-4">This is a <span class="font-semibold">{{ .Type }}</span> ticket</p>

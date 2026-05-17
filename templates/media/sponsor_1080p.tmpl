@@ -70,7 +70,7 @@ body {
     <div class="absolute inset-0 bounding img"></div>
     <div class="bounding flex flex-col items-center justify-center relative">
         <div class="level font-semibold text-white mb-8">{{ .SponsorLevel }}</div>
-        <img {{ safesrc .SponsorLogo }} alt="{{ .SponsorName }}" class="{{ if or (eq .SponsorLevel "Title") (eq .SponsorLevel "Headline") }}sponsor-logo{{ else }}sponsor-logo-small{{ end }}" />
+        <img src="{{ .SponsorLogo | safeURL }}" alt="{{ .SponsorName }}" class="{{ if or (eq .SponsorLevel "Title") (eq .SponsorLevel "Headline") }}sponsor-logo{{ else }}sponsor-logo-small{{ end }}" />
     </div>
     <div style="position: absolute; bottom: 48px; left: 64px; right: 48px; display: flex; align-items: flex-start; justify-content: space-between;">
         <div style="text-align: left;align-self: flex-end;">

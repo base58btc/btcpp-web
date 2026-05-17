@@ -55,6 +55,7 @@ func AdminInviteSpeakerSubmit(w http.ResponseWriter, r *http.Request, ctx *confi
 		handle404(w, r, ctx)
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "parse form: "+err.Error(), http.StatusBadRequest)
 		return

@@ -34,8 +34,8 @@ type HotelAdminPage struct {
 	// IsConfAdmin gates the edit form. Staff get a read-only view
 	// of the same four rows; the Save / Upload / Delete controls
 	// only render for admins (and the POST handlers gate too).
-	IsConfAdmin  bool
-	Year         uint
+	IsConfAdmin bool
+	Year        uint
 }
 
 // HotelSlot is one row in the editor. Empty slots have ID == "" so
@@ -92,6 +92,7 @@ func HotelsAdminSave(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		handle404(w, r, ctx)
 		return
 	}
+	limitRequestBody(w, r, maxFormBodyBytes)
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
@@ -195,6 +196,7 @@ func HotelImageUpload(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		handle404(w, r, ctx)
 		return
 	}
+	limitRequestBody(w, r, maxMultipartBodyBytes)
 	raw, contentType, ext, err := readMultipartFile(r, "file")
 	if err != nil {
 		http.Error(w, "missing or unreadable file", http.StatusBadRequest)
