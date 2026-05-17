@@ -519,15 +519,37 @@ func buildRecordingRow(rec *types.Recording) *RecordingRow {
 	if rec.ConfTalkID != "" {
 		row.ConfTalk = getters.FetchConfTalkByID(rec.ConfTalkID)
 		if row.ConfTalk != nil && row.ConfTalk.Proposal != nil {
-			for _, sc := range row.ConfTalk.Proposal.Speakers {
-				if sc == nil || sc.Speaker == nil {
-					continue
-				}
-				row.Speakers = append(row.Speakers, sc.Speaker)
-			}
+			row.Speakers = recordingSpeakersForProposal(row.ConfTalk.Proposal)
 		}
 	}
 	return row
+}
+
+func recordingSpeakersForProposal(proposal *types.Proposal) []*types.Speaker {
+	if proposal == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	out := make([]*types.Speaker, 0, len(proposal.SpeakerConfRefs))
+	appendSpeakerConf := func(sc *types.SpeakerConf) {
+		if sc == nil || sc.Speaker == nil || seen[sc.Speaker.ID] {
+			return
+		}
+		seen[sc.Speaker.ID] = true
+		out = append(out, sc.Speaker)
+	}
+
+	// Cached proposals generally carry raw SpeakerConfRefs; the
+	// Speakers slice is only filled by specific enrichers. Resolve
+	// through the warm SpeakerConf cache so recordings get names even
+	// when the proposal has not been enriched in this request.
+	for _, sc := range resolveProposalSpeakers(proposal) {
+		appendSpeakerConf(sc)
+	}
+	for _, sc := range proposal.Speakers {
+		appendSpeakerConf(sc)
+	}
+	return out
 }
 
 // ---- copy generators -------------------------------------------------
