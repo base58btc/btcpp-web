@@ -296,10 +296,11 @@ type AffiliateStats struct {
 // IsConf* flags so a staff user lands on a slimmer page than an
 // admin (no review/applicants/sponsors/social/email).
 type OrganizerDashboardPage struct {
-	Conf            *types.Conf
-	PendingCount    int
-	DecisionedCount int
-	FlashMessage    string
+	Conf              *types.Conf
+	PendingCount      int
+	DecisionedCount   int
+	ReviewCountsReady bool
+	FlashMessage      string
 	// Stats drives the headline-numbers panel under the
 	// hero image (tickets sold, revenue, sponsors, etc).
 	// nil when the load was skipped or all queries blanked.

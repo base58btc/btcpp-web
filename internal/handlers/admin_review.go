@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/internal/auth"
@@ -72,44 +73,59 @@ func OrganizerDashboard(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 	// Pending-review counts are admin-only data (a staff visitor
 	// shouldn't see "12 talks pending decision"). Skip the load
 	// when they don't have the role.
+	started := time.Now()
 	isAdmin := id.HasRoleForConf(conf.Tag, auth.RoleAdmin)
 	var pendingCount, decisionedCount int
+	var confProposals []*types.Proposal
+	var reviewCountsReady bool
+	proposalsStarted := time.Now()
 	if isAdmin {
-		pending, decisioned := splitProposalsByPending(loadConfProposals(ctx, conf))
-		pendingCount = len(pending)
-		decisionedCount = len(decisioned)
+		pendingCount, decisionedCount, confProposals, reviewCountsReady = loadAdminDashboardProposalSnapshotCached(ctx, conf)
 	}
+	proposalsDur := time.Since(proposalsStarted)
 
 	// Stats panel (tickets sold, revenue, sponsors, top affiliates,
 	// …). Pendingcount is threaded in for admins so we don't re-
-	// split the proposal list; staff get -1 → loadOrganizerStats
+	// split the proposal list; staff get -1 → the async stats refresh
 	// re-derives locally so the panel is consistent across roles.
 	statsPending := pendingCount
-	if !isAdmin {
+	if !isAdmin || !reviewCountsReady {
 		statsPending = -1
 	}
-	stats := loadOrganizerStats(ctx, conf, statsPending)
+	statsStarted := time.Now()
+	stats := loadOrganizerStatsCached(ctx, conf, confProposals, statsPending)
+	statsDur := time.Since(statsStarted)
 
 	// Populate countdown bounds (doors-open / doors-close) on a
 	// shallow copy of conf so the cached pointer isn't mutated.
 	// Drives the countdown widget at the top of conf_dashboard.
 	confCopy := *conf
-	var infosByDay map[int]*types.ConfInfo
-	if cis, err := getters.ListConfInfos(ctx, conf.Tag); err == nil {
-		infosByDay = confInfosByDay(cis)
+	countdownStarted := time.Now()
+	confCopy.CountdownStart, confCopy.CountdownEnd, _ = loadAdminDashboardCountdownCached(ctx, &confCopy)
+	countdownDur := time.Since(countdownStarted)
+
+	if ctx.Infos != nil {
+		ctx.Infos.Printf("/%s/admin dashboard timings: proposals=%s stats=%s countdown=%s total=%s stats_rendered=%t",
+			conf.Tag,
+			proposalsDur.Round(time.Millisecond),
+			statsDur.Round(time.Millisecond),
+			countdownDur.Round(time.Millisecond),
+			time.Since(started).Round(time.Millisecond),
+			stats != nil,
+		)
 	}
-	confCopy.CountdownStart, confCopy.CountdownEnd = computeCountdownBounds(&confCopy, infosByDay)
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "admin/conf_dashboard.tmpl", &OrganizerDashboardPage{
-		Conf:            &confCopy,
-		PendingCount:    pendingCount,
-		DecisionedCount: decisionedCount,
-		FlashMessage:    r.URL.Query().Get("flash"),
-		Stats:           stats,
-		IsGlobalAdmin:   id.IsGlobalAdmin(),
-		IsConfAdmin:     isAdmin,
-		IsConfVolcoord:  id.HasRoleForConf(conf.Tag, auth.RoleVolcoord),
-		Year:            helpers.CurrentYear(),
+		Conf:              &confCopy,
+		PendingCount:      pendingCount,
+		DecisionedCount:   decisionedCount,
+		ReviewCountsReady: reviewCountsReady,
+		FlashMessage:      r.URL.Query().Get("flash"),
+		Stats:             stats,
+		IsGlobalAdmin:     id.IsGlobalAdmin(),
+		IsConfAdmin:       isAdmin,
+		IsConfVolcoord:    id.HasRoleForConf(conf.Tag, auth.RoleVolcoord),
+		Year:              helpers.CurrentYear(),
 	})
 	if err != nil {
 		ctx.Err.Printf("/%s/admin render: %s", conf.Tag, err)
@@ -525,8 +541,7 @@ func AdminProposalRemoveSpeaker(w http.ResponseWriter, r *http.Request, ctx *con
 }
 
 // loadConfProposals returns every Proposal whose ScheduleFor matches
-// conf, sorted by ID for stable walkthrough order. Reads from the warm
-// proposals cache.
+// conf, sorted by ID for stable walkthrough order.
 func loadConfProposals(ctx *config.AppContext, conf *types.Conf) []*types.Proposal {
 	all, err := getters.ListProposals(ctx)
 	if err != nil {

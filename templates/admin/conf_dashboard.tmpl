@@ -128,7 +128,7 @@
         <div class="min-w-0 flex-1">
           <p class="text-sm font-semibold text-gray-900">Review applications</p>
           <p class="text-xs text-gray-500">
-            {{ if .PendingCount }}{{ .PendingCount }} pending{{ else }}all caught up{{ end }}{{ if .DecisionedCount }} &middot; {{ .DecisionedCount }} decisioned{{ end }}
+            {{ if .ReviewCountsReady }}{{ if .PendingCount }}{{ .PendingCount }} pending{{ else }}all caught up{{ end }}{{ if .DecisionedCount }} &middot; {{ .DecisionedCount }} decisioned{{ end }}{{ else }}counts refreshing{{ end }}
           </p>
         </div>
         <span class="text-sm font-medium text-indigo-600 group-hover:text-indigo-700">Walk through &rarr;</span>
