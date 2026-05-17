@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"btcpp-web/external/getters"
+	"btcpp-web/internal/auth"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/types"
@@ -16,6 +17,9 @@ import (
 
 func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 	r.HandleFunc("/media/preview/{conf}/{type}/{card}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		params := mux.Vars(r)
 		cardtype := params["type"]
 		switch cardtype {
@@ -36,6 +40,9 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/{type}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		params := mux.Vars(r)
 		cardtype := params["type"]
 		switch cardtype {
@@ -52,42 +59,87 @@ func AddMediaRoutes(r *mux.Router, app *config.AppContext) {
 
 	/* Gen both talk + speaker cards */
 	r.HandleFunc("/media/imgs/{conf}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		GenSpeakerCards(w, r, app)
 		GenTalkCards(w, r, app)
 		GenAgendaCards(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/speaker/{card}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		MakeSpeakerCard(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/talk/{card}/{talk}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		MakeTalkCard(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/png/{conf}/speaker/{card}/{talk}/{speaker}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		ServeSpeakerPng(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/png/{conf}/talk/{card}/{talk}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		ServeTalkPng(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/sponsor/{card}/{sponsorRef}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		MakeSponsorCard(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/png/{conf}/sponsor/{card}/{sponsorRef}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		ServeSponsorPng(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/media/imgs/{conf}/agenda/{ref}/{venue}", func(w http.ResponseWriter, r *http.Request) {
+		if !allowMediaGeneration(w, r, app) {
+			return
+		}
 		params := mux.Vars(r)
 		confTag := params["conf"]
 		ref := params["ref"]
 		venue := params["venue"]
 		MakeAgendaCard(w, r, app, confTag, ref, venue)
 	}).Methods("GET")
+}
+
+func allowMediaGeneration(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) bool {
+	if !ctx.Env.Prod {
+		return true
+	}
+	if sig := r.URL.Query().Get("mt"); sig != "" && helpers.VerifyScopedHMAC(ctx, "media-render", r.URL.Path, sig) {
+		return true
+	}
+	id := auth.RequireOptional(r, ctx)
+	if id != nil {
+		confTag := mux.Vars(r)["conf"]
+		if confTag != "" && id.HasRoleForConf(confTag, auth.RoleAdmin) {
+			return true
+		}
+		if id.IsGlobalAdmin() {
+			return true
+		}
+	}
+	http.Error(w, "unauthorized", http.StatusUnauthorized)
+	return false
 }
 
 type TalkCard struct {

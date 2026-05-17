@@ -3,6 +3,8 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -14,6 +16,8 @@ import (
 
 // chromeSem limits concurrent headless Chrome instances
 var chromeSem = make(chan struct{}, 4)
+
+const chromeRenderTimeout = 90 * time.Second
 
 type PDFPage struct {
 	URL    string
@@ -47,7 +51,10 @@ func BuildChromePdf(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 		chromedp.Flag("accept-insecure-certs", true),
 	)
 
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	baseCtx, timeoutCancel := context.WithTimeout(context.Background(), chromeRenderTimeout)
+	defer timeoutCancel()
+
+	allocCtx, cancel := chromedp.NewExecAllocator(baseCtx, opts...)
 	defer cancel()
 
 	taskCtx, cancel := chromedp.NewContext(allocCtx)
@@ -85,7 +92,10 @@ func BuildChromePng(ctx *config.AppContext, pdfPage *PDFPage) ([]byte, error) {
 		chromedp.Flag("accept-insecure-certs", true),
 	)
 
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	baseCtx, timeoutCancel := context.WithTimeout(context.Background(), chromeRenderTimeout)
+	defer timeoutCancel()
+
+	allocCtx, cancel := chromedp.NewExecAllocator(baseCtx, opts...)
 	defer cancel()
 
 	taskCtx, cancel := chromedp.NewContext(allocCtx)
@@ -106,13 +116,19 @@ func MakeMediaPng(ctx *config.AppContext, card, path string) ([]byte, error) {
 	}
 
 	pg := &PDFPage{
-		URL:    ctx.Env.GetURI() + path,
+		URL:    ctx.Env.GetURI() + signedMediaPath(ctx, path),
 		Height: dimens.Height,
 		Width:  dimens.Width,
 	}
 
 	ctx.Infos.Printf("PNG URL: %s", pg.URL)
 	return BuildChromePng(ctx, pg)
+}
+
+func signedMediaPath(ctx *config.AppContext, path string) string {
+	q := url.Values{}
+	q.Set("mt", CreateScopedHMAC(ctx, "media-render", path))
+	return path + "?" + q.Encode()
 }
 
 func MakeSpeakerPng(ctx *config.AppContext, confTag, card, speakerID, talkID string) ([]byte, error) {
