@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -16,14 +17,14 @@ const CHARGES_ENDPOINT string = "/charges"
 func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice, preDiscountPrice uint, tix *types.ConfTicket, conf *types.Conf, isLocal bool, count uint, email string, discountRef string, subNewsletter bool) (*types.OpenNodePayment, error) {
 
 	metadata := &types.OpenNodeMetadata{
-		Email:            email,
-		Quantity:         float64(count),
-		ConfRef:          conf.Ref,
-		TixLocal:         isLocal,
-		DiscountRef:      discountRef,
+		Email:       email,
+		Quantity:    float64(count),
+		ConfRef:     conf.Ref,
+		TixLocal:    isLocal,
+		DiscountRef: discountRef,
 		/* We have to save it b/c OpenNode doesnt */
-		Currency:         tix.Currency,
-		Subscribe:        subNewsletter,
+		Currency:  tix.Currency,
+		Subscribe: subNewsletter,
 		// Pre-discount per-ticket price in the buyer's selected
 		// currency (BTC / USD / Local). tixPrice here is the post-
 		// discount form value; preDiscountPrice is the original tier.
@@ -54,11 +55,14 @@ func InitOpenNodeCheckout(ctx *config.AppContext, tixPrice, preDiscountPrice uin
 	}
 
 	chargesURL := ctx.Env.OpenNode.Endpoint + CHARGES_ENDPOINT
-	req, _ := http.NewRequest("POST", chargesURL, bytes.NewBuffer(payload))
+	req, err := http.NewRequest("POST", chargesURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return nil, err
+	}
 	req.Header.Add("Authorization", ctx.Env.OpenNode.Key)
 	req.Header.Add("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err

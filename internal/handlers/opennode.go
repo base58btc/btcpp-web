@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -35,8 +36,8 @@ type (
 
 func GetCharge(ctx *config.AppContext, ID string) (*Charge, error) {
 
-	url := fmt.Sprintf("https://api.opennode.com/v2/charge/%s", ID)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	chargeURL := fmt.Sprintf("https://api.opennode.com/v2/charge/%s", url.PathEscape(ID))
+	req, err := http.NewRequest(http.MethodGet, chargeURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +46,12 @@ func GetCharge(ctx *config.AppContext, ID string) (*Charge, error) {
 	req.Header.Set("Authorization", ctx.Env.OpenNode.Key)
 	req.Header.Set("accept", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	client := &http.Client{Timeout: 15 * time.Second}
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	if res.StatusCode >= 300 {
 		return nil, fmt.Errorf("Failed to fetch, %d", res.StatusCode)

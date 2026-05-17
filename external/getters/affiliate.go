@@ -103,7 +103,7 @@ func ArchiveAffiliateCode(ctx *config.AppContext, codeID string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Notion-Version", "2022-06-28")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}

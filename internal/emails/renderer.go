@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
@@ -182,8 +183,11 @@ func findEmailMarkdown(ctx *config.AppContext, tmplURL string) (*template.Templa
 	t, ok := ctx.EmailCache[tmplURL]
 	if !ok {
 		ctx.Infos.Printf("cache miss for %s", tmplURL)
-		req, _ := http.NewRequest("GET", tmplURL, nil)
-		client := &http.Client{}
+		req, err := http.NewRequest("GET", tmplURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		client := &http.Client{Timeout: 15 * time.Second}
 		resp, err := client.Do(req)
 		if err != nil {
 			return nil, err
@@ -195,7 +199,7 @@ func findEmailMarkdown(ctx *config.AppContext, tmplURL string) (*template.Templa
 		}
 
 		if resp.StatusCode != 200 {
-			return nil, fmt.Errorf("error returned from %s: %s", tmplURL, err.Error())
+			return nil, fmt.Errorf("error returned from %s: status %d", tmplURL, resp.StatusCode)
 		}
 
 		t = template.Must(template.New("").Parse(string(tmpl)))

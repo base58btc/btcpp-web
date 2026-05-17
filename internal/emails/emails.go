@@ -293,7 +293,7 @@ func addAuthStamp(ctx *config.AppContext, req *http.Request) {
 }
 
 func sendMailerReq(ctx *config.AppContext, endpoint string, method string, payload []byte) error {
-	client := &http.Client{}
+	client := &http.Client{Timeout: 15 * time.Second}
 
 	url := ctx.Env.MailEndpoint + endpoint
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
@@ -485,7 +485,7 @@ func SendNewsletterSubEmail(ctx *config.AppContext, email, token, newsletter str
 // SendMailTest fires a single ticket email through the OnlyFor
 // pipeline against the conf + email supplied as query params:
 //
-//   GET /trial-email?conf=atx25&email=you@example.com
+//	GET /trial-email?conf=atx25&email=you@example.com
 //
 // Defaults to conf=atx25 and email=niftynei@gmail.com so a bare
 // /trial-email hit still works for the maintainer's own inbox.
