@@ -947,6 +947,43 @@ func UpdateRecordingXLink(ctx *config.AppContext, recordingID, xLink string) err
 	return nil
 }
 
+// UpdateRecordingPublishAt patches the PublishAt date on a Recording row
+// and mirrors the value into the warm cache. A nil publishAt clears the
+// Notion date property.
+func UpdateRecordingPublishAt(ctx *config.AppContext, recordingID string, publishAt *time.Time) error {
+	dateValue := interface{}(nil)
+	if publishAt != nil {
+		dateValue = map[string]interface{}{
+			"start": publishAt.UTC().Format(time.RFC3339),
+		}
+	}
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"PublishAt": map[string]interface{}{
+				"date": dateValue,
+			},
+		},
+	}
+	if err := notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+recordingID, body); err != nil {
+		return fmt.Errorf("notion update PublishAt: %w", err)
+	}
+	recordingCacheMu.Lock()
+	for _, r := range cacheRecordings {
+		if r == nil || r.ID != recordingID {
+			continue
+		}
+		if publishAt == nil {
+			r.PublishAt = nil
+		} else {
+			when := *publishAt
+			r.PublishAt = &when
+		}
+		break
+	}
+	recordingCacheMu.Unlock()
+	return nil
+}
+
 // RecordingPublishingUpdate mirrors final published URLs onto the Recording
 // row. Workflow state (status, errors, timestamps) lives in SocialPosts.
 type RecordingPublishingUpdate struct {

@@ -78,20 +78,22 @@ type RecordingsAdminListPage struct {
 }
 
 type RecordingsAdminDetailPage struct {
-	Conf         *types.Conf
-	Row          *RecordingRow
-	YTTitle      string
-	YTBody       string
-	XBody        string
-	XReplyBody   string
-	XIntentURL   string
-	JobActive    bool
-	JobStatus    string
-	JobMessage   string
-	YouTubeReady bool
-	FlashMessage string
-	FlashError   string
-	Year         uint
+	Conf            *types.Conf
+	Row             *RecordingRow
+	YTTitle         string
+	YTBody          string
+	XBody           string
+	XReplyBody      string
+	XIntentURL      string
+	PublishAtInput  string
+	PublishTimezone string
+	JobActive       bool
+	JobStatus       string
+	JobMessage      string
+	YouTubeReady    bool
+	FlashMessage    string
+	FlashError      string
+	Year            uint
 }
 
 // ---- job tracker -------------------------------------------------------
@@ -225,15 +227,17 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
 
 	page := &RecordingsAdminDetailPage{
-		Conf:         conf,
-		Row:          row,
-		YTTitle:      ytTitle,
-		YTBody:       ytBody,
-		XBody:        xBody,
-		XReplyBody:   xReplyBody,
-		XIntentURL:   intentURL,
-		YouTubeReady: youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
-		Year:         uint(time.Now().Year()),
+		Conf:            conf,
+		Row:             row,
+		YTTitle:         ytTitle,
+		YTBody:          ytBody,
+		XBody:           xBody,
+		XReplyBody:      xReplyBody,
+		XIntentURL:      intentURL,
+		PublishAtInput:  recordingPublishAtInput(rec.PublishAt, conf),
+		PublishTimezone: recordingPublishTimezone(conf),
+		YouTubeReady:    youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
+		Year:            uint(time.Now().Year()),
 	}
 	if job := getJob(rec.ID); job != nil {
 		page.JobActive = job.Status == "running"
@@ -299,6 +303,45 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 	go runYouTubeUpload(ctx, rec, title, body, privacy, publishAt)
 
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=Upload+started", http.StatusSeeOther)
+}
+
+func RecordingsAdminSchedule(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	recordingID := rec.ID
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
+		return
+	}
+
+	var publishAt *time.Time
+	if r.FormValue("action") != "clear" {
+		raw := strings.TrimSpace(r.FormValue("publish_at"))
+		if raw == "" {
+			redirectWithErr(w, r, conf.Tag, recordingID, "Choose a publish time or clear the schedule")
+			return
+		}
+		when, err := time.ParseInLocation("2006-01-02T15:04", raw, conf.Loc())
+		if err != nil {
+			redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse publish time: "+err.Error())
+			return
+		}
+		publishAt = &when
+	}
+
+	if err := getters.UpdateRecordingPublishAt(ctx, recordingID, publishAt); err != nil {
+		ctx.Err.Printf("schedule recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update PublishAt: "+err.Error())
+		return
+	}
+	flash := "Schedule cleared"
+	if publishAt != nil {
+		flash = "Schedule saved"
+	}
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
 }
 
 // runYouTubeUpload streams the source video from Spaces straight into
@@ -549,6 +592,27 @@ func recordingDetailPath(confTag, recordingID string) string {
 
 func recordingsOAuthRedirectURL(ctx *config.AppContext, confTag string) string {
 	return strings.TrimRight(ctx.Env.GetURI(), "/") + recordingsAdminPath(confTag, "/oauth/youtube/callback")
+}
+
+func recordingPublishAtInput(publishAt *time.Time, conf *types.Conf) string {
+	if publishAt == nil {
+		return ""
+	}
+	loc := time.Local
+	if conf != nil {
+		loc = conf.Loc()
+	}
+	return publishAt.In(loc).Format("2006-01-02T15:04")
+}
+
+func recordingPublishTimezone(conf *types.Conf) string {
+	if conf == nil {
+		return time.Local.String()
+	}
+	if conf.Timezone != "" {
+		return conf.Timezone
+	}
+	return conf.Loc().String()
 }
 
 func recordingSocialPostRef(rec *types.Recording, platform string) string {
