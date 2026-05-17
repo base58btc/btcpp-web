@@ -17,7 +17,12 @@
                 <h1 class="text-xl font-bold text-gray-900">Recordings</h1>
                 <p class="text-sm text-gray-500">Upload longform talks to YouTube and X.com from a single dashboard.</p>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap justify-end">
+                {{ if .AutopublishEnabled }}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Autopublish on</span>
+                {{ else }}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">Autopublish off</span>
+                {{ end }}
                 {{ if .YouTubeReady }}
                   <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">YouTube connected ✓</span>
                   <form method="POST" action="/admin/recordings/oauth/youtube/disconnect" class="inline">
@@ -25,6 +30,16 @@
                   </form>
                 {{ else }}
                   <a href="{{ .YouTubeAuthURL }}" class="px-3 py-1.5 text-sm rounded-md text-white bg-red-600 hover:bg-red-700">Authorize YouTube</a>
+                {{ end }}
+                {{ if .XUploaderEnabled }}
+                  <form method="POST" action="/admin/recordings/x/auth-check" class="inline">
+                    <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800">Test X auth</button>
+                  </form>
+                  <form method="POST" action="/admin/recordings/x/bootstrap" class="inline">
+                    <button type="submit" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Bootstrap X</button>
+                  </form>
+                {{ else }}
+                  <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">X uploader off</span>
                 {{ end }}
               </div>
             </div>
@@ -51,6 +66,7 @@
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Talk</th>
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conf</th>
                   <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Speakers</th>
+                  <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Publish</th>
                   <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
                   <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">YouTube</th>
                   <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">X</th>
@@ -68,14 +84,17 @@
                   <td class="px-4 py-3 text-sm text-gray-700">
                     {{ range $i, $s := .Speakers }}{{ if $i }}, {{ end }}{{ $s.Name }}{{ end }}
                   </td>
+                  <td class="px-4 py-3 text-sm text-gray-700">
+                    {{ if .Recording.PublishAt }}{{ .Recording.PublishAt.Format "Jan 2, 2006 3:04 PM MST" }}{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                  </td>
                   <td class="px-4 py-3 text-center">
                     {{ if .HasFile }}<span class="text-green-600">✓</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
-                    {{ if .HasYT }}<a href="{{ .Recording.YTLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .HasYT }}<a href="{{ .Recording.YTLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .Recording.YTStatus }}<span class="text-xs text-gray-600">{{ .Recording.YTStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
-                    {{ if .HasX }}<a href="{{ .Recording.XLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .HasX }}<a href="{{ .Recording.XLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .Recording.XStatus }}<span class="text-xs text-gray-600">{{ .Recording.XStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-right">
                     <a href="/admin/recordings/{{ .Recording.ID }}" class="text-sm text-indigo-600 hover:text-indigo-800">Open →</a>

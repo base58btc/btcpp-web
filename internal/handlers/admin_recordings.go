@@ -3,12 +3,11 @@
 //   - per-recording detail page with editable YT + X copy
 //   - YouTube OAuth bootstrap (start / callback / disconnect)
 //   - YouTube upload kickoff + async status polling
-//   - X manual-handoff: save the X post URL the admin pastes back
+//   - X browser automation status + manual fallback URL save
 //
-// X automation via chromedp is out-of-scope for this round (see the
-// in-progress plan) — the detail page just opens an intent/post link
-// pre-filled with the generated text; the admin uploads the video by
-// hand and pastes the resulting URL back into a tiny form.
+// X automation is implemented in admin_recordings_autopublish.go and
+// external/xposter; this file keeps the dashboard, YouTube OAuth, and
+// manual escape hatches.
 package handlers
 
 import (
@@ -50,12 +49,15 @@ type RecordingRow struct {
 }
 
 type RecordingsAdminListPage struct {
-	Rows           []*RecordingRow
-	YouTubeReady   bool
-	YouTubeAuthURL string
-	FlashMessage   string
-	FlashError     string
-	Year           uint
+	Rows               []*RecordingRow
+	YouTubeReady       bool
+	YouTubeAuthURL     string
+	AutopublishEnabled bool
+	XUploaderEnabled   bool
+	XProfileObject     string
+	FlashMessage       string
+	FlashError         string
+	Year               uint
 }
 
 type RecordingsAdminDetailPage struct {
@@ -63,6 +65,7 @@ type RecordingsAdminDetailPage struct {
 	YTTitle      string
 	YTBody       string
 	XBody        string
+	XReplyBody   string
 	XIntentURL   string
 	JobActive    bool
 	JobStatus    string
@@ -145,10 +148,13 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 	})
 
 	page := &RecordingsAdminListPage{
-		Rows:           rows,
-		YouTubeReady:   youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
-		YouTubeAuthURL: "/admin/recordings/oauth/youtube/start",
-		Year:           uint(time.Now().Year()),
+		Rows:               rows,
+		YouTubeReady:       youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
+		YouTubeAuthURL:     "/admin/recordings/oauth/youtube/start",
+		AutopublishEnabled: ctx.Env.Recordings.AutopublishEnabled,
+		XUploaderEnabled:   ctx.Env.Recordings.X.Enabled,
+		XProfileObject:     ctx.Env.Recordings.X.ProfileObject,
+		Year:               uint(time.Now().Year()),
 	}
 	if !youtubepkg.IsConfigured() {
 		page.FlashError = "YouTube OAuth env vars (YOUTUBE_CLIENT_ID/SECRET/REDIRECT_URL) are not set — set them and restart to enable uploads."
@@ -158,6 +164,9 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 	if flash := r.URL.Query().Get("flash"); flash != "" {
 		page.FlashMessage = flash
 		page.FlashError = ""
+	}
+	if flashErr := r.URL.Query().Get("err"); flashErr != "" {
+		page.FlashError = flashErr
 	}
 
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/recordings.tmpl", page); err != nil {
@@ -191,7 +200,8 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	row := buildRecordingRow(rec)
 
 	ytTitle, ytBody := defaultYouTubeCopy(ctx, row)
-	xBody := defaultXCopy(ctx, row)
+	xBody := defaultXMainCopy(ctx, row)
+	xReplyBody := defaultXReplyCopy(ctx, row)
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
 
 	page := &RecordingsAdminDetailPage{
@@ -199,6 +209,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		YTTitle:      ytTitle,
 		YTBody:       ytBody,
 		XBody:        xBody,
+		XReplyBody:   xReplyBody,
 		XIntentURL:   intentURL,
 		YouTubeReady: youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
 		Year:         uint(time.Now().Year()),
@@ -243,6 +254,11 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 	if privacy == "" {
 		privacy = "public"
 	}
+	var publishAt time.Time
+	if rec.PublishAt != nil && rec.PublishAt.After(time.Now()) {
+		privacy = "private"
+		publishAt = rec.PublishAt.UTC()
+	}
 	if title == "" {
 		redirectWithErr(w, r, recordingID, "YouTube title is required")
 		return
@@ -263,7 +279,7 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 		redirectWithErr(w, r, recordingID, "An upload is already in progress for this recording")
 		return
 	}
-	go runYouTubeUpload(ctx, recordingID, rec.FileURI, title, body, privacy)
+	go runYouTubeUpload(ctx, recordingID, rec.FileURI, title, body, privacy, publishAt)
 
 	http.Redirect(w, r, fmt.Sprintf("/admin/recordings/%s?flash=Upload+started", recordingID), http.StatusSeeOther)
 }
@@ -272,17 +288,22 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 // YouTube's resumable-upload endpoint, then writes the resulting URL
 // back to the Notion Recording row. Uses a fresh context.Background()
 // because the HTTP request that kicked us off has already returned.
-func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body, privacy string) {
+func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body, privacy string, publishAt time.Time) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			ctx.Err.Printf("youtube upload panic recording=%s: %v", recordingID, rec)
 			setJobStatus(recordingID, "failed", fmt.Sprintf("internal error: %v", rec))
 		}
 	}()
-	src, _, err := spaces.GetStream(fileURI)
+	status := recordingStatusUploading
+	_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status})
+	src, size, err := spaces.GetStream(fileURI)
 	if err != nil {
 		ctx.Err.Printf("youtube upload: fetch %s: %s", fileURI, err)
 		setJobStatus(recordingID, "failed", "couldn't fetch source video from Spaces: "+err.Error())
+		msg := "couldn't fetch source video from Spaces: " + err.Error()
+		status = recordingStatusFailed
+		_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status, YTError: &msg})
 		return
 	}
 	defer src.Close()
@@ -292,13 +313,23 @@ func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body,
 		Title:         title,
 		Description:   body,
 		PrivacyStatus: privacy,
-	}, src, -1)
+		PublishAt:     publishAt,
+	}, src, size)
 	if err != nil {
 		ctx.Err.Printf("youtube upload: %s", err)
 		setJobStatus(recordingID, "failed", err.Error())
+		msg := err.Error()
+		status = recordingStatusFailed
+		_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status, YTError: &msg})
 		return
 	}
-	if err := getters.UpdateRecordingYTLink(ctx, recordingID, ytURL); err != nil {
+	now := time.Now()
+	status = recordingStatusUploaded
+	if err := getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{
+		YTLink:       &ytURL,
+		YTStatus:     &status,
+		YTUploadedAt: &now,
+	}); err != nil {
 		ctx.Err.Printf("youtube upload: persist YTLink: %s", err)
 		setJobStatus(recordingID, "failed", "uploaded to YouTube but failed to update Notion: "+err.Error())
 		return
@@ -480,7 +511,7 @@ Follow @btcplusplus for upcoming events: https://x.com/btcplusplus
 Future bitcoin++ events: https://btcpp.dev
 `))
 
-var xCopy = template.Must(template.New("x").Parse(
+var xMainCopy = template.Must(template.New("x-main").Parse(
 	`🎥 New video: "{{ .TalkName }}"
 {{- if .SpeakerHandles }}
 
@@ -490,8 +521,10 @@ with {{ .SpeakerHandles }}
 
 from {{ .Conf.Desc }}{{ if .Conf.Location }} ({{ .Conf.Location }}){{ end }}
 {{- end }}
+`))
 
-Watch ▶ {{ .YTLink }}
+var xReplyCopy = template.Must(template.New("x-reply").Parse(
+	`Watch ▶ {{ .YTLink }}
 {{- if .Conf }}
 More: https://btcpp.dev/{{ .Conf.Tag }}#talks
 {{- end }}`))
@@ -548,7 +581,7 @@ func defaultYouTubeCopy(ctx *config.AppContext, row *RecordingRow) (string, stri
 	return title, strings.TrimSpace(buf.String()) + "\n"
 }
 
-func defaultXCopy(ctx *config.AppContext, row *RecordingRow) string {
+func defaultXMainCopy(ctx *config.AppContext, row *RecordingRow) string {
 	if row == nil || row.Recording == nil {
 		return ""
 	}
@@ -560,18 +593,36 @@ func defaultXCopy(ctx *config.AppContext, row *RecordingRow) string {
 			talkName = row.ConfTalk.Proposal.Title
 		}
 	}
+	var buf bytes.Buffer
+	if err := xMainCopy.Execute(&buf, xCopyData{
+		TalkName:       talkName,
+		SpeakerHandles: joinSpeakerHandles(row.Speakers),
+		Conf:           conf,
+	}); err != nil {
+		ctx.Err.Printf("x copy gen: %s", err)
+		return ""
+	}
+	return strings.TrimSpace(buf.String())
+}
+
+func defaultXReplyCopy(ctx *config.AppContext, row *RecordingRow) string {
+	if row == nil || row.Recording == nil {
+		return ""
+	}
+	var conf *types.Conf
+	if row.ConfTalk != nil {
+		conf = row.ConfTalk.Conf
+	}
 	yt := row.Recording.YTLink
 	if yt == "" {
 		yt = "<paste the YouTube link after you upload>"
 	}
 	var buf bytes.Buffer
-	if err := xCopy.Execute(&buf, xCopyData{
-		TalkName:       talkName,
-		SpeakerHandles: joinSpeakerHandles(row.Speakers),
-		Conf:           conf,
-		YTLink:         yt,
+	if err := xReplyCopy.Execute(&buf, xCopyData{
+		Conf:   conf,
+		YTLink: yt,
 	}); err != nil {
-		ctx.Err.Printf("x copy gen: %s", err)
+		ctx.Err.Printf("x reply copy gen: %s", err)
 		return ""
 	}
 	return strings.TrimSpace(buf.String())

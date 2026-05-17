@@ -113,6 +113,20 @@ func loadConfig() *types.EnvConfig {
 			ClientSecret: os.Getenv("YOUTUBE_CLIENT_SECRET"),
 			RedirectURL:  os.Getenv("YOUTUBE_REDIRECT_URL"),
 		}
+		config.Recordings = types.RecordingsConfig{
+			AutopublishEnabled: envBool("RECORDINGS_AUTOPUBLISH_ENABLED"),
+			PollSec:            envInt("RECORDINGS_AUTOPUBLISH_POLL_SEC", 0),
+			NotifyEmail:        os.Getenv("RECORDINGS_NOTIFY_EMAIL"),
+			EncryptionKey:      firstNonEmpty(os.Getenv("SOCIAL_STATE_KEY"), os.Getenv("X_PROFILE_ARCHIVE_KEY")),
+			YouTubeTokenObject: os.Getenv("YOUTUBE_TOKEN_OBJECT"),
+			X: types.XUploaderConfig{
+				Enabled:        envBool("X_UPLOADER_ENABLED"),
+				ProfileObject:  os.Getenv("X_PROFILE_ARCHIVE_OBJECT"),
+				Headed:         envBool("X_BROWSER_HEADED"),
+				PostTimeoutSec: envInt("X_POST_TIMEOUT_SEC", 0),
+				AuthWaitSec:    envInt("X_AUTH_WAIT_SEC", 0),
+			},
+		}
 
 		config.HMACKey, err = types.DeriveHMACKey(os.Getenv("HMAC_SECRET"))
 		if err != nil {
@@ -120,16 +134,38 @@ func loadConfig() *types.EnvConfig {
 		}
 	}
 
-	// Default cache TTL to 300s (5 min) if not set
-	if config.CacheTTLSec == 0 {
-		config.CacheTTLSec = 300
-	}
-
+	config.ApplyDefaults()
 	if err := config.Validate(); err != nil {
 		log.Fatal(err)
 	}
 
 	return &config
+}
+
+func envBool(name string) bool {
+	v, err := strconv.ParseBool(os.Getenv(name))
+	return err == nil && v
+}
+
+func envInt(name string, fallback int) int {
+	raw := os.Getenv(name)
+	if raw == "" {
+		return fallback
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil {
+		return fallback
+	}
+	return v
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 /* Every XX seconds, try to send new ticket emails. */
@@ -157,6 +193,11 @@ func main() {
 	/* OAuth token store (YouTube today; X tomorrow when chromedp lands) */
 	if err := tokens.Init("tokens.bolt"); err != nil {
 		app.Err.Fatalf("open tokens.bolt: %s", err)
+	}
+	if spaces.IsConfigured() {
+		if err := tokens.InitRemote(app.Env.Recordings.YouTubeTokenObject, app.Env.Recordings.EncryptionKey); err != nil {
+			app.Err.Printf("encrypted youtube token store disabled: %s", err)
+		}
 	}
 	youtubepkg.Init(app.Env.YouTube.ClientID, app.Env.YouTube.ClientSecret, app.Env.YouTube.RedirectURL)
 
@@ -196,6 +237,8 @@ func main() {
 		}()
 		app.Infos.Printf("scheduling media refresh")
 	}
+
+	handlers.StartRecordingAutopublisher(&app)
 
 	/* Start the server */
 	app.Infos.Printf("Starting application on port %s\n", app.Env.Port)

@@ -28,6 +28,27 @@ We use nix for this. Installs go + tailwindcss + air dependencies for Makefile.
 
 This will put all the files necessary to serve the site into `target/`
 
+
+## Recording autopublisher
+
+The recordings dashboard can auto-publish Notion Recording rows that have `FileURI` and `PublishAt` set. Enable the background worker with:
+
+```
+RECORDINGS_AUTOPUBLISH_ENABLED=true
+RECORDINGS_AUTOPUBLISH_POLL_SEC=60
+RECORDINGS_NOTIFY_EMAIL=nifty@btcpp.dev
+SOCIAL_STATE_KEY=<base64-encoded 32-byte key>
+```
+
+YouTube OAuth tokens and the X Chrome profile are encrypted into Spaces because DigitalOcean App Platform does not persist local disk across deploys. The default object keys are:
+
+```
+YOUTUBE_TOKEN_OBJECT=private/social/youtube-token.json.enc
+X_PROFILE_ARCHIVE_OBJECT=private/social/x-chrome-profile.tgz.enc
+```
+
+Set `X_UPLOADER_ENABLED=true` on exactly one running app component. To repair X auth, run the app locally with the same Spaces credentials plus `X_BROWSER_HEADED=true`, use the recordings admin page's Bootstrap X action, finish the x.com login in Chrome, then run Test X auth.
+
 Note that the Github actions deployer uses Docker and isn't nix-aware, so for now you *must* make and check-in any CSS changes before deploying.
 
 CSS updates are made automatically by `dev-run`, so this shouldn't be too hard.

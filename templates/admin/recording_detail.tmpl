@@ -41,6 +41,26 @@
         {{ else }}
         <p class="text-sm text-yellow-700">No <code>FileURI</code> set. Add the Spaces key to the Notion Recording row before uploading.</p>
         {{ end }}
+        <dl class="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div>
+            <dt class="font-medium text-gray-500">PublishAt</dt>
+            <dd class="mt-1 text-gray-900">{{ if .Row.Recording.PublishAt }}{{ .Row.Recording.PublishAt.Format "Jan 2, 2006 3:04 PM MST" }}{{ else }}—{{ end }}</dd>
+          </div>
+          <div>
+            <dt class="font-medium text-gray-500">YouTube status</dt>
+            <dd class="mt-1 text-gray-900">{{ if .Row.Recording.YTStatus }}{{ .Row.Recording.YTStatus }}{{ else }}—{{ end }}</dd>
+          </div>
+          <div>
+            <dt class="font-medium text-gray-500">X status</dt>
+            <dd class="mt-1 text-gray-900">{{ if .Row.Recording.XStatus }}{{ .Row.Recording.XStatus }}{{ else }}—{{ end }}</dd>
+          </div>
+        </dl>
+        {{ if .Row.Recording.YTError }}
+        <div class="mt-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800">YouTube error: {{ .Row.Recording.YTError }}</div>
+        {{ end }}
+        {{ if .Row.Recording.XError }}
+        <div class="mt-3 rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800">X error: {{ .Row.Recording.XError }}</div>
+        {{ end }}
       </section>
 
       <!-- YouTube section -->
@@ -113,25 +133,37 @@
         </form>
       </section>
 
-      <!-- X section (manual handoff for now) -->
+      <!-- X section -->
       <section class="mb-6 bg-white shadow rounded-lg p-5">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-sm font-semibold uppercase tracking-wider text-gray-500">X.com</h2>
-          {{ if .Row.Recording.XLink }}
-          <a href="{{ .Row.Recording.XLink }}" target="_blank" rel="noopener" class="text-xs text-indigo-600 hover:text-indigo-800">{{ .Row.Recording.XLink }} ↗</a>
-          {{ end }}
+          <div class="flex items-center gap-3">
+            {{ if .Row.Recording.XReplyLink }}
+            <a href="{{ .Row.Recording.XReplyLink }}" target="_blank" rel="noopener" class="text-xs text-indigo-600 hover:text-indigo-800">reply ↗</a>
+            {{ end }}
+            {{ if .Row.Recording.XLink }}
+            <a href="{{ .Row.Recording.XLink }}" target="_blank" rel="noopener" class="text-xs text-indigo-600 hover:text-indigo-800">{{ .Row.Recording.XLink }} ↗</a>
+            {{ end }}
+          </div>
         </div>
 
-        <p class="text-xs text-gray-500 mb-3">No X developer plan yet, so this is a two-step handoff: copy the text below, click <strong>Open X compose</strong>, attach the video manually, post, then paste the resulting URL back here.</p>
-
         <div class="space-y-3">
+          <label class="block text-xs font-medium text-gray-700">Main post</label>
           <textarea id="x-body" rows="6" readonly
                     class="block w-full rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 font-mono">{{ .XBody }}</textarea>
+          <label class="block text-xs font-medium text-gray-700">Reply</label>
+          <textarea id="x-reply-body" rows="3" readonly
+                    class="block w-full rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 font-mono">{{ .XReplyBody }}</textarea>
           <div class="flex items-center gap-3">
             <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy text',1500);"
                     class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy text</button>
+            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-reply-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy reply',1500);"
+                    class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy reply</button>
             <a href="{{ .XIntentURL }}" target="_blank" rel="noopener"
                class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800">Open X compose ↗</a>
+            <form method="POST" action="/admin/recordings/{{ .Row.Recording.ID }}/retry-x" class="inline">
+              <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Retry X automation</button>
+            </form>
           </div>
         </div>
 
