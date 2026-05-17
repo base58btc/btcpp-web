@@ -7,14 +7,16 @@ import (
 	"strings"
 )
 
+const MinHMACSecretBytes = 32
+
 // DeriveHMACKey validates the configured HMAC secret before deriving the
 // fixed-size key used by auth links, checkout price signatures, and
 // newsletter tokens. An empty secret would otherwise deterministically become
 // sha256(""), making every signed URL forgeable by anyone reading the code.
 func DeriveHMACKey(secret string) ([32]byte, error) {
 	secret = strings.TrimSpace(secret)
-	if secret == "" {
-		return [32]byte{}, errors.New("HMAC_SECRET must not be empty")
+	if len(secret) < MinHMACSecretBytes {
+		return [32]byte{}, fmt.Errorf("HMAC_SECRET must be at least %d bytes", MinHMACSecretBytes)
 	}
 	return sha256.Sum256([]byte(secret)), nil
 }
