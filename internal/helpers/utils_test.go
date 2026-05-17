@@ -11,7 +11,7 @@ import (
 
 func testAppContext(t *testing.T) *config.AppContext {
 	t.Helper()
-	key, err := types.DeriveHMACKey(strings.Repeat("s", types.MinHMACSecretBytes))
+	key, err := types.DeriveHMACKey("test-secret")
 	if err != nil {
 		t.Fatalf("DeriveHMACKey: %s", err)
 	}
