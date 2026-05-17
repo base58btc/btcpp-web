@@ -1,4 +1,5 @@
 APP_NAME = btcpp-web
+GO_ENV = CGO_ENABLED=0 GOSUMDB=sum.golang.org
 
 .PHONY: dev-run
 dev-run: build-all
@@ -6,7 +7,7 @@ dev-run: build-all
 
 .PHONY: build
 build:
-	go build -v -o target/$(APP_NAME) ./cmd/web/main.go
+	$(GO_ENV) go build -v -o target/$(APP_NAME) ./cmd/web/main.go
 
 .PHONY: css-build
 css-build:
@@ -21,7 +22,7 @@ build-all: build css-build
 
 .PHONY: test
 test:
-	go test ./...
+	$(GO_ENV) go test ./...
 
 .PHONY: clean
 clean:
