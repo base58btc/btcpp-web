@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strings"
 	"testing"
 
 	"btcpp-web/external/getters"
@@ -45,5 +46,27 @@ func TestRecordingSpeakersForProposalDedupesResolvedAndEnrichedSpeakers(t *testi
 	}
 	if got[0] != speaker {
 		t.Fatalf("got speaker %#v, want %#v", got[0], speaker)
+	}
+}
+
+func TestRecordingXMainCopyUsesSavedSocialPostText(t *testing.T) {
+	want := "Custom X copy for this recording"
+	got := recordingXMainCopy(nil, &RecordingRow{
+		Recording:   &types.Recording{TalkName: "Generated title"},
+		XSocialPost: &types.SocialPost{Text: want},
+	})
+
+	if got != want {
+		t.Fatalf("got %q, want saved text %q", got, want)
+	}
+}
+
+func TestRecordingXMainCopyFallsBackToGeneratedText(t *testing.T) {
+	got := recordingXMainCopy(nil, &RecordingRow{
+		Recording: &types.Recording{TalkName: "Generated title"},
+	})
+
+	if !strings.Contains(got, "Generated title") {
+		t.Fatalf("got %q, want generated recording title", got)
 	}
 }

@@ -999,6 +999,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/recordings/{id}/schedule", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminSchedule(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/x-copy", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminSaveXCopy(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/{id}/x", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminSaveXLink(w, r, app)
 	}).Methods("POST")

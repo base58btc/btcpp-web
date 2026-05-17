@@ -184,7 +184,7 @@ func recordYouTubeFailure(ctx *config.AppContext, row *RecordingRow, msg string)
 func runScheduledXPost(ctx *config.AppContext, row *RecordingRow, client *xposter.Client) {
 	rec := row.Recording
 	status := recordingStatusPosting
-	mainText := defaultXMainCopy(ctx, row)
+	mainText := recordingXMainCopy(ctx, row)
 	replyText := defaultXReplyCopy(ctx, row)
 	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
 		Text:   &mainText,

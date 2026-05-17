@@ -161,20 +161,27 @@
           </div>
         </div>
 
-        <div class="space-y-3">
+        <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/x-copy" class="space-y-3">
           <label class="block text-xs font-medium text-gray-700">Main post</label>
-          <textarea id="x-body" rows="6" readonly
-                    class="block w-full rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 font-mono">{{ .XBody }}</textarea>
+          <textarea id="x-body" name="x_body" rows="6" required
+                    class="block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin font-mono">{{ .XBody }}</textarea>
+          <div class="flex items-center gap-3">
+            <button type="submit"
+                    class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save X text</button>
+            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy text',1500);"
+                    class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy text</button>
+            <a href="{{ .XIntentURL }}" target="_blank" rel="noopener"
+               class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800">Open X compose ↗</a>
+          </div>
+        </form>
+
+        <div class="mt-4 space-y-3">
           <label class="block text-xs font-medium text-gray-700">Reply</label>
           <textarea id="x-reply-body" rows="3" readonly
                     class="block w-full rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 font-mono">{{ .XReplyBody }}</textarea>
           <div class="flex items-center gap-3">
-            <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy text',1500);"
-                    class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy text</button>
             <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-reply-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy reply',1500);"
                     class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy reply</button>
-            <a href="{{ .XIntentURL }}" target="_blank" rel="noopener"
-               class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800">Open X compose ↗</a>
             <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/retry-x" class="inline">
               <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Retry X automation</button>
             </form>

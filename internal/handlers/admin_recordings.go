@@ -222,7 +222,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	}
 
 	ytTitle, ytBody := defaultYouTubeCopy(ctx, row)
-	xBody := defaultXMainCopy(ctx, row)
+	xBody := recordingXMainCopy(ctx, row)
 	xReplyBody := defaultXReplyCopy(ctx, row)
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
 
@@ -342,6 +342,30 @@ func RecordingsAdminSchedule(w http.ResponseWriter, r *http.Request, ctx *config
 		flash = "Schedule saved"
 	}
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
+}
+
+func RecordingsAdminSaveXCopy(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	recordingID := rec.ID
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
+		return
+	}
+	xBody := strings.TrimSpace(r.FormValue("x_body"))
+	if xBody == "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X post text is required")
+		return
+	}
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{Text: &xBody}); err != nil {
+		ctx.Err.Printf("save x copy recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update SocialPosts: "+err.Error())
+		return
+	}
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+text+saved", http.StatusSeeOther)
 }
 
 // runYouTubeUpload streams the source video from Spaces straight into
@@ -867,6 +891,13 @@ func defaultXMainCopy(ctx *config.AppContext, row *RecordingRow) string {
 		return ""
 	}
 	return strings.TrimSpace(buf.String())
+}
+
+func recordingXMainCopy(ctx *config.AppContext, row *RecordingRow) string {
+	if row != nil && row.XSocialPost != nil && strings.TrimSpace(row.XSocialPost.Text) != "" {
+		return row.XSocialPost.Text
+	}
+	return defaultXMainCopy(ctx, row)
 }
 
 func defaultXReplyCopy(ctx *config.AppContext, row *RecordingRow) string {
