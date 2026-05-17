@@ -17,6 +17,7 @@ import (
 
 	"btcpp-web/external/secureblob"
 
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -200,20 +201,52 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 	ctx, cancelTimeout := context.WithTimeout(parent, timeout)
 	defer cancelTimeout()
 
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.UserDataDir(profileDir),
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-		chromedp.Flag("headless", !c.cfg.Headed),
-		chromedp.Flag("disable-gpu", true),
-		chromedp.Flag("disable-dev-shm-usage", true),
-	)
+	opts := chromeOptions(profileDir, c.cfg.Headed)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancelAlloc()
 	bctx, cancelBrowser := chromedp.NewContext(allocCtx)
+	if err := installBrowserShims(bctx); err != nil {
+		cancelBrowser()
+		return err
+	}
 	err := fn(bctx)
 	cancelBrowser()
 	return err
+}
+
+func chromeOptions(profileDir string, headed bool) []chromedp.ExecAllocatorOption {
+	if headed {
+		return []chromedp.ExecAllocatorOption{
+			chromedp.UserDataDir(profileDir),
+			chromedp.NoFirstRun,
+			chromedp.NoDefaultBrowserCheck,
+			chromedp.Flag("headless", false),
+			chromedp.Flag("enable-automation", false),
+			chromedp.Flag("disable-blink-features", "AutomationControlled"),
+			chromedp.Flag("disable-infobars", true),
+			chromedp.Flag("password-store", "basic"),
+			chromedp.Flag("use-mock-keychain", true),
+		}
+	}
+	return append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.UserDataDir(profileDir),
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+		chromedp.Flag("headless", true),
+		chromedp.Flag("enable-automation", false),
+		chromedp.Flag("disable-blink-features", "AutomationControlled"),
+		chromedp.Flag("disable-gpu", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+	)
+}
+
+func installBrowserShims(ctx context.Context) error {
+	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		_, err := page.AddScriptToEvaluateOnNewDocument(`
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+`).Do(ctx)
+		return err
+	}))
 }
 
 func detectLogin(ctx context.Context) (string, error) {
