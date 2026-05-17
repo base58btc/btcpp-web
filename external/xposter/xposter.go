@@ -210,7 +210,9 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 		return err
 	}
 	err := fn(bctx)
-	cancelBrowser()
+	if closeErr := chromedp.Cancel(bctx); closeErr != nil && err == nil {
+		err = closeErr
+	}
 	return err
 }
 
