@@ -298,7 +298,7 @@ func MagicLink(ctx *config.AppContext, email, next string) string {
 	u.Path = "/auth"
 	q := u.Query()
 	q.Set("em", base64.RawURLEncoding.EncodeToString([]byte(email)))
-	q.Set("hr", base64.RawURLEncoding.EncodeToString([]byte(helpers.CreateEmailHMAC(ctx, email))))
+	q.Set("hr", base64.RawURLEncoding.EncodeToString([]byte(helpers.CreateEmailHMACTTL(ctx, email, helpers.LoginEmailLinkTTL))))
 	if next != "" {
 		q.Set("next", next)
 	}

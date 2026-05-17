@@ -13,16 +13,17 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
 	"net/url"
 	"os"
+	"strings"
 
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/types"
 	"github.com/BurntSushi/toml"
 )
 
@@ -59,35 +60,35 @@ func main() {
 	if err != nil {
 		log.Fatalf("decode em (base64url): %s", err)
 	}
-	hmacBytes, err := base64.RawURLEncoding.DecodeString(hr)
+	tokenBytes, err := base64.RawURLEncoding.DecodeString(hr)
 	if err != nil {
 		log.Fatalf("decode hr (base64url): %s", err)
 	}
 	email := string(emailBytes)
-	suppliedHex := string(hmacBytes)
+	token := string(tokenBytes)
 
-	// Reproduce the server's key derivation: HMACKey = sha256(HMACSecret).
-	keyArr := sha256.Sum256([]byte(c.HMACSecret))
-	mac := hmac.New(sha256.New, keyArr[:])
-	mac.Write([]byte(email))
-	expectedHex := hex.EncodeToString(mac.Sum(nil))
+	key, err := types.DeriveHMACKey(c.HMACSecret)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ctx := &config.AppContext{
+		Env: &types.EnvConfig{HMACKey: key},
+	}
 
 	fmt.Printf("Decoded email: %q\n", email)
-	fmt.Printf("Supplied HMAC (hex, %d chars): %s\n", len(suppliedHex), suppliedHex)
-	fmt.Printf("Expected HMAC (hex, %d chars): %s\n", len(expectedHex), expectedHex)
+	fmt.Printf("Supplied token (%d chars): %s\n", len(token), token)
 
-	if suppliedHex == expectedHex {
+	if helpers.VerifyEmailHMAC(ctx, token, email) {
 		fmt.Println("\nMATCH — the link is valid for this HMACSecret.")
 		os.Exit(0)
 	}
 
 	fmt.Println("\nMISMATCH — the link will fail VerifyEmailHMAC.")
 	switch {
-	case len(suppliedHex) != len(expectedHex):
-		fmt.Printf("Length differs (%d vs %d). The link was probably truncated or built with a different algorithm.\n",
-			len(suppliedHex), len(expectedHex))
+	case !strings.HasPrefix(token, "v1."):
+		fmt.Println("The token is not the current v1 expiring-token format.")
 	default:
-		fmt.Println("Length matches but bytes don't. Most likely: the link was minted against a different HMACSecret")
+		fmt.Println("Most likely: the link expired, was minted against a different HMACSecret")
 		fmt.Println("(prod vs local config.toml mismatch, or the secret rotated since the link was generated).")
 	}
 	os.Exit(1)

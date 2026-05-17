@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"html/template"
 	"log"
@@ -37,7 +36,10 @@ func loadConfig() *types.EnvConfig {
 		}
 		config.Prod = false
 
-		config.HMACKey = sha256.Sum256([]byte(config.HMACSecret))
+		config.HMACKey, err = types.DeriveHMACKey(config.HMACSecret)
+		if err != nil {
+			log.Fatal(err)
+		}
 		config.HMACSecret = ""
 	} else {
 		config.Port = os.Getenv("PORT")
@@ -62,27 +64,27 @@ func loadConfig() *types.EnvConfig {
 		config.StripeEndpointSec = os.Getenv("STRIPE_END_SECRET")
 		config.RegistryPin = os.Getenv("REGISTRY_PIN")
 		config.Notion = types.NotionConfig{
-			Token:        os.Getenv("NOTION_TOKEN"),
-			PurchasesDb:  os.Getenv("NOTION_PURCHASES_DB"),
-			SpeakersDb:   os.Getenv("NOTION_SPEAKERS_DB"),
-			ConfsDb:      os.Getenv("NOTION_CONFS_DB"),
-			ConfsTixDb:   os.Getenv("NOTION_CONFSTIX_DB"),
-			DiscountsDb:  os.Getenv("NOTION_DISCOUNT_DB"),
-			NewsletterDb: os.Getenv("NOTION_NEWSLETTER_DB"),
-			MissivesDb:   os.Getenv("NOTION_MISSIVES_DB"),
-			HotelsDb:     os.Getenv("NOTION_HOTEL_DB"),
-			VolunteerDb:     os.Getenv("NOTION_VOLUNTEER_DB"),
-			JobTypeDb:     os.Getenv("NOTION_JOBTYPE_DB"),
-			ProposalDb:        os.Getenv("NOTION_PROPOSAL_DB"),
-			SpeakerConfDb:     os.Getenv("NOTION_SPEAKER_CONF_DB"),
-			ConfTalkDb:        os.Getenv("NOTION_CONFTALK_DB"),
-			RecordingsDb:      os.Getenv("NOTION_RECORDINGS_DB"),
-			ConfInfoDb:        os.Getenv("NOTION_CONFINFO_DB"),
-			ShiftDb:     os.Getenv("NOTION_SHIFTS_DB"),
-                        VolInfoDb:   os.Getenv("NOTION_VOLINFO_DB"),
-			OrgDb:         os.Getenv("NOTION_ORG_DB"),
-			SponsorshipsDb: os.Getenv("NOTION_SPONSORSHIPS_DB"),
-			SocialPostsDb:  os.Getenv("NOTION_SOCIAL_POSTS_DB"),
+			Token:            os.Getenv("NOTION_TOKEN"),
+			PurchasesDb:      os.Getenv("NOTION_PURCHASES_DB"),
+			SpeakersDb:       os.Getenv("NOTION_SPEAKERS_DB"),
+			ConfsDb:          os.Getenv("NOTION_CONFS_DB"),
+			ConfsTixDb:       os.Getenv("NOTION_CONFSTIX_DB"),
+			DiscountsDb:      os.Getenv("NOTION_DISCOUNT_DB"),
+			NewsletterDb:     os.Getenv("NOTION_NEWSLETTER_DB"),
+			MissivesDb:       os.Getenv("NOTION_MISSIVES_DB"),
+			HotelsDb:         os.Getenv("NOTION_HOTEL_DB"),
+			VolunteerDb:      os.Getenv("NOTION_VOLUNTEER_DB"),
+			JobTypeDb:        os.Getenv("NOTION_JOBTYPE_DB"),
+			ProposalDb:       os.Getenv("NOTION_PROPOSAL_DB"),
+			SpeakerConfDb:    os.Getenv("NOTION_SPEAKER_CONF_DB"),
+			ConfTalkDb:       os.Getenv("NOTION_CONFTALK_DB"),
+			RecordingsDb:     os.Getenv("NOTION_RECORDINGS_DB"),
+			ConfInfoDb:       os.Getenv("NOTION_CONFINFO_DB"),
+			ShiftDb:          os.Getenv("NOTION_SHIFTS_DB"),
+			VolInfoDb:        os.Getenv("NOTION_VOLINFO_DB"),
+			OrgDb:            os.Getenv("NOTION_ORG_DB"),
+			SponsorshipsDb:   os.Getenv("NOTION_SPONSORSHIPS_DB"),
+			SocialPostsDb:    os.Getenv("NOTION_SOCIAL_POSTS_DB"),
 			AffiliateUsageDb: os.Getenv("NOTION_AFFILIATE_USE_DB"),
 		}
 		config.BufferAPI = os.Getenv("BUFFER_KEY")
@@ -101,13 +103,19 @@ func loadConfig() *types.EnvConfig {
 			}
 		}
 
-		secretHex := os.Getenv("HMAC_SECRET")
-		config.HMACKey = sha256.Sum256([]byte(secretHex))
+		config.HMACKey, err = types.DeriveHMACKey(os.Getenv("HMAC_SECRET"))
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Default cache TTL to 300s (5 min) if not set
 	if config.CacheTTLSec == 0 {
 		config.CacheTTLSec = 300
+	}
+
+	if err := config.Validate(); err != nil {
+		log.Fatal(err)
 	}
 
 	return &config
@@ -149,8 +157,12 @@ func main() {
 	}
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", app.Env.Port),
-		Handler: app.Session.LoadAndSave(routes),
+		Addr:              fmt.Sprintf(":%s", app.Env.Port),
+		Handler:           app.Session.LoadAndSave(routes),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
 	}
 
 	/* Kick off job to start sending mails */
@@ -163,10 +175,10 @@ func main() {
 		go func() {
 			time.Sleep(3 * time.Second)
 			handlers.InitMediaRefresh(&app)
-	                app.Infos.Printf("media refresh done")
+			app.Infos.Printf("media refresh done")
 		}()
-	        app.Infos.Printf("scheduling media refresh")
-        }
+		app.Infos.Printf("scheduling media refresh")
+	}
 
 	/* Start the server */
 	app.Infos.Printf("Starting application on port %s\n", app.Env.Port)
