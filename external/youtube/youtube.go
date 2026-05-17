@@ -41,7 +41,7 @@ var (
 func Init(clientID, clientSecret, redirectURL string) {
 	cfgMu.Lock()
 	defer cfgMu.Unlock()
-	if clientID == "" || clientSecret == "" || redirectURL == "" {
+	if clientID == "" || clientSecret == "" {
 		cfg = nil
 		return
 	}
@@ -79,12 +79,26 @@ func IsConnected() bool {
 // the refresh token on every fresh consent so a re-bootstrap after a
 // revoke still works.
 func AuthCodeURL(state string) string {
-	cfgMu.RLock()
-	defer cfgMu.RUnlock()
-	if cfg == nil {
+	c := configForRedirect("")
+	if c == nil {
 		return ""
 	}
-	return cfg.AuthCodeURL(state,
+	return c.AuthCodeURL(state,
+		oauth2.AccessTypeOffline,
+		oauth2.SetAuthURLParam("prompt", "consent"),
+	)
+}
+
+// AuthCodeURLForRedirect builds a consent URL with a request-specific
+// redirect URI. This lets event-scoped admin pages keep OAuth callbacks
+// under /{conf}/admin/recordings without needing one static redirect in
+// config.toml.
+func AuthCodeURLForRedirect(state, redirectURL string) string {
+	c := configForRedirect(redirectURL)
+	if c == nil {
+		return ""
+	}
+	return c.AuthCodeURL(state,
 		oauth2.AccessTypeOffline,
 		oauth2.SetAuthURLParam("prompt", "consent"),
 	)
@@ -93,9 +107,17 @@ func AuthCodeURL(state string) string {
 // Exchange swaps the OAuth code for a token and persists it. Called
 // from the callback handler after CSRF state verification.
 func Exchange(ctx context.Context, code string) error {
-	cfgMu.RLock()
-	c := cfg
-	cfgMu.RUnlock()
+	return exchange(ctx, code, "")
+}
+
+// ExchangeForRedirect swaps a code using the same dynamic redirect URI
+// that AuthCodeURLForRedirect sent to Google.
+func ExchangeForRedirect(ctx context.Context, code, redirectURL string) error {
+	return exchange(ctx, code, redirectURL)
+}
+
+func exchange(ctx context.Context, code, redirectURL string) error {
+	c := configForRedirect(redirectURL)
 	if c == nil {
 		return fmt.Errorf("youtube: oauth not configured")
 	}
@@ -119,6 +141,19 @@ func Exchange(ctx context.Context, code string) error {
 	})
 }
 
+func configForRedirect(redirectURL string) *oauth2.Config {
+	cfgMu.RLock()
+	defer cfgMu.RUnlock()
+	if cfg == nil {
+		return nil
+	}
+	c := *cfg
+	if redirectURL != "" {
+		c.RedirectURL = redirectURL
+	}
+	return &c
+}
+
 // Disconnect clears the stored token (UI "disconnect" button).
 func Disconnect() error {
 	return tokens.Set(tokenKey, nil)
@@ -140,7 +175,7 @@ func httpClient(ctx context.Context) (*http.Client, error) {
 		return nil, fmt.Errorf("youtube: load token: %w", err)
 	}
 	if stored == nil {
-		return nil, fmt.Errorf("youtube: not connected — visit /admin/recordings/oauth/youtube/start")
+		return nil, fmt.Errorf("youtube: not connected — visit the recordings admin page and authorize YouTube")
 	}
 	tok := &oauth2.Token{
 		AccessToken:  stored.AccessToken,

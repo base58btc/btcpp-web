@@ -972,49 +972,45 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/comp-tickets", func(w http.ResponseWriter, r *http.Request) {
 		AdminCompTickets(w, r, app)
 	}).Methods("GET", "POST")
+	r.HandleFunc("/{conf}/admin/recordings", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminList(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/recordings/oauth/youtube/start", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthStart(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/recordings/oauth/youtube/callback", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthCallback(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/recordings/oauth/youtube/disconnect", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthDisconnect(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/x/auth-check", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminXAuthCheck(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/x/bootstrap", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminXBootstrap(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminDetail(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/upload-yt", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminUploadYT(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/x", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminSaveXLink(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/retry-x", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminRetryX(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/status", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminJobStatus(w, r, app)
+	}).Methods("GET")
 
 	// Dev-only smoke endpoint for the self-hosted ICS pipeline.
 	// Production registrations of the route are blocked at the
 	// handler boundary (TrialCalInvite checks ctx.Env.Prod).
 	r.HandleFunc("/trial-cal-invite", func(w http.ResponseWriter, r *http.Request) {
 		TrialCalInvite(w, r, app)
-	}).Methods("GET")
-
-	// Recordings: longform YouTube + X uploader. Lives outside any
-	// {conf} scope because a recording's home conf is recoverable
-	// from the ConfTalk relation. Auth: requireGlobalAdmin.
-	r.HandleFunc("/admin/recordings", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminList(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/admin/recordings/oauth/youtube/start", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsYTOAuthStart(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/admin/recordings/oauth/youtube/callback", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsYTOAuthCallback(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/admin/recordings/oauth/youtube/disconnect", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsYTOAuthDisconnect(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/x/auth-check", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminXAuthCheck(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/x/bootstrap", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminXBootstrap(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/{id}", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminDetail(w, r, app)
-	}).Methods("GET")
-	r.HandleFunc("/admin/recordings/{id}/upload-yt", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminUploadYT(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/{id}/x", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminSaveXLink(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/{id}/retry-x", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminRetryX(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/admin/recordings/{id}/status", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminJobStatus(w, r, app)
 	}).Methods("GET")
 
 	r.HandleFunc("/admin/orgs", func(w http.ResponseWriter, r *http.Request) {

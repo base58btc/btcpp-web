@@ -31,7 +31,7 @@ This will put all the files necessary to serve the site into `target/`
 
 ## Recording autopublisher
 
-The recordings dashboard can auto-publish Notion Recording rows that have `FileURI` and `PublishAt` set. Enable the background worker with:
+The per-event recordings dashboard lives at `/{conf}/admin/recordings` and can auto-publish Notion Recording rows that have `FileURI` and `PublishAt` set. Enable the background worker with:
 
 ```
 RECORDINGS_AUTOPUBLISH_ENABLED=true
@@ -48,6 +48,8 @@ X_PROFILE_ARCHIVE_OBJECT=private/social/x-chrome-profile.tgz.enc
 ```
 
 Set `X_UPLOADER_ENABLED=true` on exactly one running app component. To repair X auth, run the app locally with the same Spaces credentials plus `X_BROWSER_HEADED=true`, use the recordings admin page's Bootstrap X action, finish the x.com login in Chrome, then run Test X auth.
+
+YouTube OAuth uses the current event-scoped callback URL, for example `https://btcpp.dev/berlin26/admin/recordings/oauth/youtube/callback`. Register the event callback URL in the Google OAuth client before authorizing YouTube from that event dashboard.
 
 Note that the Github actions deployer uses Docker and isn't nix-aware, so for now you *must* make and check-in any CSS changes before deploying.
 

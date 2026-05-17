@@ -1,4 +1,4 @@
-// admin_recordings.go wires the /admin/recordings dashboard:
+// admin_recordings.go wires the /{conf}/admin/recordings dashboard:
 //   - list every Notion Recording row with per-row publish status
 //   - per-recording detail page with editable YT + X copy
 //   - YouTube OAuth bootstrap (start / callback / disconnect)
@@ -30,6 +30,7 @@ import (
 	"btcpp-web/external/tokens"
 	youtubepkg "btcpp-web/external/youtube"
 	"btcpp-web/internal/config"
+	"btcpp-web/internal/helpers"
 	"btcpp-web/internal/types"
 
 	"github.com/gorilla/mux"
@@ -50,6 +51,7 @@ type RecordingRow struct {
 
 type RecordingsAdminListPage struct {
 	Rows               []*RecordingRow
+	Conf               *types.Conf
 	YouTubeReady       bool
 	YouTubeAuthURL     string
 	AutopublishEnabled bool
@@ -61,6 +63,7 @@ type RecordingsAdminListPage struct {
 }
 
 type RecordingsAdminDetailPage struct {
+	Conf         *types.Conf
 	Row          *RecordingRow
 	YTTitle      string
 	YTBody       string
@@ -131,7 +134,8 @@ func claimJob(recordingID string) bool {
 // ---- list page ---------------------------------------------------------
 
 func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 
@@ -141,7 +145,10 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 		if rec == nil {
 			continue
 		}
-		rows = append(rows, buildRecordingRow(rec))
+		row := buildRecordingRow(rec)
+		if recordingRowBelongsToConf(row, conf.Tag) {
+			rows = append(rows, row)
+		}
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rowSortKey(rows[i]) > rowSortKey(rows[j])
@@ -149,15 +156,16 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 
 	page := &RecordingsAdminListPage{
 		Rows:               rows,
+		Conf:               conf,
 		YouTubeReady:       youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
-		YouTubeAuthURL:     "/admin/recordings/oauth/youtube/start",
+		YouTubeAuthURL:     recordingsAdminPath(conf.Tag, "/oauth/youtube/start"),
 		AutopublishEnabled: ctx.Env.Recordings.AutopublishEnabled,
 		XUploaderEnabled:   ctx.Env.Recordings.X.Enabled,
 		XProfileObject:     ctx.Env.Recordings.X.ProfileObject,
 		Year:               uint(time.Now().Year()),
 	}
 	if !youtubepkg.IsConfigured() {
-		page.FlashError = "YouTube OAuth env vars (YOUTUBE_CLIENT_ID/SECRET/REDIRECT_URL) are not set — set them and restart to enable uploads."
+		page.FlashError = "YouTube OAuth env vars (YOUTUBE_CLIENT_ID/SECRET) are not set — set them and restart to enable uploads."
 	} else if !youtubepkg.IsConnected() {
 		page.FlashError = "YouTube is configured but not connected. Click \"Authorize YouTube\" to grant upload access to the btcplusplus channel."
 	}
@@ -170,7 +178,7 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 	}
 
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/recordings.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/recordings render: %s", err)
+		ctx.Err.Printf("/%s/admin/recordings render: %s", conf.Tag, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -188,16 +196,10 @@ func rowSortKey(row *RecordingRow) string {
 // ---- detail page -------------------------------------------------------
 
 func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
 		return
 	}
-	recordingID := mux.Vars(r)["id"]
-	rec := getters.FetchRecordingByID(recordingID)
-	if rec == nil {
-		handle404(w, r, ctx)
-		return
-	}
-	row := buildRecordingRow(rec)
 
 	ytTitle, ytBody := defaultYouTubeCopy(ctx, row)
 	xBody := defaultXMainCopy(ctx, row)
@@ -205,6 +207,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
 
 	page := &RecordingsAdminDetailPage{
+		Conf:         conf,
 		Row:          row,
 		YTTitle:      ytTitle,
 		YTBody:       ytBody,
@@ -214,7 +217,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		YouTubeReady: youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
 		Year:         uint(time.Now().Year()),
 	}
-	if job := getJob(recordingID); job != nil {
+	if job := getJob(rec.ID); job != nil {
 		page.JobActive = job.Status == "running"
 		page.JobStatus = job.Status
 		page.JobMessage = job.Message
@@ -227,7 +230,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	}
 
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "admin/recording_detail.tmpl", page); err != nil {
-		ctx.Err.Printf("/admin/recordings/%s render: %s", recordingID, err)
+		ctx.Err.Printf("/%s/admin/recordings/%s render: %s", conf.Tag, rec.ID, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
 }
@@ -235,17 +238,13 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 // ---- upload to YouTube ------------------------------------------------
 
 func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
 		return
 	}
-	recordingID := mux.Vars(r)["id"]
-	rec := getters.FetchRecordingByID(recordingID)
-	if rec == nil {
-		handle404(w, r, ctx)
-		return
-	}
+	recordingID := rec.ID
 	if err := r.ParseForm(); err != nil {
-		redirectWithErr(w, r, recordingID, "couldn't parse form: "+err.Error())
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
 		return
 	}
 	title := strings.TrimSpace(r.FormValue("yt_title"))
@@ -260,28 +259,28 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 		publishAt = rec.PublishAt.UTC()
 	}
 	if title == "" {
-		redirectWithErr(w, r, recordingID, "YouTube title is required")
+		redirectWithErr(w, r, conf.Tag, recordingID, "YouTube title is required")
 		return
 	}
 	if rec.FileURI == "" {
-		redirectWithErr(w, r, recordingID, "Recording row has no FileURI — set the Spaces key in Notion first")
+		redirectWithErr(w, r, conf.Tag, recordingID, "Recording row has no FileURI — set the Spaces key in Notion first")
 		return
 	}
 	if !youtubepkg.IsConfigured() {
-		redirectWithErr(w, r, recordingID, "YouTube OAuth is not configured")
+		redirectWithErr(w, r, conf.Tag, recordingID, "YouTube OAuth is not configured")
 		return
 	}
 	if !youtubepkg.IsConnected() {
-		redirectWithErr(w, r, recordingID, "YouTube is not connected — click Authorize on the recordings page")
+		redirectWithErr(w, r, conf.Tag, recordingID, "YouTube is not connected — click Authorize on the recordings page")
 		return
 	}
 	if !claimJob(recordingID) {
-		redirectWithErr(w, r, recordingID, "An upload is already in progress for this recording")
+		redirectWithErr(w, r, conf.Tag, recordingID, "An upload is already in progress for this recording")
 		return
 	}
 	go runYouTubeUpload(ctx, recordingID, rec.FileURI, title, body, privacy, publishAt)
 
-	http.Redirect(w, r, fmt.Sprintf("/admin/recordings/%s?flash=Upload+started", recordingID), http.StatusSeeOther)
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=Upload+started", http.StatusSeeOther)
 }
 
 // runYouTubeUpload streams the source video from Spaces straight into
@@ -340,44 +339,40 @@ func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body,
 // ---- save X link (manual handoff) ------------------------------------
 
 func RecordingsAdminSaveXLink(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
 		return
 	}
-	recordingID := mux.Vars(r)["id"]
-	rec := getters.FetchRecordingByID(recordingID)
-	if rec == nil {
-		handle404(w, r, ctx)
-		return
-	}
+	recordingID := rec.ID
 	if err := r.ParseForm(); err != nil {
-		redirectWithErr(w, r, recordingID, "couldn't parse form: "+err.Error())
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
 		return
 	}
 	xURL := strings.TrimSpace(r.FormValue("x_url"))
 	if xURL == "" {
-		redirectWithErr(w, r, recordingID, "Paste the X URL before saving")
+		redirectWithErr(w, r, conf.Tag, recordingID, "Paste the X URL before saving")
 		return
 	}
 	if !strings.HasPrefix(xURL, "https://x.com/") && !strings.HasPrefix(xURL, "https://twitter.com/") {
-		redirectWithErr(w, r, recordingID, "That doesn't look like an X.com URL")
+		redirectWithErr(w, r, conf.Tag, recordingID, "That doesn't look like an X.com URL")
 		return
 	}
 	if err := getters.UpdateRecordingXLink(ctx, recordingID, xURL); err != nil {
 		ctx.Err.Printf("save xlink recording=%s: %s", recordingID, err)
-		redirectWithErr(w, r, recordingID, "couldn't update Notion: "+err.Error())
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update Notion: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/recordings/%s?flash=X+link+saved", recordingID), http.StatusSeeOther)
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+link+saved", http.StatusSeeOther)
 }
 
 // ---- job status polling ----------------------------------------------
 
 func RecordingsAdminJobStatus(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	_, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
 		return
 	}
-	recordingID := mux.Vars(r)["id"]
-	job := getJob(recordingID)
+	job := getJob(rec.ID)
 	w.Header().Set("Content-Type", "application/json")
 	if job == nil {
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": ""})
@@ -392,7 +387,8 @@ func RecordingsAdminJobStatus(w http.ResponseWriter, r *http.Request, ctx *confi
 // ---- YouTube OAuth bootstrap -----------------------------------------
 
 func RecordingsYTOAuthStart(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 	if !youtubepkg.IsConfigured() {
@@ -401,11 +397,12 @@ func RecordingsYTOAuthStart(w http.ResponseWriter, r *http.Request, ctx *config.
 	}
 	state := mintState()
 	ctx.Session.Put(r.Context(), youtubeOAuthStateKey, state)
-	http.Redirect(w, r, youtubepkg.AuthCodeURL(state), http.StatusSeeOther)
+	http.Redirect(w, r, youtubepkg.AuthCodeURLForRedirect(state, recordingsOAuthRedirectURL(ctx, conf.Tag)), http.StatusSeeOther)
 }
 
 func RecordingsYTOAuthCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 	wantState, _ := ctx.Session.Pop(r.Context(), youtubeOAuthStateKey).(string)
@@ -423,16 +420,17 @@ func RecordingsYTOAuthCallback(w http.ResponseWriter, r *http.Request, ctx *conf
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
-	if err := youtubepkg.Exchange(r.Context(), code); err != nil {
+	if err := youtubepkg.ExchangeForRedirect(r.Context(), code, recordingsOAuthRedirectURL(ctx, conf.Tag)); err != nil {
 		ctx.Err.Printf("youtube oauth exchange: %s", err)
 		http.Error(w, "OAuth exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/admin/recordings?flash=YouTube+connected", http.StatusSeeOther)
+	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash=YouTube+connected"), http.StatusSeeOther)
 }
 
 func RecordingsYTOAuthDisconnect(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 	if err := youtubepkg.Disconnect(); err != nil {
@@ -441,7 +439,7 @@ func RecordingsYTOAuthDisconnect(w http.ResponseWriter, r *http.Request, ctx *co
 		return
 	}
 	_ = tokens.Set("youtube", nil)
-	http.Redirect(w, r, "/admin/recordings?flash=YouTube+disconnected", http.StatusSeeOther)
+	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash=YouTube+disconnected"), http.StatusSeeOther)
 }
 
 // ---- helpers ---------------------------------------------------------
@@ -452,10 +450,63 @@ func mintState() string {
 	return base64.RawURLEncoding.EncodeToString(b[:])
 }
 
-func redirectWithErr(w http.ResponseWriter, r *http.Request, recordingID, msg string) {
+func redirectWithErr(w http.ResponseWriter, r *http.Request, confTag, recordingID, msg string) {
 	http.Redirect(w, r,
-		fmt.Sprintf("/admin/recordings/%s?err=%s", recordingID, url.QueryEscape(msg)),
+		fmt.Sprintf("/%s/admin/recordings/%s?err=%s", url.PathEscape(confTag), url.PathEscape(recordingID), url.QueryEscape(msg)),
 		http.StatusSeeOther)
+}
+
+func requireRecordingsConfAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) (*types.Conf, bool) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return nil, false
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return nil, false
+	}
+	return conf, true
+}
+
+func scopedRecordingFromRequest(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) (*types.Conf, *types.Recording, *RecordingRow, bool) {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
+		return nil, nil, nil, false
+	}
+	recordingID := mux.Vars(r)["id"]
+	rec := getters.FetchRecordingByID(recordingID)
+	if rec == nil {
+		handle404(w, r, ctx)
+		return nil, nil, nil, false
+	}
+	row := buildRecordingRow(rec)
+	if !recordingRowBelongsToConf(row, conf.Tag) {
+		handle404(w, r, ctx)
+		return nil, nil, nil, false
+	}
+	return conf, rec, row, true
+}
+
+func recordingRowBelongsToConf(row *RecordingRow, confTag string) bool {
+	return row != nil &&
+		row.ConfTalk != nil &&
+		row.ConfTalk.Conf != nil &&
+		row.ConfTalk.Conf.Tag == confTag
+}
+
+func recordingsAdminPath(confTag, suffix string) string {
+	if suffix != "" && !strings.HasPrefix(suffix, "/") && !strings.HasPrefix(suffix, "?") {
+		suffix = "/" + suffix
+	}
+	return fmt.Sprintf("/%s/admin/recordings%s", url.PathEscape(confTag), suffix)
+}
+
+func recordingDetailPath(confTag, recordingID string) string {
+	return fmt.Sprintf("/%s/admin/recordings/%s", url.PathEscape(confTag), url.PathEscape(recordingID))
+}
+
+func recordingsOAuthRedirectURL(ctx *config.AppContext, confTag string) string {
+	return strings.TrimRight(ctx.Env.GetURI(), "/") + recordingsAdminPath(confTag, "/oauth/youtube/callback")
 }
 
 func buildRecordingRow(rec *types.Recording) *RecordingRow {

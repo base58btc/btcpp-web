@@ -21,8 +21,6 @@ import (
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/types"
-
-	"github.com/gorilla/mux"
 )
 
 const (
@@ -273,7 +271,12 @@ func sendXFailureEmail(ctx *config.AppContext, rec *types.Recording, status, msg
 	if row.ConfTalk != nil && row.ConfTalk.Proposal != nil && row.ConfTalk.Proposal.Title != "" {
 		title = row.ConfTalk.Proposal.Title
 	}
-	adminURL := fmt.Sprintf("%s/admin/recordings/%s", strings.TrimRight(ctx.Env.GetURI(), "/"), url.PathEscape(rec.ID))
+	adminURL := strings.TrimRight(ctx.Env.GetURI(), "/")
+	if row.ConfTalk != nil && row.ConfTalk.Conf != nil {
+		adminURL += recordingDetailPath(row.ConfTalk.Conf.Tag, rec.ID)
+	} else {
+		adminURL += "/dashboard"
+	}
 	text := fmt.Sprintf(`X uploader issue for %s
 
 Status: %s
@@ -337,33 +340,35 @@ func newXPosterClient(ctx *config.AppContext) (*xposter.Client, error) {
 }
 
 func RecordingsAdminXAuthCheck(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 	client, err := newXPosterClient(ctx)
 	if err != nil {
-		redirectRecordingsListErr(w, r, "X uploader is not configured: "+err.Error())
+		redirectRecordingsListErr(w, r, conf.Tag, "X uploader is not configured: "+err.Error())
 		return
 	}
 	status, err := client.AuthStatus(r.Context())
 	if err != nil {
-		redirectRecordingsListErr(w, r, "X auth check failed: "+err.Error())
+		redirectRecordingsListErr(w, r, conf.Tag, "X auth check failed: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, "/admin/recordings?flash="+url.QueryEscape("X auth status: "+status), http.StatusSeeOther)
+	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash="+url.QueryEscape("X auth status: "+status)), http.StatusSeeOther)
 }
 
 func RecordingsAdminXBootstrap(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
+	if !ok {
 		return
 	}
 	if !ctx.Env.Recordings.X.Headed {
-		redirectRecordingsListErr(w, r, "X bootstrap must be run locally with X_BROWSER_HEADED=true")
+		redirectRecordingsListErr(w, r, conf.Tag, "X bootstrap must be run locally with X_BROWSER_HEADED=true")
 		return
 	}
 	client, err := newXPosterClient(ctx)
 	if err != nil {
-		redirectRecordingsListErr(w, r, "X uploader is not configured: "+err.Error())
+		redirectRecordingsListErr(w, r, conf.Tag, "X uploader is not configured: "+err.Error())
 		return
 	}
 	go func() {
@@ -373,26 +378,22 @@ func RecordingsAdminXBootstrap(w http.ResponseWriter, r *http.Request, ctx *conf
 		}
 		ctx.Infos.Printf("x bootstrap completed and profile archive saved")
 	}()
-	http.Redirect(w, r, "/admin/recordings?flash="+url.QueryEscape("X bootstrap started; complete login in the Chrome window, then run Test X auth"), http.StatusSeeOther)
+	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash="+url.QueryEscape("X bootstrap started; complete login in the Chrome window, then run Test X auth")), http.StatusSeeOther)
 }
 
 func RecordingsAdminRetryX(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := requireGlobalAdmin(w, r, ctx); id == nil {
-		return
-	}
-	recordingID := mux.Vars(r)["id"]
-	if getters.FetchRecordingByID(recordingID) == nil {
-		handle404(w, r, ctx)
+	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
 		return
 	}
 	status := recordingStatusPending
-	if err := getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{XStatus: &status}); err != nil {
-		redirectWithErr(w, r, recordingID, "couldn't update Notion: "+err.Error())
+	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{XStatus: &status}); err != nil {
+		redirectWithErr(w, r, conf.Tag, rec.ID, "couldn't update Notion: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/admin/recordings/%s?flash=X+post+queued+for+retry", recordingID), http.StatusSeeOther)
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, rec.ID)+"?flash=X+post+queued+for+retry", http.StatusSeeOther)
 }
 
-func redirectRecordingsListErr(w http.ResponseWriter, r *http.Request, msg string) {
-	http.Redirect(w, r, "/admin/recordings?err="+url.QueryEscape(msg), http.StatusSeeOther)
+func redirectRecordingsListErr(w http.ResponseWriter, r *http.Request, confTag, msg string) {
+	http.Redirect(w, r, recordingsAdminPath(confTag, "?err="+url.QueryEscape(msg)), http.StatusSeeOther)
 }
