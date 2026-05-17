@@ -73,6 +73,42 @@ func Upload(key string, data []byte, contentType string, hash string) (string, e
 	return PublicURL(key), nil
 }
 
+// PutPrivate writes an object without a public-read ACL. Use this for
+// encrypted credentials or browser-profile archives; callers are still
+// responsible for encrypting sensitive bytes before handing them here.
+func PutPrivate(key string, data []byte, contentType string) error {
+	if client == nil {
+		return fmt.Errorf("spaces not configured")
+	}
+	_, err := client.PutObject(context.Background(), &s3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to upload private object %s: %w", key, err)
+	}
+	return nil
+}
+
+// DeletePrivate removes a private object. It is intentionally narrow:
+// public assets should continue to flow through the purpose-built
+// upload/update paths above.
+func DeletePrivate(key string) error {
+	if client == nil {
+		return fmt.Errorf("spaces not configured")
+	}
+	_, err := client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete private object %s: %w", key, err)
+	}
+	return nil
+}
+
 const hashIndexKey = "_hashes.json"
 
 // LoadHashes reads the hash index file from the bucket.

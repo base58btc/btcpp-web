@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"btcpp-web/external/secureblob"
+
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -26,8 +28,11 @@ type Token struct {
 }
 
 var (
-	db *bolt.DB
-	mu sync.Mutex
+	db        *bolt.DB
+	mu        sync.Mutex
+	remoteMu  sync.Mutex
+	remoteKey string
+	remoteEnc []byte
 )
 
 // Init opens (or creates) the tokens.bolt file at the given path and
@@ -54,6 +59,24 @@ func Init(path string) error {
 	return nil
 }
 
+// InitRemote enables an encrypted Spaces-backed copy of the token store.
+// The local Bolt file remains a process-local cache; the remote object is
+// authoritative after App Platform deploys wipe local disk.
+func InitRemote(objectKey, encryptionKey string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if objectKey == "" || encryptionKey == "" {
+		return nil
+	}
+	key, err := secureblob.DecodeKey(encryptionKey)
+	if err != nil {
+		return err
+	}
+	remoteKey = objectKey
+	remoteEnc = key
+	return nil
+}
+
 // Get returns the stored token for the given service key (e.g.
 // "youtube"). Returns (nil, nil) when nothing has been persisted yet —
 // callers should treat that as "needs OAuth bootstrap" rather than an
@@ -62,6 +85,24 @@ func Get(key string) (*Token, error) {
 	if db == nil {
 		return nil, fmt.Errorf("tokens store not initialized")
 	}
+	t, err := getLocal(key)
+	if err != nil {
+		return nil, err
+	}
+	if t != nil {
+		return t, nil
+	}
+	t, err = getRemote(key)
+	if err != nil || t == nil {
+		return t, err
+	}
+	if err := setLocal(key, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
+func getLocal(key string) (*Token, error) {
 	var raw []byte
 	err := db.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
@@ -85,12 +126,62 @@ func Get(key string) (*Token, error) {
 	return &t, nil
 }
 
+func getRemote(key string) (*Token, error) {
+	if remoteKey == "" || len(remoteEnc) == 0 {
+		return nil, nil
+	}
+	remoteMu.Lock()
+	defer remoteMu.Unlock()
+	all, ok, err := loadRemote()
+	if err != nil || !ok {
+		return nil, err
+	}
+	t := all[key]
+	if t == nil {
+		return nil, nil
+	}
+	cp := *t
+	return &cp, nil
+}
+
 // Set stores a token under the given service key. A nil token deletes
 // the entry (useful for "log out" / disconnect flows).
 func Set(key string, t *Token) error {
 	if db == nil {
 		return fmt.Errorf("tokens store not initialized")
 	}
+	if err := setLocal(key, t); err != nil {
+		return err
+	}
+	if remoteKey == "" || len(remoteEnc) == 0 {
+		return nil
+	}
+	remoteMu.Lock()
+	defer remoteMu.Unlock()
+	all, ok, err := loadRemote()
+	if err != nil {
+		return err
+	}
+	if !ok || all == nil {
+		all = make(map[string]*Token)
+	}
+	if t == nil {
+		delete(all, key)
+	} else {
+		cp := *t
+		all[key] = &cp
+	}
+	if len(all) == 0 {
+		return secureblob.Delete(remoteKey)
+	}
+	raw, err := json.Marshal(all)
+	if err != nil {
+		return err
+	}
+	return secureblob.Save(remoteKey, raw, remoteEnc)
+}
+
+func setLocal(key string, t *Token) error {
 	return db.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket([]byte(bucket))
 		if t == nil {
@@ -102,6 +193,21 @@ func Set(key string, t *Token) error {
 		}
 		return b.Put([]byte(key), raw)
 	})
+}
+
+func loadRemote() (map[string]*Token, bool, error) {
+	raw, ok, err := secureblob.Load(remoteKey, remoteEnc)
+	if err != nil || !ok {
+		return nil, ok, err
+	}
+	var all map[string]*Token
+	if err := json.Unmarshal(raw, &all); err != nil {
+		return nil, true, fmt.Errorf("unmarshal remote token store: %w", err)
+	}
+	if all == nil {
+		all = make(map[string]*Token)
+	}
+	return all, true, nil
 }
 
 // Has reports whether a token exists for the given service key.
