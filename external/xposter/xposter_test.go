@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestArchiveExtractDirRoundTripSkipsChromeLocks(t *testing.T) {
@@ -41,5 +42,22 @@ func TestArchiveExtractDirRoundTripSkipsChromeLocks(t *testing.T) {
 func TestSafeJoinRejectsTraversal(t *testing.T) {
 	if _, err := safeJoin(t.TempDir(), "../outside"); err == nil {
 		t.Fatalf("safeJoin accepted traversal path")
+	}
+}
+
+func TestNewXScheduleFieldsFormatsLocalTime(t *testing.T) {
+	loc := time.FixedZone("test", -5*60*60)
+	got := newXScheduleFields(time.Date(2026, time.May, 17, 0, 4, 0, 0, loc))
+
+	if got.Month != "May" || got.MonthShort != "May" || got.Day != "17" || got.Year != "2026" {
+		t.Fatalf("date fields = %#v", got)
+	}
+	if got.Hour != "12" || got.Minute != "04" || got.Period != "AM" {
+		t.Fatalf("time fields = %#v", got)
+	}
+
+	got = newXScheduleFields(time.Date(2026, time.May, 17, 15, 30, 0, 0, loc))
+	if got.Hour != "3" || got.Minute != "30" || got.Period != "PM" {
+		t.Fatalf("afternoon time fields = %#v", got)
 	}
 }

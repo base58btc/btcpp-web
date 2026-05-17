@@ -168,6 +168,12 @@
           <div class="flex items-center gap-3">
             <button type="submit"
                     class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save X text</button>
+            {{ $xBusy := or (eq .Row.XStatus "scheduling") (eq .Row.XStatus "scheduled") (eq .Row.XStatus "posting") }}
+            <button type="submit" formaction="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/schedule-x"
+                    {{ if or .Row.XURL (not .Row.Recording.FileURI) (not .Row.Recording.PublishAt) $xBusy }}disabled{{ end }}
+                    class="px-3 py-1.5 text-sm rounded-md text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+              {{ if eq .Row.XStatus "scheduled" }}Scheduled on X{{ else if eq .Row.XStatus "scheduling" }}Scheduling X...{{ else }}Schedule on X{{ end }}
+            </button>
             <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy text',1500);"
                     class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy text</button>
             <a href="{{ .XIntentURL }}" target="_blank" rel="noopener"

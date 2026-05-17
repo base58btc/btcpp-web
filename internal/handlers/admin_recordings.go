@@ -368,6 +368,65 @@ func RecordingsAdminSaveXCopy(w http.ResponseWriter, r *http.Request, ctx *confi
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+text+saved", http.StatusSeeOther)
 }
 
+func RecordingsAdminScheduleX(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	recordingID := rec.ID
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
+		return
+	}
+	xBody := strings.TrimSpace(r.FormValue("x_body"))
+	if xBody == "" {
+		xBody = strings.TrimSpace(recordingXMainCopy(ctx, row))
+	}
+	if xBody == "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X post text is required")
+		return
+	}
+	if rec.FileURI == "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "Recording row has no FileURI — set the Spaces key in Notion first")
+		return
+	}
+	if rec.PublishAt == nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "Set PublishAt before scheduling on X")
+		return
+	}
+	if !rec.PublishAt.After(time.Now()) {
+		redirectWithErr(w, r, conf.Tag, recordingID, "PublishAt must be in the future to schedule on X")
+		return
+	}
+	if row.XURL != "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X already has a saved URL")
+		return
+	}
+	if row.XStatus == recordingStatusScheduling || row.XStatus == recordingStatusScheduled || row.XStatus == recordingStatusPosting {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X is already "+row.XStatus)
+		return
+	}
+	if !ctx.Env.Recordings.X.Enabled {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X uploader is disabled")
+		return
+	}
+
+	status := recordingStatusScheduling
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		Text:        &xBody,
+		Status:      &status,
+		ScheduledAt: rec.PublishAt,
+	}); err != nil {
+		ctx.Err.Printf("schedule x status recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update SocialPosts: "+err.Error())
+		return
+	}
+	go runXSchedule(ctx, rec, conf, xBody)
+
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+scheduling+started", http.StatusSeeOther)
+}
+
 // runYouTubeUpload streams the source video from Spaces straight into
 // YouTube's resumable-upload endpoint, then writes the resulting URL
 // back to the Notion Recording row. Uses a fresh context.Background()

@@ -27,6 +27,8 @@ const (
 	recordingStatusPending      = "pending"
 	recordingStatusUploading    = "uploading"
 	recordingStatusUploaded     = "uploaded"
+	recordingStatusScheduling   = "scheduling"
+	recordingStatusScheduled    = "scheduled"
 	recordingStatusPosting      = "posting"
 	recordingStatusPosted       = "posted"
 	recordingStatusFailed       = "failed"
@@ -231,6 +233,56 @@ func runScheduledXPost(ctx *config.AppContext, row *RecordingRow, client *xposte
 		return
 	}
 	ctx.Infos.Printf("recording autopublish x posted recording=%s url=%s", rec.ID, result.PostURL)
+}
+
+func runXSchedule(ctx *config.AppContext, rec *types.Recording, conf *types.Conf, mainText string) {
+	row := buildRecordingRow(rec)
+	if rec.PublishAt == nil {
+		recordXFailure(ctx, row, recordingStatusFailed, "PublishAt is required before scheduling on X")
+		return
+	}
+	client, err := newXPosterClient(ctx)
+	if err != nil {
+		recordXFailure(ctx, row, recordingStatusFailed, "x uploader is not configured: "+err.Error())
+		return
+	}
+	videoPath, cleanup, err := downloadRecordingVideo(rec.FileURI)
+	if err != nil {
+		recordXFailure(ctx, row, recordingStatusFailed, "couldn't fetch source video from Spaces: "+err.Error())
+		return
+	}
+	defer cleanup()
+
+	timezone := ""
+	scheduleAt := *rec.PublishAt
+	if conf != nil {
+		timezone = conf.Timezone
+		scheduleAt = rec.PublishAt.In(conf.Loc())
+	}
+	if err := client.Schedule(context.Background(), xposter.ScheduleParams{
+		Text:      mainText,
+		VideoPath: videoPath,
+		Schedule:  scheduleAt,
+		Timezone:  timezone,
+	}); err != nil {
+		status := recordingStatusFailed
+		if xposter.IsAuthError(err) {
+			status = recordingStatusAuthRequired
+		}
+		recordXFailure(ctx, row, status, err.Error())
+		return
+	}
+
+	status := recordingStatusScheduled
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		Text:        &mainText,
+		Status:      &status,
+		ScheduledAt: rec.PublishAt,
+	}); err != nil {
+		ctx.Err.Printf("recording schedule x persist socialpost recording=%s: %s", rec.ID, err)
+		return
+	}
+	ctx.Infos.Printf("recording x scheduled recording=%s publishAt=%s", rec.ID, rec.PublishAt.UTC().Format(time.RFC3339))
 }
 
 func downloadRecordingVideo(fileURI string) (string, func(), error) {

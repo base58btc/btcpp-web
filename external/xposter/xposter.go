@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,6 +18,7 @@ import (
 
 	"btcpp-web/external/secureblob"
 
+	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
@@ -41,6 +43,13 @@ type PostParams struct {
 	Text      string
 	ReplyText string
 	VideoPath string
+}
+
+type ScheduleParams struct {
+	Text      string
+	VideoPath string
+	Schedule  time.Time
+	Timezone  string
 }
 
 type PostResult struct {
@@ -156,6 +165,32 @@ func (c *Client) Post(ctx context.Context, p PostParams) (PostResult, error) {
 		})
 	})
 	return result, err
+}
+
+func (c *Client) Schedule(ctx context.Context, p ScheduleParams) error {
+	if p.Text == "" {
+		return fmt.Errorf("x post text is required")
+	}
+	if p.VideoPath == "" {
+		return fmt.Errorf("x video path is required")
+	}
+	if p.Schedule.IsZero() {
+		return fmt.Errorf("x schedule time is required")
+	}
+	if !p.Schedule.After(time.Now()) {
+		return fmt.Errorf("x schedule time must be in the future")
+	}
+	if _, err := os.Stat(p.VideoPath); err != nil {
+		return fmt.Errorf("x video path: %w", err)
+	}
+	return c.withProfile(ctx, false, func(profileDir string) error {
+		return c.withBrowser(ctx, profileDir, func(bctx context.Context) error {
+			if err := ensureLoggedIn(bctx); err != nil {
+				return err
+			}
+			return createScheduledPost(bctx, p.Text, p.VideoPath, p.Schedule, p.Timezone)
+		})
+	})
 }
 
 func (c *Client) withProfile(ctx context.Context, allowCreate bool, fn func(profileDir string) error) error {
@@ -301,6 +336,43 @@ func createPost(ctx context.Context, text, videoPath string) (string, error) {
 	return waitForNewStatusURL(ctx, before)
 }
 
+func createScheduledPost(ctx context.Context, text, videoPath string, schedule time.Time, timezone string) error {
+	if timezone != "" {
+		if err := setBrowserTimezone(ctx, timezone); err != nil {
+			return fmt.Errorf("set browser timezone %q: %w", timezone, err)
+		}
+	}
+	if err := chromedp.Run(ctx, chromedp.Navigate("https://x.com/compose/post")); err != nil {
+		return err
+	}
+	tasks := chromedp.Tasks{
+		chromedp.WaitVisible(`div[data-testid="tweetTextarea_0"]`, chromedp.ByQuery),
+		chromedp.SendKeys(`div[data-testid="tweetTextarea_0"]`, text, chromedp.ByQuery),
+		chromedp.SetUploadFiles(`input[data-testid="fileInput"]`, []string{videoPath}, chromedp.ByQuery),
+		chromedp.Sleep(8 * time.Second),
+	}
+	if err := chromedp.Run(ctx, tasks); err != nil {
+		return err
+	}
+	if err := clickScheduleOption(ctx); err != nil {
+		return err
+	}
+	if err := fillScheduleDialog(ctx, newXScheduleFields(schedule)); err != nil {
+		return err
+	}
+	if err := clickScheduleConfirm(ctx); err != nil {
+		return err
+	}
+	if err := chromedp.Run(ctx,
+		chromedp.WaitEnabled(`button[data-testid="tweetButton"]`, chromedp.ByQuery),
+		chromedp.Click(`button[data-testid="tweetButton"]`, chromedp.ByQuery),
+		chromedp.Sleep(3*time.Second),
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 func createReply(ctx context.Context, postURL, text string) (string, error) {
 	if err := chromedp.Run(ctx,
 		chromedp.Navigate(postURL),
@@ -319,6 +391,187 @@ func createReply(ctx context.Context, postURL, text string) (string, error) {
 		return "", err
 	}
 	return waitForNewStatusURL(ctx, before)
+}
+
+func setBrowserTimezone(ctx context.Context, timezone string) error {
+	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
+		return emulation.SetTimezoneOverride(timezone).Do(ctx)
+	}))
+}
+
+type xScheduleFields struct {
+	Month      string `json:"month"`
+	MonthShort string `json:"monthShort"`
+	Day        string `json:"day"`
+	Year       string `json:"year"`
+	Hour       string `json:"hour"`
+	Minute     string `json:"minute"`
+	Period     string `json:"period"`
+}
+
+func newXScheduleFields(at time.Time) xScheduleFields {
+	period := "AM"
+	hour := at.Hour()
+	if hour >= 12 {
+		period = "PM"
+	}
+	hour = hour % 12
+	if hour == 0 {
+		hour = 12
+	}
+	return xScheduleFields{
+		Month:      at.Month().String(),
+		MonthShort: at.Format("Jan"),
+		Day:        fmt.Sprintf("%d", at.Day()),
+		Year:       fmt.Sprintf("%d", at.Year()),
+		Hour:       fmt.Sprintf("%d", hour),
+		Minute:     fmt.Sprintf("%02d", at.Minute()),
+		Period:     period,
+	}
+}
+
+func clickScheduleOption(ctx context.Context) error {
+	var ok bool
+	js := `(() => {
+		const buttons = Array.from(document.querySelectorAll('button,[role="button"]'));
+		const textFor = (el) => [
+			el.getAttribute('aria-label'),
+			el.getAttribute('title'),
+			el.innerText,
+			el.textContent
+		].filter(Boolean).join(' ').toLowerCase();
+		const btn = document.querySelector('[data-testid="scheduleOption"]') ||
+			buttons.find((el) => textFor(el).includes('schedule'));
+		if (!btn || btn.getAttribute('aria-disabled') === 'true' || btn.disabled) return false;
+		btn.click();
+		return true;
+	})()`
+	if err := chromedp.Run(ctx, chromedp.Evaluate(js, &ok)); err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("x schedule button not found")
+	}
+	return chromedp.Run(ctx, chromedp.Sleep(time.Second))
+}
+
+type scheduleDialogResult struct {
+	OK      bool     `json:"ok"`
+	Missing []string `json:"missing"`
+}
+
+func fillScheduleDialog(ctx context.Context, fields xScheduleFields) error {
+	payload, err := json.Marshal(fields)
+	if err != nil {
+		return err
+	}
+	var result scheduleDialogResult
+	js := fmt.Sprintf(`(() => {
+		const wanted = %s;
+		const norm = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
+		const setValue = (el, value) => {
+			const proto = Object.getPrototypeOf(el);
+			const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+			if (desc && desc.set) {
+				desc.set.call(el, value);
+			} else {
+				el.value = value;
+			}
+			el.dispatchEvent(new Event('input', { bubbles: true }));
+			el.dispatchEvent(new Event('change', { bubbles: true }));
+		};
+		const labels = (el) => {
+			const out = [
+				el.getAttribute('aria-label'),
+				el.getAttribute('name'),
+				el.getAttribute('placeholder')
+			];
+			const id = el.getAttribute('id');
+			if (id && window.CSS && CSS.escape) {
+				const label = document.querySelector('label[for="' + CSS.escape(id) + '"]');
+				if (label) out.push(label.innerText);
+			}
+			const labelledBy = el.getAttribute('aria-labelledby');
+			if (labelledBy) {
+				for (const part of labelledBy.split(/\s+/)) {
+					const label = document.getElementById(part);
+					if (label) out.push(label.innerText);
+				}
+			}
+			const nearest = el.closest('label,[data-testid]');
+			if (nearest) out.push(nearest.innerText);
+			let parent = el.parentElement;
+			for (let i = 0; parent && i < 3; i++, parent = parent.parentElement) {
+				const text = parent.innerText || parent.textContent || '';
+				if (text && text.length <= 80) out.push(text);
+			}
+			return norm(out.filter(Boolean).join(' '));
+		};
+		const controls = Array.from(document.querySelectorAll('select,input'));
+		const matchControl = (names) => controls.find((el) => {
+			const label = labels(el);
+			return names.some((name) => label.includes(norm(name)));
+		});
+		const choose = (names, values) => {
+			const el = matchControl(names);
+			if (!el) return false;
+			if (el.tagName === 'SELECT') {
+				const option = Array.from(el.options).find((opt) => {
+					const text = norm(opt.textContent);
+					const value = norm(opt.value);
+					return values.some((want) => text === norm(want) || value === norm(want));
+				});
+				if (!option) return false;
+				setValue(el, option.value);
+				return true;
+			}
+			setValue(el, values[0]);
+			return true;
+		};
+		const missing = [];
+		if (!choose(['month'], [wanted.month, wanted.monthShort])) missing.push('month');
+		if (!choose(['day', 'date'], [wanted.day])) missing.push('day');
+		if (!choose(['year'], [wanted.year])) missing.push('year');
+		if (!choose(['hour'], [wanted.hour])) missing.push('hour');
+		if (!choose(['minute'], [wanted.minute, String(Number(wanted.minute))])) missing.push('minute');
+		if (!choose(['am/pm', 'am pm', 'period', 'meridiem'], [wanted.period])) missing.push('am/pm');
+		return { ok: missing.length === 0, missing };
+	})()`, string(payload))
+	if err := chromedp.Run(ctx, chromedp.Evaluate(js, &result)); err != nil {
+		return err
+	}
+	if !result.OK {
+		return fmt.Errorf("x schedule dialog fields not found: %s", strings.Join(result.Missing, ", "))
+	}
+	return chromedp.Run(ctx, chromedp.Sleep(time.Second))
+}
+
+func clickScheduleConfirm(ctx context.Context) error {
+	var ok bool
+	js := `(() => {
+		const buttons = Array.from(document.querySelectorAll('button,[role="button"]'));
+		const textFor = (el) => [
+			el.getAttribute('aria-label'),
+			el.getAttribute('title'),
+			el.innerText,
+			el.textContent
+		].filter(Boolean).join(' ').trim().toLowerCase();
+		const btn = buttons.find((el) => {
+			if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+			const text = textFor(el);
+			return text === 'confirm' || text === 'update' || text === 'done';
+		});
+		if (!btn) return false;
+		btn.click();
+		return true;
+	})()`
+	if err := chromedp.Run(ctx, chromedp.Evaluate(js, &ok)); err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("x schedule confirmation button not found")
+	}
+	return chromedp.Run(ctx, chromedp.Sleep(time.Second))
 }
 
 func statusLinks(ctx context.Context) (map[string]bool, error) {

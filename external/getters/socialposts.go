@@ -346,7 +346,7 @@ func socialPostSuppressesRef(post *types.SocialPost) bool {
 		return true
 	}
 	switch status {
-	case "queued", "posted", "uploaded", "published", "succeeded", "success":
+	case "queued", "scheduled", "posted", "uploaded", "published", "succeeded", "success":
 		return true
 	default:
 		return false

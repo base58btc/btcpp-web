@@ -39,6 +39,11 @@ func TestRecordingAutopublishEligibility(t *testing.T) {
 	if shouldPostRecordingToX(row, time.Now()) {
 		t.Fatalf("future recording should not post to X yet")
 	}
+	rec.PublishAt = &due
+	row.XStatus = recordingStatusScheduled
+	if shouldPostRecordingToX(row, time.Now()) {
+		t.Fatalf("recording already scheduled on X should not post again")
+	}
 }
 
 func TestXFailureFingerprintChangesByStatusAndMessage(t *testing.T) {
