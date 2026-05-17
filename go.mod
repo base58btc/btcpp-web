@@ -1,8 +1,8 @@
 module btcpp-web
 
-go 1.24
+go 1.25
 
-toolchain go1.24.4
+toolchain go1.25.10
 
 require (
 	github.com/BurntSushi/toml v1.2.1
@@ -16,7 +16,7 @@ require (
 	github.com/chromedp/chromedp v0.9.1
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/gorilla/mux v1.8.1
-	github.com/gorilla/schema v1.2.0
+	github.com/gorilla/schema v1.4.1
 	github.com/niftynei/go-notion v0.2.9
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/stripe/stripe-go/v76 v76.3.0
@@ -34,7 +34,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.22 // indirect
 	github.com/aws/smithy-go v1.25.0 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
-	github.com/go-chi/chi/v5 v5.2.2 // indirect
+	github.com/go-chi/chi/v5 v5.2.4 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.1.0 // indirect
