@@ -57,6 +57,9 @@ func runRecordingAutopublishTick(ctx *config.AppContext) {
 	if len(recs) == 0 {
 		return
 	}
+	if _, err := getters.FetchSocialPostsCached(ctx); err != nil {
+		ctx.Err.Printf("recording autopublisher socialposts: %s", err)
+	}
 	youtubeReady := youtubepkg.IsConfigured() && youtubepkg.IsConnected()
 	var xClient *xposter.Client
 	var xInitErr error
@@ -73,34 +76,41 @@ func runRecordingAutopublishTick(ctx *config.AppContext) {
 		if rec == nil || rec.PublishAt == nil || rec.FileURI == "" {
 			continue
 		}
-		if youtubeReady && shouldUploadRecordingToYouTube(rec) {
-			runScheduledYouTubeUpload(ctx, rec)
+		row := buildRecordingRow(rec)
+		if youtubeReady && shouldUploadRecordingToYouTube(row) {
+			runScheduledYouTubeUpload(ctx, row)
 		}
-		if shouldPostRecordingToX(rec, now) {
+		if shouldPostRecordingToX(row, now) {
 			if xClient != nil {
-				runScheduledXPost(ctx, rec, xClient)
+				runScheduledXPost(ctx, row, xClient)
 			} else if xInitErr != nil {
-				recordXFailure(ctx, rec, recordingStatusFailed, "x uploader is not configured: "+xInitErr.Error())
+				recordXFailure(ctx, row, recordingStatusFailed, "x uploader is not configured: "+xInitErr.Error())
 			}
 		}
 	}
 }
 
-func shouldUploadRecordingToYouTube(rec *types.Recording) bool {
-	if rec.YTLink != "" || rec.FileURI == "" {
+func shouldUploadRecordingToYouTube(row *RecordingRow) bool {
+	if row == nil || row.Recording == nil {
 		return false
 	}
-	return statusAllowsRetry(rec.YTStatus)
+	if row.YTURL != "" || row.Recording.FileURI == "" {
+		return false
+	}
+	return statusAllowsRetry(row.YTStatus)
 }
 
-func shouldPostRecordingToX(rec *types.Recording, now time.Time) bool {
-	if rec.XLink != "" || rec.FileURI == "" || rec.YTLink == "" || rec.PublishAt == nil {
+func shouldPostRecordingToX(row *RecordingRow, now time.Time) bool {
+	if row == nil || row.Recording == nil {
 		return false
 	}
-	if now.Before(rec.PublishAt.UTC()) {
+	if row.XURL != "" || row.Recording.FileURI == "" || row.YTURL == "" || row.Recording.PublishAt == nil {
 		return false
 	}
-	return statusAllowsRetry(rec.XStatus)
+	if now.Before(row.Recording.PublishAt.UTC()) {
+		return false
+	}
+	return statusAllowsRetry(row.XStatus)
 }
 
 func statusAllowsRetry(status string) bool {
@@ -108,16 +118,18 @@ func statusAllowsRetry(status string) bool {
 	return status == "" || status == recordingStatusPending || status == "queued"
 }
 
-func runScheduledYouTubeUpload(ctx *config.AppContext, rec *types.Recording) {
-	row := buildRecordingRow(rec)
+func runScheduledYouTubeUpload(ctx *config.AppContext, row *RecordingRow) {
+	rec := row.Recording
 	title, body := defaultYouTubeCopy(ctx, row)
 	if title == "" {
 		title = rec.TalkName
 	}
 	status := recordingStatusUploading
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{YTStatus: &status}); err != nil {
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{
+		Text:   &body,
+		Status: &status,
+	}); err != nil {
 		ctx.Err.Printf("recording autopublish yt status recording=%s: %s", rec.ID, err)
-		return
 	}
 
 	privacy := "public"
@@ -128,7 +140,7 @@ func runScheduledYouTubeUpload(ctx *config.AppContext, rec *types.Recording) {
 	}
 	src, size, err := spaces.GetStream(rec.FileURI)
 	if err != nil {
-		recordYouTubeFailure(ctx, rec, "couldn't fetch source video from Spaces: "+err.Error())
+		recordYouTubeFailure(ctx, row, "couldn't fetch source video from Spaces: "+err.Error())
 		return
 	}
 	defer src.Close()
@@ -140,50 +152,56 @@ func runScheduledYouTubeUpload(ctx *config.AppContext, rec *types.Recording) {
 		PublishAt:     publishAt,
 	}, src, size)
 	if err != nil {
-		recordYouTubeFailure(ctx, rec, err.Error())
+		recordYouTubeFailure(ctx, row, err.Error())
 		return
 	}
 	now := time.Now()
 	status = recordingStatusUploaded
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{
-		YTLink:       &ytURL,
-		YTStatus:     &status,
-		YTUploadedAt: &now,
-	}); err != nil {
+	if err := getters.UpdateRecordingYTLink(ctx, rec.ID, ytURL); err != nil {
 		ctx.Err.Printf("recording autopublish persist yt recording=%s: %s", rec.ID, err)
+		return
+	}
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{
+		URL:      &ytURL,
+		Status:   &status,
+		PostedAt: &now,
+	}); err != nil {
+		ctx.Err.Printf("recording autopublish persist yt socialpost recording=%s: %s", rec.ID, err)
 		return
 	}
 	ctx.Infos.Printf("recording autopublish yt uploaded recording=%s url=%s", rec.ID, ytURL)
 }
 
-func recordYouTubeFailure(ctx *config.AppContext, rec *types.Recording, msg string) {
+func recordYouTubeFailure(ctx *config.AppContext, row *RecordingRow, msg string) {
+	rec := row.Recording
 	status := recordingStatusFailed
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{
-		YTStatus: &status,
-		YTError:  &msg,
-	}); err != nil {
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{Status: &status, Error: &msg}); err != nil {
 		ctx.Err.Printf("recording autopublish persist yt failure recording=%s: %s", rec.ID, err)
 	}
 	ctx.Err.Printf("recording autopublish yt failed recording=%s: %s", rec.ID, msg)
 }
 
-func runScheduledXPost(ctx *config.AppContext, rec *types.Recording, client *xposter.Client) {
+func runScheduledXPost(ctx *config.AppContext, row *RecordingRow, client *xposter.Client) {
+	rec := row.Recording
 	status := recordingStatusPosting
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{XStatus: &status}); err != nil {
+	mainText := defaultXMainCopy(ctx, row)
+	replyText := defaultXReplyCopy(ctx, row)
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		Text:   &mainText,
+		Status: &status,
+	}); err != nil {
 		ctx.Err.Printf("recording autopublish x status recording=%s: %s", rec.ID, err)
-		return
 	}
 	videoPath, cleanup, err := downloadRecordingVideo(rec.FileURI)
 	if err != nil {
-		recordXFailure(ctx, rec, recordingStatusFailed, "couldn't fetch source video from Spaces: "+err.Error())
+		recordXFailure(ctx, row, recordingStatusFailed, "couldn't fetch source video from Spaces: "+err.Error())
 		return
 	}
 	defer cleanup()
 
-	row := buildRecordingRow(rec)
 	result, err := client.Post(context.Background(), xposter.PostParams{
-		Text:      defaultXMainCopy(ctx, row),
-		ReplyText: defaultXReplyCopy(ctx, row),
+		Text:      mainText,
+		ReplyText: replyText,
 		VideoPath: videoPath,
 	})
 	if err != nil {
@@ -191,7 +209,7 @@ func runScheduledXPost(ctx *config.AppContext, rec *types.Recording, client *xpo
 		if xposter.IsAuthError(err) {
 			status = recordingStatusAuthRequired
 		}
-		recordXFailure(ctx, rec, status, err.Error())
+		recordXFailure(ctx, row, status, err.Error())
 		return
 	}
 	now := time.Now()
@@ -199,10 +217,17 @@ func runScheduledXPost(ctx *config.AppContext, rec *types.Recording, client *xpo
 	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{
 		XLink:      &result.PostURL,
 		XReplyLink: &result.ReplyURL,
-		XStatus:    &status,
-		XPostedAt:  &now,
 	}); err != nil {
 		ctx.Err.Printf("recording autopublish persist x recording=%s: %s", rec.ID, err)
+		return
+	}
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		URL:      &result.PostURL,
+		ReplyURL: &result.ReplyURL,
+		Status:   &status,
+		PostedAt: &now,
+	}); err != nil {
+		ctx.Err.Printf("recording autopublish persist x socialpost recording=%s: %s", rec.ID, err)
 		return
 	}
 	ctx.Infos.Printf("recording autopublish x posted recording=%s url=%s", rec.ID, result.PostURL)
@@ -237,13 +262,14 @@ func downloadRecordingVideo(fileURI string) (string, func(), error) {
 	return path, cleanup, nil
 }
 
-func recordXFailure(ctx *config.AppContext, rec *types.Recording, status, msg string) {
+func recordXFailure(ctx *config.AppContext, row *RecordingRow, status, msg string) {
+	rec := row.Recording
 	fp := xFailureFingerprint(status, msg)
-	shouldNotify := rec.XErrorFingerprint != fp
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{
-		XStatus:           &status,
-		XError:            &msg,
-		XErrorFingerprint: &fp,
+	shouldNotify := row.XErrorFingerprint != fp
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		Status:           &status,
+		Error:            &msg,
+		ErrorFingerprint: &fp,
 	}); err != nil {
 		ctx.Err.Printf("recording autopublish persist x failure recording=%s: %s", rec.ID, err)
 	}
@@ -256,7 +282,7 @@ func recordXFailure(ctx *config.AppContext, rec *types.Recording, status, msg st
 		return
 	}
 	now := time.Now()
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{XNotifiedAt: &now}); err != nil {
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{NotifiedAt: &now}); err != nil {
 		ctx.Err.Printf("recording autopublish x notify stamp recording=%s: %s", rec.ID, err)
 	}
 }
@@ -382,12 +408,12 @@ func RecordingsAdminXBootstrap(w http.ResponseWriter, r *http.Request, ctx *conf
 }
 
 func RecordingsAdminRetryX(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
 	if !ok {
 		return
 	}
 	status := recordingStatusPending
-	if err := getters.UpdateRecordingPublishing(ctx, rec.ID, getters.RecordingPublishingUpdate{XStatus: &status}); err != nil {
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{Status: &status}); err != nil {
 		redirectWithErr(w, r, conf.Tag, rec.ID, "couldn't update Notion: "+err.Error())
 		return
 	}

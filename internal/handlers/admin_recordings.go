@@ -38,15 +38,30 @@ import (
 
 const youtubeOAuthStateKey = "yt_oauth_state"
 
+const (
+	recordingPlatformYouTube = "youtube"
+	recordingPlatformX       = "x"
+)
+
 // ---- page data ---------------------------------------------------------
 
 type RecordingRow struct {
-	Recording *types.Recording
-	ConfTalk  *types.ConfTalk
-	Speakers  []*types.Speaker
-	HasFile   bool
-	HasYT     bool
-	HasX      bool
+	Recording         *types.Recording
+	ConfTalk          *types.ConfTalk
+	Speakers          []*types.Speaker
+	YTSocialPost      *types.SocialPost
+	XSocialPost       *types.SocialPost
+	YTURL             string
+	XURL              string
+	XReplyURL         string
+	YTStatus          string
+	XStatus           string
+	YTError           string
+	XError            string
+	XErrorFingerprint string
+	HasFile           bool
+	HasYT             bool
+	HasX              bool
 }
 
 type RecordingsAdminListPage struct {
@@ -139,6 +154,9 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 		return
 	}
 
+	if _, err := getters.FetchSocialPostsCached(ctx); err != nil {
+		ctx.Err.Printf("/%s/admin/recordings socialposts: %s", conf.Tag, err)
+	}
 	recs := getters.ListRecordingsCached()
 	rows := make([]*RecordingRow, 0, len(recs))
 	for _, rec := range recs {
@@ -278,7 +296,7 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 		redirectWithErr(w, r, conf.Tag, recordingID, "An upload is already in progress for this recording")
 		return
 	}
-	go runYouTubeUpload(ctx, recordingID, rec.FileURI, title, body, privacy, publishAt)
+	go runYouTubeUpload(ctx, rec, title, body, privacy, publishAt)
 
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=Upload+started", http.StatusSeeOther)
 }
@@ -287,22 +305,29 @@ func RecordingsAdminUploadYT(w http.ResponseWriter, r *http.Request, ctx *config
 // YouTube's resumable-upload endpoint, then writes the resulting URL
 // back to the Notion Recording row. Uses a fresh context.Background()
 // because the HTTP request that kicked us off has already returned.
-func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body, privacy string, publishAt time.Time) {
+func runYouTubeUpload(ctx *config.AppContext, rec *types.Recording, title, body, privacy string, publishAt time.Time) {
+	recordingID := rec.ID
 	defer func() {
 		if rec := recover(); rec != nil {
 			ctx.Err.Printf("youtube upload panic recording=%s: %v", recordingID, rec)
 			setJobStatus(recordingID, "failed", fmt.Sprintf("internal error: %v", rec))
 		}
 	}()
+	row := buildRecordingRow(rec)
 	status := recordingStatusUploading
-	_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status})
-	src, size, err := spaces.GetStream(fileURI)
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{
+		Text:   &body,
+		Status: &status,
+	}); err != nil {
+		ctx.Err.Printf("youtube upload: socialpost status recording=%s: %s", recordingID, err)
+	}
+	src, size, err := spaces.GetStream(rec.FileURI)
 	if err != nil {
-		ctx.Err.Printf("youtube upload: fetch %s: %s", fileURI, err)
+		ctx.Err.Printf("youtube upload: fetch %s: %s", rec.FileURI, err)
 		setJobStatus(recordingID, "failed", "couldn't fetch source video from Spaces: "+err.Error())
 		msg := "couldn't fetch source video from Spaces: " + err.Error()
 		status = recordingStatusFailed
-		_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status, YTError: &msg})
+		_ = upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{Status: &status, Error: &msg})
 		return
 	}
 	defer src.Close()
@@ -319,19 +344,22 @@ func runYouTubeUpload(ctx *config.AppContext, recordingID, fileURI, title, body,
 		setJobStatus(recordingID, "failed", err.Error())
 		msg := err.Error()
 		status = recordingStatusFailed
-		_ = getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{YTStatus: &status, YTError: &msg})
+		_ = upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{Status: &status, Error: &msg})
 		return
 	}
 	now := time.Now()
 	status = recordingStatusUploaded
-	if err := getters.UpdateRecordingPublishing(ctx, recordingID, getters.RecordingPublishingUpdate{
-		YTLink:       &ytURL,
-		YTStatus:     &status,
-		YTUploadedAt: &now,
-	}); err != nil {
+	if err := getters.UpdateRecordingYTLink(ctx, recordingID, ytURL); err != nil {
 		ctx.Err.Printf("youtube upload: persist YTLink: %s", err)
 		setJobStatus(recordingID, "failed", "uploaded to YouTube but failed to update Notion: "+err.Error())
 		return
+	}
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{
+		URL:      &ytURL,
+		Status:   &status,
+		PostedAt: &now,
+	}); err != nil {
+		ctx.Err.Printf("youtube upload: persist socialpost recording=%s: %s", recordingID, err)
 	}
 	setJobStatus(recordingID, "succeeded", ytURL)
 }
@@ -360,6 +388,17 @@ func RecordingsAdminSaveXLink(w http.ResponseWriter, r *http.Request, ctx *confi
 	if err := getters.UpdateRecordingXLink(ctx, recordingID, xURL); err != nil {
 		ctx.Err.Printf("save xlink recording=%s: %s", recordingID, err)
 		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update Notion: "+err.Error())
+		return
+	}
+	status := recordingStatusPosted
+	now := time.Now()
+	if err := upsertRecordingSocialPost(ctx, buildRecordingRow(rec), recordingPlatformX, getters.SocialPostUpdate{
+		URL:      &xURL,
+		Status:   &status,
+		PostedAt: &now,
+	}); err != nil {
+		ctx.Err.Printf("save xlink socialpost recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update SocialPosts: "+err.Error())
 		return
 	}
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+link+saved", http.StatusSeeOther)
@@ -479,6 +518,9 @@ func scopedRecordingFromRequest(w http.ResponseWriter, r *http.Request, ctx *con
 		handle404(w, r, ctx)
 		return nil, nil, nil, false
 	}
+	if _, err := getters.FetchSocialPostsCached(ctx); err != nil {
+		ctx.Err.Printf("/%s/admin/recordings/%s socialposts: %s", conf.Tag, recordingID, err)
+	}
 	row := buildRecordingRow(rec)
 	if !recordingRowBelongsToConf(row, conf.Tag) {
 		handle404(w, r, ctx)
@@ -509,12 +551,48 @@ func recordingsOAuthRedirectURL(ctx *config.AppContext, confTag string) string {
 	return strings.TrimRight(ctx.Env.GetURI(), "/") + recordingsAdminPath(confTag, "/oauth/youtube/callback")
 }
 
+func recordingSocialPostRef(rec *types.Recording, platform string) string {
+	if rec == nil {
+		return ""
+	}
+	return fmt.Sprintf("recording:%s:%s", rec.ID, platform)
+}
+
+func upsertRecordingSocialPost(ctx *config.AppContext, row *RecordingRow, platform string, up getters.SocialPostUpdate) error {
+	if row == nil || row.Recording == nil {
+		return fmt.Errorf("recording row required")
+	}
+	up.Ref = recordingSocialPostRef(row.Recording, platform)
+	up.PostedTo = platform
+	up.Kind = getters.SocialPostKindRecording
+	up.RecordingID = row.Recording.ID
+	if row.ConfTalk != nil {
+		up.ConfTalkID = row.ConfTalk.ID
+	}
+	if up.ScheduledAt == nil && row.Recording.PublishAt != nil {
+		up.ScheduledAt = row.Recording.PublishAt
+	}
+	_, err := getters.UpsertSocialPost(ctx, up)
+	if err == nil {
+		attachRecordingSocialPosts(row)
+		row.HasYT = row.YTURL != ""
+		row.HasX = row.XURL != ""
+	}
+	return err
+}
+
 func buildRecordingRow(rec *types.Recording) *RecordingRow {
 	row := &RecordingRow{
-		Recording: rec,
-		HasFile:   rec.FileURI != "",
-		HasYT:     rec.YTLink != "",
-		HasX:      rec.XLink != "",
+		Recording:         rec,
+		YTURL:             rec.YTLink,
+		XURL:              rec.XLink,
+		XReplyURL:         rec.XReplyLink,
+		YTStatus:          rec.YTStatus,
+		XStatus:           rec.XStatus,
+		YTError:           rec.YTError,
+		XError:            rec.XError,
+		XErrorFingerprint: rec.XErrorFingerprint,
+		HasFile:           rec.FileURI != "",
 	}
 	if rec.ConfTalkID != "" {
 		row.ConfTalk = getters.FetchConfTalkByID(rec.ConfTalkID)
@@ -522,7 +600,61 @@ func buildRecordingRow(rec *types.Recording) *RecordingRow {
 			row.Speakers = recordingSpeakersForProposal(row.ConfTalk.Proposal)
 		}
 	}
+	attachRecordingSocialPosts(row)
+	if !recordingStatusIsError(row.YTStatus) {
+		row.YTError = ""
+	}
+	if !recordingStatusIsError(row.XStatus) {
+		row.XError = ""
+	}
+	row.HasYT = row.YTURL != ""
+	row.HasX = row.XURL != ""
 	return row
+}
+
+func recordingStatusIsError(status string) bool {
+	switch strings.TrimSpace(strings.ToLower(status)) {
+	case recordingStatusFailed, recordingStatusAuthRequired:
+		return true
+	default:
+		return false
+	}
+}
+
+func attachRecordingSocialPosts(row *RecordingRow) {
+	if row == nil || row.Recording == nil {
+		return
+	}
+	row.YTSocialPost = getters.FetchSocialPostByRef(recordingSocialPostRef(row.Recording, recordingPlatformYouTube))
+	row.XSocialPost = getters.FetchSocialPostByRef(recordingSocialPostRef(row.Recording, recordingPlatformX))
+	if row.YTSocialPost != nil {
+		if row.YTSocialPost.URL != "" {
+			row.YTURL = row.YTSocialPost.URL
+		}
+		if row.YTSocialPost.Status != "" {
+			row.YTStatus = row.YTSocialPost.Status
+		}
+		if row.YTSocialPost.Error != "" {
+			row.YTError = row.YTSocialPost.Error
+		}
+	}
+	if row.XSocialPost != nil {
+		if row.XSocialPost.URL != "" {
+			row.XURL = row.XSocialPost.URL
+		}
+		if row.XSocialPost.ReplyURL != "" {
+			row.XReplyURL = row.XSocialPost.ReplyURL
+		}
+		if row.XSocialPost.Status != "" {
+			row.XStatus = row.XSocialPost.Status
+		}
+		if row.XSocialPost.Error != "" {
+			row.XError = row.XSocialPost.Error
+		}
+		if row.XSocialPost.ErrorFingerprint != "" {
+			row.XErrorFingerprint = row.XSocialPost.ErrorFingerprint
+		}
+	}
 }
 
 func recordingSpeakersForProposal(proposal *types.Proposal) []*types.Speaker {
@@ -686,7 +818,7 @@ func defaultXReplyCopy(ctx *config.AppContext, row *RecordingRow) string {
 	if row.ConfTalk != nil {
 		conf = row.ConfTalk.Conf
 	}
-	yt := row.Recording.YTLink
+	yt := row.YTURL
 	if yt == "" {
 		yt = "<paste the YouTube link after you upload>"
 	}

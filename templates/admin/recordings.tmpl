@@ -91,10 +91,10 @@
                     {{ if .HasFile }}<span class="text-green-600">✓</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
-                    {{ if .HasYT }}<a href="{{ .Recording.YTLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .Recording.YTStatus }}<span class="text-xs text-gray-600">{{ .Recording.YTStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .HasYT }}<a href="{{ .YTURL }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .YTStatus }}<span class="text-xs text-gray-600">{{ .YTStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
-                    {{ if .HasX }}<a href="{{ .Recording.XLink }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .Recording.XStatus }}<span class="text-xs text-gray-600">{{ .Recording.XStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .HasX }}<a href="{{ .XURL }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .XStatus }}<span class="text-xs text-gray-600">{{ .XStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-right">
                     <a href="/{{ $.Conf.Tag }}/admin/recordings/{{ .Recording.ID }}" class="text-sm text-indigo-600 hover:text-indigo-800">Open →</a>

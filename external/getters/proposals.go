@@ -947,22 +947,12 @@ func UpdateRecordingXLink(ctx *config.AppContext, recordingID, xLink string) err
 	return nil
 }
 
-// RecordingPublishingUpdate patches the status fields owned by the
-// recordings autopublisher. Nil pointers mean "leave this field alone";
-// empty rich-text values are skipped because go-notion omits empty
-// rich_text arrays in a shape Notion rejects.
+// RecordingPublishingUpdate mirrors final published URLs onto the Recording
+// row. Workflow state (status, errors, timestamps) lives in SocialPosts.
 type RecordingPublishingUpdate struct {
-	YTLink            *string
-	XLink             *string
-	XReplyLink        *string
-	YTStatus          *string
-	XStatus           *string
-	YTError           *string
-	XError            *string
-	XErrorFingerprint *string
-	YTUploadedAt      *time.Time
-	XPostedAt         *time.Time
-	XNotifiedAt       *time.Time
+	YTLink     *string
+	XLink      *string
+	XReplyLink *string
 }
 
 func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up RecordingPublishingUpdate) error {
@@ -975,30 +965,6 @@ func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up Re
 	}
 	if up.XReplyLink != nil {
 		props["XReplyLink"] = notion.NewURLPropertyValue(*up.XReplyLink)
-	}
-	if up.YTStatus != nil && *up.YTStatus != "" {
-		props["YTStatus"] = selectProperty(*up.YTStatus)
-	}
-	if up.XStatus != nil && *up.XStatus != "" {
-		props["XStatus"] = selectProperty(*up.XStatus)
-	}
-	if up.YTError != nil && *up.YTError != "" {
-		props["YTError"] = richTextValue(*up.YTError)
-	}
-	if up.XError != nil && *up.XError != "" {
-		props["XError"] = richTextValue(*up.XError)
-	}
-	if up.XErrorFingerprint != nil && *up.XErrorFingerprint != "" {
-		props["XErrorFingerprint"] = richTextValue(*up.XErrorFingerprint)
-	}
-	if up.YTUploadedAt != nil {
-		props["YTUploadedAt"] = notion.NewDatePropertyValue(&notion.Date{Start: *up.YTUploadedAt})
-	}
-	if up.XPostedAt != nil {
-		props["XPostedAt"] = notion.NewDatePropertyValue(&notion.Date{Start: *up.XPostedAt})
-	}
-	if up.XNotifiedAt != nil {
-		props["XNotifiedAt"] = notion.NewDatePropertyValue(&notion.Date{Start: *up.XNotifiedAt})
 	}
 	if len(props) == 0 {
 		return nil
@@ -1019,33 +985,6 @@ func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up Re
 		}
 		if up.XReplyLink != nil {
 			r.XReplyLink = *up.XReplyLink
-		}
-		if up.YTStatus != nil && *up.YTStatus != "" {
-			r.YTStatus = *up.YTStatus
-		}
-		if up.XStatus != nil && *up.XStatus != "" {
-			r.XStatus = *up.XStatus
-		}
-		if up.YTError != nil && *up.YTError != "" {
-			r.YTError = *up.YTError
-		}
-		if up.XError != nil && *up.XError != "" {
-			r.XError = *up.XError
-		}
-		if up.XErrorFingerprint != nil && *up.XErrorFingerprint != "" {
-			r.XErrorFingerprint = *up.XErrorFingerprint
-		}
-		if up.YTUploadedAt != nil {
-			when := *up.YTUploadedAt
-			r.YTUploadedAt = &when
-		}
-		if up.XPostedAt != nil {
-			when := *up.XPostedAt
-			r.XPostedAt = &when
-		}
-		if up.XNotifiedAt != nil {
-			when := *up.XNotifiedAt
-			r.XNotifiedAt = &when
 		}
 		break
 	}

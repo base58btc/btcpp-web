@@ -15,27 +15,28 @@ func TestRecordingAutopublishEligibility(t *testing.T) {
 		FileURI:   "videos/talk.mp4",
 		PublishAt: &future,
 	}
-	if !shouldUploadRecordingToYouTube(rec) {
+	row := &RecordingRow{Recording: rec}
+	if !shouldUploadRecordingToYouTube(row) {
 		t.Fatalf("recording with FileURI, PublishAt, and no YTLink should upload")
 	}
-	rec.YTStatus = recordingStatusFailed
-	if shouldUploadRecordingToYouTube(rec) {
+	row.YTStatus = recordingStatusFailed
+	if shouldUploadRecordingToYouTube(row) {
 		t.Fatalf("failed YouTube recording should wait for explicit retry")
 	}
-	rec.YTStatus = recordingStatusPending
-	rec.YTLink = "https://youtu.be/example"
-	if shouldUploadRecordingToYouTube(rec) {
+	row.YTStatus = recordingStatusPending
+	row.YTURL = "https://youtu.be/example"
+	if shouldUploadRecordingToYouTube(row) {
 		t.Fatalf("recording with YTLink should not upload again")
 	}
 
 	rec.PublishAt = &due
-	rec.XStatus = ""
-	rec.XLink = ""
-	if !shouldPostRecordingToX(rec, time.Now()) {
+	row.XStatus = ""
+	row.XURL = ""
+	if !shouldPostRecordingToX(row, time.Now()) {
 		t.Fatalf("due recording with YTLink should post to X")
 	}
 	rec.PublishAt = &future
-	if shouldPostRecordingToX(rec, time.Now()) {
+	if shouldPostRecordingToX(row, time.Now()) {
 		t.Fatalf("future recording should not post to X yet")
 	}
 }

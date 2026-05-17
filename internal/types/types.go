@@ -351,6 +351,24 @@ type (
 		XErrorFingerprint string
 	}
 
+	SocialPost struct {
+		ID               string
+		Ref              string
+		Text             string
+		PostedTo         string
+		Kind             string
+		Status           string
+		RecordingID      string
+		ConfTalkID       string
+		URL              string
+		ReplyURL         string
+		Error            string
+		ErrorFingerprint string
+		ScheduledAt      *time.Time
+		PostedAt         *time.Time
+		NotifiedAt       *time.Time
+	}
+
 	Talk struct {
 		ID          string
 		Name        string
