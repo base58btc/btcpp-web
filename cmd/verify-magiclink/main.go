@@ -28,7 +28,8 @@ import (
 )
 
 type cfgFile struct {
-	HMACSecret string `toml:"hmac_secret"`
+	HMACSecret      string `toml:"hmacsecret"`
+	HMACSecretSnake string `toml:"hmac_secret"`
 }
 
 func main() {
@@ -41,6 +42,9 @@ func main() {
 	var c cfgFile
 	if _, err := toml.DecodeFile("config.toml", &c); err != nil {
 		log.Fatalf("read config.toml: %s", err)
+	}
+	if c.HMACSecret == "" {
+		c.HMACSecret = c.HMACSecretSnake
 	}
 	if c.HMACSecret == "" {
 		log.Fatal("config.toml is missing hmac_secret — refusing to verify against a zero-byte key")
