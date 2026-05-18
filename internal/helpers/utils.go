@@ -299,16 +299,22 @@ const (
 	DefaultEmailLinkTTL = 30 * 24 * time.Hour
 )
 
+var legacyEmailTokenCutoff = time.Date(2026, time.November, 18, 0, 0, 0, 0, time.UTC)
+
 func VerifyEmailHMAC(ctx *config.AppContext, token, email string) bool {
+	return verifyEmailHMACAt(ctx, token, email, time.Now().UTC())
+}
+
+func verifyEmailHMACAt(ctx *config.AppContext, token, email string, now time.Time) bool {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 || parts[0] != "v1" {
-		return false
+		return now.Before(legacyEmailTokenCutoff) && verifyLegacyEmailToken(ctx, token, email)
 	}
 	exp, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
 		return false
 	}
-	if time.Now().UTC().Unix() > exp {
+	if now.Unix() > exp {
 		return false
 	}
 	verify := signEmailToken(ctx, email, exp)
@@ -333,6 +339,19 @@ func signEmailToken(ctx *config.AppContext, email string, exp int64) string {
 	binary.BigEndian.PutUint64(b, uint64(exp))
 	mac.Write(b)
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+func verifyLegacyEmailToken(ctx *config.AppContext, token, email string) bool {
+	if len(token) != sha256.Size*2 {
+		return false
+	}
+	if _, err := hex.DecodeString(token); err != nil {
+		return false
+	}
+	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
+	mac.Write([]byte(email))
+	verify := hex.EncodeToString(mac.Sum(nil))
+	return subtle.ConstantTimeCompare([]byte(verify), []byte(token)) == 1
 }
 
 func CreateScopedHMAC(ctx *config.AppContext, purpose, value string) string {

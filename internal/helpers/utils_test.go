@@ -1,6 +1,9 @@
 package helpers
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"strings"
 	"testing"
 	"time"
@@ -11,7 +14,7 @@ import (
 
 func testAppContext(t *testing.T) *config.AppContext {
 	t.Helper()
-	key, err := types.DeriveHMACKey(strings.Repeat("s", types.MinHMACSecretBytes))
+	key, err := types.DeriveHMACKey("test-secret")
 	if err != nil {
 		t.Fatalf("DeriveHMACKey: %s", err)
 	}
@@ -51,8 +54,34 @@ func TestEmailHMACRejectsLegacyTokenShape(t *testing.T) {
 	ctx := testAppContext(t)
 
 	if VerifyEmailHMAC(ctx, strings.Repeat("a", 64), "user@example.test") {
-		t.Fatal("expected legacy bare-hex token to fail")
+		t.Fatal("expected mismatched legacy bare-hex token to fail")
 	}
+}
+
+func TestEmailHMACAcceptsLegacyTokenUntilCutoff(t *testing.T) {
+	ctx := testAppContext(t)
+	token := createLegacyEmailTokenForTest(ctx, "user@example.test")
+	now := legacyEmailTokenCutoff.Add(-time.Second)
+
+	if !verifyEmailHMACAt(ctx, token, "user@example.test", now) {
+		t.Fatal("expected legacy bare-hex token to verify before cutoff")
+	}
+}
+
+func TestEmailHMACRejectsLegacyTokenAfterCutoff(t *testing.T) {
+	ctx := testAppContext(t)
+	token := createLegacyEmailTokenForTest(ctx, "user@example.test")
+	now := legacyEmailTokenCutoff
+
+	if verifyEmailHMACAt(ctx, token, "user@example.test", now) {
+		t.Fatal("expected legacy bare-hex token to fail at cutoff")
+	}
+}
+
+func createLegacyEmailTokenForTest(ctx *config.AppContext, email string) string {
+	mac := hmac.New(sha256.New, ctx.Env.HMACKey[:])
+	mac.Write([]byte(email))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 func TestScopedHMACRoundTrip(t *testing.T) {
