@@ -14,6 +14,7 @@
           <div class="overflow-hidden sm:rounded-lg bg-white shadow">
             <div class="px-4 py-5 sm:p-6 flex items-center justify-between">
               <div>
+                <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
                 <h1 class="text-xl font-bold text-gray-900">Recordings</h1>
                 <p class="text-sm text-gray-500">Upload longform talks to YouTube and X.com from a single dashboard.</p>
               </div>
@@ -88,7 +89,14 @@
                     {{ if .Recording.PublishAt }}{{ .Recording.PublishAt.Format "Jan 2, 2006 3:04 PM MST" }}{{ else }}<span class="text-gray-300">—</span>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
-                    {{ if .HasFile }}<span class="text-green-600">✓</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .HasFile }}
+                      <span class="text-green-600">✓</span>
+                    {{ else }}
+                      <form method="POST" action="/{{ $.Conf.Tag }}/admin/recordings/{{ .Recording.ID }}/file" enctype="multipart/form-data" class="flex items-center justify-center gap-2">
+                        <input type="file" name="recording_file" accept="video/*,.mp4,.mov,.m4v,.webm" required class="block w-36 text-xs text-gray-600 file:mr-2 file:rounded-md file:border-0 file:bg-gray-100 file:px-2 file:py-1 file:text-xs file:text-gray-700 hover:file:bg-gray-200">
+                        <button type="submit" class="px-2 py-1 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Upload</button>
+                      </form>
+                    {{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
                     {{ if .HasYT }}<a href="{{ .YTURL }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .YTStatus }}<span class="text-xs text-gray-600">{{ .YTStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}

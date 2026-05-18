@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"btcpp-web/internal/config"
@@ -979,6 +980,30 @@ func UpdateRecordingPublishAt(ctx *config.AppContext, recordingID string, publis
 			r.PublishAt = &when
 		}
 		break
+	}
+	recordingCacheMu.Unlock()
+	return nil
+}
+
+// UpdateRecordingFileURI patches the FileURI rich-text property on a
+// Recording row and mirrors the value into the warm cache.
+func UpdateRecordingFileURI(ctx *config.AppContext, recordingID, fileURI string) error {
+	if strings.TrimSpace(fileURI) == "" {
+		return fmt.Errorf("FileURI is required")
+	}
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), recordingID,
+		map[string]*notion.PropertyValue{
+			"FileURI": richTextValue(fileURI),
+		})
+	if err != nil {
+		return fmt.Errorf("notion update FileURI: %w", err)
+	}
+	recordingCacheMu.Lock()
+	for _, r := range cacheRecordings {
+		if r != nil && r.ID == recordingID {
+			r.FileURI = fileURI
+			break
+		}
 	}
 	recordingCacheMu.Unlock()
 	return nil

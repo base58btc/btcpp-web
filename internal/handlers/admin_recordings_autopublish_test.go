@@ -57,3 +57,18 @@ func TestXFailureFingerprintChangesByStatusAndMessage(t *testing.T) {
 		t.Fatalf("fingerprint length = %d, want 16", len(a))
 	}
 }
+
+func TestRecordingSourceObjectKeyNormalizesSpacesValues(t *testing.T) {
+	tests := map[string]string{
+		" videos/talk.mp4 ": "videos/talk.mp4",
+		"/videos/talk.mp4":  "videos/talk.mp4",
+		"https://btcpp.nyc3.digitaloceanspaces.com/videos/talk.mp4":     "videos/talk.mp4",
+		"https://btcpp.nyc3.digitaloceanspaces.com/videos/talk%201.mp4": "videos/talk 1.mp4",
+	}
+
+	for in, want := range tests {
+		if got := recordingSourceObjectKey(in); got != want {
+			t.Fatalf("recordingSourceObjectKey(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

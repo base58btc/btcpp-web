@@ -17,8 +17,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"mime"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -38,9 +40,11 @@ import (
 
 const youtubeOAuthStateKey = "yt_oauth_state"
 
+const maxRecordingUploadBytes int64 = 25 << 30 // 25 GiB
+
 const (
 	recordingPlatformYouTube = "youtube"
-	recordingPlatformX       = "x"
+	recordingPlatformX       = "twitter"
 )
 
 // ---- page data ---------------------------------------------------------
@@ -78,22 +82,26 @@ type RecordingsAdminListPage struct {
 }
 
 type RecordingsAdminDetailPage struct {
-	Conf            *types.Conf
-	Row             *RecordingRow
-	YTTitle         string
-	YTBody          string
-	XBody           string
-	XReplyBody      string
-	XIntentURL      string
-	PublishAtInput  string
-	PublishTimezone string
-	JobActive       bool
-	JobStatus       string
-	JobMessage      string
-	YouTubeReady    bool
-	FlashMessage    string
-	FlashError      string
-	Year            uint
+	Conf             *types.Conf
+	Row              *RecordingRow
+	YTTitle          string
+	YTBody           string
+	XBody            string
+	XReplyBody       string
+	XIntentURL       string
+	PublishAtInput   string
+	PublishTimezone  string
+	JobActive        bool
+	JobStatus        string
+	JobMessage       string
+	XJobActive       bool
+	XJobStatus       string
+	XJobMessage      string
+	YouTubeReady     bool
+	XUploaderEnabled bool
+	FlashMessage     string
+	FlashError       string
+	Year             uint
 }
 
 // ---- job tracker -------------------------------------------------------
@@ -103,6 +111,8 @@ type RecordingsAdminDetailPage struct {
 type uploadJob struct {
 	Status    string // "running" | "succeeded" | "failed"
 	Message   string
+	Stage     string
+	Progress  int
 	StartedAt time.Time
 	EndedAt   time.Time
 }
@@ -110,6 +120,9 @@ type uploadJob struct {
 var (
 	jobsMu sync.Mutex
 	jobs   = map[string]*uploadJob{}
+
+	xJobsMu sync.Mutex
+	xJobs   = map[string]*uploadJob{}
 )
 
 func getJob(recordingID string) *uploadJob {
@@ -146,6 +159,54 @@ func claimJob(recordingID string) bool {
 	}
 	jobs[recordingID] = &uploadJob{Status: "running", StartedAt: time.Now()}
 	return true
+}
+
+func getXJob(recordingID string) *uploadJob {
+	xJobsMu.Lock()
+	defer xJobsMu.Unlock()
+	j := xJobs[recordingID]
+	if j == nil {
+		return nil
+	}
+	cp := *j
+	return &cp
+}
+
+func setXJobStatus(recordingID, status, message string) {
+	setXJobProgress(recordingID, status, message, "", 0)
+}
+
+func setXJobProgress(recordingID, status, message, stage string, progress int) {
+	xJobsMu.Lock()
+	defer xJobsMu.Unlock()
+	j := xJobs[recordingID]
+	if j == nil {
+		j = &uploadJob{StartedAt: time.Now()}
+		xJobs[recordingID] = j
+	}
+	j.Status = status
+	j.Message = message
+	if stage != "" {
+		j.Stage = stage
+	}
+	if progress < 0 {
+		progress = 0
+	}
+	if progress > 100 {
+		progress = 100
+	}
+	j.Progress = progress
+	if status == "succeeded" || status == "failed" {
+		j.EndedAt = time.Now()
+	}
+}
+
+func setXJobStage(recordingID, stage, message string) {
+	progress := 0
+	if stage == "done" {
+		progress = 100
+	}
+	setXJobProgress(recordingID, "running", message, stage, progress)
 }
 
 // ---- list page ---------------------------------------------------------
@@ -227,22 +288,28 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
 
 	page := &RecordingsAdminDetailPage{
-		Conf:            conf,
-		Row:             row,
-		YTTitle:         ytTitle,
-		YTBody:          ytBody,
-		XBody:           xBody,
-		XReplyBody:      xReplyBody,
-		XIntentURL:      intentURL,
-		PublishAtInput:  recordingPublishAtInput(rec.PublishAt, conf),
-		PublishTimezone: recordingPublishTimezone(conf),
-		YouTubeReady:    youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
-		Year:            uint(time.Now().Year()),
+		Conf:             conf,
+		Row:              row,
+		YTTitle:          ytTitle,
+		YTBody:           ytBody,
+		XBody:            xBody,
+		XReplyBody:       xReplyBody,
+		XIntentURL:       intentURL,
+		PublishAtInput:   recordingPublishAtInput(rec.PublishAt, conf),
+		PublishTimezone:  recordingPublishTimezone(conf),
+		YouTubeReady:     youtubepkg.IsConfigured() && youtubepkg.IsConnected(),
+		XUploaderEnabled: ctx.Env.Recordings.X.Enabled,
+		Year:             uint(time.Now().Year()),
 	}
 	if job := getJob(rec.ID); job != nil {
 		page.JobActive = job.Status == "running"
 		page.JobStatus = job.Status
 		page.JobMessage = job.Message
+	}
+	if job := getXJob(rec.ID); job != nil {
+		page.XJobActive = job.Status == "running"
+		page.XJobStatus = job.Status
+		page.XJobMessage = job.Message
 	}
 	if flash := r.URL.Query().Get("flash"); flash != "" {
 		page.FlashMessage = flash
@@ -255,6 +322,114 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 		ctx.Err.Printf("/%s/admin/recordings/%s render: %s", conf.Tag, rec.ID, err)
 		http.Error(w, "render failed", http.StatusInternalServerError)
 	}
+}
+
+// ---- upload source recording to Spaces --------------------------------
+
+func RecordingsAdminUploadSourceFile(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, rec, _, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	if rec.FileURI != "" {
+		redirectRecordingsListErr(w, r, conf.Tag, "Recording already has a FileURI")
+		return
+	}
+	if !spaces.IsConfigured() {
+		redirectRecordingsListErr(w, r, conf.Tag, "Spaces is not configured")
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxRecordingUploadBytes)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		redirectRecordingsListErr(w, r, conf.Tag, "couldn't parse uploaded recording: "+err.Error())
+		return
+	}
+	file, handler, err := r.FormFile("recording_file")
+	if err != nil {
+		redirectRecordingsListErr(w, r, conf.Tag, "choose a recording file to upload")
+		return
+	}
+	defer file.Close()
+
+	key, err := recordingUploadKey(conf.Tag, rec.ID, handler.Filename)
+	if err != nil {
+		redirectRecordingsListErr(w, r, conf.Tag, err.Error())
+		return
+	}
+	contentType := handler.Header.Get("Content-Type")
+	if contentType == "" || contentType == "application/octet-stream" {
+		if detected := mime.TypeByExtension(filepath.Ext(handler.Filename)); detected != "" {
+			contentType = detected
+		}
+	}
+	if contentType == "" {
+		contentType = "video/mp4"
+	}
+	if !allowedRecordingUploadType(contentType, handler.Filename) {
+		redirectRecordingsListErr(w, r, conf.Tag, "recording upload must be a video file")
+		return
+	}
+
+	if spaces.Exists(key) {
+		if err := getters.UpdateRecordingFileURI(ctx, rec.ID, key); err != nil {
+			redirectRecordingsListErr(w, r, conf.Tag, "file already exists in Spaces, but couldn't update Notion: "+err.Error())
+			return
+		}
+		redirectRecordingsList(w, r, conf.Tag, "Recording file already existed in Spaces; linked it in Notion")
+		return
+	}
+	if _, err := spaces.UploadStream(key, file, contentType, handler.Size); err != nil {
+		redirectRecordingsListErr(w, r, conf.Tag, "couldn't upload recording to Spaces: "+err.Error())
+		return
+	}
+	if err := getters.UpdateRecordingFileURI(ctx, rec.ID, key); err != nil {
+		redirectRecordingsListErr(w, r, conf.Tag, "uploaded to Spaces, but couldn't update Notion FileURI: "+err.Error())
+		return
+	}
+	redirectRecordingsList(w, r, conf.Tag, "Recording file uploaded")
+}
+
+func recordingUploadKey(confTag, recordingID, filename string) (string, error) {
+	ext := strings.ToLower(filepath.Ext(filename))
+	if ext == "" {
+		return "", fmt.Errorf("recording upload filename needs a video extension")
+	}
+	return fmt.Sprintf("recordings/%s/%s%s", slugPathSegment(confTag), recordingID, ext), nil
+}
+
+func allowedRecordingUploadType(contentType, filename string) bool {
+	if strings.HasPrefix(strings.ToLower(contentType), "video/") {
+		return true
+	}
+	switch strings.ToLower(filepath.Ext(filename)) {
+	case ".mp4", ".mov", ".m4v", ".webm":
+		return true
+	default:
+		return false
+	}
+}
+
+func slugPathSegment(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	lastDash := false
+	for _, r := range s {
+		ok := r >= 'a' && r <= 'z' || r >= '0' && r <= '9'
+		if ok {
+			b.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	out := strings.Trim(b.String(), "-")
+	if out == "" {
+		return "unknown"
+	}
+	return out
 }
 
 // ---- upload to YouTube ------------------------------------------------
@@ -324,7 +499,7 @@ func RecordingsAdminSchedule(w http.ResponseWriter, r *http.Request, ctx *config
 			redirectWithErr(w, r, conf.Tag, recordingID, "Choose a publish time or clear the schedule")
 			return
 		}
-		when, err := time.ParseInLocation("2006-01-02T15:04", raw, conf.Loc())
+		when, err := parseRecordingPublishAt(raw, conf)
 		if err != nil {
 			redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse publish time: "+err.Error())
 			return
@@ -368,6 +543,65 @@ func RecordingsAdminSaveXCopy(w http.ResponseWriter, r *http.Request, ctx *confi
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+text+saved", http.StatusSeeOther)
 }
 
+func RecordingsAdminPostXNow(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	recordingID := rec.ID
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse form: "+err.Error())
+		return
+	}
+	xBody := strings.TrimSpace(r.FormValue("x_body"))
+	if xBody == "" {
+		xBody = strings.TrimSpace(recordingXMainCopy(ctx, row))
+	}
+	if xBody == "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X post text is required")
+		return
+	}
+	if rec.FileURI == "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "Recording row has no FileURI — set the Spaces key in Notion first")
+		return
+	}
+	if row.XURL != "" {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X already has a saved URL")
+		return
+	}
+	if row.XStatus == recordingStatusScheduling || row.XStatus == recordingStatusScheduled || row.XStatus == recordingStatusPosting {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X is already "+row.XStatus)
+		return
+	}
+	if !ctx.Env.Recordings.X.Enabled {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X uploader is disabled")
+		return
+	}
+	client, err := newXPosterClient(ctx)
+	if err != nil {
+		redirectWithErr(w, r, conf.Tag, recordingID, "X uploader is not configured: "+err.Error())
+		return
+	}
+
+	status := recordingStatusPosting
+	clear := ""
+	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
+		Text:             &xBody,
+		Status:           &status,
+		Error:            &clear,
+		ErrorFingerprint: &clear,
+	}); err != nil {
+		ctx.Err.Printf("post x status recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update SocialPosts: "+err.Error())
+		return
+	}
+	setXJobStatus(recordingID, "running", "Starting X post")
+	go runXPostNow(ctx, row, client, xBody)
+
+	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+post+started", http.StatusSeeOther)
+}
+
 func RecordingsAdminScheduleX(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	conf, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
 	if !ok {
@@ -391,11 +625,21 @@ func RecordingsAdminScheduleX(w http.ResponseWriter, r *http.Request, ctx *confi
 		redirectWithErr(w, r, conf.Tag, recordingID, "Recording row has no FileURI — set the Spaces key in Notion first")
 		return
 	}
-	if rec.PublishAt == nil {
+	publishAt := rec.PublishAt
+	rawPublishAt := strings.TrimSpace(r.FormValue("publish_at"))
+	if rawPublishAt != "" {
+		when, err := parseRecordingPublishAt(rawPublishAt, conf)
+		if err != nil {
+			redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse publish time: "+err.Error())
+			return
+		}
+		publishAt = &when
+	}
+	if publishAt == nil {
 		redirectWithErr(w, r, conf.Tag, recordingID, "Set PublishAt before scheduling on X")
 		return
 	}
-	if !rec.PublishAt.After(time.Now()) {
+	if !publishAt.After(time.Now()) {
 		redirectWithErr(w, r, conf.Tag, recordingID, "PublishAt must be in the future to schedule on X")
 		return
 	}
@@ -411,17 +655,30 @@ func RecordingsAdminScheduleX(w http.ResponseWriter, r *http.Request, ctx *confi
 		redirectWithErr(w, r, conf.Tag, recordingID, "X uploader is disabled")
 		return
 	}
+	if rec.PublishAt == nil || !rec.PublishAt.Equal(*publishAt) {
+		if err := getters.UpdateRecordingPublishAt(ctx, recordingID, publishAt); err != nil {
+			ctx.Err.Printf("schedule x publishAt recording=%s: %s", recordingID, err)
+			redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update PublishAt: "+err.Error())
+			return
+		}
+		rec.PublishAt = publishAt
+		row.Recording.PublishAt = publishAt
+	}
 
 	status := recordingStatusScheduling
+	clear := ""
 	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformX, getters.SocialPostUpdate{
-		Text:        &xBody,
-		Status:      &status,
-		ScheduledAt: rec.PublishAt,
+		Text:             &xBody,
+		Status:           &status,
+		Error:            &clear,
+		ErrorFingerprint: &clear,
+		ScheduledAt:      publishAt,
 	}); err != nil {
 		ctx.Err.Printf("schedule x status recording=%s: %s", recordingID, err)
 		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update SocialPosts: "+err.Error())
 		return
 	}
+	setXJobStatus(recordingID, "running", "Starting X schedule")
 	go runXSchedule(ctx, rec, conf, xBody)
 
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash=X+scheduling+started", http.StatusSeeOther)
@@ -447,7 +704,7 @@ func runYouTubeUpload(ctx *config.AppContext, rec *types.Recording, title, body,
 	}); err != nil {
 		ctx.Err.Printf("youtube upload: socialpost status recording=%s: %s", recordingID, err)
 	}
-	src, size, err := spaces.GetStream(rec.FileURI)
+	src, size, err := openRecordingSourceStream(rec.FileURI)
 	if err != nil {
 		ctx.Err.Printf("youtube upload: fetch %s: %s", rec.FileURI, err)
 		setJobStatus(recordingID, "failed", "couldn't fetch source video from Spaces: "+err.Error())
@@ -549,6 +806,34 @@ func RecordingsAdminJobStatus(w http.ResponseWriter, r *http.Request, ctx *confi
 	})
 }
 
+func RecordingsAdminXJobStatus(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	_, rec, row, ok := scopedRecordingFromRequest(w, r, ctx)
+	if !ok {
+		return
+	}
+	job := getXJob(rec.ID)
+	w.Header().Set("Content-Type", "application/json")
+	if job == nil {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":   row.XStatus,
+			"message":  row.XError,
+			"stage":    "",
+			"progress": 0,
+			"url":      row.XURL,
+			"reply":    row.XReplyURL,
+		})
+		return
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":   job.Status,
+		"message":  job.Message,
+		"stage":    job.Stage,
+		"progress": job.Progress,
+		"url":      row.XURL,
+		"reply":    row.XReplyURL,
+	})
+}
+
 // ---- YouTube OAuth bootstrap -----------------------------------------
 
 func RecordingsYTOAuthStart(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -621,6 +906,10 @@ func redirectWithErr(w http.ResponseWriter, r *http.Request, confTag, recordingI
 		http.StatusSeeOther)
 }
 
+func redirectRecordingsList(w http.ResponseWriter, r *http.Request, confTag, msg string) {
+	http.Redirect(w, r, recordingsAdminPath(confTag, "?flash="+url.QueryEscape(msg)), http.StatusSeeOther)
+}
+
 func requireRecordingsConfAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) (*types.Conf, bool) {
 	if id := requireConfAdmin(w, r, ctx); id == nil {
 		return nil, false
@@ -686,6 +975,14 @@ func recordingPublishAtInput(publishAt *time.Time, conf *types.Conf) string {
 		loc = conf.Loc()
 	}
 	return publishAt.In(loc).Format("2006-01-02T15:04")
+}
+
+func parseRecordingPublishAt(raw string, conf *types.Conf) (time.Time, error) {
+	loc := time.Local
+	if conf != nil {
+		loc = conf.Loc()
+	}
+	return time.ParseInLocation("2006-01-02T15:04", raw, loc)
 }
 
 func recordingPublishTimezone(conf *types.Conf) string {
@@ -859,10 +1156,10 @@ Future bitcoin++ events: https://btcpp.dev
 `))
 
 var xMainCopy = template.Must(template.New("x-main").Parse(
-	`🎥 New video: "{{ .TalkName }}"
-{{- if .SpeakerHandles }}
+	`POSTED 🎥: {{ .TalkName }}
+{{- if .SpeakerCredits }}
 
-with {{ .SpeakerHandles }}
+Featuring: {{ .SpeakerCredits }}
 {{- end }}
 {{- if .Conf }}
 
@@ -872,8 +1169,9 @@ from {{ .Conf.Desc }}{{ if .Conf.Location }} ({{ .Conf.Location }}){{ end }}
 
 var xReplyCopy = template.Must(template.New("x-reply").Parse(
 	`Watch ▶ {{ .YTLink }}
-{{- if .Conf }}
-More: https://btcpp.dev/{{ .Conf.Tag }}#talks
+{{- if .TicketConf }}
+
+Join us at {{ .TicketConf.Desc }}: https://btcpp.dev/{{ .TicketConf.Tag }}#tickets
 {{- end }}`))
 
 type ytCopyData struct {
@@ -886,8 +1184,9 @@ type ytCopyData struct {
 
 type xCopyData struct {
 	TalkName       string
-	SpeakerHandles string
+	SpeakerCredits string
 	Conf           *types.Conf
+	TicketConf     *types.Conf
 	YTLink         string
 }
 
@@ -943,7 +1242,7 @@ func defaultXMainCopy(ctx *config.AppContext, row *RecordingRow) string {
 	var buf bytes.Buffer
 	if err := xMainCopy.Execute(&buf, xCopyData{
 		TalkName:       talkName,
-		SpeakerHandles: joinSpeakerHandles(row.Speakers),
+		SpeakerCredits: joinSpeakerXCredits(row.Speakers),
 		Conf:           conf,
 	}); err != nil {
 		ctx.Err.Printf("x copy gen: %s", err)
@@ -973,13 +1272,45 @@ func defaultXReplyCopy(ctx *config.AppContext, row *RecordingRow) string {
 	}
 	var buf bytes.Buffer
 	if err := xReplyCopy.Execute(&buf, xCopyData{
-		Conf:   conf,
-		YTLink: yt,
+		Conf:       conf,
+		TicketConf: nextTicketConf(ctx, conf),
+		YTLink:     yt,
 	}); err != nil {
 		ctx.Err.Printf("x reply copy gen: %s", err)
 		return ""
 	}
 	return strings.TrimSpace(buf.String())
+}
+
+func nextTicketConf(ctx *config.AppContext, current *types.Conf) *types.Conf {
+	if ctx == nil {
+		return nil
+	}
+	confs, err := getters.FetchConfsCached(ctx)
+	if err != nil {
+		return nil
+	}
+	return nextTicketConfFromList(confs, current, time.Now())
+}
+
+func nextTicketConfFromList(confs []*types.Conf, current *types.Conf, now time.Time) *types.Conf {
+	var candidates []*types.Conf
+	for _, conf := range confs {
+		if conf == nil || !conf.Active || !conf.StartDate.After(now) || len(conf.Tickets) == 0 {
+			continue
+		}
+		if current != nil && ((current.Ref != "" && conf.Ref == current.Ref) || (current.Tag != "" && conf.Tag == current.Tag)) {
+			continue
+		}
+		candidates = append(candidates, conf)
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].StartDate.Before(candidates[j].StartDate)
+	})
+	if len(candidates) == 0 {
+		return nil
+	}
+	return candidates[0]
 }
 
 // buildYTTitle assembles "Talk Name — Speaker A, Speaker B | bitcoin++ Conf"
@@ -1029,17 +1360,17 @@ func joinSpeakerCredits(speakers []*types.Speaker) string {
 	return strings.Join(parts, ", ")
 }
 
-func joinSpeakerHandles(speakers []*types.Speaker) string {
+func joinSpeakerXCredits(speakers []*types.Speaker) string {
 	var parts []string
 	for _, s := range speakers {
-		if s == nil {
+		if s == nil || s.Name == "" {
 			continue
 		}
 		if s.Twitter.Handle != "" {
-			parts = append(parts, "@"+s.Twitter.Handle)
-		} else if s.Name != "" {
+			parts = append(parts, fmt.Sprintf("%s (@%s)", s.Name, s.Twitter.Handle))
+		} else {
 			parts = append(parts, s.Name)
 		}
 	}
-	return strings.Join(parts, " ")
+	return strings.Join(parts, ", ")
 }

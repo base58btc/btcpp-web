@@ -999,8 +999,14 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/recordings/{id}/schedule", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminSchedule(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/file", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminUploadSourceFile(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/{id}/x-copy", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminSaveXCopy(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/post-x", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminPostXNow(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/{id}/schedule-x", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminScheduleX(w, r, app)
@@ -1013,6 +1019,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/{id}/status", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminJobStatus(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/{conf}/admin/recordings/{id}/x-status", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsAdminXJobStatus(w, r, app)
 	}).Methods("GET")
 
 	// Dev-only smoke endpoint for the self-hosted ICS pipeline.

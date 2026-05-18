@@ -12,6 +12,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,6 +44,7 @@ type PostParams struct {
 	Text      string
 	ReplyText string
 	VideoPath string
+	Progress  ProgressFunc
 }
 
 type ScheduleParams struct {
@@ -50,11 +52,33 @@ type ScheduleParams struct {
 	VideoPath string
 	Schedule  time.Time
 	Timezone  string
+	Progress  ProgressFunc
 }
+
+type ProgressFunc func(stage string, progress int, message string)
 
 type PostResult struct {
 	PostURL  string
 	ReplyURL string
+}
+
+type ReplyError struct {
+	PostURL string
+	Err     error
+}
+
+func (e *ReplyError) Error() string {
+	if e == nil || e.Err == nil {
+		return "x reply failed"
+	}
+	return "x reply failed after main post succeeded: " + e.Err.Error()
+}
+
+func (e *ReplyError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.Err
 }
 
 type AuthError struct {
@@ -149,7 +173,7 @@ func (c *Client) Post(ctx context.Context, p PostParams) (PostResult, error) {
 			if err := ensureLoggedIn(bctx); err != nil {
 				return err
 			}
-			postURL, err := createPost(bctx, p.Text, p.VideoPath)
+			postURL, err := createPost(bctx, p.Text, p.VideoPath, p.Progress)
 			if err != nil {
 				return err
 			}
@@ -157,7 +181,7 @@ func (c *Client) Post(ctx context.Context, p PostParams) (PostResult, error) {
 			if p.ReplyText != "" {
 				replyURL, err := createReply(bctx, postURL, p.ReplyText)
 				if err != nil {
-					return err
+					return &ReplyError{PostURL: postURL, Err: err}
 				}
 				result.ReplyURL = replyURL
 			}
@@ -188,7 +212,7 @@ func (c *Client) Schedule(ctx context.Context, p ScheduleParams) error {
 			if err := ensureLoggedIn(bctx); err != nil {
 				return err
 			}
-			return createScheduledPost(bctx, p.Text, p.VideoPath, p.Schedule, p.Timezone)
+			return createScheduledPost(bctx, p.Text, p.VideoPath, p.Schedule, p.Timezone, p.Progress)
 		})
 	})
 }
@@ -233,6 +257,9 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 	if c.cfg.Headed {
 		timeout = c.cfg.AuthWait
 	}
+	if c.cfg.Logf != nil {
+		c.cfg.Logf("x browser starting headed=%t timeout=%s", c.cfg.Headed, timeout)
+	}
 	ctx, cancelTimeout := context.WithTimeout(parent, timeout)
 	defer cancelTimeout()
 
@@ -242,11 +269,21 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 	bctx, cancelBrowser := chromedp.NewContext(allocCtx)
 	if err := installBrowserShims(bctx); err != nil {
 		cancelBrowser()
-		return err
+		return wrapBrowserTimeout(err, timeout, c.cfg.Headed)
 	}
 	err := fn(bctx)
 	if closeErr := chromedp.Cancel(bctx); closeErr != nil && err == nil {
 		err = closeErr
+	}
+	return wrapBrowserTimeout(err, timeout, c.cfg.Headed)
+}
+
+func wrapBrowserTimeout(err error, timeout time.Duration, headed bool) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return fmt.Errorf("x browser timeout after %s headed=%t: %w", timeout, headed, err)
 	}
 	return err
 }
@@ -317,26 +354,29 @@ func currentLoginState(ctx context.Context) (string, error) {
 	return status, err
 }
 
-func createPost(ctx context.Context, text, videoPath string) (string, error) {
+func createPost(ctx context.Context, text, videoPath string, progress ProgressFunc) (string, error) {
 	if err := chromedp.Run(ctx, chromedp.Navigate("https://x.com/compose/post")); err != nil {
 		return "", err
 	}
 	before, _ := statusLinks(ctx)
-	tasks := chromedp.Tasks{
+	if err := chromedp.Run(ctx,
 		chromedp.WaitVisible(`div[data-testid="tweetTextarea_0"]`, chromedp.ByQuery),
 		chromedp.SendKeys(`div[data-testid="tweetTextarea_0"]`, text, chromedp.ByQuery),
 		chromedp.SetUploadFiles(`input[data-testid="fileInput"]`, []string{videoPath}, chromedp.ByQuery),
-		chromedp.Sleep(8 * time.Second),
-		chromedp.WaitEnabled(`button[data-testid="tweetButton"]`, chromedp.ByQuery),
-		chromedp.Click(`button[data-testid="tweetButton"]`, chromedp.ByQuery),
+	); err != nil {
+		return "", err
 	}
-	if err := chromedp.Run(ctx, tasks); err != nil {
+	reportProgress(progress, "upload", 0, "Video handed to X")
+	if err := waitForTweetButtonEnabled(ctx, progress); err != nil {
+		return "", err
+	}
+	if err := chromedp.Run(ctx, chromedp.Click(`button[data-testid="tweetButton"]`, chromedp.ByQuery)); err != nil {
 		return "", err
 	}
 	return waitForNewStatusURL(ctx, before)
 }
 
-func createScheduledPost(ctx context.Context, text, videoPath string, schedule time.Time, timezone string) error {
+func createScheduledPost(ctx context.Context, text, videoPath string, schedule time.Time, timezone string, progress ProgressFunc) error {
 	if timezone != "" {
 		if err := setBrowserTimezone(ctx, timezone); err != nil {
 			return fmt.Errorf("set browser timezone %q: %w", timezone, err)
@@ -349,9 +389,12 @@ func createScheduledPost(ctx context.Context, text, videoPath string, schedule t
 		chromedp.WaitVisible(`div[data-testid="tweetTextarea_0"]`, chromedp.ByQuery),
 		chromedp.SendKeys(`div[data-testid="tweetTextarea_0"]`, text, chromedp.ByQuery),
 		chromedp.SetUploadFiles(`input[data-testid="fileInput"]`, []string{videoPath}, chromedp.ByQuery),
-		chromedp.Sleep(8 * time.Second),
 	}
 	if err := chromedp.Run(ctx, tasks); err != nil {
+		return err
+	}
+	reportProgress(progress, "upload", 0, "Video handed to X")
+	if err := waitForTweetButtonEnabled(ctx, progress); err != nil {
 		return err
 	}
 	if err := clickScheduleOption(ctx); err != nil {
@@ -373,6 +416,87 @@ func createScheduledPost(ctx context.Context, text, videoPath string, schedule t
 	return nil
 }
 
+func waitForTweetButtonEnabled(ctx context.Context, progress ProgressFunc) error {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+	lastPercent := -1
+	lastMessage := ""
+	for {
+		percent, message := scrapeXUploadProgress(ctx)
+		if percent >= 0 || message != "" {
+			if percent != lastPercent || message != lastMessage {
+				reportProgress(progress, "upload", percent, message)
+				lastPercent = percent
+				lastMessage = message
+			}
+		}
+		enabled, err := tweetButtonEnabled(ctx)
+		if err == nil && enabled {
+			reportProgress(progress, "upload", 100, "X video upload/processing complete")
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+		}
+	}
+}
+
+func tweetButtonEnabled(ctx context.Context) (bool, error) {
+	var enabled bool
+	js := `(() => {
+		const btn = document.querySelector('button[data-testid="tweetButton"]');
+		if (!btn) return false;
+		return !btn.disabled && btn.getAttribute('aria-disabled') !== 'true';
+	})()`
+	err := chromedp.Run(ctx, chromedp.Evaluate(js, &enabled))
+	return enabled, err
+}
+
+func scrapeXUploadProgress(ctx context.Context) (int, string) {
+	var raw string
+	js := `(() => {
+		const body = (document.body && document.body.innerText || '').replace(/\s+/g, ' ').trim();
+		const percent = body.match(/(\d{1,3})\s*%/);
+		const interesting = body.match(/([^.!?\n]*(upload|uploads|uploading|processing|processed|video)[^.!?\n]*)/i);
+		const p = percent ? Math.min(100, parseInt(percent[1], 10)) : -1;
+		const msg = interesting ? interesting[1].trim().slice(0, 180) : '';
+		return p + '|' + msg;
+	})()`
+	if err := chromedp.Run(ctx, chromedp.Evaluate(js, &raw)); err != nil {
+		return -1, ""
+	}
+	parts := strings.SplitN(raw, "|", 2)
+	if len(parts) != 2 {
+		return -1, strings.TrimSpace(raw)
+	}
+	percent, err := strconv.Atoi(strings.TrimSpace(parts[0]))
+	if err != nil {
+		percent = -1
+	}
+	return percent, strings.TrimSpace(parts[1])
+}
+
+func reportProgress(progress ProgressFunc, stage string, percent int, message string) {
+	if progress == nil {
+		return
+	}
+	if percent < 0 {
+		percent = 0
+	}
+	if percent > 100 {
+		percent = 100
+	}
+	if message == "" {
+		message = "Uploading video to X"
+		if percent > 0 {
+			message = fmt.Sprintf("Uploading video to X (%d%%)", percent)
+		}
+	}
+	progress(stage, percent, message)
+}
+
 func createReply(ctx context.Context, postURL, text string) (string, error) {
 	if err := chromedp.Run(ctx,
 		chromedp.Navigate(postURL),
@@ -381,16 +505,33 @@ func createReply(ctx context.Context, postURL, text string) (string, error) {
 		return "", err
 	}
 	before, _ := statusLinks(ctx)
+	if err := openReplyComposer(ctx); err != nil {
+		return "", err
+	}
 	tasks := chromedp.Tasks{
 		chromedp.WaitVisible(`div[data-testid="tweetTextarea_0"]`, chromedp.ByQuery),
 		chromedp.SendKeys(`div[data-testid="tweetTextarea_0"]`, text, chromedp.ByQuery),
-		chromedp.Sleep(1 * time.Second),
+		chromedp.WaitEnabled(`button[data-testid="tweetButtonInline"], button[data-testid="tweetButton"]`, chromedp.ByQuery),
 		chromedp.Click(`button[data-testid="tweetButtonInline"], button[data-testid="tweetButton"]`, chromedp.ByQuery),
 	}
 	if err := chromedp.Run(ctx, tasks); err != nil {
 		return "", err
 	}
 	return waitForNewStatusURL(ctx, before)
+}
+
+func openReplyComposer(ctx context.Context) error {
+	var visible bool
+	if err := chromedp.Run(ctx, chromedp.Evaluate(`document.querySelector('div[data-testid="tweetTextarea_0"]') !== null`, &visible)); err != nil {
+		return err
+	}
+	if visible {
+		return nil
+	}
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`button[data-testid="reply"]`, chromedp.ByQuery),
+		chromedp.Click(`button[data-testid="reply"]`, chromedp.ByQuery),
+	)
 }
 
 func setBrowserTimezone(ctx context.Context, timezone string) error {

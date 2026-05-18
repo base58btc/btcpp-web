@@ -248,11 +248,11 @@ func socialPostUpdateProps(up SocialPostUpdate, includeRef bool) map[string]*not
 	if up.ReplyURL != nil && *up.ReplyURL != "" {
 		props["ReplyURL"] = notion.NewURLPropertyValue(*up.ReplyURL)
 	}
-	if up.Error != nil && *up.Error != "" {
-		props["Error"] = richTextValue(*up.Error)
+	if up.Error != nil {
+		props["Error"] = clearableRichTextValue(*up.Error)
 	}
-	if up.ErrorFingerprint != nil && *up.ErrorFingerprint != "" {
-		props["ErrorFingerprint"] = richTextValue(*up.ErrorFingerprint)
+	if up.ErrorFingerprint != nil {
+		props["ErrorFingerprint"] = clearableRichTextValue(*up.ErrorFingerprint)
 	}
 	if up.ScheduledAt != nil {
 		props["ScheduledAt"] = notion.NewDatePropertyValue(&notion.Date{Start: *up.ScheduledAt})
@@ -319,11 +319,11 @@ func applySocialPostUpdate(post *types.SocialPost, up SocialPostUpdate) *types.S
 	if up.ReplyURL != nil && *up.ReplyURL != "" {
 		cp.ReplyURL = *up.ReplyURL
 	}
-	if up.Error != nil && *up.Error != "" {
-		cp.Error = *up.Error
+	if up.Error != nil {
+		cp.Error = strings.TrimSpace(*up.Error)
 	}
-	if up.ErrorFingerprint != nil && *up.ErrorFingerprint != "" {
-		cp.ErrorFingerprint = *up.ErrorFingerprint
+	if up.ErrorFingerprint != nil {
+		cp.ErrorFingerprint = strings.TrimSpace(*up.ErrorFingerprint)
 	}
 	if up.ScheduledAt != nil {
 		when := *up.ScheduledAt
@@ -338,6 +338,14 @@ func applySocialPostUpdate(post *types.SocialPost, up SocialPostUpdate) *types.S
 		cp.NotifiedAt = &when
 	}
 	return &cp
+}
+
+func clearableRichTextValue(content string) *notion.PropertyValue {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		content = " "
+	}
+	return richTextValue(content)
 }
 
 func socialPostSuppressesRef(post *types.SocialPost) bool {

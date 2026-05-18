@@ -64,7 +64,7 @@
         <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/schedule" class="mt-4 flex flex-wrap items-end gap-3">
           <div>
             <label class="block text-xs font-medium text-gray-700">Publish time</label>
-            <input type="datetime-local" name="publish_at" value="{{ .PublishAtInput }}"
+            <input id="publish-at-input" type="datetime-local" name="publish_at" value="{{ .PublishAtInput }}"
                    class="mt-1 rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
           </div>
           <div class="pb-2 text-xs text-gray-500">{{ .PublishTimezone }}</div>
@@ -161,18 +161,85 @@
           </div>
         </div>
 
+        {{ if .XJobActive }}
+        <div id="x-status" data-stage="{{ .XJobStatus }}" class="mb-4 rounded-md bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-800">
+          <div class="flex flex-wrap items-center gap-2 text-xs font-medium">
+            <span data-x-stage="prepare" class="x-stage rounded-full bg-blue-600 px-2 py-0.5 text-white">Prepare</span>
+            <span data-x-stage="download" class="x-stage rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">Download</span>
+            <span data-x-stage="upload" class="x-stage rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">Upload</span>
+            <span data-x-stage="save" class="x-stage rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">Save</span>
+            <span data-x-stage="done" class="x-stage rounded-full bg-blue-100 px-2 py-0.5 text-blue-800">Done</span>
+          </div>
+          <div id="x-status-message" class="mt-3">X automation running: {{ .XJobMessage }}</div>
+          <div id="x-progress-wrap" class="mt-3 hidden h-2 w-full overflow-hidden rounded-full bg-blue-100">
+            <div id="x-progress-bar" class="h-full w-0 rounded-full bg-blue-600 transition-all"></div>
+          </div>
+        </div>
+        <script>
+          function updateXProgress(stage, progress) {
+            document.querySelectorAll('.x-stage').forEach(function(el) {
+              var active = el.getAttribute('data-x-stage') === stage;
+              el.className = active
+                ? 'x-stage rounded-full bg-blue-600 px-2 py-0.5 text-white'
+                : 'x-stage rounded-full bg-blue-100 px-2 py-0.5 text-blue-800';
+            });
+            var wrap = document.getElementById('x-progress-wrap');
+            var bar = document.getElementById('x-progress-bar');
+            if (!wrap || !bar) return;
+            if (stage === 'download' || stage === 'upload') {
+              wrap.classList.remove('hidden');
+              bar.style.width = Math.max(0, Math.min(100, progress || 0)) + '%';
+            } else {
+              wrap.classList.add('hidden');
+            }
+          }
+          (function pollX() {
+            fetch('/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/x-status')
+              .then(r => r.json())
+              .then(j => {
+                var el = document.getElementById('x-status');
+                var msg = document.getElementById('x-status-message');
+                if (!el) return;
+                updateXProgress(j.stage, j.progress);
+                if (j.status === 'succeeded' || j.status === 'posted' || j.status === 'scheduled') {
+                  el.className = 'mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800';
+                  if (msg) msg.innerText = j.url ? 'X posted: ' + j.url : 'X automation finished: ' + (j.message || j.status);
+                  setTimeout(function() { location.reload(); }, 1500);
+                } else if (j.status === 'failed' || j.status === 'auth_required') {
+                  el.className = 'mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800';
+                  if (msg) msg.innerText = 'X automation failed: ' + (j.message || j.status);
+                } else {
+                  if (msg) msg.innerText = 'X automation running: ' + (j.message || j.status || 'working');
+                  setTimeout(pollX, 4000);
+                }
+              })
+              .catch(() => setTimeout(pollX, 6000));
+          })();
+        </script>
+        {{ else if eq .XJobStatus "failed" }}
+        <div class="mb-4 rounded-md bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">Last X automation failed: {{ .XJobMessage }}</div>
+        {{ else if eq .XJobStatus "succeeded" }}
+        <div class="mb-4 rounded-md bg-green-50 border border-green-200 px-4 py-3 text-sm text-green-800">Last X automation finished: {{ .XJobMessage }}</div>
+        {{ end }}
+
         <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/x-copy" class="space-y-3">
           <label class="block text-xs font-medium text-gray-700">Main post</label>
           <textarea id="x-body" name="x_body" rows="6" required
                     class="block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin font-mono">{{ .XBody }}</textarea>
+          <input type="hidden" id="x-publish-at" name="publish_at" value="{{ .PublishAtInput }}">
           <div class="flex items-center gap-3">
             <button type="submit"
                     class="px-3 py-1.5 text-sm rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Save X text</button>
             {{ $xBusy := or (eq .Row.XStatus "scheduling") (eq .Row.XStatus "scheduled") (eq .Row.XStatus "posting") }}
-            <button type="submit" formaction="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/schedule-x"
-                    {{ if or .Row.XURL (not .Row.Recording.FileURI) (not .Row.Recording.PublishAt) $xBusy }}disabled{{ end }}
-                    class="px-3 py-1.5 text-sm rounded-md text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
-              {{ if eq .Row.XStatus "scheduled" }}Scheduled on X{{ else if eq .Row.XStatus "scheduling" }}Scheduling X...{{ else }}Schedule on X{{ end }}
+            <button type="submit" formaction="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/post-x"
+                    {{ if or .Row.XURL (not .Row.Recording.FileURI) $xBusy (not .XUploaderEnabled) }}disabled{{ end }}
+                    class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed">
+              {{ if eq .Row.XStatus "posting" }}Posting...{{ else }}Post now{{ end }}
+            </button>
+            <button id="x-schedule-button" type="submit" formaction="/{{ .Conf.Tag }}/admin/recordings/{{ .Row.Recording.ID }}/schedule-x"
+                    {{ if or .Row.XURL (not .Row.Recording.FileURI) $xBusy (not .XUploaderEnabled) }}disabled{{ end }}
+                    class="{{ if not .PublishAtInput }}hidden {{ end }}px-3 py-1.5 text-sm rounded-md text-white bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed">
+              {{ if eq .Row.XStatus "scheduled" }}Scheduled on X{{ else if eq .Row.XStatus "scheduling" }}Scheduling X...{{ else }}Schedule{{ end }}
             </button>
             <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('x-body').value); this.innerText='Copied!'; setTimeout(()=>this.innerText='Copy text',1500);"
                     class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Copy text</button>
@@ -205,5 +272,23 @@
       </section>
 
     </div>
+    <script>
+      (function() {
+        var publishAt = document.getElementById('publish-at-input');
+        var xPublishAt = document.getElementById('x-publish-at');
+        var scheduleButton = document.getElementById('x-schedule-button');
+        if (!publishAt || !xPublishAt || !scheduleButton) {
+          return;
+        }
+        function syncPublishAt() {
+          var hasPublishAt = publishAt.value.trim() !== '';
+          xPublishAt.value = publishAt.value;
+          scheduleButton.classList.toggle('hidden', !hasPublishAt);
+        }
+        publishAt.addEventListener('input', syncPublishAt);
+        publishAt.addEventListener('change', syncPublishAt);
+        syncPublishAt();
+      })();
+    </script>
   </body>
 </html>

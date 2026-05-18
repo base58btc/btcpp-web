@@ -73,6 +73,31 @@ func Upload(key string, data []byte, contentType string, hash string) (string, e
 	return PublicURL(key), nil
 }
 
+// UploadStream writes a public object from a streaming reader. Use this
+// for large files such as long-form recordings that should not be buffered
+// into process memory before being sent to Spaces.
+func UploadStream(key string, body io.Reader, contentType string, size int64) (string, error) {
+	if client == nil {
+		return "", fmt.Errorf("spaces not configured")
+	}
+	input := &s3.PutObjectInput{
+		Bucket:       aws.String(bucket),
+		Key:          aws.String(key),
+		Body:         body,
+		ContentType:  aws.String(contentType),
+		CacheControl: aws.String("public, max-age=300"),
+		ACL:          s3types.ObjectCannedACLPublicRead,
+	}
+	if size > 0 {
+		input.ContentLength = aws.Int64(size)
+	}
+	_, err := client.PutObject(context.Background(), input)
+	if err != nil {
+		return "", fmt.Errorf("failed to upload %s: %w", key, err)
+	}
+	return PublicURL(key), nil
+}
+
 // PutPrivate writes an object without a public-read ACL. Use this for
 // encrypted credentials or browser-profile archives; callers are still
 // responsible for encrypting sensitive bytes before handing them here.
