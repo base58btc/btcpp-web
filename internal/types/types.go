@@ -32,6 +32,7 @@ type (
 		LocalExternal     string
 		HMACSecret        string
 		HMACKey           [32]byte
+		DatabaseURL       string
 		BufferAPI         string
 		Spaces            SpacesConfig
 		CacheTTLSec       int

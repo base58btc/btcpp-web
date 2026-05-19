@@ -1070,6 +1070,32 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
+func ListConferencesOnly(n *types.Notion) ([]*types.Conf, error) {
+	var confs []*types.Conf
+
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.ConfsDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+
+		if err != nil {
+			return nil, err
+		}
+		for _, page := range pages {
+			conf := parseConf(page.ID, page.Properties)
+			confs = append(confs, conf)
+		}
+	}
+
+	return confs, nil
+}
+
 // listTalks loads every Talk-shaped row across all confs, sourced from the
 // ConfTalk → Proposal → SpeakerConf[] → Speaker[] chain. Talk.ID is the
 // ConfTalk page ID (the new canonical talk identifier).

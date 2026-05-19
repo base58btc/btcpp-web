@@ -37,6 +37,9 @@ func loadConfig() *types.EnvConfig {
 			log.Fatal(err)
 		}
 		config.Prod = false
+		if config.DatabaseURL == "" {
+			config.DatabaseURL = os.Getenv("DATABASE_URL")
+		}
 
 		config.HMACKey, err = types.DeriveHMACKey(config.HMACSecret)
 		if err != nil {
@@ -48,6 +51,7 @@ func loadConfig() *types.EnvConfig {
 		config.Prod = true
 
 		config.Host = os.Getenv("HOST")
+		config.DatabaseURL = os.Getenv("DATABASE_URL")
 		config.MailerSecret = os.Getenv("MAILER_SECRET")
 		config.MailEndpoint = os.Getenv("MAILER_ENDPOINT")
 		config.MailOff = false
