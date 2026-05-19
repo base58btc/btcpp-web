@@ -67,6 +67,7 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TABLE conference_tickets (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+  ticket_key text NOT NULL,
   tier text NOT NULL,
   local_price integer NOT NULL DEFAULT 0,
   btc_price integer NOT NULL DEFAULT 0,
@@ -79,7 +80,8 @@ CREATE TABLE conference_tickets (
   post_symbol text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (conference_id, tier),
+  UNIQUE (conference_id, ticket_key),
+  CHECK (ticket_key <> ''),
   CHECK (tier <> ''),
   CHECK (local_price >= 0),
   CHECK (btc_price >= 0),

@@ -33,7 +33,8 @@ btcpp_pg_reset
 
 ## Notion Import
 
-The first migration slice imports conferences:
+The migration command currently imports conferences and conference ticket
+tiers:
 
 ```sh
 go run ./cmd/migrate-notion-postgres -reset -validate
@@ -44,4 +45,5 @@ Useful flags:
 ```sh
 go run ./cmd/migrate-notion-postgres -dry-run
 go run ./cmd/migrate-notion-postgres -database-url "$DATABASE_URL" -validate
+go run ./cmd/migrate-notion-postgres -skip-tickets -validate
 ```

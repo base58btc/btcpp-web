@@ -87,7 +87,7 @@
 
             btcpp_pg_reset() {
               btcpp_pg_start
-              dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists "$PGDATABASE"
+              dropdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" --if-exists --force "$PGDATABASE"
               createdb -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" "$PGDATABASE"
               btcpp_pg_migrate
             }
