@@ -157,9 +157,6 @@ CREATE TABLE organizations (
 );
 
 CREATE UNIQUE INDEX organizations_name_key ON organizations (lower(name));
-CREATE UNIQUE INDEX organizations_website_key
-ON organizations (lower(trim(trailing '/' FROM website_url)))
-WHERE website_url <> '';
 
 CREATE TRIGGER organizations_set_updated_at
 BEFORE UPDATE ON organizations

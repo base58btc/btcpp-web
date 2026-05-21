@@ -17,12 +17,13 @@ import (
 )
 
 type options struct {
-	configPath  string
-	databaseURL string
-	dryRun      bool
-	reset       bool
-	validate    bool
-	skipTickets bool
+	configPath   string
+	databaseURL  string
+	dryRun       bool
+	reset        bool
+	validate     bool
+	skipTickets  bool
+	skipSponsors bool
 }
 
 func main() {
@@ -40,7 +41,8 @@ func main() {
 	}
 	needDB := !opts.dryRun || opts.validate
 	importTickets := !opts.skipTickets
-	if err := validateConfig(env, needDB, importTickets); err != nil {
+	importSponsors := !opts.skipSponsors
+	if err := validateConfig(env, needDB, importTickets, importSponsors); err != nil {
 		log.Fatal(err)
 	}
 
@@ -64,6 +66,28 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d conference tickets from Notion", len(tickets))
+	}
+
+	var orgs []*types.Org
+	var sponsorships []*types.Sponsorship
+	if importSponsors {
+		orgs, err = getters.ListOrgs(notion)
+		if err != nil {
+			log.Fatalf("fetch organizations from Notion: %s", err)
+		}
+		if err := validateOrganizationKeys(orgs); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d organizations from Notion", len(orgs))
+
+		sponsorships, err = getters.ListSponsorshipsOnly(notion)
+		if err != nil {
+			log.Fatalf("fetch sponsorships from Notion: %s", err)
+		}
+		if err := validateSponsorshipKeys(sponsorships, orgRefByRef(orgs), confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d sponsorships from Notion", len(sponsorships))
 	}
 
 	var pool *pgxpool.Pool
@@ -90,6 +114,14 @@ func main() {
 			confTag := confTagByRef[ticket.ConfRef]
 			log.Printf("dry-run conference-ticket conf=%q key=%q tier=%q local=%d btc=%d usd=%d max=%d", confTag, ticketKey(ticket), ticket.Tier, ticket.Local, ticket.BTC, ticket.USD, ticket.Max)
 		}
+		for _, org := range orgs {
+			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
+		}
+		for _, sponsorship := range sponsorships {
+			confTags := sponsorshipConfTags(sponsorship, confTagByRef)
+			orgName := sponsorshipOrgName(sponsorship, orgRefByRef(orgs))
+			log.Printf("dry-run sponsorship name=%q org=%q confs=%q level=%q status=%q vendor=%t", sponsorship.Name, orgName, strings.Join(confTags, ","), sponsorship.Level, sponsorship.Status, sponsorship.IsVendor)
+		}
 	} else {
 		if err := importConferences(ctx, pool, confs); err != nil {
 			log.Fatal(err)
@@ -100,6 +132,17 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("upserted %d conference tickets into Postgres", len(tickets))
+		}
+		if importSponsors {
+			orgIDsByRef, err := importOrganizations(ctx, pool, orgs)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d organizations into Postgres", len(orgs))
+			if err := importSponsorships(ctx, pool, sponsorships, orgIDsByRef, orgRefByRef(orgs), confTagByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d sponsorships into Postgres", len(sponsorships))
 		}
 	}
 
@@ -114,6 +157,16 @@ func main() {
 			}
 			log.Printf("validated conference ticket count and required tiers")
 		}
+		if importSponsors {
+			if err := validateOrganizations(ctx, pool, orgs); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated organization count and required names")
+			if err := validateSponsorships(ctx, pool, sponsorships, orgRefByRef(orgs), confTagByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated sponsorship count and conference links")
+		}
 	}
 }
 
@@ -125,6 +178,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.reset, "reset", false, "truncate imported tables before writing")
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
+	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.Parse()
 	return opts
 }
@@ -153,10 +207,16 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_CONFSTIX_DB"); v != "" {
 		env.Notion.ConfsTixDb = v
 	}
+	if v := os.Getenv("NOTION_ORGS_DB"); v != "" {
+		env.Notion.OrgDb = v
+	}
+	if v := os.Getenv("NOTION_SPONSORSHIPS_DB"); v != "" {
+		env.Notion.SponsorshipsDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -166,6 +226,12 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets bool) error {
 	}
 	if importTickets && strings.TrimSpace(env.Notion.ConfsTixDb) == "" {
 		missing = append(missing, "NOTION_CONFSTIX_DB")
+	}
+	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
+		missing = append(missing, "NOTION_ORGS_DB")
+	}
+	if importSponsors && strings.TrimSpace(env.Notion.SponsorshipsDb) == "" {
+		missing = append(missing, "NOTION_SPONSORSHIPS_DB")
 	}
 	if needDB && strings.TrimSpace(env.DatabaseURL) == "" {
 		missing = append(missing, "DATABASE_URL")

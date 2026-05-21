@@ -20,6 +20,13 @@ func nullableDate(t time.Time) interface{} {
 	return t
 }
 
+func nullableString(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 func nullableTimesStart(times *types.Times) interface{} {
 	if times == nil || times.Start.IsZero() {
 		return nil

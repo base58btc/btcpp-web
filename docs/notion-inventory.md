@@ -257,12 +257,12 @@ used only in-memory during an import to resolve relations.
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| `Name` | `organizations.name` | Natural key fallback. |
+| `Name` | `organizations.name` | Required. Importer upserts by case-insensitive name. |
 | `Tagline` | `organizations.tagline` | Rich text. |
 | `LogoLight` | `organizations.logo_light_url` | URL. |
 | `LogoDark` | `organizations.logo_dark_url` | URL. |
 | `Email` | `organizations.email` | Email. |
-| `Website` | `organizations.website_url` | Preferred natural key. |
+| `Website` | `organizations.website_url` | URL. Not unique in current Notion data. |
 | `LinkedIn` | `organizations.linkedin_url` | URL. |
 | `Instagram` | `organizations.instagram_url` | URL. |
 | `Youtube` | `organizations.youtube_url` | URL. |
@@ -277,15 +277,20 @@ used only in-memory during an import to resolve relations.
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| `Name` | `sponsorships.name` | Title written on create. |
-| `org` | `sponsorships.organization_id` | Relation to Org. |
-| `event` | `sponsorship_conferences.sponsorship_id`, `sponsorship_conferences.conference_id` | Multi-relation to conferences. |
+| `Name` | `sponsorships.name` | Display-ish label. Importer appends related event tag(s) only for readability; duplicates are allowed and rows use generated UUID primary keys. Blank names fall back to org name plus event tag(s). |
+| `org` | `sponsorships.organization_id` | Relation to `OrgDb`; importer resolves through in-memory org ref to `organizations.id`. |
+| `event` | `sponsorship_conferences.sponsorship_id`, `sponsorship_conferences.conference_id` | Multi-relation to conferences; importer resolves each related conference ref to `conferences.tag`, then `conferences.id`. |
 | `Level` | `sponsorships.level` | Select. |
 | `Label` | `sponsorships.label` | Rich text. |
 | `Status` | `sponsorships.status` | Select. |
 | `IsVendor` | `sponsorships.is_vendor` | Checkbox. |
 | `Notes` | `sponsorships.notes` | Rich text. |
 | archived page state | `sponsorships.archived_at` | Set when a Notion row was archived. |
+
+Importer note: since Notion page IDs are intentionally not retained,
+`SponsorshipsDb` is duplicate-friendly and import rows are inserted with
+generated UUID primary keys. During migration, rerun this table with `-reset`
+to avoid duplicate rows from repeated imports.
 
 ### `VolunteerDb` -> `volunteers`, `volunteer_conferences`, `volunteer_job_preferences`
 
@@ -385,6 +390,10 @@ temporary in-memory maps while it runs:
 - Conferences map by `Name`/tag.
 - Conference tickets, hotels, shifts, volunteer info, registrations, and
   sponsorships resolve conferences through the related row's conference tag.
+- Organizations currently map by case-insensitive `Name`.
+- Sponsorships use generated UUID primary keys. The importer allows duplicate
+  names and should be rerun with `-reset` during migration to avoid repeated
+  insert duplicates.
 - Speakers map primarily by email. Rows without email need a fallback
   disambiguator such as normalized name plus social/contact fields.
 - Speaker-conference rows map by `(speaker, conference)`. The conference is
