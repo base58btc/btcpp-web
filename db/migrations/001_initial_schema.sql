@@ -127,9 +127,11 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE speaker_roles (
   speaker_id uuid NOT NULL REFERENCES speakers(id) ON DELETE CASCADE,
-  role text NOT NULL,
-  PRIMARY KEY (speaker_id, role),
-  CHECK (role <> '')
+  scope text NOT NULL,
+  position text NOT NULL,
+  PRIMARY KEY (speaker_id, scope, position),
+  CHECK (scope <> ''),
+  CHECK (position <> '')
 );
 
 CREATE TABLE organizations (
@@ -162,6 +164,33 @@ WHERE website_url <> '';
 CREATE TRIGGER organizations_set_updated_at
 BEFORE UPDATE ON organizations
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE sponsorships (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
+  name text NOT NULL DEFAULT '',
+  level text NOT NULL DEFAULT '',
+  label text NOT NULL DEFAULT '',
+  status text NOT NULL DEFAULT '',
+  is_vendor boolean NOT NULL DEFAULT false,
+  notes text NOT NULL DEFAULT '',
+  archived_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX sponsorships_organization_idx ON sponsorships (organization_id);
+CREATE INDEX sponsorships_status_level_idx ON sponsorships (status, level);
+
+CREATE TRIGGER sponsorships_set_updated_at
+BEFORE UPDATE ON sponsorships
+FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+CREATE TABLE sponsorship_conferences (
+  sponsorship_id uuid NOT NULL REFERENCES sponsorships(id) ON DELETE CASCADE,
+  conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+  PRIMARY KEY (sponsorship_id, conference_id)
+);
 
 CREATE TABLE proposals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
