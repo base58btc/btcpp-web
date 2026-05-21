@@ -183,7 +183,7 @@ CREATE TRIGGER sponsorships_set_updated_at
 BEFORE UPDATE ON sponsorships
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE sponsorship_conferences (
+CREATE TABLE sponsorships_conferences (
   sponsorship_id uuid NOT NULL REFERENCES sponsorships(id) ON DELETE CASCADE,
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
   PRIMARY KEY (sponsorship_id, conference_id)
@@ -243,13 +243,13 @@ CREATE TRIGGER speaker_confs_set_updated_at
 BEFORE UPDATE ON speaker_confs
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE speaker_conf_other_events (
+CREATE TABLE speaker_confs_conferences (
   speaker_conf_id uuid NOT NULL REFERENCES speaker_confs(id) ON DELETE CASCADE,
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
   PRIMARY KEY (speaker_conf_id, conference_id)
 );
 
-CREATE TABLE proposal_speakers (
+CREATE TABLE proposals_speaker_confs (
   proposal_id uuid NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
   speaker_conf_id uuid NOT NULL REFERENCES speaker_confs(id) ON DELETE CASCADE,
   PRIMARY KEY (proposal_id, speaker_conf_id)
@@ -372,7 +372,7 @@ CREATE TRIGGER discounts_set_updated_at
 BEFORE UPDATE ON discounts
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE discount_conferences (
+CREATE TABLE discounts_conferences (
   discount_id uuid NOT NULL REFERENCES discounts(id) ON DELETE CASCADE,
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
   PRIMARY KEY (discount_id, conference_id)
@@ -473,7 +473,7 @@ CREATE TRIGGER volunteers_set_updated_at
 BEFORE UPDATE ON volunteers
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE volunteer_conferences (
+CREATE TABLE volunteers_conferences (
   volunteer_id uuid NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
   kind text NOT NULL,
@@ -481,7 +481,7 @@ CREATE TABLE volunteer_conferences (
   CHECK (kind IN ('schedule_for', 'other_event'))
 );
 
-CREATE TABLE volunteer_job_preferences (
+CREATE TABLE volunteers_job_types (
   volunteer_id uuid NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
   job_type_id uuid NOT NULL REFERENCES job_types(id) ON DELETE CASCADE,
   preference text NOT NULL,
@@ -513,7 +513,7 @@ CREATE TRIGGER work_shifts_set_updated_at
 BEFORE UPDATE ON work_shifts
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE work_shift_assignments (
+CREATE TABLE work_shifts_volunteers (
   shift_id uuid NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
   volunteer_id uuid NOT NULL REFERENCES volunteers(id) ON DELETE CASCADE,
   role text NOT NULL DEFAULT 'assignee',
@@ -523,7 +523,7 @@ CREATE TABLE work_shift_assignments (
 );
 
 CREATE UNIQUE INDEX work_shift_one_leader_idx
-ON work_shift_assignments (shift_id)
+ON work_shifts_volunteers (shift_id)
 WHERE role = 'leader';
 
 CREATE TABLE vol_infos (

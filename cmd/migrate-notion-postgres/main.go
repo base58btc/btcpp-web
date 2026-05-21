@@ -24,6 +24,7 @@ type options struct {
 	validate     bool
 	skipTickets  bool
 	skipSponsors bool
+	skipSpeakers bool
 }
 
 func main() {
@@ -42,7 +43,8 @@ func main() {
 	needDB := !opts.dryRun || opts.validate
 	importTickets := !opts.skipTickets
 	importSponsors := !opts.skipSponsors
-	if err := validateConfig(env, needDB, importTickets, importSponsors); err != nil {
+	importSpeakers := !opts.skipSpeakers
+	if err := validateConfig(env, needDB, importTickets, importSponsors, importSpeakers); err != nil {
 		log.Fatal(err)
 	}
 
@@ -90,6 +92,18 @@ func main() {
 		log.Printf("fetched %d sponsorships from Notion", len(sponsorships))
 	}
 
+	var speakers []*types.Speaker
+	if importSpeakers {
+		speakers, err = getters.ListSpeakers(notion)
+		if err != nil {
+			log.Fatalf("fetch speakers from Notion: %s", err)
+		}
+		if err := validateSpeakerRows(speakers); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d speakers from Notion", len(speakers))
+	}
+
 	var pool *pgxpool.Pool
 	if !opts.dryRun || opts.validate {
 		pool, err = db.Open(ctx, env.DatabaseURL)
@@ -122,6 +136,9 @@ func main() {
 			orgName := sponsorshipOrgName(sponsorship, orgRefByRef(orgs))
 			log.Printf("dry-run sponsorship name=%q org=%q confs=%q level=%q status=%q vendor=%t", sponsorship.Name, orgName, strings.Join(confTags, ","), sponsorship.Level, sponsorship.Status, sponsorship.IsVendor)
 		}
+		for _, speaker := range speakers {
+			log.Printf("dry-run speaker name=%q email=%q roles=%q", speaker.Name, speaker.Email, strings.Join(speaker.Roles, ","))
+		}
 	} else {
 		if err := importConferences(ctx, pool, confs); err != nil {
 			log.Fatal(err)
@@ -143,6 +160,12 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("upserted %d sponsorships into Postgres", len(sponsorships))
+		}
+		if importSpeakers {
+			if _, err := importSpeakersRows(ctx, pool, speakers); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d speakers into Postgres", len(speakers))
 		}
 	}
 
@@ -167,6 +190,12 @@ func main() {
 			}
 			log.Printf("validated sponsorship count and conference links")
 		}
+		if importSpeakers {
+			if err := validateSpeakers(ctx, pool, speakers); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated speaker count and roles")
+		}
 	}
 }
 
@@ -179,6 +208,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
+	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.Parse()
 	return opts
 }
@@ -213,10 +243,13 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_SPONSORSHIPS_DB"); v != "" {
 		env.Notion.SponsorshipsDb = v
 	}
+	if v := os.Getenv("NOTION_SPEAKERS_DB"); v != "" {
+		env.Notion.SpeakersDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors, importSpeakers bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -232,6 +265,9 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors 
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.SponsorshipsDb) == "" {
 		missing = append(missing, "NOTION_SPONSORSHIPS_DB")
+	}
+	if importSpeakers && strings.TrimSpace(env.Notion.SpeakersDb) == "" {
+		missing = append(missing, "NOTION_SPEAKERS_DB")
 	}
 	if needDB && strings.TrimSpace(env.DatabaseURL) == "" {
 		missing = append(missing, "DATABASE_URL")
@@ -254,6 +290,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, speakers CASCADE`)
 	return err
 }

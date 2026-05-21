@@ -64,7 +64,7 @@ func importSponsorships(ctx context.Context, pool *pgxpool.Pool, sponsorships []
 				return fmt.Errorf("sponsorship %q has unresolved conference ref", name)
 			}
 			_, err := pool.Exec(ctx, `
-				INSERT INTO sponsorship_conferences (sponsorship_id, conference_id)
+				INSERT INTO sponsorships_conferences (sponsorship_id, conference_id)
 				SELECT $1, id
 				FROM conferences
 				WHERE tag = $2
@@ -93,7 +93,7 @@ func validateSponsorships(ctx context.Context, pool *pgxpool.Pool, sponsorships 
 		}
 	}
 	var linkCount int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM sponsorship_conferences`).Scan(&linkCount); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM sponsorships_conferences`).Scan(&linkCount); err != nil {
 		return fmt.Errorf("count sponsorship conference links: %w", err)
 	}
 	if linkCount < expectedLinks {
@@ -112,7 +112,7 @@ func validateSponsorships(ctx context.Context, pool *pgxpool.Pool, sponsorships 
 			if err := pool.QueryRow(ctx, `
 				SELECT EXISTS (
 					SELECT 1
-					FROM sponsorship_conferences sc
+					FROM sponsorships_conferences sc
 					JOIN sponsorships s ON s.id = sc.sponsorship_id
 					JOIN conferences c ON c.id = sc.conference_id
 					WHERE s.organization_id IS NOT DISTINCT FROM $1::uuid
