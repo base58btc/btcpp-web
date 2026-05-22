@@ -27,6 +27,20 @@ func nullableTimePtr(t *time.Time) interface{} {
 	return *t
 }
 
+func nullableUint(n uint) interface{} {
+	if n == 0 {
+		return nil
+	}
+	return int(n)
+}
+
+func nullableFloat64(n float64) interface{} {
+	if n == 0 {
+		return nil
+	}
+	return n
+}
+
 func nullableString(s string) interface{} {
 	if s == "" {
 		return nil

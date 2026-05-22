@@ -24,6 +24,8 @@ type options struct {
 	validate         bool
 	listConfTalkDups bool
 	skipTickets      bool
+	skipDiscounts    bool
+	skipPurchases    bool
 	skipSponsors     bool
 	skipSpeakers     bool
 	skipProposals    bool
@@ -65,6 +67,8 @@ func main() {
 	}
 	needDB := !opts.dryRun || opts.validate
 	importTickets := !opts.skipTickets
+	importDiscounts := !opts.skipDiscounts
+	importPurchases := !opts.skipPurchases
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
 	importProposals := !opts.skipProposals
@@ -84,7 +88,10 @@ func main() {
 	if importSocialPosts && (!importConfTalks || !importRecordings) {
 		log.Fatal("social post import requires conf talks and recordings; use -skip-social-posts when skipping either import")
 	}
-	if err := validateConfig(env, needDB, importTickets, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if importPurchases && !importDiscounts {
+		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
+	}
+	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -108,6 +115,30 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d conference tickets from Notion", len(tickets))
+	}
+
+	var discounts []*types.DiscountCode
+	if importDiscounts {
+		discounts, err = getters.ListDiscounts(notion)
+		if err != nil {
+			log.Fatalf("fetch discounts from Notion: %s", err)
+		}
+		if err := validateDiscountRows(discounts, confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d discounts from Notion", len(discounts))
+	}
+
+	var purchases []*purchaseImportRow
+	if importPurchases {
+		purchases, err = listPurchaseImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch purchases from Notion: %s", err)
+		}
+		if err := validatePurchaseRows(purchases, confTagByRef, discountRefsByRef(discounts)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d purchases from Notion", len(purchases))
 	}
 
 	var orgs []*types.Org
@@ -228,6 +259,13 @@ func main() {
 			confTag := confTagByRef[ticket.ConfRef]
 			log.Printf("dry-run conference-ticket conf=%q key=%q tier=%q local=%d btc=%d usd=%d max=%d", confTag, ticketKey(ticket), ticket.Tier, ticket.Local, ticket.BTC, ticket.USD, ticket.Max)
 		}
+		for _, discount := range discounts {
+			log.Printf("dry-run discount code=%q expr=%q confs=%d uses=%d", discount.CodeName, discount.Discount, len(discount.ConfRef), discount.UsesCount)
+		}
+		for _, purchase := range purchases {
+			confTag := confTagByRef[purchase.confRef]
+			log.Printf("dry-run purchase ref=%q conf=%q email=%q item=%q amount=%.2f", purchase.refID, confTag, purchase.email, purchase.itemBought, purchase.amountPaid)
+		}
 		for _, org := range orgs {
 			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
 		}
@@ -268,6 +306,20 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("upserted %d conference tickets into Postgres", len(tickets))
+		}
+		var discountIDsByRef map[string]string
+		if importDiscounts {
+			discountIDsByRef, err = importDiscountRows(ctx, pool, discounts, confTagByRef)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d discounts into Postgres", len(discounts))
+		}
+		if importPurchases {
+			if err := importPurchaseRows(ctx, pool, purchases, confTagByRef, discountIDsByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d purchases into Postgres", len(purchases))
 		}
 		var orgIDsByRef map[string]string
 		if importSponsors {
@@ -338,6 +390,18 @@ func main() {
 			}
 			log.Printf("validated conference ticket count and required tiers")
 		}
+		if importDiscounts {
+			if err := validateDiscounts(ctx, pool, discounts); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated discount count and conference links")
+		}
+		if importPurchases {
+			if err := validatePurchases(ctx, pool, purchases); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated purchase count")
+		}
 		if importSponsors {
 			if err := validateOrganizations(ctx, pool, orgs); err != nil {
 				log.Fatal(err)
@@ -396,6 +460,8 @@ func parseFlags() options {
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
 	flag.BoolVar(&opts.listConfTalkDups, "list-conf-talk-duplicates", false, "print ConfTalkDb rows that share the same proposal relation and exit")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
+	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
+	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
@@ -431,6 +497,12 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_CONFSTIX_DB"); v != "" {
 		env.Notion.ConfsTixDb = v
 	}
+	if v := os.Getenv("NOTION_DISCOUNT_DB"); v != "" {
+		env.Notion.DiscountsDb = v
+	}
+	if v := os.Getenv("NOTION_PURCHASES_DB"); v != "" {
+		env.Notion.PurchasesDb = v
+	}
 	if v := os.Getenv("NOTION_ORGS_DB"); v != "" {
 		env.Notion.OrgDb = v
 	}
@@ -458,7 +530,7 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -468,6 +540,12 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors,
 	}
 	if importTickets && strings.TrimSpace(env.Notion.ConfsTixDb) == "" {
 		missing = append(missing, "NOTION_CONFSTIX_DB")
+	}
+	if importDiscounts && strings.TrimSpace(env.Notion.DiscountsDb) == "" {
+		missing = append(missing, "NOTION_DISCOUNT_DB")
+	}
+	if importPurchases && strings.TrimSpace(env.Notion.PurchasesDb) == "" {
+		missing = append(missing, "NOTION_PURCHASES_DB")
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
 		missing = append(missing, "NOTION_ORGS_DB")
@@ -514,6 +592,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, people, proposals CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, discounts, purchases, organizations, sponsorships, people, proposals CASCADE`)
 	return err
 }
