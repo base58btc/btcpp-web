@@ -35,7 +35,7 @@ func importSpeakersRows(ctx context.Context, pool *pgxpool.Pool, speakers []*typ
 
 		var id string
 		err := pool.QueryRow(ctx, `
-			INSERT INTO speakers (
+			INSERT INTO people (
 				name, email, norm_photo_path, phone, signal, telegram,
 				twitter_handle, nostr, github_url, instagram, linkedin,
 				website_url, company, org_logo_path, avail_to_hire,
@@ -64,7 +64,7 @@ func importSpeakersRows(ctx context.Context, pool *pgxpool.Pool, speakers []*typ
 				return nil, fmt.Errorf("speaker %q has invalid role %q", speaker.Name, role)
 			}
 			if _, err := pool.Exec(ctx, `
-				INSERT INTO speaker_roles (speaker_id, scope, position)
+				INSERT INTO people_roles (person_id, scope, position)
 				VALUES ($1, $2, $3)
 				ON CONFLICT DO NOTHING
 			`, id, scope, position); err != nil {
@@ -77,11 +77,11 @@ func importSpeakersRows(ctx context.Context, pool *pgxpool.Pool, speakers []*typ
 
 func validateSpeakers(ctx context.Context, pool *pgxpool.Pool, speakers []*types.Speaker) error {
 	var count int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM speakers`).Scan(&count); err != nil {
-		return fmt.Errorf("count speakers: %w", err)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM people`).Scan(&count); err != nil {
+		return fmt.Errorf("count people: %w", err)
 	}
 	if count < len(speakers) {
-		return fmt.Errorf("postgres speaker count %d is less than Notion count %d", count, len(speakers))
+		return fmt.Errorf("postgres people count %d is less than Notion count %d", count, len(speakers))
 	}
 
 	expectedRoles := 0
@@ -91,11 +91,11 @@ func validateSpeakers(ctx context.Context, pool *pgxpool.Pool, speakers []*types
 		}
 	}
 	var roleCount int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM speaker_roles`).Scan(&roleCount); err != nil {
-		return fmt.Errorf("count speaker roles: %w", err)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM people_roles`).Scan(&roleCount); err != nil {
+		return fmt.Errorf("count people roles: %w", err)
 	}
 	if roleCount < expectedRoles {
-		return fmt.Errorf("postgres speaker role count %d is less than Notion role count %d", roleCount, expectedRoles)
+		return fmt.Errorf("postgres people role count %d is less than Notion role count %d", roleCount, expectedRoles)
 	}
 
 	return nil

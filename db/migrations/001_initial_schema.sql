@@ -21,8 +21,8 @@ CREATE TABLE conferences (
   emoji text NOT NULL DEFAULT '',
   tagline text NOT NULL DEFAULT '',
   date_desc text NOT NULL DEFAULT '',
-  start_date date,
-  end_date date,
+  start_date timestamptz,
+  end_date timestamptz,
   timezone text NOT NULL DEFAULT '',
   location text NOT NULL DEFAULT '',
   venue text NOT NULL DEFAULT '',
@@ -94,7 +94,7 @@ CREATE TRIGGER conference_tickets_set_updated_at
 BEFORE UPDATE ON conference_tickets
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE speakers (
+CREATE TABLE people (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,
   email citext,
@@ -118,18 +118,18 @@ CREATE TABLE speakers (
   CHECK (name <> '')
 );
 
-CREATE INDEX speakers_email_idx ON speakers (email);
-CREATE INDEX speakers_name_idx ON speakers (lower(name));
+CREATE INDEX people_email_idx ON people (email);
+CREATE INDEX people_name_idx ON people (lower(name));
 
-CREATE TRIGGER speakers_set_updated_at
-BEFORE UPDATE ON speakers
+CREATE TRIGGER people_set_updated_at
+BEFORE UPDATE ON people
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
-CREATE TABLE speaker_roles (
-  speaker_id uuid NOT NULL REFERENCES speakers(id) ON DELETE CASCADE,
+CREATE TABLE people_roles (
+  person_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   scope text NOT NULL,
   position text NOT NULL,
-  PRIMARY KEY (speaker_id, scope, position),
+  PRIMARY KEY (person_id, scope, position),
   CHECK (scope <> ''),
   CHECK (position <> '')
 );
@@ -218,7 +218,7 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 CREATE TABLE speaker_confs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
-  speaker_id uuid NOT NULL REFERENCES speakers(id) ON DELETE CASCADE,
+  speaker_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
   coming_from text NOT NULL DEFAULT '',
   availability text[] NOT NULL DEFAULT '{}',

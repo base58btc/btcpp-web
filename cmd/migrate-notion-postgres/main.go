@@ -290,6 +290,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, speakers CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, people CASCADE`)
 	return err
 }

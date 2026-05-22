@@ -12,7 +12,7 @@ Postgres IDs.
 | `ConfsDb` / `NOTION_CONFS_DB` | Conference/event catalog. | `Name` tag, Notion unique `ID`, `Active`, `Desc`, `OG_Flavor`, `Emoji`, `Tagline`, `DateDesc`, `StartDate`, `EndDate`, `Location`, `Venue`, `VenueMap`, `VenueWebsite`, `Show Hacks`, `Has Satellites`, `Timezone`, `OrientCalNotif`. | Parent of tickets, hotels, registrations, volunteers, shifts, sponsorships, conf talks, vol info. Some newer rows reference conferences by tag instead of relation. | `conferences` |
 | `ConfsTixDb` / `NOTION_CONFSTIX_DB` | Ticket tiers per conference. | `Tier`, `Local`, `BTC`, `USD`, `Expires`, `Max`, `Currency`, `Symbol`, `PostSymbol`. | `Conf` relation to `ConfsDb`. | `conference_tickets` |
 | `ConfInfoDb` / `NOTION_CONFINFO_DB` | Per-day public schedule metadata. | `Conf` tag/select or rich text, `Day`, `Doors`, `Breakfast`, `Lunch`, `Coffee`, `Venues`. | Uses conference tag, not a Notion relation. | `conference_days` |
-| `SpeakersDb` / `NOTION_SPEAKERS_DB` | Speaker/contact profile and admin roles. | `Name`, `Email`, `NormPhoto`, `Phone`, `Signal`, `Telegram`, `Twitter`, `npub`, `Github`, `Instagram`, `LinkedIn`, `Website`, `Company`, `OrgPhoto`, `AvailToHire`, `LookingToHire`, `TShirt`, `Roles`. | Linked by `SpeakerConfDb`; role tags grant dashboard/admin access. Role tags split into `scope` and `position`, e.g. `global-admin` -> `global` / `admin`, `vienna-staff` -> `vienna` / `staff`. | `speakers`, `speaker_roles` |
+| `SpeakersDb` / `NOTION_SPEAKERS_DB` | People/contact profile and admin roles. | `Name`, `Email`, `NormPhoto`, `Phone`, `Signal`, `Telegram`, `Twitter`, `npub`, `Github`, `Instagram`, `LinkedIn`, `Website`, `Company`, `OrgPhoto`, `AvailToHire`, `LookingToHire`, `TShirt`, `Roles`. | Linked by `SpeakerConfDb`; role tags grant dashboard/admin access. Role tags split into `scope` and `position`, e.g. `global-admin` -> `global` / `admin`, `vienna-staff` -> `vienna` / `staff`. | `people`, `people_roles` |
 | `ProposalDb` / `NOTION_PROPOSAL_DB` | Talk proposal/application content. | `Title`, `Desc`, `Setup`, `Comments`, `TalkType`, `Status`, `DesiredDuration`, `AvailDuration`, `ScheduleFor`, `speakers`, `InviteToken`. | `ScheduleFor` is a conference tag. `speakers` relates to `SpeakerConfDb`. One accepted proposal usually has one `ConfTalkDb` row. | `proposals`, `proposals_speaker_confs` |
 | `SpeakerConfDb` / `NOTION_SPEAKER_CONF_DB` | A speaker's attendance/application state for one conference. | `ComingFrom`, `speaker`, `talk`, `org`, `Company`, `OrgPhoto`, `Avails`, `RecordOK`, `Visa`, `FirstEvent`, `OtherEvents`, `DinnerRSVP`, `Sponsor`, `InvitedAt`, `ViewedAt`, `AcceptedAt`. | `speaker` to `SpeakersDb`, `talk` to `ProposalDb`, `org` to `OrgDb`, `OtherEvents` by conference tag. Runtime upsert key is speaker plus conference. | `speaker_confs`, `speaker_confs_conferences`, `proposals_speaker_confs` |
 | `ConfTalkDb` / `NOTION_CONFTALK_DB` | Scheduled talk row used by agenda/media/social. | `Event`, `proposal`, `Clipart`, `TalkTime`, `ProductionNotes`, `Venue`, `Section`, `CalNotif`, `SocialCard`. | `Event` is conference tag. `proposal` relates to `ProposalDb`. | `conf_talks` |
@@ -49,8 +49,8 @@ used only in-memory during an import to resolve relations.
 | `Emoji` | `conferences.emoji` | Rich text. |
 | `Tagline` | `conferences.tagline` | Rich text. |
 | `DateDesc` | `conferences.date_desc` | Rich text. |
-| `StartDate` | `conferences.start_date` | Date. |
-| `EndDate` | `conferences.end_date` | Date. |
+| `StartDate` | `conferences.start_date` | Timestamp with timezone; Notion includes time. |
+| `EndDate` | `conferences.end_date` | Timestamp with timezone; Notion includes time. |
 | `Timezone` | `conferences.timezone` | Select or rich text IANA timezone. |
 | `Location` | `conferences.location` | Rich text. |
 | `Venue` | `conferences.venue` | Rich text. |
@@ -89,28 +89,28 @@ used only in-memory during an import to resolve relations.
 | `Coffee` | `conference_days.coffee_start`, `conference_days.coffee_end` | Rich text `HH:MM,HH:MM`. |
 | `Venues` | `conference_days.venues` | Multi-select array. |
 
-### `SpeakersDb` -> `speakers`, `speaker_roles`
+### `SpeakersDb` -> `people`, `people_roles`
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| `Name` | `speakers.name` | Required. |
-| `Email` | `speakers.email` | Case-insensitive email. |
-| `NormPhoto` | `speakers.norm_photo_path` | Rich text media path. |
-| `Phone` | `speakers.phone` | Rich text. |
-| `Signal` | `speakers.signal` | Rich text. |
-| `Telegram` | `speakers.telegram` | Rich text. |
-| `Twitter` | `speakers.twitter_handle` | Normalized handle. |
-| `npub` | `speakers.nostr` | Rich text. |
-| `Github` | `speakers.github_url` | URL. |
-| `Instagram` | `speakers.instagram` | Rich text. |
-| `LinkedIn` | `speakers.linkedin` | Rich text. |
-| `Website` | `speakers.website_url` | URL. |
-| `Company` | `speakers.company` | Rich text. |
-| `OrgPhoto` | `speakers.org_logo_path` | Rich text media path. |
-| `AvailToHire` | `speakers.avail_to_hire` | Checkbox. |
-| `LookingToHire` | `speakers.looking_to_hire` | Checkbox. |
-| `TShirt` | `speakers.tshirt` | Select. |
-| `Roles` | `speaker_roles.scope`, `speaker_roles.position` | Split each tag at the last hyphen, e.g. `global-admin`, `vienna-staff`, `seoul-admin`. |
+| `Name` | `people.name` | Required. |
+| `Email` | `people.email` | Case-insensitive email. |
+| `NormPhoto` | `people.norm_photo_path` | Rich text media path. |
+| `Phone` | `people.phone` | Rich text. |
+| `Signal` | `people.signal` | Rich text. |
+| `Telegram` | `people.telegram` | Rich text. |
+| `Twitter` | `people.twitter_handle` | Normalized handle. |
+| `npub` | `people.nostr` | Rich text. |
+| `Github` | `people.github_url` | URL. |
+| `Instagram` | `people.instagram` | Rich text. |
+| `LinkedIn` | `people.linkedin` | Rich text. |
+| `Website` | `people.website_url` | URL. |
+| `Company` | `people.company` | Rich text. |
+| `OrgPhoto` | `people.org_logo_path` | Rich text media path. |
+| `AvailToHire` | `people.avail_to_hire` | Checkbox. |
+| `LookingToHire` | `people.looking_to_hire` | Checkbox. |
+| `TShirt` | `people.tshirt` | Select. |
+| `Roles` | `people_roles.scope`, `people_roles.position` | Split each tag at the last hyphen, e.g. `global-admin`, `vienna-staff`, `seoul-admin`. |
 
 ### `ProposalDb` -> `proposals`, `proposals_speaker_confs`
 
@@ -133,7 +133,7 @@ used only in-memory during an import to resolve relations.
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
 | inferred conference | `speaker_confs.conference_id` | Infer from linked proposal `ScheduleFor` or importer context. |
-| `speaker` | `speaker_confs.speaker_id` | Relation to `SpeakersDb`. |
+| `speaker` | `speaker_confs.speaker_id` | Relation to `people.id` from `SpeakersDb`. |
 | `org` | `speaker_confs.organization_id` | Relation to `OrgDb`. |
 | `ComingFrom` | `speaker_confs.coming_from` | Title/rich text. |
 | `Avails` | `speaker_confs.availability` | Multi-select array. |
@@ -393,9 +393,9 @@ UUID `id` columns remain the primary key unless a table is a pure join table.
 | `conferences` | `public_uid` | yes | Notion unique ID property when present; not the Notion page ID. |
 | `conference_days` | `(conference_id, day_number)` | yes | One schedule metadata row per conference day. |
 | `conference_tickets` | `(conference_id, ticket_key)` | yes | Prevent duplicate ticket tiers on reruns without relying on Notion page IDs. |
-| `speakers` | `email` | no | Lookup aid; nullable and not all speakers have email. |
-| `speakers` | `lower(name)` | no | Admin/search lookup aid; names can duplicate. |
-| `speaker_roles` | `(speaker_id, scope, position)` primary key | yes | A speaker should not have the same scoped role twice. |
+| `people` | `email` | no | Lookup aid; nullable and not all people have email. |
+| `people` | `lower(name)` | no | Admin/search lookup aid; names can duplicate. |
+| `people_roles` | `(person_id, scope, position)` primary key | yes | A person should not have the same scoped role twice. |
 | `organizations` | `lower(name)` | yes | Current importer key. Website is not unique in real Notion data. |
 | `sponsorships` | `organization_id` | no | Lookup sponsorships by org. |
 | `sponsorships` | `(status, level)` | no | Filtering/grouping sponsorships by workflow status and tier. Names intentionally allow duplicates. |
@@ -446,9 +446,9 @@ temporary in-memory maps while it runs:
 - Sponsorships use generated UUID primary keys. The importer allows duplicate
   names and should be rerun with `-reset` during migration to avoid repeated
   insert duplicates.
-- Speakers map primarily by email. Rows without email need a fallback
+- People from `SpeakersDb` map primarily by email. Rows without email need a fallback
   disambiguator such as normalized name plus social/contact fields. Current
-  migration imports speakers with generated UUID primary keys and should be
+  migration imports people with generated UUID primary keys and should be
   rerun with `-reset` to avoid duplicate inserts.
 - Speaker-conference rows map by `(speaker, conference)`. The conference is
   inferred from linked proposal `ScheduleFor` values or explicit context.
