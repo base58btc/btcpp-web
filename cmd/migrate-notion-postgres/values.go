@@ -20,6 +20,13 @@ func nullableDate(t time.Time) interface{} {
 	return t
 }
 
+func nullableTimePtr(t *time.Time) interface{} {
+	if t == nil || t.IsZero() {
+		return nil
+	}
+	return *t
+}
+
 func nullableString(s string) interface{} {
 	if s == "" {
 		return nil

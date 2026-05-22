@@ -75,6 +75,17 @@ func importSpeakersRows(ctx context.Context, pool *pgxpool.Pool, speakers []*typ
 	return idsByRef, nil
 }
 
+func speakerRefByRef(speakers []*types.Speaker) map[string]*types.Speaker {
+	out := make(map[string]*types.Speaker, len(speakers))
+	for _, speaker := range speakers {
+		if speaker == nil || speaker.ID == "" {
+			continue
+		}
+		out[speaker.ID] = speaker
+	}
+	return out
+}
+
 func validateSpeakers(ctx context.Context, pool *pgxpool.Pool, speakers []*types.Speaker) error {
 	var count int
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM people`).Scan(&count); err != nil {

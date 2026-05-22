@@ -412,6 +412,49 @@ func ListProposals(ctx *config.AppContext) ([]*types.Proposal, error) {
 	return out, nil
 }
 
+func parseProposalOnly(pageID string, props map[string]notion.PropertyValue) *types.Proposal {
+	prop := &types.Proposal{
+		ID:              pageID,
+		Title:           parseRichText("Title", props),
+		Description:     parseRichText("Desc", props),
+		Setup:           parseRichText("Setup", props),
+		Comments:        parseRichText("Comments", props),
+		TalkType:        parseSelect("TalkType", props),
+		Status:          parseSelect("Status", props),
+		DesiredDuration: int(props["DesiredDuration"].Number),
+		AvailDuration:   int(props["AvailDuration"].Number),
+		InviteToken:     parseRichText("InviteToken", props),
+	}
+	if tag := parseSelect("ScheduleFor", props); tag != "" {
+		prop.ScheduleFor = &types.Conf{Tag: tag}
+	}
+	for _, ref := range props["speakers"].Relation {
+		if ref != nil && ref.ID != "" {
+			prop.SpeakerConfRefs = append(prop.SpeakerConfRefs, ref.ID)
+		}
+	}
+	return prop
+}
+
+func ListProposalsOnly(n *types.Notion) ([]*types.Proposal, error) {
+	var out []*types.Proposal
+	hasMore := true
+	nextCursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
+			n.Config.ProposalDb, notion.QueryDatabaseParam{StartCursor: nextCursor})
+		if err != nil {
+			return nil, err
+		}
+		nextCursor = next
+		hasMore = more
+		for _, page := range pages {
+			out = append(out, parseProposalOnly(page.ID, page.Properties))
+		}
+	}
+	return out, nil
+}
+
 // GetSpeakerConfsByEmail looks up Speaker(s) by email and returns every
 // SpeakerConf row linked to those speakers, fully resolved.
 //

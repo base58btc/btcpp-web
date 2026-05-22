@@ -17,14 +17,20 @@ import (
 )
 
 type options struct {
-	configPath   string
-	databaseURL  string
-	dryRun       bool
-	reset        bool
-	validate     bool
-	skipTickets  bool
-	skipSponsors bool
-	skipSpeakers bool
+	configPath       string
+	databaseURL      string
+	dryRun           bool
+	reset            bool
+	validate         bool
+	listConfTalkDups bool
+	skipTickets      bool
+	skipSponsors     bool
+	skipSpeakers     bool
+	skipProposals    bool
+	skipSpeakerConfs bool
+	skipConfTalks    bool
+	skipRecordings   bool
+	skipSocialPosts  bool
 }
 
 func main() {
@@ -40,11 +46,45 @@ func main() {
 	if opts.databaseURL != "" {
 		env.DatabaseURL = opts.databaseURL
 	}
+	if opts.listConfTalkDups {
+		if err := validateConfTalkDuplicateConfig(env); err != nil {
+			log.Fatal(err)
+		}
+		notion := &types.Notion{Config: &env.Notion}
+		notion.Setup(env.Notion.Token)
+		proposals, err := getters.ListProposalsOnly(notion)
+		if err != nil {
+			log.Fatalf("fetch proposals from Notion: %s", err)
+		}
+		confTalks, err := listConfTalkImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch conf talks from Notion: %s", err)
+		}
+		printConfTalkProposalDuplicates(confTalks, proposalByRef(proposals))
+		return
+	}
 	needDB := !opts.dryRun || opts.validate
 	importTickets := !opts.skipTickets
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
-	if err := validateConfig(env, needDB, importTickets, importSponsors, importSpeakers); err != nil {
+	importProposals := !opts.skipProposals
+	importSpeakerConfs := !opts.skipSpeakerConfs
+	importConfTalks := !opts.skipConfTalks
+	importRecordings := !opts.skipRecordings
+	importSocialPosts := !opts.skipSocialPosts
+	if importSpeakerConfs && (!importSponsors || !importSpeakers || !importProposals) {
+		log.Fatal("speaker conf import requires sponsors, speakers, and proposals; use -skip-speaker-confs when skipping any of those imports")
+	}
+	if importConfTalks && !importProposals {
+		log.Fatal("conf talk import requires proposals; use -skip-conf-talks when skipping proposals")
+	}
+	if importRecordings && !importConfTalks {
+		log.Fatal("recording import requires conf talks; use -skip-recordings when skipping conf talks")
+	}
+	if importSocialPosts && (!importConfTalks || !importRecordings) {
+		log.Fatal("social post import requires conf talks and recordings; use -skip-social-posts when skipping either import")
+	}
+	if err := validateConfig(env, needDB, importTickets, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -104,6 +144,66 @@ func main() {
 		log.Printf("fetched %d speakers from Notion", len(speakers))
 	}
 
+	var proposals []*types.Proposal
+	if importProposals {
+		proposals, err = getters.ListProposalsOnly(notion)
+		if err != nil {
+			log.Fatalf("fetch proposals from Notion: %s", err)
+		}
+		if err := validateProposalRows(proposals); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d proposals from Notion", len(proposals))
+	}
+
+	var speakerConfs []*speakerConfImportRow
+	if importSpeakerConfs {
+		speakerConfs, err = listSpeakerConfImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch speaker confs from Notion: %s", err)
+		}
+		if err := validateSpeakerConfRows(speakerConfs, speakerRefByRef(speakers), proposalByRef(proposals), orgRefByRef(orgs)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d speaker confs from Notion", len(speakerConfs))
+	}
+
+	var confTalks []*confTalkImportRow
+	if importConfTalks {
+		confTalks, err = listConfTalkImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch conf talks from Notion: %s", err)
+		}
+		if err := validateConfTalkRows(confTalks, confTagByRef, proposalByRef(proposals)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d conf talks from Notion", len(confTalks))
+	}
+
+	var recordings []*recordingImportRow
+	if importRecordings {
+		recordings, err = listRecordingImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch recordings from Notion: %s", err)
+		}
+		if err := validateRecordingRows(recordings, confTalkRefsByRef(confTalks)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d recordings from Notion", len(recordings))
+	}
+
+	var socialPosts []*socialPostImportRow
+	if importSocialPosts {
+		socialPosts, err = listSocialPostImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch social posts from Notion: %s", err)
+		}
+		if err := validateSocialPostRows(socialPosts, recordingRefsByRef(recordings), confTalkRefsByRef(confTalks)); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d social posts from Notion", len(socialPosts))
+	}
+
 	var pool *pgxpool.Pool
 	if !opts.dryRun || opts.validate {
 		pool, err = db.Open(ctx, env.DatabaseURL)
@@ -139,6 +239,25 @@ func main() {
 		for _, speaker := range speakers {
 			log.Printf("dry-run speaker name=%q email=%q roles=%q", speaker.Name, speaker.Email, strings.Join(speaker.Roles, ","))
 		}
+		for _, proposal := range proposals {
+			confTag := ""
+			if proposal.ScheduleFor != nil {
+				confTag = proposal.ScheduleFor.Tag
+			}
+			log.Printf("dry-run proposal title=%q conf=%q status=%q speakers=%d", proposal.Title, confTag, proposal.Status, len(proposal.SpeakerConfRefs))
+		}
+		for _, speakerConf := range speakerConfs {
+			log.Printf("dry-run speaker-conf speaker_ref=%q proposal_refs=%d other_events=%d", speakerConf.speakerRef, len(speakerConf.proposalRefs), len(speakerConf.otherEventTags))
+		}
+		for _, confTalk := range confTalks {
+			log.Printf("dry-run conf-talk conf=%q proposal_ref=%q venue=%q", confTalk.confTag, confTalk.proposalRef, confTalk.venue)
+		}
+		for _, recording := range recordings {
+			log.Printf("dry-run recording conf_talk_ref=%q talk_name=%q youtube=%q", recording.confTalkRef, recording.talkName, recording.youtubeURL)
+		}
+		for _, socialPost := range socialPosts {
+			log.Printf("dry-run social-post ref=%q kind=%q status=%q recording_ref=%q conf_talk_ref=%q", socialPost.socialRef, socialPost.kind, socialPost.status, socialPost.recordingRef, socialPost.confTalkRef)
+		}
 	} else {
 		if err := importConferences(ctx, pool, confs); err != nil {
 			log.Fatal(err)
@@ -150,8 +269,9 @@ func main() {
 			}
 			log.Printf("upserted %d conference tickets into Postgres", len(tickets))
 		}
+		var orgIDsByRef map[string]string
 		if importSponsors {
-			orgIDsByRef, err := importOrganizations(ctx, pool, orgs)
+			orgIDsByRef, err = importOrganizations(ctx, pool, orgs)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -161,11 +281,49 @@ func main() {
 			}
 			log.Printf("upserted %d sponsorships into Postgres", len(sponsorships))
 		}
+		var speakerIDsByRef map[string]string
 		if importSpeakers {
-			if _, err := importSpeakersRows(ctx, pool, speakers); err != nil {
+			speakerIDsByRef, err = importSpeakersRows(ctx, pool, speakers)
+			if err != nil {
 				log.Fatal(err)
 			}
 			log.Printf("inserted %d speakers into Postgres", len(speakers))
+		}
+		var proposalIDsByRef map[string]string
+		if importProposals {
+			proposalIDsByRef, err = importProposalsRows(ctx, pool, proposals)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d proposals into Postgres", len(proposals))
+		}
+		if importSpeakerConfs {
+			if err := importSpeakerConfsRows(ctx, pool, speakerConfs, speakerIDsByRef, orgIDsByRef, proposalIDsByRef, proposalByRef(proposals)); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d speaker confs into Postgres", len(speakerConfs))
+		}
+		var confTalkIDsByRef map[string]string
+		if importConfTalks {
+			confTalkIDsByRef, err = importConfTalkRows(ctx, pool, confTalks, proposalIDsByRef)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d conf talks into Postgres", len(confTalks))
+		}
+		var recordingIDsByRef map[string]string
+		if importRecordings {
+			recordingIDsByRef, err = importRecordingRows(ctx, pool, recordings, confTalkIDsByRef)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d recordings into Postgres", len(recordings))
+		}
+		if importSocialPosts {
+			if err := importSocialPostRows(ctx, pool, socialPosts, recordingIDsByRef, confTalkIDsByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d social posts into Postgres", len(socialPosts))
 		}
 	}
 
@@ -196,6 +354,36 @@ func main() {
 			}
 			log.Printf("validated speaker count and roles")
 		}
+		if importProposals {
+			if err := validateProposals(ctx, pool, proposals); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated proposal count and required titles")
+		}
+		if importSpeakerConfs {
+			if err := validateSpeakerConfs(ctx, pool, speakerConfs); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated speaker conf count and proposal links")
+		}
+		if importConfTalks {
+			if err := validateConfTalks(ctx, pool, confTalks); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated conf talk count")
+		}
+		if importRecordings {
+			if err := validateRecordings(ctx, pool, recordings); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated recording count")
+		}
+		if importSocialPosts {
+			if err := validateSocialPosts(ctx, pool, socialPosts); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated social post count")
+		}
 	}
 }
 
@@ -206,9 +394,15 @@ func parseFlags() options {
 	flag.BoolVar(&opts.dryRun, "dry-run", false, "fetch and print planned imports without writing Postgres")
 	flag.BoolVar(&opts.reset, "reset", false, "truncate imported tables before writing")
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
+	flag.BoolVar(&opts.listConfTalkDups, "list-conf-talk-duplicates", false, "print ConfTalkDb rows that share the same proposal relation and exit")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
+	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
+	flag.BoolVar(&opts.skipSpeakerConfs, "skip-speaker-confs", false, "skip importing speaker conference rows and proposal links")
+	flag.BoolVar(&opts.skipConfTalks, "skip-conf-talks", false, "skip importing scheduled conference talks")
+	flag.BoolVar(&opts.skipRecordings, "skip-recordings", false, "skip importing recording metadata")
+	flag.BoolVar(&opts.skipSocialPosts, "skip-social-posts", false, "skip importing social post state")
 	flag.Parse()
 	return opts
 }
@@ -246,10 +440,25 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_SPEAKERS_DB"); v != "" {
 		env.Notion.SpeakersDb = v
 	}
+	if v := os.Getenv("NOTION_PROPOSAL_DB"); v != "" {
+		env.Notion.ProposalDb = v
+	}
+	if v := os.Getenv("NOTION_SPEAKER_CONF_DB"); v != "" {
+		env.Notion.SpeakerConfDb = v
+	}
+	if v := os.Getenv("NOTION_CONFTALK_DB"); v != "" {
+		env.Notion.ConfTalkDb = v
+	}
+	if v := os.Getenv("NOTION_RECORDINGS_DB"); v != "" {
+		env.Notion.RecordingsDb = v
+	}
+	if v := os.Getenv("NOTION_SOCIAL_POSTS_DB"); v != "" {
+		env.Notion.SocialPostsDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors, importSpeakers bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -268,6 +477,21 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets, importSponsors,
 	}
 	if importSpeakers && strings.TrimSpace(env.Notion.SpeakersDb) == "" {
 		missing = append(missing, "NOTION_SPEAKERS_DB")
+	}
+	if importProposals && strings.TrimSpace(env.Notion.ProposalDb) == "" {
+		missing = append(missing, "NOTION_PROPOSAL_DB")
+	}
+	if importSpeakerConfs && strings.TrimSpace(env.Notion.SpeakerConfDb) == "" {
+		missing = append(missing, "NOTION_SPEAKER_CONF_DB")
+	}
+	if importConfTalks && strings.TrimSpace(env.Notion.ConfTalkDb) == "" {
+		missing = append(missing, "NOTION_CONFTALK_DB")
+	}
+	if importRecordings && strings.TrimSpace(env.Notion.RecordingsDb) == "" {
+		missing = append(missing, "NOTION_RECORDINGS_DB")
+	}
+	if importSocialPosts && strings.TrimSpace(env.Notion.SocialPostsDb) == "" {
+		missing = append(missing, "NOTION_SOCIAL_POSTS_DB")
 	}
 	if needDB && strings.TrimSpace(env.DatabaseURL) == "" {
 		missing = append(missing, "DATABASE_URL")
@@ -290,6 +514,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, people CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, organizations, sponsorships, people, proposals CASCADE`)
 	return err
 }

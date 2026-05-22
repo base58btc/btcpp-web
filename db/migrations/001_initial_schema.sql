@@ -217,7 +217,7 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE speaker_confs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conference_id uuid NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
+  conference_id uuid REFERENCES conferences(id) ON DELETE CASCADE,
   speaker_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
   coming_from text NOT NULL DEFAULT '',
@@ -299,7 +299,7 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE social_posts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  ref text NOT NULL UNIQUE,
+  ref text NOT NULL,
   text text NOT NULL DEFAULT '',
   posted_to text NOT NULL DEFAULT '',
   kind text NOT NULL DEFAULT '',
@@ -318,6 +318,7 @@ CREATE TABLE social_posts (
   CHECK (ref <> '')
 );
 
+CREATE INDEX social_posts_ref_idx ON social_posts (ref);
 CREATE INDEX social_posts_kind_status_idx ON social_posts (kind, status);
 
 CREATE TRIGGER social_posts_set_updated_at

@@ -126,13 +126,13 @@ used only in-memory during an import to resolve relations.
 | `DesiredDuration` | `proposals.desired_duration_min` | Number. |
 | `AvailDuration` | `proposals.avail_duration_min` | Number. |
 | `InviteToken` | `proposals.invite_token` | Rich text. |
-| `speakers` | `proposals_speaker_confs.proposal_id`, `proposals_speaker_confs.speaker_conf_id` | Relation to SpeakerConf rows. |
+| `speakers` | `proposals_speaker_confs.proposal_id`, `proposals_speaker_confs.speaker_conf_id` | Relation to SpeakerConf rows. Populated after `SpeakerConfDb` import can resolve those rows to Postgres IDs. |
 
 ### `SpeakerConfDb` -> `speaker_confs`, `speaker_confs_conferences`, `proposals_speaker_confs`
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| inferred conference | `speaker_confs.conference_id` | Infer from linked proposal `ScheduleFor` or importer context. |
+| inferred conference | `speaker_confs.conference_id` | Nullable during migration. Infer from linked proposal `ScheduleFor` when present; backfill unresolved rows after migration cleanup. |
 | `speaker` | `speaker_confs.speaker_id` | Relation to `people.id` from `SpeakersDb`. |
 | `org` | `speaker_confs.organization_id` | Relation to `OrgDb`. |
 | `ComingFrom` | `speaker_confs.coming_from` | Title/rich text. |
@@ -387,52 +387,52 @@ to avoid duplicate rows from repeated imports.
 These notes describe the initial Postgres schema indexes and uniqueness rules.
 UUID `id` columns remain the primary key unless a table is a pure join table.
 
-| Table | Index / unique rule | Unique? | Rationale |
-| --- | --- | --- | --- |
-| `conferences` | `tag` | yes | Stable public conference slug and importer upsert key. |
-| `conferences` | `public_uid` | yes | Notion unique ID property when present; not the Notion page ID. |
-| `conference_days` | `(conference_id, day_number)` | yes | One schedule metadata row per conference day. |
-| `conference_tickets` | `(conference_id, ticket_key)` | yes | Prevent duplicate ticket tiers on reruns without relying on Notion page IDs. |
-| `people` | `email` | no | Lookup aid; nullable and not all people have email. |
-| `people` | `lower(name)` | no | Admin/search lookup aid; names can duplicate. |
-| `people_roles` | `(person_id, scope, position)` primary key | yes | A person should not have the same scoped role twice. |
-| `organizations` | `lower(name)` | yes | Current importer key. Website is not unique in real Notion data. |
-| `sponsorships` | `organization_id` | no | Lookup sponsorships by org. |
-| `sponsorships` | `(status, level)` | no | Filtering/grouping sponsorships by workflow status and tier. Names intentionally allow duplicates. |
-| `sponsorships_conferences` | `(sponsorship_id, conference_id)` primary key | yes | Prevent duplicate conference links for the same sponsorship row. |
-| `proposals` | `(conference_id, status)` | no | Admin review/status filtering by conference. |
-| `proposals` | `invite_token` where non-empty | no | Lookup invite token when present; blank tokens are ignored. |
-| `speaker_confs` | `(conference_id, speaker_id)` | yes | One speaker attendance/application row per conference. |
-| `speaker_confs` | `speaker_id` | no | Reverse lookup all conference rows for a speaker. |
-| `speaker_confs_conferences` | `(speaker_conf_id, conference_id)` primary key | yes | Prevent duplicate related-event links. |
-| `proposals_speaker_confs` | `(proposal_id, speaker_conf_id)` primary key | yes | Prevent duplicate speaker links on a proposal. |
-| `conf_talks` | `proposal_id` | yes | At most one scheduled talk row per accepted proposal. |
-| `conf_talks` | `(conference_id, scheduled_start)` | no | Schedule rendering/query order by conference. |
-| `recordings` | `conf_talk_id` | yes | One recording metadata row per scheduled talk. |
-| `social_posts` | `ref` | yes | Stable app-generated social post identity. |
-| `social_posts` | `(kind, status)` | no | Dashboard/background job filtering. |
-| `hotels` | `(conference_id, display_order, name)` | no | Conference hotel rendering order. |
-| `discounts` | `code_name` | yes | Discount codes are case-insensitive public identifiers. |
-| `discounts_conferences` | `(discount_id, conference_id)` primary key | yes | Prevent duplicate discount/conference links. |
-| `registrations` | `ref_id` | yes | Ticket/public registration reference identity. |
-| `registrations` | `conference_id` | no | Conference attendee/report lookups. |
-| `registrations` | `email` | no | Attendee/email lookups; emails can repeat. |
-| `registrations` | `checkout_id` where non-empty | no | Payment lookup aid; blank checkout IDs are ignored. |
-| `affiliate_usages` | `affiliate_email` | no | Affiliate reporting by email. |
-| `affiliate_usages` | `conference_id` | no | Affiliate reporting by conference. |
-| `job_types` | `tag` | yes | Stable job type identifier. |
-| `volunteers` | `email` | no | Volunteer lookup aid; repeat applications may share email. |
-| `volunteers_conferences` | `(volunteer_id, conference_id, kind)` primary key | yes | A volunteer should not have the same conference relation kind twice. |
-| `volunteers_job_types` | `(volunteer_id, job_type_id, preference)` primary key | yes | Prevent duplicate yes/no preference rows. |
-| `work_shifts` | `(conference_id, shift_start)` | no | Schedule/admin lookup by conference and time. |
-| `work_shifts_volunteers` | `(shift_id, volunteer_id, role)` primary key | yes | Prevent duplicate shift assignment rows. |
-| `work_shifts_volunteers` | one leader per `shift_id` where `role='leader'` | yes | Enforces one shift leader while allowing many assignees. |
-| `vol_infos` | `conference_id` | yes | One volunteer info/orientation row per conference. |
-| `subscribers` | `email` | yes | Subscriber email is the account/subscription identity. |
-| `subscriber_subscriptions` | `(subscriber_id, name)` primary key | yes | Prevent duplicate subscription names per subscriber. |
-| `missives` | `public_uid` | yes | Notion unique ID property when present; not the Notion page ID. |
-| `missives` | `newsletters` GIN | no | Query messages by newsletter membership. |
-| `missives` | `only_for` where non-empty | no | Filter targeted messages; blank targets are ignored. |
+| Table | Index / unique rule | Indexed? | Unique? | Rationale |
+| --- | --- | --- | --- | --- |
+| `conferences` | `tag` | yes | yes | Stable public conference slug and importer upsert key. |
+| `conferences` | `public_uid` | yes | yes | Notion unique ID property when present; not the Notion page ID. |
+| `conference_days` | `(conference_id, day_number)` | yes | yes | One schedule metadata row per conference day. |
+| `conference_tickets` | `(conference_id, ticket_key)` | yes | yes | Prevent duplicate ticket tiers on reruns without relying on Notion page IDs. |
+| `people` | `email` | yes | no | Lookup aid; nullable and not all people have email. |
+| `people` | `lower(name)` | yes | no | Admin/search lookup aid; names can duplicate. |
+| `people_roles` | `(person_id, scope, position)` primary key | yes | yes | A person should not have the same scoped role twice. |
+| `organizations` | `lower(name)` | yes | yes | Current importer key. Website is not unique in real Notion data. |
+| `sponsorships` | `organization_id` | yes | no | Lookup sponsorships by org. |
+| `sponsorships` | `(status, level)` | yes | no | Filtering/grouping sponsorships by workflow status and tier. Names intentionally allow duplicates. |
+| `sponsorships_conferences` | `(sponsorship_id, conference_id)` primary key | yes | yes | Prevent duplicate conference links for the same sponsorship row. |
+| `proposals` | `(conference_id, status)` | yes | no | Admin review/status filtering by conference. |
+| `proposals` | `invite_token` where non-empty | yes | no | Lookup invite token when present; blank tokens are ignored. |
+| `speaker_confs` | `(conference_id, speaker_id)` | yes | yes | One speaker attendance/application row per known conference. `conference_id` may be null during migration cleanup. |
+| `speaker_confs` | `speaker_id` | yes | no | Reverse lookup all conference rows for a speaker. |
+| `speaker_confs_conferences` | `(speaker_conf_id, conference_id)` primary key | yes | yes | Prevent duplicate related-event links. |
+| `proposals_speaker_confs` | `(proposal_id, speaker_conf_id)` primary key | yes | yes | Prevent duplicate speaker links on a proposal. |
+| `conf_talks` | `proposal_id` | yes | yes | At most one scheduled talk row per accepted proposal. |
+| `conf_talks` | `(conference_id, scheduled_start)` | yes | no | Schedule rendering/query order by conference. |
+| `recordings` | `conf_talk_id` | yes | yes | One recording metadata row per scheduled talk. |
+| `social_posts` | `ref` | yes | no | Lookup/grouping key for app-generated social posts. Multiple rows can share a ref when they are distinct posts. |
+| `social_posts` | `(kind, status)` | yes | no | Dashboard/background job filtering. |
+| `hotels` | `(conference_id, display_order, name)` | yes | no | Conference hotel rendering order. |
+| `discounts` | `code_name` | yes | yes | Discount codes are case-insensitive public identifiers. |
+| `discounts_conferences` | `(discount_id, conference_id)` primary key | yes | yes | Prevent duplicate discount/conference links. |
+| `registrations` | `ref_id` | yes | yes | Ticket/public registration reference identity. |
+| `registrations` | `conference_id` | yes | no | Conference attendee/report lookups. |
+| `registrations` | `email` | yes | no | Attendee/email lookups; emails can repeat. |
+| `registrations` | `checkout_id` where non-empty | yes | no | Payment lookup aid; blank checkout IDs are ignored. |
+| `affiliate_usages` | `affiliate_email` | yes | no | Affiliate reporting by email. |
+| `affiliate_usages` | `conference_id` | yes | no | Affiliate reporting by conference. |
+| `job_types` | `tag` | yes | yes | Stable job type identifier. |
+| `volunteers` | `email` | yes | no | Volunteer lookup aid; repeat applications may share email. |
+| `volunteers_conferences` | `(volunteer_id, conference_id, kind)` primary key | yes | yes | A volunteer should not have the same conference relation kind twice. |
+| `volunteers_job_types` | `(volunteer_id, job_type_id, preference)` primary key | yes | yes | Prevent duplicate yes/no preference rows. |
+| `work_shifts` | `(conference_id, shift_start)` | yes | no | Schedule/admin lookup by conference and time. |
+| `work_shifts_volunteers` | `(shift_id, volunteer_id, role)` primary key | yes | yes | Prevent duplicate shift assignment rows. |
+| `work_shifts_volunteers` | one leader per `shift_id` where `role='leader'` | yes | yes | Enforces one shift leader while allowing many assignees. |
+| `vol_infos` | `conference_id` | yes | yes | One volunteer info/orientation row per conference. |
+| `subscribers` | `email` | yes | yes | Subscriber email is the account/subscription identity. |
+| `subscriber_subscriptions` | `(subscriber_id, name)` primary key | yes | yes | Prevent duplicate subscription names per subscriber. |
+| `missives` | `public_uid` | yes | yes | Notion unique ID property when present; not the Notion page ID. |
+| `missives` | `newsletters` GIN | yes | no | Query messages by newsletter membership. |
+| `missives` | `only_for` where non-empty | yes | no | Filter targeted messages; blank targets are ignored. |
 
 ## Migration Key Assumptions
 
