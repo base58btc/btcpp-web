@@ -26,6 +26,7 @@ type options struct {
 	skipTickets      bool
 	skipDiscounts    bool
 	skipPurchases    bool
+	skipAffiliateUse bool
 	skipSponsors     bool
 	skipSpeakers     bool
 	skipProposals    bool
@@ -69,6 +70,7 @@ func main() {
 	importTickets := !opts.skipTickets
 	importDiscounts := !opts.skipDiscounts
 	importPurchases := !opts.skipPurchases
+	importAffiliateUse := !opts.skipAffiliateUse
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
 	importProposals := !opts.skipProposals
@@ -91,7 +93,7 @@ func main() {
 	if importPurchases && !importDiscounts {
 		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
 	}
-	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -139,6 +141,18 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d purchases from Notion", len(purchases))
+	}
+
+	var affiliateUsages []*affiliateUsageImportRow
+	if importAffiliateUse {
+		affiliateUsages, err = listAffiliateUsageImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch affiliate usages from Notion: %s", err)
+		}
+		if err := validateAffiliateUsageRows(affiliateUsages, confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d affiliate usages from Notion", len(affiliateUsages))
 	}
 
 	var orgs []*types.Org
@@ -266,6 +280,9 @@ func main() {
 			confTag := confTagByRef[purchase.confRef]
 			log.Printf("dry-run purchase ref=%q conf=%q email=%q item=%q amount=%.2f", purchase.refID, confTag, purchase.email, purchase.itemBought, purchase.amountPaid)
 		}
+		for _, affiliateUsage := range affiliateUsages {
+			log.Printf("dry-run affiliate-usage code=%q conf=%q email=%q tickets=%d saved_sats=%d earned_sats=%d", affiliateUsage.codeName, affiliateUsage.confTag, affiliateUsage.affiliateEmail, affiliateUsage.ticketsCount, affiliateUsage.savedSats, affiliateUsage.earnedSats)
+		}
 		for _, org := range orgs {
 			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
 		}
@@ -320,6 +337,12 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("upserted %d purchases into Postgres", len(purchases))
+		}
+		if importAffiliateUse {
+			if err := importAffiliateUsageRows(ctx, pool, affiliateUsages); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d affiliate usages into Postgres", len(affiliateUsages))
 		}
 		var orgIDsByRef map[string]string
 		if importSponsors {
@@ -402,6 +425,12 @@ func main() {
 			}
 			log.Printf("validated purchase count")
 		}
+		if importAffiliateUse {
+			if err := validateAffiliateUsages(ctx, pool, affiliateUsages); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated affiliate usage count")
+		}
 		if importSponsors {
 			if err := validateOrganizations(ctx, pool, orgs); err != nil {
 				log.Fatal(err)
@@ -462,6 +491,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
 	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
+	flag.BoolVar(&opts.skipAffiliateUse, "skip-affiliate-usages", false, "skip importing affiliate usage ledger rows")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
@@ -527,10 +557,13 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_SOCIAL_POSTS_DB"); v != "" {
 		env.Notion.SocialPostsDb = v
 	}
+	if v := os.Getenv("NOTION_AFFILIATE_USE_DB"); v != "" {
+		env.Notion.AffiliateUsageDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -546,6 +579,9 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts
 	}
 	if importPurchases && strings.TrimSpace(env.Notion.PurchasesDb) == "" {
 		missing = append(missing, "NOTION_PURCHASES_DB")
+	}
+	if importAffiliateUse && strings.TrimSpace(env.Notion.AffiliateUsageDb) == "" {
+		missing = append(missing, "NOTION_AFFILIATE_USE_DB")
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
 		missing = append(missing, "NOTION_ORGS_DB")
