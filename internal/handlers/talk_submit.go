@@ -17,14 +17,14 @@ const StatusApplied = "Applied"
 // submitDeps carries the side-effecting collaborators used by the talk-submit
 // pipeline. Production wires these to the getters package; tests pass fakes.
 type submitDeps struct {
-	findSpeakers          func(email string) ([]*types.Speaker, error)
-	createSpeaker         func(in getters.SpeakerInput) (string, error)
-	updateSpeaker         func(speakerID string, up getters.SpeakerUpdate) error
-	findOrg            func(website, name string) (*types.Org, error)
-	createOrg          func(org *types.Org) (string, error)
-	createProposal     func(in getters.ProposalInput) (string, error)
-	upsertSpeakerConf  func(in getters.SpeakerConfInput) (string, error)
-	logf               func(format string, args ...interface{})
+	findSpeakers      func(email string) ([]*types.Speaker, error)
+	createSpeaker     func(in getters.SpeakerInput) (string, error)
+	updateSpeaker     func(speakerID string, up getters.SpeakerUpdate) error
+	findOrg           func(website, name string) (*types.Org, error)
+	createOrg         func(org *types.Org) (string, error)
+	createProposal    func(in getters.ProposalInput) (string, error)
+	upsertSpeakerConf func(in getters.SpeakerConfInput) (string, error)
+	logf              func(format string, args ...interface{})
 }
 
 type submitPipeline struct {
@@ -74,6 +74,7 @@ func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
 // conf the form was submitted from.
 func (p submitPipeline) Submit(app *types.TalkApp) (SubmitResult, error) {
 	var result SubmitResult
+	trimTalkApp(app)
 
 	if app.Email == "" {
 		return result, errors.New("email is required")
@@ -177,6 +178,7 @@ func (p submitPipeline) Submit(app *types.TalkApp) (SubmitResult, error) {
 // the SpeakerConf at the end.
 func (p submitPipeline) JoinProposal(app *types.TalkApp, proposalID string) (SubmitResult, error) {
 	var result SubmitResult
+	trimTalkApp(app)
 
 	if app.Email == "" {
 		return result, errors.New("email is required")

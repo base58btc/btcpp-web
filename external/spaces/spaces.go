@@ -191,6 +191,11 @@ func SaveHashes(hashes map[string]string) error {
 // available locally.
 const TalkManifestKey = "talks/_manifest.json"
 
+// SpeakerManifestKey is the location of the per-speaker-photo
+// fingerprint manifest. Maintained by the speaker photo upload path so
+// media-card hashing can stop depending on static/img/speakers.
+const SpeakerManifestKey = "speakers/_manifest.json"
+
 // LoadJSONMap reads a JSON map (string→string) from the given Spaces
 // key. Returns an empty map when the key doesn't exist yet (so a
 // caller can use it to bootstrap a fresh manifest without special-
@@ -238,6 +243,32 @@ func SaveJSONMap(key string, m map[string]string) error {
 		ACL:         s3types.ObjectCannedACLPublicRead,
 	})
 	return err
+}
+
+// ListKeys returns all object keys under prefix. It follows S3 pagination
+// so callers can safely use it for large asset folders.
+func ListKeys(prefix string) ([]string, error) {
+	if client == nil {
+		return nil, fmt.Errorf("spaces not configured")
+	}
+	var keys []string
+	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
+		Bucket: aws.String(bucket),
+		Prefix: aws.String(prefix),
+	})
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		for _, obj := range page.Contents {
+			if obj.Key == nil {
+				continue
+			}
+			keys = append(keys, *obj.Key)
+		}
+	}
+	return keys, nil
 }
 
 // Get fetches an object's raw bytes by key. Used by the admin

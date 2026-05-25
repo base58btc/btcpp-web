@@ -10,9 +10,9 @@ import (
 )
 
 type submitRecorder struct {
-	findCalls       []string
-	speakerCreated  []getters.SpeakerInput
-	speakerUpdated  []struct {
+	findCalls      []string
+	speakerCreated []getters.SpeakerInput
+	speakerUpdated []struct {
 		ID     string
 		Update getters.SpeakerUpdate
 	}
@@ -32,34 +32,34 @@ func makeSubmitApp(email, scheduleTag string, otherTags ...string) *types.TalkAp
 		schedule = &types.Conf{Tag: scheduleTag, Ref: "conf-" + scheduleTag}
 	}
 	return &types.TalkApp{
-		Ref:           "tapp-1",
-		Status:        "Applied",
-		Name:          "Alice Test",
-		Email:         email,
-		Phone:         "+15551234567",
-		TalkTitle:     "On Bitcoin",
-		Description:   "A talk",
-		Setup:         "Install Bitcoin Core 27.0",
-		Comments:      "looking forward to it",
-		PresType:      "20talk",
-		Recording:     "",
-		Org:           "ACME",
-		NormPhoto:     "abc123.jpg",
-		Twitter:       types.Twitter{Handle: "alice"},
-		Github:        "https://github.com/alice",
-		Website:       "https://alice.example",
-		Nostr:         "npub1alice",
-		Signal:        "alice.99",
-		Telegram:      "alice_tg",
-		Hometown:      "Brooklyn, NY",
-		Visa:          "I have a US passport",
-		Shirt:         "MM",
-		FirstEvent:    true,
-		DinnerRSVP:    true,
-		Sponsor:       false,
-		Availability:  []string{"day-thursday", "day-friday"},
-		ScheduleFor:   schedule,
-		OtherEvents:   others,
+		Ref:          "tapp-1",
+		Status:       "Applied",
+		Name:         "Alice Test",
+		Email:        email,
+		Phone:        "+15551234567",
+		TalkTitle:    "On Bitcoin",
+		Description:  "A talk",
+		Setup:        "Install Bitcoin Core 27.0",
+		Comments:     "looking forward to it",
+		PresType:     "20talk",
+		Recording:    "",
+		Org:          "ACME",
+		NormPhoto:    "abc123.jpg",
+		Twitter:      types.Twitter{Handle: "alice"},
+		Github:       "https://github.com/alice",
+		Website:      "https://alice.example",
+		Nostr:        "npub1alice",
+		Signal:       "alice.99",
+		Telegram:     "alice_tg",
+		Hometown:     "Brooklyn, NY",
+		Visa:         "I have a US passport",
+		Shirt:        "MM",
+		FirstEvent:   true,
+		DinnerRSVP:   true,
+		Sponsor:      false,
+		Availability: []string{"day-thursday", "day-friday"},
+		ScheduleFor:  schedule,
+		OtherEvents:  others,
 	}
 }
 
@@ -178,6 +178,55 @@ func TestSubmit_NewSpeaker_OneConf(t *testing.T) {
 	}
 	if len(sp.OtherEventTags) != 0 {
 		t.Errorf("OtherEventTags should be empty for single-conf submission; got %v", sp.OtherEventTags)
+	}
+}
+
+func TestSubmit_TrimsTextInputsBeforeNotionWrites(t *testing.T) {
+	app := makeSubmitApp(" alice@example.com ", "berlin26")
+	app.Name = " Alice Test "
+	app.Phone = " +15551234567 "
+	app.Signal = " alice.99 "
+	app.Telegram = " alice_tg "
+	app.Twitter = types.Twitter{Handle: " @alice "}
+	app.Nostr = " npub1alice "
+	app.Github = " https://github.com/alice "
+	app.Website = " https://alice.example "
+	app.Org = " ACME "
+	app.OrgSite = " https://acme.example "
+	app.OrgTwitter = types.Twitter{Handle: " @acme "}
+	app.OrgNostr = " npub1acme "
+	app.TalkTitle = " On Bitcoin "
+	app.Description = " A talk "
+	app.Setup = " Install Bitcoin Core 27.0 "
+	app.Comments = " looking forward to it "
+	app.Hometown = " Brooklyn, NY "
+	app.Visa = " I have a US passport "
+
+	p, rec := newSubmitRecorder(t, app, nil)
+	if _, err := p.Submit(app); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+
+	if got := rec.findCalls[0]; got != "alice@example.com" {
+		t.Fatalf("findSpeakers email = %q", got)
+	}
+	created := rec.speakerCreated[0]
+	if created.Email != "alice@example.com" || created.Phone != "+15551234567" || created.Signal != "alice.99" {
+		t.Fatalf("speaker fields not trimmed: %+v", created)
+	}
+	if created.Twitter != "alice" || created.Github != "https://github.com/alice" || created.Website != "https://alice.example" {
+		t.Fatalf("speaker social fields not trimmed: %+v", created)
+	}
+	if got := rec.orgFindCalls[0]; got != "https://acme.example|ACME" {
+		t.Fatalf("org lookup = %q", got)
+	}
+	proposal := rec.proposalCreated[0]
+	if proposal.Title != "On Bitcoin" || proposal.Description != "A talk" || proposal.Setup != "Install Bitcoin Core 27.0" || proposal.Comments != "looking forward to it" {
+		t.Fatalf("proposal fields not trimmed: %+v", proposal)
+	}
+	sc := rec.speakerProposals[0]
+	if sc.Company != "ACME" || sc.ComingFrom != "Brooklyn, NY" || sc.Visa != "I have a US passport" {
+		t.Fatalf("speaker conf fields not trimmed: %+v", sc)
 	}
 }
 

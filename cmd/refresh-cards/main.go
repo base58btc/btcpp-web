@@ -17,6 +17,7 @@
 //	go run ./cmd/refresh-cards -conf berlin26             # one conf
 //	go run ./cmd/refresh-cards -speaker neigut            # one speaker
 //	go run ./cmd/refresh-cards -conf berlin26 -speaker neigut
+//	go run ./cmd/refresh-cards -conf berlin26 -sponsors-only -force
 package main
 
 import (
@@ -40,15 +41,15 @@ type cfgFile struct {
 	Port   string `toml:"port"`
 	Host   string `toml:"host"`
 	Notion struct {
-		Token             string `toml:"token"`
-		ConfsDb           string `toml:"confsdb"`
-		ConfsTixDb        string `toml:"confstixdb"`
-		SpeakersDb        string `toml:"speakersdb"`
-		OrgDb             string `toml:"orgdb"`
-		ProposalDb        string `toml:"proposaldb"`
-		SpeakerConfDb     string `toml:"speakerconfdb"`
-		ConfTalkDb        string `toml:"conftalkdb"`
-		SponsorshipsDb    string `toml:"sponsorshipsdb"`
+		Token          string `toml:"token"`
+		ConfsDb        string `toml:"confsdb"`
+		ConfsTixDb     string `toml:"confstixdb"`
+		SpeakersDb     string `toml:"speakersdb"`
+		OrgDb          string `toml:"orgdb"`
+		ProposalDb     string `toml:"proposaldb"`
+		SpeakerConfDb  string `toml:"speakerconfdb"`
+		ConfTalkDb     string `toml:"conftalkdb"`
+		SponsorshipsDb string `toml:"sponsorshipsdb"`
 	} `toml:"notion"`
 	Spaces struct {
 		Endpoint string `toml:"endpoint"`
@@ -63,14 +64,21 @@ func main() {
 	confTag := flag.String("conf", "", "Restrict to talks where Talk.Event matches this conf tag")
 	speakerQ := flag.String("speaker", "", "Restrict to talks containing a speaker whose name matches (case-insensitive substring)")
 	orgQ := flag.String("org", "", "Restrict sponsor refresh to orgs whose name matches (case-insensitive substring). Implies sponsor-only.")
+	sponsorsOnly := flag.Bool("sponsors-only", false, "Refresh only sponsor cards for -conf. Can be combined with -org and -force.")
 	force := flag.Bool("force", false, "Bypass hash + Spaces.Exists short-circuits — always re-render and re-upload. Useful when a logo's bytes changed but the filename didn't.")
 	activeOnly := flag.Bool("active", false, "Refresh talks/speakers/sponsors for every Active+future conf. Mutually exclusive with -conf.")
 	flag.Parse()
-	if *activeOnly && (*confTag != "" || *speakerQ != "" || *orgQ != "") {
-		log.Fatalf("-active is incompatible with -conf / -speaker / -org")
+	if *activeOnly && (*confTag != "" || *speakerQ != "" || *orgQ != "" || *sponsorsOnly) {
+		log.Fatalf("-active is incompatible with -conf / -speaker / -org / -sponsors-only")
 	}
 	if *orgQ != "" && *confTag == "" {
 		log.Fatalf("-org requires -conf")
+	}
+	if *sponsorsOnly && *confTag == "" {
+		log.Fatalf("-sponsors-only requires -conf")
+	}
+	if *sponsorsOnly && *speakerQ != "" {
+		log.Fatalf("-sponsors-only is incompatible with -speaker")
 	}
 
 	var c cfgFile
@@ -78,13 +86,13 @@ func main() {
 		log.Fatalf("read %s: %s", configFile, err)
 	}
 	for k, v := range map[string]string{
-		"notion.token":             c.Notion.Token,
-		"notion.confsdb":           c.Notion.ConfsDb,
-		"notion.confstixdb":        c.Notion.ConfsTixDb,
-		"notion.speakersdb":        c.Notion.SpeakersDb,
-		"notion.proposaldb":        c.Notion.ProposalDb,
-		"notion.speakerconfdb":     c.Notion.SpeakerConfDb,
-		"notion.conftalkdb":        c.Notion.ConfTalkDb,
+		"notion.token":         c.Notion.Token,
+		"notion.confsdb":       c.Notion.ConfsDb,
+		"notion.confstixdb":    c.Notion.ConfsTixDb,
+		"notion.speakersdb":    c.Notion.SpeakersDb,
+		"notion.proposaldb":    c.Notion.ProposalDb,
+		"notion.speakerconfdb": c.Notion.SpeakerConfDb,
+		"notion.conftalkdb":    c.Notion.ConfTalkDb,
 	} {
 		if v == "" {
 			log.Fatalf("missing %s in %s", k, configFile)
@@ -92,15 +100,15 @@ func main() {
 	}
 
 	nc := &types.NotionConfig{
-		Token:             c.Notion.Token,
-		ConfsDb:           c.Notion.ConfsDb,
-		ConfsTixDb:        c.Notion.ConfsTixDb,
-		SpeakersDb:        c.Notion.SpeakersDb,
-		OrgDb:             c.Notion.OrgDb,
-		ProposalDb:        c.Notion.ProposalDb,
-		SpeakerConfDb:     c.Notion.SpeakerConfDb,
-		ConfTalkDb:        c.Notion.ConfTalkDb,
-		SponsorshipsDb:    c.Notion.SponsorshipsDb,
+		Token:          c.Notion.Token,
+		ConfsDb:        c.Notion.ConfsDb,
+		ConfsTixDb:     c.Notion.ConfsTixDb,
+		SpeakersDb:     c.Notion.SpeakersDb,
+		OrgDb:          c.Notion.OrgDb,
+		ProposalDb:     c.Notion.ProposalDb,
+		SpeakerConfDb:  c.Notion.SpeakerConfDb,
+		ConfTalkDb:     c.Notion.ConfTalkDb,
+		SponsorshipsDb: c.Notion.SponsorshipsDb,
 	}
 	n := &types.Notion{Config: nc}
 	n.Setup(c.Notion.Token)
@@ -163,9 +171,9 @@ func main() {
 		return
 	}
 
-	// -org filter is sponsor-only. Skip the talk/speaker pass and
-	// just refresh matching sponsors for the named conf.
-	if *orgQ != "" {
+	// Sponsor-only mode skips the talk/speaker pass and refreshes
+	// matching sponsors for the named conf.
+	if *sponsorsOnly || *orgQ != "" {
 		confs, _ := getters.FetchConfsCached(appCtx)
 		var hit *types.Conf
 		for _, c := range confs {

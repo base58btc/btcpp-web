@@ -1,6 +1,8 @@
 *.swp
 btcpp-web
 config.toml
+config.prod
+config.staging
 _cache/
 target
 todo

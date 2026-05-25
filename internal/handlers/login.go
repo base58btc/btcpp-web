@@ -18,6 +18,7 @@ import (
 type LoginPage struct {
 	Next         string
 	FlashMessage string
+	FlashError   string
 	Year         uint
 }
 
@@ -53,6 +54,7 @@ func Login(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	page := &LoginPage{
 		Next:         auth.SafeNext(r.URL.Query().Get("next"), "/dashboard"),
 		FlashMessage: r.URL.Query().Get("flash"),
+		FlashError:   r.URL.Query().Get("error"),
 		Year:         helpers.CurrentYear(),
 	}
 	if err := ctx.TemplateCache.ExecuteTemplate(w, "login.tmpl", page); err != nil {

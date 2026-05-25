@@ -89,6 +89,9 @@ func getStructFields(v interface{}) []string {
 func newFormDecoder() *schema.Decoder {
 	dec := schema.NewDecoder()
 	dec.IgnoreUnknownKeys(true)
+	dec.RegisterConverter("", func(value string) reflect.Value {
+		return reflect.ValueOf(strings.TrimSpace(value))
+	})
 	dec.RegisterConverter(types.Twitter{}, func(value string) reflect.Value {
 		return reflect.ValueOf(types.ParseTwitter(value))
 	})
@@ -590,6 +593,11 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 		return r, err
 	}
 
+	err = addFaviconRoutes(r)
+	if err != nil {
+		return r, err
+	}
+
 	/* Handle 404s */
 	r.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handle404(w, r, app)
@@ -861,8 +869,26 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/api/speakers/{speakerID}/roles", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerRolesGet(w, r, app)
 	}).Methods("GET")
-	r.HandleFunc("/dashboard/admin/roles", func(w http.ResponseWriter, r *http.Request) {
+	r.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		GlobalAdminDashboard(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/roles", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerRolesUpdate(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/missives", func(w http.ResponseWriter, r *http.Request) {
+		TemplatedMissivesAdmin(w, r, app)
+	}).Methods("GET")
+	r.HandleFunc("/admin/missives", func(w http.ResponseWriter, r *http.Request) {
+		TemplatedMissivesSave(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/missives/upload-image", func(w http.ResponseWriter, r *http.Request) {
+		TemplatedMissivesUploadImage(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/missives/test-send", func(w http.ResponseWriter, r *http.Request) {
+		TemplatedMissivesTestSend(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/admin/missives/schedule", func(w http.ResponseWriter, r *http.Request) {
+		TemplatedMissivesSchedule(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/api/cache-stats", func(w http.ResponseWriter, r *http.Request) {
@@ -972,6 +998,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/comp-tickets", func(w http.ResponseWriter, r *http.Request) {
 		AdminCompTickets(w, r, app)
 	}).Methods("GET", "POST")
+	r.HandleFunc("/{conf}/admin/discounts", func(w http.ResponseWriter, r *http.Request) {
+		AdminDiscounts(w, r, app)
+	}).Methods("GET", "POST")
 	r.HandleFunc("/{conf}/admin/recordings", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminList(w, r, app)
 	}).Methods("GET")
@@ -986,9 +1015,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/x/auth-check", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminXAuthCheck(w, r, app)
-	}).Methods("POST")
-	r.HandleFunc("/{conf}/admin/recordings/x/bootstrap", func(w http.ResponseWriter, r *http.Request) {
-		RecordingsAdminXBootstrap(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/recordings/{id}", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsAdminDetail(w, r, app)
@@ -1225,11 +1251,6 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	// stale assets within the hour via conditional GET / 304s.
 	fs := http.FileServer(http.Dir("static"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", staticCache(fs)))
-	err = addFaviconRoutes(r)
-
-	if err != nil {
-		return r, err
-	}
 
 	return requestLog(app, noIndexRobots(r)), nil
 }
@@ -1316,11 +1337,11 @@ func affiliateSessionKey(confTag string) string {
 // outputs share a single unit — sats in this codebase, but the math
 // is unit-agnostic. preDiscountPerTicket is the per-ticket list
 // price BEFORE any discount; paidTotal is what the buyer actually
-// paid; count is the number of tickets. The 20% ceiling is fixed:
-// affiliates earn whatever's left after the buyer's actual savings
-// come out of that ceiling. Both outputs are floored at zero to
-// avoid negatives leaking into Notion (rounding noise from currency
-// conversion / fee math).
+// paid; count is the number of tickets. Inputs should be in the same
+// unit, usually fiat cents. The 20% ceiling is fixed: affiliates earn
+// whatever's left after the buyer's actual savings come out of that
+// ceiling. Both outputs are floored at zero to avoid negatives leaking
+// into Notion.
 func affiliateMath(preDiscountPerTicket, count, paidTotal int64) (saved, earned int64) {
 	original := preDiscountPerTicket * count
 	ceiling := original * 20 / 100
@@ -1338,10 +1359,10 @@ func affiliateMath(preDiscountPerTicket, count, paidTotal int64) (saved, earned 
 // recordAffiliateUsageFromCheckout writes one AffiliateUsage row to
 // Notion when a successful checkout consumed a discount code that
 // has an AffiliateEmail set. The list price + paid total arrive in
-// fiat cents (whatever currency the tier was priced in); both are
-// converted to sats at the live BTC spot rate before the math runs,
-// so the stored Saved/Earned values are BTC-denominated and stable
-// across multi-currency events.
+// fiat cents (whatever currency the tier was priced in). Saved/Earned
+// are split in fiat cents first, then converted to sats. Doing the
+// split before BTC conversion keeps a %20 buyer discount from leaving
+// tiny EarnedSats remainders due to spot-price or rounding drift.
 //
 // preDiscountCentsStr is a string from webhook metadata (Stripe map
 // / OpenNode struct); missing or unparseable means we skip recording
@@ -1373,17 +1394,17 @@ func recordAffiliateUsageFromCheckout(ctx *config.AppContext, conf *types.Conf, 
 		ctx.Err.Printf("affiliate usage skip %s: empty entry.Currency", disc.CodeName)
 		return
 	}
-	preDiscountSats, err := coingecko.CentsToSats(preDiscountCents, currency)
+	savedCents, earnedCents := affiliateMath(preDiscountCents, count, entry.Total)
+	savedSats, err := coingecko.CentsToSats(savedCents, currency)
 	if err != nil {
-		ctx.Err.Printf("affiliate usage skip %s: coingecko cents→sats (%s): %s", disc.CodeName, currency, err)
+		ctx.Err.Printf("affiliate usage skip %s: coingecko saved cents→sats (%s): %s", disc.CodeName, currency, err)
 		return
 	}
-	paidSats, err := coingecko.CentsToSats(entry.Total, currency)
+	earnedSats, err := coingecko.CentsToSats(earnedCents, currency)
 	if err != nil {
-		ctx.Err.Printf("affiliate usage skip %s: coingecko paid→sats (%s): %s", disc.CodeName, currency, err)
+		ctx.Err.Printf("affiliate usage skip %s: coingecko earned cents→sats (%s): %s", disc.CodeName, currency, err)
 		return
 	}
-	savedSats, earnedSats := affiliateMath(preDiscountSats, count, paidSats)
 	err = getters.RecordAffiliateUsage(ctx, getters.AffiliateUsageInput{
 		CodeName:       disc.CodeName,
 		AffiliateEmail: disc.AffiliateEmail,
@@ -1916,6 +1937,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 			w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
 			return
 		}
+		trimTalkApp(&talkapp)
 
 		/* ten divided by two is five */
 		if talkapp.Captcha != 5 {
@@ -2117,6 +2139,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 			w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))
 			return
 		}
+		trimVolunteer(&vol)
 
 		/* ten divided by two is five */
 		if vol.Captcha != 5 {
@@ -2375,20 +2398,20 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			return
 		}
 
-		name := r.FormValue("Name")
-		phone := r.FormValue("Phone")
-		email := r.FormValue("Email")
-		signal := r.FormValue("Signal")
-		telegram := r.FormValue("Telegram")
-		contactAt := r.FormValue("ContactAt")
-		org := r.FormValue("Org")
-		orgSite := r.FormValue("OrgSite")
-		orgTwitter := r.FormValue("OrgTwitter")
-		orgNostr := r.FormValue("OrgNostr")
-		budget := r.FormValue("Budget")
-		discoveredVia := r.FormValue("DiscoveredVia")
-		comments := r.FormValue("Comments")
-		captcha := r.FormValue("Captcha")
+		name := strings.TrimSpace(r.FormValue("Name"))
+		phone := strings.TrimSpace(r.FormValue("Phone"))
+		email := strings.TrimSpace(r.FormValue("Email"))
+		signal := strings.TrimSpace(r.FormValue("Signal"))
+		telegram := strings.TrimSpace(r.FormValue("Telegram"))
+		contactAt := strings.TrimSpace(r.FormValue("ContactAt"))
+		org := strings.TrimSpace(r.FormValue("Org"))
+		orgSite := strings.TrimSpace(r.FormValue("OrgSite"))
+		orgTwitter := types.ParseTwitter(r.FormValue("OrgTwitter")).Handle
+		orgNostr := strings.TrimSpace(r.FormValue("OrgNostr"))
+		budget := strings.TrimSpace(r.FormValue("Budget"))
+		discoveredVia := strings.TrimSpace(r.FormValue("DiscoveredVia"))
+		comments := strings.TrimSpace(r.FormValue("Comments"))
+		captcha := strings.TrimSpace(r.FormValue("Captcha"))
 
 		if captcha != "5" {
 			w.Write([]byte(helpers.ErrApp("Incorrect captcha. The answer is 5.", "sponsors")))

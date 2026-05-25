@@ -134,14 +134,15 @@ func parseAffiliateEmail(props map[string]notion.PropertyValue) string {
 }
 
 // parseAffiliateUsage projects one AffiliateUsageDb row into the
-// internal struct. CodeName / Email come from rich_text, ConfTag
-// from a Notion select, the sats amounts + count from numbers,
-// Created from Notion's built-in created_time.
+// internal struct. CodeName comes from rich_text, Email may be an
+// email or rich_text property, ConfTag from a Notion select, the sats
+// amounts + count from numbers, Created from Notion's built-in
+// created_time.
 func parseAffiliateUsage(pageID string, props map[string]notion.PropertyValue, createdAt *time.Time) *types.AffiliateUsage {
 	return &types.AffiliateUsage{
 		ID:             pageID,
 		CodeName:       parseRichText("DiscountCode", props),
-		AffiliateEmail: parseRichText("AffiliateEmail", props),
+		AffiliateEmail: parseAffiliateEmail(props),
 		ConfTag:        parseSelect("Conference", props),
 		SavedSats:      int64(props["SavedSats"].Number),
 		EarnedSats:     int64(props["EarnedSats"].Number),
@@ -180,7 +181,7 @@ func parseSpeaker(pageID string, props map[string]notion.PropertyValue) *types.S
 		ID:            pageID,
 		Name:          parseRichText("Name", props),
 		Photo:         parseRichText("NormPhoto", props),
-		Email:         props["Email"].Email,
+		Email:         strings.TrimSpace(props["Email"].Email),
 		Phone:         parseRichText("Phone", props),
 		Signal:        parseRichText("Signal", props),
 		Telegram:      parseRichText("Telegram", props),

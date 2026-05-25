@@ -35,8 +35,10 @@ func TestAffiliateMath(t *testing.T) {
 			wantEarned:  2000,
 		},
 		{
-			// Max (%20) code: buyer takes the whole ceiling, affiliate
-			// earns nothing.
+			// Max (%20) code: buyer takes the whole ceiling,
+			// affiliate earns nothing. This is intentionally checked
+			// in fiat cents before BTC conversion so a clean 20%
+			// discount cannot leave an EarnedSats remainder.
 			name:        "buyer_takes_full_ceiling",
 			preDiscount: 10000,
 			count:       1,

@@ -36,6 +36,7 @@ type (
 		BufferAPI         string
 		Spaces            SpacesConfig
 		CacheTTLSec       int
+		NotionRequestLogs bool
 		YouTube           YouTubeConfig
 		Recordings        RecordingsConfig
 	}
@@ -69,6 +70,8 @@ type (
 		Enabled        bool
 		ProfileObject  string
 		Headed         bool
+		LoginUsername  string
+		LoginPassword  string
 		PostTimeoutSec int
 		AuthWaitSec    int
 	}

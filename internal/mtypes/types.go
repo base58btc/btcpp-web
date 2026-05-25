@@ -16,13 +16,15 @@ const (
 	Sendable SendStatus = 2
 )
 
+const OnlyForTemplated = "templated"
+
 type (
 	Letter struct {
 		PageID      string
 		UID         uint64
 		Title       string
 		Newsletters []string
-                OnlyFor     string
+		OnlyFor     string
 		Markdown    string
 		SendAt      string
 		SentAt      *time.Time
@@ -252,9 +254,9 @@ func (l *Letter) InNewsletters() []string {
 
 func (l *Letter) HasNewsletter(newsletter string) bool {
 	for _, ln := range l.Newsletters {
-                if ln == newsletter {
-                        return true
-                }
+		if ln == newsletter {
+			return true
+		}
 	}
 	return false
 }

@@ -75,6 +75,21 @@ func scheduleMissives(ctx *config.AppContext, subscribers []*mtypes.Subscriber, 
 	return nil
 }
 
+func ScheduleMissiveByUID(ctx *config.AppContext, uid uint64) (*mtypes.Letter, error) {
+	letter, err := getters.GetLetter(ctx.Notion, uid)
+	if err != nil {
+		return nil, err
+	}
+	subscribers, err := getters.ListSubscribersFor(ctx.Notion, letter.Newsletters)
+	if err != nil {
+		return nil, err
+	}
+	if err := scheduleMissives(ctx, subscribers, []*mtypes.Letter{letter}); err != nil {
+		return nil, err
+	}
+	return letter, nil
+}
+
 func scheduleMissive(ctx *config.AppContext, subscribers []*mtypes.Subscriber, letter *mtypes.Letter, isPreview bool) ([]byte, mtypes.SendStatus, error) {
 
 	if !letter.Sendable() {
@@ -160,13 +175,13 @@ func NewSubscriberMissives(ctx *config.AppContext, subscriber *mtypes.Subscriber
 
 func MakeApplicationSublist(conftag, apptype string, gensub bool) []string {
 	/* Add to subscriber list */
-	newsletters := []string { apptype, conftag + "-" + apptype }
+	newsletters := []string{apptype, conftag + "-" + apptype}
 
 	if gensub {
 		newsletters = append(newsletters, "newsletter")
 	}
 
-        return newsletters
+	return newsletters
 }
 
 func NewSubs(ctx *config.AppContext, email string, newsletters []string) error {

@@ -35,7 +35,10 @@ func (env *EnvConfig) ApplyDefaults() {
 		env.Recordings.YouTubeTokenObject = "private/social/youtube-token.json.enc"
 	}
 	if strings.TrimSpace(env.Recordings.X.ProfileObject) == "" {
-		env.Recordings.X.ProfileObject = "private/social/x-chrome-profile.tgz.enc"
+		env.Recordings.X.ProfileObject = "private/social/x-chrome-profile-staging.tgz.enc"
+		if env.Prod {
+			env.Recordings.X.ProfileObject = "private/social/x-chrome-profile-prod.tgz.enc"
+		}
 	}
 	if env.Recordings.X.PostTimeoutSec == 0 {
 		env.Recordings.X.PostTimeoutSec = 300

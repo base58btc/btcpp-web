@@ -419,9 +419,18 @@ func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, lette
 		subkey = makeSubKey(sub.Email, subList[0])
 	}
 
-	htmlBody, err := BuildHTMLEmailUnsub(ctx, letter.ImgRef(), buf.Bytes(), subToken)
-	if err != nil {
-		return nil, err
+	var htmlBody []byte
+	textBody := buf.Bytes()
+	if letter.OnlyFor == mtypes.OnlyForTemplated {
+		htmlBody, textBody, err = BuildTemplatedNewsletterEmailAt(ctx, letter.ImgRef(), buf.Bytes(), subToken, sendAt)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		htmlBody, err = BuildHTMLEmailUnsub(ctx, letter.ImgRef(), buf.Bytes(), subToken)
+		if err != nil {
+			return nil, err
+		}
 	}
 	mail := &Mail{
 		JobKey:   jobkey,
@@ -430,7 +439,7 @@ func SendNewsletterMissive(ctx *config.AppContext, sub *mtypes.Subscriber, lette
 		Email:    sub.Email,
 		Title:    letter.Title,
 		SendAt:   sendAt,
-		TextBody: buf.Bytes(),
+		TextBody: textBody,
 		HTMLBody: htmlBody,
 	}
 

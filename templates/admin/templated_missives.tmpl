@@ -1,0 +1,847 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Templated missives - bitcoin++</title>
+  {{ block "header" . }} {{ end }}
+  {{ template "admin_favicon" "" }}
+  <style>
+    @media (min-width: 1280px) {
+      .missive-page-grid {
+        display: grid;
+        grid-template-columns: minmax(720px, 65fr) minmax(360px, 35fr);
+        gap: 1.5rem;
+      }
+      .missive-page-grid > main {
+        grid-column: 1 / span 2;
+        grid-row-start: 1;
+      }
+      .missive-page-grid > aside {
+        grid-column-start: 2;
+        grid-row-start: 2;
+      }
+      .missive-form-grid {
+        display: grid;
+        grid-template-columns: minmax(720px, 65fr) minmax(360px, 35fr);
+        gap: 1.5rem;
+        align-items: start;
+      }
+      .missive-form-grid > .xl\:col-start-1 {
+        grid-column-start: 1;
+      }
+      .missive-form-grid > .xl\:col-start-2 {
+        grid-column-start: 2;
+      }
+      .missive-form-grid > .xl\:row-start-1 {
+        grid-row-start: 1;
+      }
+      .missive-form-grid > .xl\:col-span-2 {
+        grid-column: span 2 / span 2;
+      }
+      .missive-preview-panel {
+        grid-column-start: 1;
+        grid-row: 1 / span 30;
+        position: sticky;
+        top: 1rem;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900">
+  {{ block "mainnav" . }} {{ end }}
+  <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mb-6 flex items-center justify-between gap-4">
+      <div>
+        <a href="/dashboard" class="text-sm font-medium text-indigo-600 hover:text-indigo-500">&larr; Back to dashboard</a>
+        <h1 class="mt-2 text-2xl font-semibold tracking-tight">Templated missives</h1>
+        <p class="mt-1 text-sm text-gray-600">Create and edit newsletter missives that use the rebrand renderer. These are normal scheduled missives with <code class="rounded bg-gray-100 px-1">OnlyFor=templated</code>.</p>
+      </div>
+      <a href="/admin/missives" class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800">New templated missive</a>
+    </div>
+
+    {{ if .FlashMessage }}
+    <div class="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{{ .FlashMessage }}</div>
+    {{ end }}
+    {{ if .ErrorMessage }}
+    <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ .ErrorMessage }}</div>
+    {{ end }}
+
+    <div class="missive-page-grid grid gap-6">
+      <aside class="space-y-4 xl:col-start-2 xl:row-start-2">
+        <div class="rounded-lg bg-white shadow">
+          <div class="border-b border-gray-200 px-4 py-3">
+            <h2 class="text-sm font-semibold">Existing templated missives</h2>
+          </div>
+          <div class="divide-y divide-gray-100">
+            {{ if .Letters }}
+              {{ range .Letters }}
+              <a href="/admin/missives?uid={{ .UID }}" class="block px-4 py-3 hover:bg-indigo-50">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="truncate text-sm font-medium text-gray-900">{{ .Title }}</div>
+                    <div class="mt-1 text-xs text-gray-500">MISS-{{ .UID }} · SendAt {{ if .SendAt }}{{ .SendAt }}{{ else }}unset{{ end }}</div>
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      {{ range .Newsletters }}<span class="rounded bg-gray-100 px-1.5 py-0.5 text-[11px] text-gray-600">{{ . }}</span>{{ end }}
+                    </div>
+                  </div>
+                  {{ if .SentAt }}
+                  <span class="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">sent</span>
+                  {{ else }}
+                  <span class="shrink-0 rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">active</span>
+                  {{ end }}
+                </div>
+              </a>
+              {{ end }}
+            {{ else }}
+              <div class="px-4 py-8 text-sm text-gray-500">No templated missives yet.</div>
+            {{ end }}
+          </div>
+        </div>
+
+        <div class="rounded-lg bg-white p-4 text-sm shadow">
+          <h2 class="font-semibold">Image uploads</h2>
+          {{ if .SpacesReady }}
+          <p class="mt-1 text-gray-600">Attach a hero image while saving. It uploads to <code class="rounded bg-gray-100 px-1">newsletter/</code> in Spaces and writes the public URL into the hero field.</p>
+          {{ else }}
+          <p class="mt-1 text-red-700">Spaces is not configured, so image uploads are disabled.</p>
+          {{ end }}
+        </div>
+      </aside>
+
+      <main class="rounded-lg bg-white shadow xl:col-span-2 xl:row-start-1">
+        <form method="POST" action="/admin/missives" enctype="multipart/form-data" class="missive-form-grid grid gap-6 p-5 xl:items-start">
+          <input type="hidden" name="UID" value="{{ .Form.UID }}">
+
+          <div class="flex items-center justify-between gap-4 border-b border-gray-200 pb-4 xl:col-start-2">
+            <div>
+              <h2 class="text-lg font-semibold">{{ if .IsNew }}New templated missive{{ else }}Edit MISS-{{ .Form.UID }}{{ end }}</h2>
+              <p class="mt-1 text-sm text-gray-500">Saving updates the Notion missive row. Delivery still depends on SendAt, Expiry, SentAt, and subscriber list matching.</p>
+            </div>
+            <div class="flex flex-wrap justify-end gap-2">
+              {{ if not .IsNew }}
+              <button type="submit" formaction="/admin/missives/schedule?uid={{ .Form.UID }}" formmethod="POST"
+                      onclick="return confirm('Schedule this saved missive using its current SendAt and audience settings?')"
+                      class="rounded-md border border-amber-700 bg-white px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50">
+                Schedule saved missive
+              </button>
+              {{ end }}
+              <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Save missive</button>
+            </div>
+          </div>
+
+          <section class="rounded-md border border-indigo-200 bg-indigo-50 p-4 xl:col-start-2">
+            <div class="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+              <label class="block">
+                <span class="text-xs font-medium text-indigo-950">Test recipient</span>
+                <input type="email" name="TestEmail" value="{{ .Form.TestEmail }}" placeholder="you@example.com" class="mt-1 block w-full rounded-md border border-indigo-200 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+              </label>
+              <button type="submit" formaction="/admin/missives/test-send" formmethod="POST"
+                      class="rounded-md border border-indigo-700 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100">
+                Send test
+              </button>
+            </div>
+            <p class="mt-2 text-xs text-indigo-900">Sends the current editor contents immediately without saving the missive or changing its scheduled delivery state.</p>
+          </section>
+
+          <section class="grid gap-4 xl:col-start-2">
+            <label class="block">
+              <span class="text-xs font-medium text-gray-700">Title</span>
+              <input name="Title" value="{{ .Form.Title }}" required class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-700">Newsletter lists</span>
+              <input name="Newsletters" value="{{ .Form.Newsletters }}" placeholder="newsletter, vienna" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+              <span class="mt-1 block text-xs text-gray-500">Comma-separated. Use <code class="rounded bg-gray-100 px-1">!newsletter</code> to exclude that list. Include at least one positive list.</span>
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-700">SendAt</span>
+              <input name="SendAt" value="{{ .Form.SendAt }}" placeholder="now, onsub, +9, 6/12/2026" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            </label>
+            <label class="block">
+              <span class="text-xs font-medium text-gray-700">Expiry</span>
+              <input type="date" name="Expiry" value="{{ .Form.Expiry }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            </label>
+          </section>
+
+          <section class="rounded-md border border-gray-200 p-4 xl:col-start-2">
+            <h3 class="text-sm font-semibold">Template metadata</h3>
+            <div class="mt-3 grid gap-4 md:grid-cols-3">
+              <label class="block">
+                <span class="text-xs font-medium text-gray-700">Type</span>
+                <select name="Template" id="TemplateType" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  {{ $t := .Form.Template }}
+                  <option value="roundup" {{ if eq $t "roundup" }}selected{{ end }}>Roundup</option>
+                  <option value="announce" {{ if eq $t "announce" }}selected{{ end }}>Event announce</option>
+                  <option value="cfp" {{ if eq $t "cfp" }}selected{{ end }}>CFP open</option>
+                  <option value="hackathon" {{ if eq $t "hackathon" }}selected{{ end }}>Hackathon</option>
+                  <option value="recap" {{ if eq $t "recap" }}selected{{ end }}>Recap</option>
+                  <option value="sponsor" {{ if eq $t "sponsor" }}selected{{ end }}>Sponsor spotlight</option>
+                </select>
+                <span id="TemplateTypeHelp" class="mt-1 block text-xs text-gray-500"></span>
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-700">Palette</span>
+                <select name="Palette" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  {{ $p := .Form.Palette }}
+                  <option value="ember" {{ if eq $p "ember" }}selected{{ end }}>Ember</option>
+                  <option value="graphite" {{ if eq $p "graphite" }}selected{{ end }}>Graphite</option>
+                  <option value="signal" {{ if eq $p "signal" }}selected{{ end }}>Signal</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="text-xs font-medium text-gray-700">Issue</span>
+                <input name="Issue" value="{{ .Form.Issue }}" placeholder="№ 42" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block md:col-span-2 section-field" data-section="hero">
+                <span class="text-xs font-medium text-gray-700">Hero URL</span>
+                <input name="Hero" id="HeroURL" value="{{ .Form.Hero }}" placeholder="https://..." class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <div class="block md:col-span-3 section-field" data-section="hero">
+                <span class="text-xs font-medium text-gray-700">Hero image</span>
+                <div class="mt-2 flex flex-wrap items-center gap-3">
+                  <button type="button" id="HeroUploadButton" {{ if not .SpacesReady }}disabled{{ end }}
+                          class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                    Select image
+                  </button>
+                  <button type="button" id="HeroRemoveButton"
+                          class="hidden text-xs font-medium text-red-600 hover:text-red-700">
+                    Remove
+                  </button>
+                  <img id="HeroPreviewThumb" alt="" class="hidden h-16 w-auto max-w-[220px] rounded border border-gray-200 bg-white object-contain">
+                </div>
+                <input type="file" id="HeroFilePicker" accept="image/*" class="hidden">
+                <p id="HeroUploadStatus" class="mt-1 text-xs text-gray-500">{{ if .SpacesReady }}No image selected for upload.{{ else }}Spaces is not configured, so image uploads are disabled.{{ end }}</p>
+                <div id="HeroCropPanel" class="mt-4 hidden rounded-md border border-gray-200 bg-gray-50 p-3">
+                  <div class="flex flex-col gap-4 lg:flex-row">
+                    <div class="w-full max-w-xl">
+                      <div class="relative aspect-[64/27] overflow-hidden rounded border border-gray-300 bg-gray-900">
+                        <canvas id="HeroCropCanvas" width="1600" height="675" class="h-full w-full"></canvas>
+                      </div>
+                      <p class="mt-2 text-xs text-gray-500">Preview is cropped to a wide newsletter banner and uploaded as 1600x675.</p>
+                    </div>
+                    <div class="min-w-[220px] flex-1 space-y-3">
+                      <label class="block">
+                        <span class="text-xs font-medium text-gray-700">Zoom</span>
+                        <input id="HeroCropZoom" type="range" min="1" max="3" step="0.01" value="1" class="mt-1 w-full">
+                      </label>
+                      <label class="block">
+                        <span class="text-xs font-medium text-gray-700">Horizontal crop</span>
+                        <input id="HeroCropX" type="range" min="0" max="1" step="0.01" value="0.5" class="mt-1 w-full">
+                      </label>
+                      <label class="block">
+                        <span class="text-xs font-medium text-gray-700">Vertical crop</span>
+                        <input id="HeroCropY" type="range" min="0" max="1" step="0.01" value="0.5" class="mt-1 w-full">
+                      </label>
+                      <div class="flex flex-wrap gap-2 pt-1">
+                        <button type="button" id="HeroCropUpload"
+                                class="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700">
+                          Upload cropped hero
+                        </button>
+                        <button type="button" id="HeroCropCancel"
+                                class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <label class="block md:col-span-3 section-field" data-section="ticker">
+                <span class="text-xs font-medium text-gray-700" data-label="ticker">Ticker items, one per line</span>
+                <textarea name="Ticker" rows="3" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm">{{ .Form.Ticker }}</textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="rounded-md border border-amber-200 bg-amber-50 p-4 xl:col-start-2">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-amber-950">Audience helper</h3>
+                <p class="mt-1 text-sm text-amber-900">Pick a common targeting pattern, then adjust the newsletter list if needed.</p>
+              </div>
+              <select id="AudiencePreset" class="rounded-md border border-amber-300 bg-white px-3 py-2 text-sm text-amber-950">
+                <option value="">Choose a preset…</option>
+                <option value="newsletter">General newsletter subscribers</option>
+                <option value="insider, !newsletter">Insiders only, excluding general newsletter</option>
+                <option value="speaker">All speakers</option>
+                <option value="sponsor">All sponsors</option>
+                <option value="volunteer">All volunteers</option>
+                <option value="local, !newsletter">Local list, excluding general newsletter</option>
+                <option value="genpop">General registration audience</option>
+              </select>
+            </div>
+            <div class="mt-4 grid gap-3 text-xs text-amber-950 md:grid-cols-3">
+              <div class="rounded border border-amber-200 bg-white/70 p-3">
+                <div class="font-semibold">Send broadly</div>
+                <code class="mt-1 block rounded bg-amber-100 px-2 py-1">newsletter</code>
+              </div>
+              <div class="rounded border border-amber-200 bg-white/70 p-3">
+                <div class="font-semibold">Event-specific</div>
+                <code class="mt-1 block rounded bg-amber-100 px-2 py-1">vienna, !newsletter</code>
+              </div>
+              <div class="rounded border border-amber-200 bg-white/70 p-3">
+                <div class="font-semibold">Role-specific</div>
+                <code class="mt-1 block rounded bg-amber-100 px-2 py-1">speaker, sponsor, volunteer</code>
+              </div>
+            </div>
+            <p class="mt-3 text-xs text-amber-900">Exclusions only filter an included audience. A target like <code class="rounded bg-amber-100 px-1">!newsletter</code> by itself has nobody to send to.</p>
+          </section>
+
+          <section class="rounded-md border border-gray-200 p-4 xl:col-start-2">
+            <h3 class="text-sm font-semibold">Structured sections</h3>
+            <div class="mt-3 grid gap-4 md:grid-cols-3">
+              <label class="block section-field" data-section="lead">
+                <span class="text-xs font-medium text-gray-700" data-label="leadEyebrow">Lead eyebrow</span>
+                <input name="LeadEyebrow" value="{{ .Form.LeadEyebrow }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block md:col-span-2 section-field" data-section="lead">
+                <span class="text-xs font-medium text-gray-700" data-label="leadTitle">Lead title</span>
+                <input name="LeadTitle" value="{{ .Form.LeadTitle }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block md:col-span-3 section-field" data-section="lead">
+                <span class="text-xs font-medium text-gray-700" data-label="leadDeck">Lead deck</span>
+                <textarea name="LeadDeck" rows="2" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">{{ .Form.LeadDeck }}</textarea>
+              </label>
+              <label class="block md:col-span-3 section-field" data-section="news">
+                <span class="text-xs font-medium text-gray-700" data-label="news">News items, one per line: title | blurb | tag | url</span>
+                <textarea name="NewsItems" rows="4" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm">{{ .Form.NewsItems }}</textarea>
+              </label>
+              <label class="block md:col-span-3 section-field" data-section="stats">
+                <span class="text-xs font-medium text-gray-700" data-label="stats">Stats, one per line: value | label</span>
+                <textarea name="Stats" rows="3" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm">{{ .Form.Stats }}</textarea>
+              </label>
+              <label class="block md:col-span-2 section-field" data-section="pullquote">
+                <span class="text-xs font-medium text-gray-700" data-label="pullquote">Pullquote</span>
+                <textarea name="Pullquote" rows="2" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">{{ .Form.Pullquote }}</textarea>
+              </label>
+              <label class="block section-field" data-section="pullquote">
+                <span class="text-xs font-medium text-gray-700" data-label="pullquoteBy">Pullquote byline</span>
+                <input name="PullquoteBy" value="{{ .Form.PullquoteBy }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+            </div>
+          </section>
+
+          <section class="rounded-md border border-gray-200 p-4 xl:col-start-2">
+            <h3 class="text-sm font-semibold">Body and CTA</h3>
+            <label class="mt-3 block section-field" data-section="body">
+              <span class="text-xs font-medium text-gray-700" data-label="body">Markdown body</span>
+              <textarea name="ContentMarkdown" rows="14" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm">{{ .Form.ContentMarkdown }}</textarea>
+            </label>
+            <div class="mt-4 grid gap-4 md:grid-cols-2">
+              <label class="block section-field" data-section="cta">
+                <span class="text-xs font-medium text-gray-700" data-label="ctaEyebrow">CTA eyebrow</span>
+                <input name="CTAEyebrow" value="{{ .Form.CTAEyebrow }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block section-field" data-section="cta">
+                <span class="text-xs font-medium text-gray-700" data-label="ctaTitle">CTA title</span>
+                <input name="CTATitle" value="{{ .Form.CTATitle }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block section-field" data-section="cta">
+                <span class="text-xs font-medium text-gray-700" data-label="ctaSubtitle">CTA subtitle</span>
+                <input name="CTASubtitle" value="{{ .Form.CTASubtitle }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block section-field" data-section="cta">
+                <span class="text-xs font-medium text-gray-700" data-label="ctaLabel">CTA label</span>
+                <input name="CTALabel" value="{{ .Form.CTALabel }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+              <label class="block md:col-span-2 section-field" data-section="cta">
+                <span class="text-xs font-medium text-gray-700" data-label="ctaURL">CTA URL</span>
+                <input name="CTAURL" value="{{ .Form.CTAURL }}" class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+              </label>
+            </div>
+          </section>
+
+          <section class="missive-preview-panel rounded-md border border-gray-200 bg-gray-50 p-4 xl:col-start-1 xl:row-start-1">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <h3 class="text-sm font-semibold">Live preview</h3>
+                <p class="mt-1 text-xs text-gray-500">Updates as you type. Save still writes the missive to Notion.</p>
+              </div>
+              <span class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-500">approximate inbox render</span>
+            </div>
+            <div class="mt-4 overflow-x-auto rounded-md border border-gray-300 bg-gray-200 p-4">
+              <iframe id="NewsletterPreview" title="Newsletter preview" scrolling="no" class="block w-full bg-white" style="min-width:680px;"></iframe>
+            </div>
+          </section>
+
+          <div class="flex justify-end xl:col-start-2">
+            <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700">Save missive</button>
+          </div>
+        </form>
+      </main>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const templateSelect = document.getElementById('TemplateType');
+      const help = document.getElementById('TemplateTypeHelp');
+      const preview = document.getElementById('NewsletterPreview');
+      const preset = document.getElementById('AudiencePreset');
+      const audienceInput = document.querySelector('input[name="Newsletters"]');
+      const heroInput = document.getElementById('HeroURL');
+      const heroUploadButton = document.getElementById('HeroUploadButton');
+      const heroRemoveButton = document.getElementById('HeroRemoveButton');
+      const heroFilePicker = document.getElementById('HeroFilePicker');
+      const heroThumb = document.getElementById('HeroPreviewThumb');
+      const heroStatus = document.getElementById('HeroUploadStatus');
+      const heroCropPanel = document.getElementById('HeroCropPanel');
+      const heroCropCanvas = document.getElementById('HeroCropCanvas');
+      const heroCropZoom = document.getElementById('HeroCropZoom');
+      const heroCropX = document.getElementById('HeroCropX');
+      const heroCropY = document.getElementById('HeroCropY');
+      const heroCropUpload = document.getElementById('HeroCropUpload');
+      const heroCropCancel = document.getElementById('HeroCropCancel');
+      let heroCropImage = null;
+      let heroCropObjectURL = '';
+
+      const templates = {
+        roundup: {
+          help: 'A recurring dispatch: editorial note, news items, optional talk/event links, and a CTA.',
+          sections: ['ticker', 'hero', 'lead', 'news', 'body', 'cta'],
+          labels: {
+            ticker: 'Top ticker items',
+            leadEyebrow: 'Roundup label',
+            leadTitle: 'Roundup headline',
+            leadDeck: 'Roundup deck',
+            news: 'News items: title | blurb | tag | url',
+            body: 'Editor note / additional markdown',
+            ctaEyebrow: 'CTA eyebrow',
+            ctaTitle: 'CTA title',
+            ctaSubtitle: 'CTA subtitle',
+            ctaLabel: 'CTA button label',
+            ctaURL: 'CTA URL'
+          }
+        },
+        announce: {
+          help: 'A single event announcement: hero, strong lead, event stats, quote, and ticket CTA.',
+          sections: ['ticker', 'hero', 'lead', 'stats', 'pullquote', 'body', 'cta'],
+          labels: {
+            ticker: 'Announcement ticker items',
+            leadEyebrow: 'Event/date label',
+            leadTitle: 'Event headline',
+            leadDeck: 'Event summary',
+            stats: 'Event stats: value | label',
+            pullquote: 'Organizer quote',
+            pullquoteBy: 'Quote byline',
+            body: 'Included details / logistics markdown',
+            ctaTitle: 'Ticket CTA title',
+            ctaSubtitle: 'Ticket CTA subtitle',
+            ctaLabel: 'Ticket button label',
+            ctaURL: 'Ticket URL'
+          }
+        },
+        cfp: {
+          help: 'A call for proposals: what you want, deadlines, and an apply-to-speak CTA.',
+          sections: ['ticker', 'hero', 'lead', 'news', 'body', 'cta'],
+          labels: {
+            ticker: 'CFP ticker items',
+            leadEyebrow: 'CFP label',
+            leadTitle: 'CFP headline',
+            leadDeck: 'CFP summary',
+            news: 'Desired topics/tracks: title | description | tag | url',
+            body: 'Deadlines / requirements markdown',
+            ctaTitle: 'Apply CTA title',
+            ctaSubtitle: 'Apply CTA subtitle',
+            ctaLabel: 'Apply button label',
+            ctaURL: 'Application URL'
+          }
+        },
+        hackathon: {
+          help: 'A hackathon push: hero, prize pool or tracks, logistics, and registration CTA.',
+          sections: ['ticker', 'hero', 'lead', 'stats', 'news', 'body', 'cta'],
+          labels: {
+            ticker: 'Hackathon ticker items',
+            leadEyebrow: 'Hackathon label',
+            leadTitle: 'Hackathon headline',
+            leadDeck: 'Hackathon summary',
+            stats: 'Prize/stats rows: value | label',
+            news: 'Tracks: title | blurb | tag | url',
+            body: 'Schedule / rules markdown',
+            ctaTitle: 'Registration CTA title',
+            ctaSubtitle: 'Registration CTA subtitle',
+            ctaLabel: 'Registration button label',
+            ctaURL: 'Registration URL'
+          }
+        },
+        recap: {
+          help: 'A post-event recap: hero, stats, highlighted talks or links, quote, and next-step CTA.',
+          sections: ['ticker', 'hero', 'lead', 'stats', 'news', 'pullquote', 'body', 'cta'],
+          labels: {
+            ticker: 'Recap ticker items',
+            leadEyebrow: 'Recap label',
+            leadTitle: 'Recap headline',
+            leadDeck: 'Recap summary',
+            stats: 'Recap stats: value | label',
+            news: 'Highlighted talks/links: title | blurb | tag | url',
+            pullquote: 'Attendee quote',
+            pullquoteBy: 'Quote byline',
+            body: 'Press / notes markdown',
+            ctaTitle: 'Next event CTA title',
+            ctaSubtitle: 'Next event CTA subtitle',
+            ctaLabel: 'CTA button label',
+            ctaURL: 'CTA URL'
+          }
+        },
+        sponsor: {
+          help: 'A sponsor spotlight: sponsor story, links, optional supporting bullets, and sponsor CTA.',
+          sections: ['ticker', 'hero', 'lead', 'news', 'body', 'cta'],
+          labels: {
+            ticker: 'Sponsor ticker items',
+            leadEyebrow: 'Sponsor label',
+            leadTitle: 'Sponsor headline',
+            leadDeck: 'Sponsor summary',
+            news: 'Sponsor facts/links: title | blurb | tag | url',
+            body: 'Sponsor story markdown',
+            ctaTitle: 'Sponsor CTA title',
+            ctaSubtitle: 'Sponsor CTA subtitle',
+            ctaLabel: 'CTA button label',
+            ctaURL: 'CTA URL'
+          }
+        }
+      };
+
+      function field(name) {
+        const el = document.querySelector('[name="' + name + '"]');
+        return el ? el.value.trim() : '';
+      }
+
+      function setHeroStatus(message, tone) {
+        if (!heroStatus) return;
+        heroStatus.textContent = message;
+        heroStatus.className = 'mt-1 text-xs ' + (tone === 'error' ? 'text-red-700' : (tone === 'ok' ? 'text-green-700' : 'text-gray-500'));
+      }
+
+      function updateHeroControls() {
+        if (!heroInput || !heroThumb || !heroRemoveButton) return;
+        const url = heroInput.value.trim();
+        if (url) {
+          heroThumb.src = url;
+          heroThumb.classList.remove('hidden');
+          heroRemoveButton.classList.remove('hidden');
+        } else {
+          heroThumb.removeAttribute('src');
+          heroThumb.classList.add('hidden');
+          heroRemoveButton.classList.add('hidden');
+        }
+      }
+
+      function clearHeroCrop() {
+        heroCropImage = null;
+        if (heroCropObjectURL) URL.revokeObjectURL(heroCropObjectURL);
+        heroCropObjectURL = '';
+        if (heroCropPanel) heroCropPanel.classList.add('hidden');
+      }
+
+      function drawHeroCrop() {
+        if (!heroCropCanvas || !heroCropImage) return;
+        const ctx = heroCropCanvas.getContext('2d');
+        const outW = heroCropCanvas.width;
+        const outH = heroCropCanvas.height;
+        const zoom = parseFloat(heroCropZoom ? heroCropZoom.value : '1') || 1;
+        const focalX = parseFloat(heroCropX ? heroCropX.value : '0.5') || 0.5;
+        const focalY = parseFloat(heroCropY ? heroCropY.value : '0.5') || 0.5;
+        const targetRatio = outW / outH;
+        let srcW = heroCropImage.naturalWidth;
+        let srcH = srcW / targetRatio;
+        if (srcH > heroCropImage.naturalHeight) {
+          srcH = heroCropImage.naturalHeight;
+          srcW = srcH * targetRatio;
+        }
+        srcW = srcW / zoom;
+        srcH = srcH / zoom;
+        const maxX = Math.max(0, heroCropImage.naturalWidth - srcW);
+        const maxY = Math.max(0, heroCropImage.naturalHeight - srcH);
+        const sx = maxX * focalX;
+        const sy = maxY * focalY;
+        ctx.clearRect(0, 0, outW, outH);
+        ctx.drawImage(heroCropImage, sx, sy, srcW, srcH, 0, 0, outW, outH);
+      }
+
+      function openHeroCrop(file) {
+        clearHeroCrop();
+        heroCropObjectURL = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = function () {
+          heroCropImage = img;
+          if (heroCropZoom) heroCropZoom.value = '1';
+          if (heroCropX) heroCropX.value = '0.5';
+          if (heroCropY) heroCropY.value = '0.5';
+          if (heroCropPanel) heroCropPanel.classList.remove('hidden');
+          drawHeroCrop();
+          setHeroStatus('Adjust the 16:9 crop, then upload.', 'info');
+        };
+        img.onerror = function () {
+          clearHeroCrop();
+          setHeroStatus('Could not load that image.', 'error');
+        };
+        img.src = heroCropObjectURL;
+      }
+
+      function heroCropBlob() {
+        return new Promise(function (resolve, reject) {
+          if (!heroCropCanvas || !heroCropImage) {
+            reject(new Error('No image selected'));
+            return;
+          }
+          drawHeroCrop();
+          heroCropCanvas.toBlob(function (blob) {
+            if (!blob) reject(new Error('Could not crop image'));
+            else resolve(blob);
+          }, 'image/jpeg', 0.9);
+        });
+      }
+
+      function esc(s) {
+        return String(s || '').replace(/[&<>"']/g, function (ch) {
+          return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+      }
+
+      function lines(s) {
+        return String(s || '').split(/\r?\n/).map(function (v) { return v.trim(); }).filter(Boolean);
+      }
+
+      function pipeParts(s) {
+        return String(s || '').split('|').map(function (v) { return v.trim(); });
+      }
+
+      function markdownHTML(md) {
+        const out = [];
+        let inList = false;
+        lines(md).forEach(function (line) {
+          if (/^- /.test(line)) {
+            if (!inList) { out.push('<ul style="padding-left:24px;margin:14px 0;">'); inList = true; }
+            out.push('<li style="font-size:15px;line-height:1.6;margin:6px 0;">' + esc(line.replace(/^- /, '')) + '</li>');
+            return;
+          }
+          if (inList) { out.push('</ul>'); inList = false; }
+          if (/^### /.test(line)) out.push('<h3 style="font-size:20px;line-height:1.2;margin:24px 0 8px;">' + esc(line.replace(/^### /, '')) + '</h3>');
+          else if (/^## /.test(line)) out.push('<h2 style="font-size:30px;line-height:1.05;margin:28px 0 12px;">' + esc(line.replace(/^## /, '')) + '</h2>');
+          else if (/^# /.test(line)) out.push('<h1 style="font-size:42px;line-height:1;margin:0 0 14px;">' + esc(line.replace(/^# /, '')) + '</h1>');
+          else out.push('<p style="font-size:15px;line-height:1.65;margin:16px 0;color:#1C1C1E;">' + esc(line) + '</p>');
+        });
+        if (inList) out.push('</ul>');
+        return out.join('');
+      }
+
+      function currentConfig() {
+        const key = field('Template') || 'roundup';
+        return templates[key] || templates.roundup;
+      }
+
+      function visible(section) {
+        return currentConfig().sections.indexOf(section) !== -1;
+      }
+
+      function setLabels(cfg) {
+        document.querySelectorAll('[data-label]').forEach(function (el) {
+          const key = el.dataset.label;
+          if (cfg.labels[key]) el.textContent = cfg.labels[key];
+        });
+      }
+
+      function applyTemplateType() {
+        const cfg = currentConfig();
+        if (help) help.textContent = cfg.help;
+        document.querySelectorAll('.section-field').forEach(function (el) {
+          const show = cfg.sections.indexOf(el.dataset.section) !== -1;
+          el.classList.toggle('hidden', !show);
+        });
+        setLabels(cfg);
+        renderPreview();
+      }
+
+      function sectionLabel(text) {
+        if (!text) return '';
+        return '<div style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:1.5px;color:#F57247;text-transform:uppercase;margin-bottom:8px;">' + esc(text) + '</div>';
+      }
+
+      function renderLead() {
+        if (!visible('lead') || (!field('LeadTitle') && !field('LeadDeck'))) return '';
+        return sectionLabel(field('LeadEyebrow') || '§ FEATURE') +
+          '<h1 style="font-size:48px;line-height:.95;letter-spacing:-2px;font-weight:700;margin:0 0 12px;color:#1C1C1E;">' + esc(field('LeadTitle')) + '</h1>' +
+          '<div style="font-family:Georgia,serif;font-style:italic;font-size:20px;line-height:1.35;color:#6B655C;">' + esc(field('LeadDeck')) + '</div>';
+      }
+
+      function renderNews() {
+        if (!visible('news') || !field('NewsItems')) return '';
+        let html = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">';
+        lines(field('NewsItems')).forEach(function (raw, i) {
+          const p = pipeParts(raw);
+          html += '<tr><td style="padding:18px 0;border-top:1px solid #1C1C1E;"><table role="presentation" width="100%"><tr>' +
+            '<td style="width:48px;vertical-align:top;font-family:IBM Plex Mono,Menlo,monospace;font-size:13px;color:#F57247;font-weight:600;">' + String(i + 1).padStart(2, '0') + '</td>' +
+            '<td><div style="font-size:18px;font-weight:700;letter-spacing:-.3px;line-height:1.2;">' + esc(p[0] || '') + '</div>' +
+            '<div style="font-family:Georgia,serif;font-style:italic;font-size:15px;color:#6B655C;margin-top:4px;line-height:1.4;">' + esc(p[1] || '') + '</div>' +
+            (p[3] ? '<div style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;color:#F57247;margin-top:8px;letter-spacing:1px;">READ &#8594;</div>' : '') + '</td>' +
+            '<td style="width:80px;vertical-align:top;text-align:right;font-family:IBM Plex Mono,Menlo,monospace;font-size:10px;letter-spacing:1px;color:#6B655C;">' + esc((p[2] || '').toUpperCase()) + '</td>' +
+            '</tr></table></td></tr>';
+        });
+        return html + '</table>';
+      }
+
+      function renderStats() {
+        if (!visible('stats') || !field('Stats')) return '';
+        let html = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #1C1C1E;border-bottom:1px solid #1C1C1E;"><tr>';
+        lines(field('Stats')).forEach(function (raw) {
+          const p = pipeParts(raw);
+          html += '<td style="padding:18px 12px;text-align:center;border-right:1px solid #1C1C1E;"><div style="font-size:36px;font-weight:700;line-height:1;letter-spacing:-1px;">' + esc(p[0] || '') + '</div><div style="font-family:IBM Plex Mono,Menlo,monospace;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#6B655C;margin-top:6px;">' + esc(p[1] || '') + '</div></td>';
+        });
+        return html + '</tr></table>';
+      }
+
+      function renderPullquote() {
+        if (!visible('pullquote') || !field('Pullquote')) return '';
+        return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-left:4px solid #F57247;"><tr><td style="padding:8px 0 8px 20px;"><div style="font-family:Georgia,serif;font-style:italic;font-size:24px;line-height:1.3;color:#1C1C1E;">&ldquo;' + esc(field('Pullquote')) + '&rdquo;</div><div style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;color:#6B655C;letter-spacing:1px;margin-top:12px;text-transform:uppercase;">' + esc(field('PullquoteBy')) + '</div></td></tr></table>';
+      }
+
+      function renderCTA() {
+        if (!visible('cta') || (!field('CTATitle') && !field('CTAURL'))) return '';
+        return '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:24px;border-top:1px solid #1C1C1E;border-bottom:1px solid #1C1C1E;background:#F57247;"><tr><td style="padding:32px 28px;"><div style="font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">' + esc(field('CTAEyebrow')) + '</div><div style="font-size:36px;line-height:1;font-weight:700;letter-spacing:-1.5px;margin-bottom:10px;">' + esc(field('CTATitle')) + '</div><div style="font-family:Georgia,serif;font-size:18px;line-height:1.35;margin-bottom:20px;">' + esc(field('CTASubtitle')) + '</div><a href="' + esc(field('CTAURL')) + '" style="display:inline-block;background:#1C1C1E;color:#fff;border:1px solid #1C1C1E;padding:14px 24px;font-family:IBM Plex Mono,Menlo,monospace;font-size:12px;font-weight:700;letter-spacing:1.5px;text-decoration:none;text-transform:uppercase;">' + esc(field('CTALabel') || 'READ MORE') + ' &#8594;</a></td></tr></table>';
+      }
+
+      function formatDisplayDate(date) {
+        return date.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }).toUpperCase();
+      }
+
+      function displayDateFromSendAt() {
+        const raw = field('SendAt');
+        const now = new Date();
+        if (!raw || raw === 'now' || raw === 'onsub') return formatDisplayDate(now);
+        if (/^\+\d+$/.test(raw)) {
+          let days = parseInt(raw.slice(1), 10);
+          let d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+          if (d.getDay() === 0) days += 1;
+          if (d.getDay() === 6) days += 2;
+          d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+          return formatDisplayDate(d);
+        }
+        const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+        if (match) {
+          const d = new Date(parseInt(match[3], 10), parseInt(match[1], 10) - 1, parseInt(match[2], 10));
+          if (!Number.isNaN(d.getTime())) return formatDisplayDate(d);
+        }
+        return formatDisplayDate(now);
+      }
+
+      function renderPreview() {
+        if (!preview) return;
+        const palette = field('Palette');
+        const paper = palette === 'signal' ? '#FDFBF4' : (palette === 'graphite' ? '#FBFBFC' : '#FFFFFF');
+        const outer = palette === 'signal' ? '#E9E4D2' : (palette === 'graphite' ? '#E7E8EB' : '#F1F0ED');
+        const ticker = visible('ticker') ? lines(field('Ticker')) : [];
+        const hero = visible('hero') ? field('Hero') : '';
+        const body = visible('body') ? markdownHTML(field('ContentMarkdown')) : '';
+        let html = '<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;overflow:hidden;background:' + outer + ';font-family:IBM Plex Sans,-apple-system,BlinkMacSystemFont,Helvetica Neue,Arial,sans-serif;color:#1C1C1E}a{color:inherit}.inner{width:640px;max-width:100%;background:' + paper + ';border:1px solid #1C1C1E}</style></head><body><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:' + outer + ';"><tr><td align="center" style="padding:24px 12px;"><table role="presentation" class="inner" cellpadding="0" cellspacing="0">';
+        if (ticker.length) {
+          html += '<tr><td style="background:#1C1C1E;color:#fff;padding:10px 20px;font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:1.5px;"><span style="color:#F57247;margin-right:16px;">&#9654; LIVE</span>' + ticker.map(esc).join('<span style="color:#6B655C;margin:0 12px;">&bull;</span>') + '</td></tr>';
+        }
+        html += '<tr><td style="padding:22px 32px;border-bottom:1px solid #1C1C1E;"><table role="presentation" width="100%"><tr><td><div style="font-size:28px;font-weight:700;letter-spacing:-1px;font-family:IBM Plex Mono,Menlo,monospace;line-height:1;">bitcoin<span style="color:#F57247;">++</span></div><div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#6B655C;margin-top:4px;">a dispatch from the frontier</div></td><td style="text-align:right;font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:1.2px;color:#6B655C;"><div>ISSUE ' + esc(field('Issue') || 'NEWSLETTER') + '</div><div>' + esc(displayDateFromSendAt()) + '</div></td></tr></table></td></tr>';
+        if (hero) html += '<tr><td style="padding:0;border-bottom:1px solid #1C1C1E;"><img src="' + esc(hero) + '" width="640" height="270" style="width:100%;max-width:640px;height:270px;max-height:270px;object-fit:cover;display:block;"></td></tr>';
+        html += '<tr><td style="padding:24px 32px;border-bottom:1px solid #1C1C1E;">' + renderLead() + renderStats() + renderNews() + renderPullquote() + body + renderCTA() + '</td></tr>';
+        html += '<tr><td style="padding:28px 32px;border-top:1px solid #1C1C1E;font-family:IBM Plex Mono,Menlo,monospace;font-size:11px;letter-spacing:1px;color:#6B655C;">bitcoin<span style="color:#F57247;">++</span> / protocol dispatches, conference notes, and builder signals</td></tr>';
+        html += '</table></td></tr></table></body></html>';
+        preview.srcdoc = html;
+        preview.onload = resizePreview;
+        setTimeout(resizePreview, 40);
+      }
+
+      function resizePreview() {
+        if (!preview || !preview.contentDocument) return;
+        const doc = preview.contentDocument;
+        const height = Math.max(
+          doc.body ? doc.body.scrollHeight : 0,
+          doc.documentElement ? doc.documentElement.scrollHeight : 0
+        );
+        preview.style.height = Math.max(320, height) + 'px';
+      }
+
+      if (heroUploadButton && heroFilePicker && heroInput) {
+        heroUploadButton.addEventListener('click', function () {
+          heroFilePicker.value = '';
+          heroFilePicker.click();
+        });
+        heroFilePicker.addEventListener('change', function () {
+          if (!heroFilePicker.files || heroFilePicker.files.length === 0) return;
+          const file = heroFilePicker.files[0];
+          openHeroCrop(file);
+        });
+      }
+
+      [heroCropZoom, heroCropX, heroCropY].forEach(function (el) {
+        if (!el) return;
+        el.addEventListener('input', drawHeroCrop);
+      });
+
+      if (heroCropCancel) {
+        heroCropCancel.addEventListener('click', function () {
+          clearHeroCrop();
+          setHeroStatus('Crop cancelled.', 'info');
+        });
+      }
+
+      if (heroCropUpload && heroInput) {
+        heroCropUpload.addEventListener('click', function () {
+          heroCropBlob().then(function (blob) {
+          const fd = new FormData();
+          fd.append('file', blob, 'newsletter-hero-wide.jpg');
+          heroCropUpload.disabled = true;
+          if (heroUploadButton) heroUploadButton.disabled = true;
+          setHeroStatus('Uploading cropped hero...', 'info');
+          fetch('/admin/missives/upload-image', { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function (r) {
+              if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+              return r.json();
+            })
+            .then(function (data) {
+              heroInput.value = data.url || '';
+              updateHeroControls();
+              renderPreview();
+              clearHeroCrop();
+              setHeroStatus('Cropped hero uploaded.', 'ok');
+            })
+            .catch(function (err) {
+              setHeroStatus('Upload failed: ' + (err.message || err), 'error');
+            })
+            .finally(function () {
+              heroCropUpload.disabled = false;
+              if (heroUploadButton) heroUploadButton.disabled = false;
+            });
+          }).catch(function (err) {
+            setHeroStatus(err.message || String(err), 'error');
+          });
+        });
+      }
+
+      if (heroRemoveButton && heroInput) {
+        heroRemoveButton.addEventListener('click', function () {
+          heroInput.value = '';
+          clearHeroCrop();
+          updateHeroControls();
+          renderPreview();
+          setHeroStatus('Hero image removed.', 'info');
+        });
+      }
+
+      if (heroInput) {
+        heroInput.addEventListener('input', updateHeroControls);
+        heroInput.addEventListener('change', updateHeroControls);
+      }
+
+      if (preset && audienceInput) {
+        preset.addEventListener('change', function () {
+          if (!preset.value) return;
+          audienceInput.value = preset.value;
+          audienceInput.focus();
+          renderPreview();
+        });
+      }
+      if (templateSelect) templateSelect.addEventListener('change', applyTemplateType);
+      document.querySelectorAll('input, textarea, select').forEach(function (el) {
+        el.addEventListener('input', renderPreview);
+        el.addEventListener('change', renderPreview);
+      });
+      updateHeroControls();
+      applyTemplateType();
+    })();
+  </script>
+</body>
+</html>

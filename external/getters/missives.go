@@ -49,9 +49,9 @@ func parseLetter(pageID string, props map[string]notion.PropertyValue) *mtypes.L
 		Newsletters: parseOptsToList("Newsletter", props),
 		Markdown:    parseRichText("Markdown", props),
 		SendAt:      parseRichText("SendAt", props),
-                OnlyFor:     parseSelect("OnlyFor", props),
-                Expiry:      parseDate("Expiry", props),
-                SentAt:      parseDate("SentAt", props),
+		OnlyFor:     parseSelect("OnlyFor", props),
+		Expiry:      parseDate("Expiry", props),
+		SentAt:      parseDate("SentAt", props),
 	}
 
 	return letter
@@ -364,9 +364,9 @@ func GetLetters(n *types.Notion, newsletter string) ([]*mtypes.Letter, error) {
 
 		for _, page := range pages {
 			letter := parseLetter(page.ID, page.Properties)
-                        if !letter.HasNewsletter(newsletter) {
-                                continue
-                        }
+			if !letter.HasNewsletter(newsletter) {
+				continue
+			}
 			letters = append(letters, letter)
 		}
 	}
@@ -402,6 +402,75 @@ func ListOnlyForLetters(n *types.Notion) ([]*mtypes.Letter, error) {
 	}
 
 	return letters, nil
+}
+
+func ListTemplatedLetters(n *types.Notion) ([]*mtypes.Letter, error) {
+	hasMore := true
+	nextCursor := ""
+	var letters []*mtypes.Letter
+
+	for hasMore {
+		var err error
+		var pages []*notion.Page
+		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
+			n.Config.MissivesDb, notion.QueryDatabaseParam{
+				StartCursor: nextCursor,
+			})
+		if err != nil {
+			return nil, err
+		}
+
+		for _, page := range pages {
+			letter := parseLetter(page.ID, page.Properties)
+			if letter.OnlyFor != mtypes.OnlyForTemplated {
+				continue
+			}
+			letters = append(letters, letter)
+		}
+	}
+
+	return letters, nil
+}
+
+type MissiveInput struct {
+	Title       string
+	Markdown    string
+	SendAt      string
+	Newsletters []string
+	OnlyFor     string
+	Expiry      *time.Time
+}
+
+func CreateTemplatedMissive(n *types.Notion, in MissiveInput) (*mtypes.Letter, error) {
+	in.OnlyFor = mtypes.OnlyForTemplated
+	props := missiveProps(in)
+	page, err := n.Client.CreatePage(context.Background(),
+		notion.NewDatabaseParent(n.Config.MissivesDb), props)
+	if err != nil {
+		return nil, err
+	}
+	return parseLetter(page.ID, page.Properties), nil
+}
+
+func UpdateTemplatedMissive(n *types.Notion, pageID string, in MissiveInput) error {
+	in.OnlyFor = mtypes.OnlyForTemplated
+	props := missiveProps(in)
+	_, err := n.Client.UpdatePageProperties(context.Background(), pageID, props)
+	return err
+}
+
+func missiveProps(in MissiveInput) map[string]*notion.PropertyValue {
+	props := map[string]*notion.PropertyValue{
+		"Title":      titleValue(in.Title),
+		"Markdown":   richTextValue(in.Markdown),
+		"SendAt":     richTextValue(in.SendAt),
+		"Newsletter": multiSelectValue(in.Newsletters),
+		"OnlyFor":    selectValue(in.OnlyFor),
+	}
+	if in.Expiry != nil {
+		props["Expiry"] = notion.NewDatePropertyValue(&notion.Date{Start: *in.Expiry})
+	}
+	return props
 }
 
 func CreateMissive(n *types.Notion, title, markdown, sendAt string, newsletters []string) error {

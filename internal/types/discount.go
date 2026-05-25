@@ -11,16 +11,18 @@ import (
 // DiscountCode's parsed fields.
 //
 // Syntax:
-//   %50           -> 50% off
-//   $10           -> $10 off
-//   $10:50        -> $10 off, max 50 uses
-//   %50+1         -> 50% off a second ticket (BOGO)
-//   =25           -> fixed price $25
-//   =25:70        -> fixed price $25, max 70 uses
-//   =100<20260519 -> fixed $100 until end of May 19, 2026
-//   =100@20260519 -> fixed $100 only on May 19, 2026
-//   =100@20260519-20260520 -> fixed $100 from May 19 to May 20, 2026
-//   =100:50<20260519 -> fixed $100, max 50 uses OR until May 19, 2026
+//
+//	%50           -> 50% off
+//	$10           -> $10 off
+//	$10:50        -> $10 off, max 50 uses
+//	%50+1         -> 50% off a second ticket (BOGO)
+//	=25           -> fixed price $25
+//	=25:70        -> fixed price $25, max 70 uses
+//	=100<20260519 -> fixed $100 until end of May 19, 2026
+//	=100@20260519- -> fixed $100 starting May 19, 2026
+//	=100@20260519 -> fixed $100 only on May 19, 2026
+//	=100@20260519-20260520 -> fixed $100 from May 19 to May 20, 2026
+//	=100:50<20260519 -> fixed $100, max 50 uses OR until May 19, 2026
 func (dc *DiscountCode) ParseDiscountExpr() error {
 	expr := strings.TrimSpace(dc.Discount)
 	if expr == "" {
@@ -52,23 +54,25 @@ func (dc *DiscountCode) ParseDiscountExpr() error {
 	} else if atIdx := strings.Index(rest, "@"); atIdx != -1 {
 		dateStr := rest[atIdx+1:]
 		if dashIdx := strings.Index(dateStr, "-"); dashIdx != -1 {
-			// @YYYYMMDD-YYYYMMDD range
+			// @YYYYMMDD-YYYYMMDD range, or @YYYYMMDD- for start-only
 			fromStr := dateStr[:dashIdx]
 			toStr := dateStr[dashIdx+1:]
 			from, err := parseDate(fromStr)
 			if err != nil {
 				return fmt.Errorf("invalid start date in %q: %w", expr, err)
 			}
-			to, err := parseDate(toStr)
-			if err != nil {
-				return fmt.Errorf("invalid end date in %q: %w", expr, err)
-			}
 			// Start at beginning of from day
 			startOfDay := from
 			dc.ValidFrom = &startOfDay
-			// End at end of to day
-			endOfDay := to.Add(24*time.Hour - time.Second)
-			dc.ValidUntil = &endOfDay
+			if toStr != "" {
+				to, err := parseDate(toStr)
+				if err != nil {
+					return fmt.Errorf("invalid end date in %q: %w", expr, err)
+				}
+				// End at end of to day
+				endOfDay := to.Add(24*time.Hour - time.Second)
+				dc.ValidUntil = &endOfDay
+			}
 		} else {
 			// @YYYYMMDD single day
 			day, err := parseDate(dateStr)

@@ -36,9 +36,6 @@
                   <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/x/auth-check" class="inline">
                     <button type="submit" class="px-3 py-1.5 text-sm rounded-md text-white bg-black hover:bg-gray-800">Test X auth</button>
                   </form>
-                  <form method="POST" action="/{{ .Conf.Tag }}/admin/recordings/x/bootstrap" class="inline">
-                    <button type="submit" class="px-3 py-1.5 text-sm rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200">Bootstrap X</button>
-                  </form>
                 {{ else }}
                   <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">X uploader off</span>
                 {{ end }}

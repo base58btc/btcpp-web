@@ -300,6 +300,7 @@ func richText(s string) []*notion.RichText {
 }
 
 func RegisterOrg(n *types.Notion, org *types.Org) (string, error) {
+	normalizeOrgInput(org)
 	props := map[string]*notion.PropertyValue{
 		"Name": notion.NewTitlePropertyValue(richText(org.Name)...),
 	}
@@ -366,6 +367,7 @@ type OrgUpdate struct {
 }
 
 func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
+	up = normalizeOrgUpdate(up)
 	props := map[string]*notion.PropertyValue{}
 	if up.Website != "" {
 		props["Website"] = notion.NewURLPropertyValue(up.Website)
@@ -390,6 +392,36 @@ func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
 	}
 	_, err := n.Client.UpdatePageProperties(context.Background(), orgID, props)
 	return err
+}
+
+func normalizeOrgInput(org *types.Org) {
+	if org == nil {
+		return
+	}
+	org.Name = strings.TrimSpace(org.Name)
+	org.Tagline = strings.TrimSpace(org.Tagline)
+	org.LogoLight = strings.TrimSpace(org.LogoLight)
+	org.LogoDark = strings.TrimSpace(org.LogoDark)
+	org.Email = strings.TrimSpace(org.Email)
+	org.Website = strings.TrimSpace(org.Website)
+	org.LinkedIn = strings.TrimSpace(org.LinkedIn)
+	org.Instagram = strings.TrimSpace(org.Instagram)
+	org.Youtube = strings.TrimSpace(org.Youtube)
+	org.Github = strings.TrimSpace(org.Github)
+	org.Twitter = types.ParseTwitter(org.Twitter.Handle)
+	org.Nostr = strings.TrimSpace(org.Nostr)
+	org.Matrix = strings.TrimSpace(org.Matrix)
+	org.Notes = strings.TrimSpace(org.Notes)
+}
+
+func normalizeOrgUpdate(up OrgUpdate) OrgUpdate {
+	up.Website = strings.TrimSpace(up.Website)
+	up.Twitter = types.ParseTwitter(up.Twitter).Handle
+	up.Nostr = strings.TrimSpace(up.Nostr)
+	up.Github = strings.TrimSpace(up.Github)
+	up.LogoLight = strings.TrimSpace(up.LogoLight)
+	up.LogoDark = strings.TrimSpace(up.LogoDark)
+	return up
 }
 
 // FindOrg returns the first Org whose Website matches `website` (preferred),

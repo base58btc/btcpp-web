@@ -2227,6 +2227,7 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 }
 
 func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) error {
+	normalizeVolunteerInput(vol)
 	parent := notion.NewDatabaseParent(n.Config.VolunteerDb)
 
 	// multiselect
@@ -2361,6 +2362,23 @@ func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) error {
 	_, err := n.Client.CreatePage(context.Background(), parent, vals)
 
 	return err
+}
+
+func normalizeVolunteerInput(vol *types.Volunteer) {
+	if vol == nil {
+		return
+	}
+	vol.Name = strings.TrimSpace(vol.Name)
+	vol.Email = strings.TrimSpace(vol.Email)
+	vol.Phone = strings.TrimSpace(vol.Phone)
+	vol.Signal = strings.TrimSpace(vol.Signal)
+	vol.ContactAt = strings.TrimSpace(vol.ContactAt)
+	vol.Comments = strings.TrimSpace(vol.Comments)
+	vol.DiscoveredVia = strings.TrimSpace(vol.DiscoveredVia)
+	vol.Hometown = strings.TrimSpace(vol.Hometown)
+	vol.Twitter = types.ParseTwitter(vol.Twitter.Handle)
+	vol.Nostr = strings.TrimSpace(vol.Nostr)
+	vol.Shirt = strings.TrimSpace(vol.Shirt)
 }
 
 func GetVolInfo(ctx *config.AppContext, confRef string) (*types.VolInfo, error) {

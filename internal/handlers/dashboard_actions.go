@@ -87,9 +87,9 @@ func SpeakerSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 }
 
 // SpeakerRolesGet returns the Roles slice for a speaker by ID, as
-// JSON `{roles: [...]}`. Used by the dashboard's role-manager
-// autocomplete to pre-fill existing tags. Caller must be a
-// global-admin — this leaks role memberships otherwise.
+// JSON `{roles: [...]}`. Used by the admin role-manager autocomplete
+// to pre-fill existing tags. Caller must be a global-admin — this
+// leaks role memberships otherwise.
 func SpeakerRolesGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	id := auth.RequireOptional(r, ctx)
 	if id == nil || !id.IsGlobalAdmin() {
@@ -109,7 +109,7 @@ func SpeakerRolesGet(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 
 // SpeakerRolesUpdate writes the Roles multi-select on a Speakers row.
 // POST form: speakerID + roles (comma-separated tags). Caller must be
-// global-admin. Redirects back to /dashboard with a flash.
+// global-admin. Redirects back to the global admin dashboard with a flash.
 func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	id := auth.RequireOptional(r, ctx)
 	if id == nil || !id.IsGlobalAdmin() {
@@ -136,12 +136,12 @@ func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		roles = append(roles, t)
 	}
 	if err := getters.UpdateSpeakerRoles(ctx.Notion, speakerID, roles); err != nil {
-		ctx.Err.Printf("/dashboard/admin/roles update %s: %s", speakerID, err)
+		ctx.Err.Printf("%s update roles %s: %s", r.URL.Path, speakerID, err)
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
-	ctx.Infos.Printf("/dashboard/admin/roles %s set roles for %s → %v", id.Email, speakerID, roles)
-	http.Redirect(w, r, "/dashboard?flash="+url.QueryEscape("Roles updated."), http.StatusSeeOther)
+	ctx.Infos.Printf("%s %s set roles for %s → %v", r.URL.Path, id.Email, speakerID, roles)
+	http.Redirect(w, r, "/admin?flash="+url.QueryEscape("Roles updated."), http.StatusSeeOther)
 }
 
 // inviteLinkBail redirects an unusable /invite-speaker click to the
@@ -1159,6 +1159,7 @@ func handleInviteSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 		w.Write([]byte(helpers.ErrSpeakerApp("Unable to register you: form parsing error")))
 		return
 	}
+	trimTalkApp(&talkapp)
 	talkapp.ParseAvailability("days-", r.PostForm)
 	talkapp.DinnerRSVP = r.PostForm.Get("DinnerOpt") == "Yes"
 	talkapp.OtherEvents = helpers.ParseFormConfs("conf-", r.PostForm, confs)

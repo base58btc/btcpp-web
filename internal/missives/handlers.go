@@ -36,10 +36,6 @@ func RegisterNewsletterHandlers(r *mux.Router, ctx *config.AppContext) {
 		ScheduleNewsMissives(w, r, ctx)
 	}).Methods("GET")
 
-	r.HandleFunc("/missives/schedule/MISS-{uid}", func(w http.ResponseWriter, r *http.Request) {
-		ScheduleNewsMissive(w, r, ctx)
-	}).Methods("GET")
-
 	r.HandleFunc("/missives/unschedule/MISS-{uid}", func(w http.ResponseWriter, r *http.Request) {
 		UnscheduleNewsMissive(w, r, ctx)
 	}).Methods("GET")
@@ -363,50 +359,6 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 
 	ctx.Infos.Printf("Scheduled preview emails for %s", missive.Title)
 	w.Write(body)
-}
-
-func ScheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	if id := auth.RequireRole(w, r, ctx, auth.Spec{Role: auth.RoleAdmin}); id == nil {
-		return
-	}
-
-	params := mux.Vars(r)
-	uniqueID := params["uid"]
-
-	uid, err := strconv.ParseUint(uniqueID, 10, 64)
-	if err != nil {
-		ctx.Infos.Printf("Unable to schedule missives uid (%s): %s", uniqueID, err)
-		/* Return the homepage page */
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-	missive, err := getters.GetLetter(ctx.Notion, uid)
-	if err != nil {
-		ctx.Infos.Printf("Unable to schedule missives: %s", err)
-		/* Return the homepage page */
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	subscribers, err := getters.ListSubscribersFor(ctx.Notion, missive.Newsletters)
-	if err != nil {
-		ctx.Infos.Printf("Unable to schedule missives: %s", err)
-		/* Return the homepage page */
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	letters := []*mtypes.Letter{missive}
-	err = scheduleMissives(ctx, subscribers, letters)
-	if err != nil {
-		ctx.Infos.Printf("Unable to send missives: %s", err)
-		/* Return the homepage page */
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
-	}
-
-	ctx.Infos.Printf("Scheduled emails for %s", missive.Title)
-	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

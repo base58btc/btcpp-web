@@ -230,6 +230,51 @@ func RecordAffiliateUsage(ctx *config.AppContext, in AffiliateUsageInput) error 
 	return err
 }
 
+// ListAffiliateUsage issues a live paginated query for every
+// AffiliateUsageDb row. This is intended for admin/backfill jobs, not
+// request paths.
+func ListAffiliateUsage(ctx *config.AppContext) ([]*types.AffiliateUsage, error) {
+	if ctx.Notion.Config.AffiliateUsageDb == "" {
+		return nil, fmt.Errorf("AffiliateUsageDb not configured")
+	}
+	n := ctx.Notion
+	var out []*types.AffiliateUsage
+	hasMore := true
+	cursor := ""
+	for hasMore {
+		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
+			n.Config.AffiliateUsageDb, notion.QueryDatabaseParam{
+				StartCursor: cursor,
+			})
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range pages {
+			created := p.CreatedTime
+			out = append(out, parseAffiliateUsage(p.ID, p.Properties, &created))
+		}
+		cursor = next
+		hasMore = more
+	}
+	return out, nil
+}
+
+// UpdateAffiliateUsageSats rewrites the stored sats split on an existing
+// AffiliateUsage row. It uses the direct Notion JSON path so EarnedSats
+// can be set to zero; go-notion omits zero number values.
+func UpdateAffiliateUsageSats(ctx *config.AppContext, usageID string, savedSats, earnedSats int64) error {
+	if usageID == "" {
+		return fmt.Errorf("UpdateAffiliateUsageSats: usageID is required")
+	}
+	body := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"SavedSats":  map[string]interface{}{"number": savedSats},
+			"EarnedSats": map[string]interface{}{"number": earnedSats},
+		},
+	}
+	return notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+usageID, body)
+}
+
 // QueryAffiliateUsageByEmail issues a live Notion query against
 // AffiliateUsageDb filtering on the AffiliateEmail rich_text equals
 // the given email. No caching — affiliates expect to see fresh stats

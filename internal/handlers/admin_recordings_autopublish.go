@@ -563,6 +563,8 @@ func newXPosterClient(ctx *config.AppContext) (*xposter.Client, error) {
 		ProfileObject: ctx.Env.Recordings.X.ProfileObject,
 		EncryptionKey: ctx.Env.Recordings.EncryptionKey,
 		Headed:        ctx.Env.Recordings.X.Headed,
+		LoginUsername: ctx.Env.Recordings.X.LoginUsername,
+		LoginPassword: ctx.Env.Recordings.X.LoginPassword,
 		PostTimeout:   postTimeout,
 		AuthWait:      authWait,
 		Logf:          ctx.Infos.Printf,
@@ -585,30 +587,6 @@ func RecordingsAdminXAuthCheck(w http.ResponseWriter, r *http.Request, ctx *conf
 		return
 	}
 	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash="+url.QueryEscape("X auth status: "+status)), http.StatusSeeOther)
-}
-
-func RecordingsAdminXBootstrap(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
-	if !ok {
-		return
-	}
-	if !ctx.Env.Recordings.X.Headed {
-		redirectRecordingsListErr(w, r, conf.Tag, "X bootstrap must be run locally with X_BROWSER_HEADED=true")
-		return
-	}
-	client, err := newXPosterClient(ctx)
-	if err != nil {
-		redirectRecordingsListErr(w, r, conf.Tag, "X uploader is not configured: "+err.Error())
-		return
-	}
-	go func() {
-		if err := client.Bootstrap(context.Background()); err != nil {
-			ctx.Err.Printf("x bootstrap failed: %s", err)
-			return
-		}
-		ctx.Infos.Printf("x bootstrap completed and profile archive saved")
-	}()
-	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash="+url.QueryEscape("X bootstrap started; complete login in the Chrome window, then run Test X auth")), http.StatusSeeOther)
 }
 
 func RecordingsAdminRetryX(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {

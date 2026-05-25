@@ -14,10 +14,10 @@ import (
 const apiURL = "https://api.buffer.com/graphql"
 
 var (
-	apiKey   string
-	orgID    string
-	channels []Channel
-	mu       sync.Mutex
+	apiKey            string
+	orgID             string
+	channels          []Channel
+	mu                sync.Mutex
 	channelsFetchedAt time.Time
 )
 
@@ -152,18 +152,23 @@ func FetchChannels() ([]Channel, error) {
 	return channels, nil
 }
 
+func buildAssetsBlock(imageURLs []string) string {
+	if len(imageURLs) == 0 {
+		return ""
+	}
+
+	var assets []string
+	for _, u := range imageURLs {
+		escaped, _ := json.Marshal(u)
+		assets = append(assets, fmt.Sprintf(`{ image: { url: %s } }`, string(escaped)))
+	}
+	return fmt.Sprintf(`, assets: [%s]`, strings.Join(assets, ", "))
+}
+
 func CreatePost(channelID, text string, imageURLs []string, service string) (*PostResult, error) {
 	textEscaped, _ := json.Marshal(text)
 
-	var assetsBlock string
-	if len(imageURLs) > 0 {
-		var imgs []string
-		for _, u := range imageURLs {
-			escaped, _ := json.Marshal(u)
-			imgs = append(imgs, fmt.Sprintf(`{ url: %s }`, string(escaped)))
-		}
-		assetsBlock = fmt.Sprintf(`, assets: { images: [%s] }`, strings.Join(imgs, ", "))
-	}
+	assetsBlock := buildAssetsBlock(imageURLs)
 
 	var metadataBlock string
 	if service == "instagram" {

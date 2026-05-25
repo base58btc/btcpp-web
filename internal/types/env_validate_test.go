@@ -71,3 +71,17 @@ func TestEnvConfigValidateAllowsCompleteProdConfig(t *testing.T) {
 		t.Fatalf("Validate returned error: %s", err)
 	}
 }
+
+func TestEnvConfigApplyDefaultsSeparatesXProfileObjects(t *testing.T) {
+	staging := &EnvConfig{}
+	staging.ApplyDefaults()
+	if got, want := staging.Recordings.X.ProfileObject, "private/social/x-chrome-profile-staging.tgz.enc"; got != want {
+		t.Fatalf("staging X profile object = %q, want %q", got, want)
+	}
+
+	prod := &EnvConfig{Prod: true}
+	prod.ApplyDefaults()
+	if got, want := prod.Recordings.X.ProfileObject, "private/social/x-chrome-profile-prod.tgz.enc"; got != want {
+		t.Fatalf("prod X profile object = %q, want %q", got, want)
+	}
+}

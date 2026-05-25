@@ -7,13 +7,13 @@ import (
 
 func TestParseDiscountExpr(t *testing.T) {
 	tests := []struct {
-		name     string
-		expr     string
-		wantType rune
-		wantAmt  uint
-		wantMax  uint
+		name      string
+		expr      string
+		wantType  rune
+		wantAmt   uint
+		wantMax   uint
 		wantExtra uint
-		wantErr  bool
+		wantErr   bool
 	}{
 		{"percent 50", "%50", '%', 50, 0, 0, false},
 		{"percent 100", "%100", '%', 100, 0, 0, false},
@@ -265,6 +265,23 @@ func TestParseDateModifiers(t *testing.T) {
 		}
 	})
 
+	t.Run("start-only range (@from-)", func(t *testing.T) {
+		dc := &DiscountCode{Discount: "=100@20260519-"}
+		if err := dc.ParseDiscountExpr(); err != nil {
+			t.Fatal(err)
+		}
+		if dc.ValidFrom == nil {
+			t.Fatal("ValidFrom should be set")
+		}
+		if dc.ValidUntil != nil {
+			t.Fatal("ValidUntil should be nil")
+		}
+		expectedFrom := time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC)
+		if !dc.ValidFrom.Equal(expectedFrom) {
+			t.Errorf("ValidFrom = %v, want %v", dc.ValidFrom, expectedFrom)
+		}
+	})
+
 	t.Run("limit and date combined", func(t *testing.T) {
 		dc := &DiscountCode{Discount: "=100:50<20260519"}
 		if err := dc.ParseDiscountExpr(); err != nil {
@@ -317,6 +334,11 @@ func TestIsDateExpired(t *testing.T) {
 		{"in range day 1", "=100@20260519-20260520", may19Mid, false},
 		{"in range day 2", "=100@20260519-20260520", may20Mid, false},
 		{"after range", "=100@20260519-20260520", time.Date(2026, 5, 21, 12, 0, 0, 0, time.UTC), true},
+
+		// =100@20260519- -> valid from May 19 onward
+		{"before start-only range", "=100@20260519-", may18Mid, true},
+		{"on start-only range", "=100@20260519-", may19Mid, false},
+		{"after start-only range", "=100@20260519-", may20Mid, false},
 
 		// No date constraint
 		{"no date, any time", "%50", may19Mid, false},

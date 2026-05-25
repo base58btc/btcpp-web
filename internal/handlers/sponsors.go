@@ -178,22 +178,23 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 
 	org := &types.Org{
-		Name:      r.FormValue("Name"),
-		Tagline:   r.FormValue("Tagline"),
-		Email:     r.FormValue("Email"),
-		Website:   r.FormValue("Website"),
+		Name:      strings.TrimSpace(r.FormValue("Name")),
+		Tagline:   strings.TrimSpace(r.FormValue("Tagline")),
+		Email:     strings.TrimSpace(r.FormValue("Email")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
 		Twitter:   types.ParseTwitter(r.FormValue("Twitter")),
-		Nostr:     r.FormValue("Nostr"),
-		Matrix:    r.FormValue("Matrix"),
-		LinkedIn:  r.FormValue("LinkedIn"),
-		Instagram: r.FormValue("Instagram"),
-		Youtube:   r.FormValue("Youtube"),
-		Github:    r.FormValue("Github"),
-		LogoLight: r.FormValue("LogoLight"),
-		LogoDark:  r.FormValue("LogoDark"),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Matrix:    strings.TrimSpace(r.FormValue("Matrix")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		Youtube:   strings.TrimSpace(r.FormValue("Youtube")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		LogoLight: strings.TrimSpace(r.FormValue("LogoLight")),
+		LogoDark:  strings.TrimSpace(r.FormValue("LogoDark")),
 		Hiring:    r.FormValue("Hiring") == "on",
-		Notes:     r.FormValue("Notes"),
+		Notes:     strings.TrimSpace(r.FormValue("Notes")),
 	}
+	trimOrg(org)
 
 	if org.Name == "" {
 		http.Error(w, "Org name is required", http.StatusBadRequest)
@@ -300,8 +301,8 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	orgRef := r.FormValue("OrgRef")
-	level := r.FormValue("Level")
+	orgRef := strings.TrimSpace(r.FormValue("OrgRef"))
+	level := strings.TrimSpace(r.FormValue("Level"))
 
 	if orgRef == "" || level == "" {
 		http.Error(w, "Org and level are required", http.StatusBadRequest)

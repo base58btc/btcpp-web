@@ -72,13 +72,15 @@ type SpeakerUpdate struct {
 // case (existing speaker), we still take the cache hit and skip the
 // Notion call.
 func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error) {
+	email = strings.TrimSpace(email)
 	if email == "" {
 		return nil, nil
 	}
 	if cached := cacheSpeakers; len(cached) > 0 {
 		var hits []*types.Speaker
 		for _, s := range cached {
-			if s != nil && strings.EqualFold(s.Email, email) {
+			if s != nil && strings.EqualFold(strings.TrimSpace(s.Email), email) {
+				s.Email = strings.TrimSpace(s.Email)
 				hits = append(hits, s)
 			}
 		}
@@ -93,7 +95,7 @@ func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error)
 			Filter: &notion.Filter{
 				Property: "Email",
 				Text: &notion.TextFilterCondition{
-					Equals: email,
+					Contains: email,
 				},
 			},
 		})
@@ -101,7 +103,10 @@ func GetSpeakersByEmail(n *types.Notion, email string) ([]*types.Speaker, error)
 		return nil, err
 	}
 	for _, page := range pages {
-		speakers = append(speakers, parseSpeaker(page.ID, page.Properties))
+		speaker := parseSpeaker(page.ID, page.Properties)
+		if speaker != nil && strings.EqualFold(strings.TrimSpace(speaker.Email), email) {
+			speakers = append(speakers, speaker)
+		}
 	}
 	return speakers, nil
 }
@@ -132,6 +137,7 @@ func SearchSpeakersByNameOrEmail(q string, limit int) []*types.Speaker {
 }
 
 func CreateSpeaker(n *types.Notion, in SpeakerInput) (string, error) {
+	in = normalizeSpeakerInput(in)
 	parent := notion.NewDatabaseParent(n.Config.SpeakersDb)
 	page, err := n.Client.CreatePage(context.Background(), parent, speakerCreateProps(in))
 	if err != nil {
@@ -173,12 +179,49 @@ func speakerFromInput(pageID string, in SpeakerInput) *types.Speaker {
 }
 
 func UpdateSpeaker(n *types.Notion, speakerID string, up SpeakerUpdate) error {
+	up = normalizeSpeakerUpdate(up)
 	props := speakerUpdateProps(up)
 	if len(props) == 0 {
 		return nil
 	}
 	_, err := n.Client.UpdatePageProperties(context.Background(), speakerID, props)
 	return err
+}
+
+func normalizeSpeakerInput(in SpeakerInput) SpeakerInput {
+	in.Name = strings.TrimSpace(in.Name)
+	in.Email = strings.TrimSpace(in.Email)
+	in.Photo = strings.TrimSpace(in.Photo)
+	in.Phone = strings.TrimSpace(in.Phone)
+	in.Signal = strings.TrimSpace(in.Signal)
+	in.Telegram = strings.TrimSpace(in.Telegram)
+	in.Twitter = types.ParseTwitter(in.Twitter).Handle
+	in.Nostr = strings.TrimSpace(in.Nostr)
+	in.Github = strings.TrimSpace(in.Github)
+	in.Instagram = strings.TrimSpace(in.Instagram)
+	in.LinkedIn = strings.TrimSpace(in.LinkedIn)
+	in.Website = strings.TrimSpace(in.Website)
+	in.Company = strings.TrimSpace(in.Company)
+	in.OrgLogo = strings.TrimSpace(in.OrgLogo)
+	in.TShirt = strings.TrimSpace(in.TShirt)
+	return in
+}
+
+func normalizeSpeakerUpdate(up SpeakerUpdate) SpeakerUpdate {
+	up.Photo = strings.TrimSpace(up.Photo)
+	up.Phone = strings.TrimSpace(up.Phone)
+	up.Signal = strings.TrimSpace(up.Signal)
+	up.Telegram = strings.TrimSpace(up.Telegram)
+	up.Twitter = types.ParseTwitter(up.Twitter).Handle
+	up.Nostr = strings.TrimSpace(up.Nostr)
+	up.Github = strings.TrimSpace(up.Github)
+	up.Instagram = strings.TrimSpace(up.Instagram)
+	up.LinkedIn = strings.TrimSpace(up.LinkedIn)
+	up.Website = strings.TrimSpace(up.Website)
+	up.Company = strings.TrimSpace(up.Company)
+	up.OrgLogo = strings.TrimSpace(up.OrgLogo)
+	up.TShirt = strings.TrimSpace(up.TShirt)
+	return up
 }
 
 // AllCachedSpeakers returns the in-memory Speaker slice. Read-only

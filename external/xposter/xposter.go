@@ -28,6 +28,8 @@ type Config struct {
 	ProfileObject string
 	EncryptionKey string
 	Headed        bool
+	LoginUsername string
+	LoginPassword string
 	PostTimeout   time.Duration
 	AuthWait      time.Duration
 	Logf          func(string, ...any)
@@ -39,6 +41,8 @@ type Client struct {
 }
 
 var profileMu sync.Mutex
+
+const xDesktopUserAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
 type PostParams struct {
 	Text      string
@@ -116,11 +120,27 @@ func New(cfg Config) (*Client, error) {
 
 func (c *Client) AuthStatus(ctx context.Context) (string, error) {
 	var status string
-	err := c.withProfile(ctx, false, func(profileDir string) error {
-		return c.withBrowser(ctx, profileDir, func(bctx context.Context) error {
+	err := c.withProfile(ctx, true, true, func(profileDir string) error {
+		return c.withBrowser(ctx, profileDir, true, func(bctx context.Context) error {
 			s, err := detectLogin(bctx)
+			if err != nil {
+				return err
+			}
 			status = s
-			return err
+			if s == "ok" {
+				return nil
+			}
+			if s != "login required" {
+				return &AuthError{Reason: s}
+			}
+			if c.cfg.Logf != nil {
+				c.cfg.Logf("x auth status requires login; attempting configured credential login")
+			}
+			if err := c.loginWithCredentials(bctx); err != nil {
+				return err
+			}
+			status = "ok"
+			return nil
 		})
 	})
 	if err != nil {
@@ -129,32 +149,30 @@ func (c *Client) AuthStatus(ctx context.Context) (string, error) {
 	return status, nil
 }
 
-func (c *Client) Bootstrap(ctx context.Context) error {
-	if !c.cfg.Headed {
-		return fmt.Errorf("x bootstrap requires X_BROWSER_HEADED=true on a machine with a display")
+func (c *Client) hasLoginCredentials() bool {
+	return strings.TrimSpace(c.cfg.LoginUsername) != "" && c.cfg.LoginPassword != ""
+}
+
+func (c *Client) loginWithCredentials(ctx context.Context) error {
+	if !c.hasLoginCredentials() {
+		return &AuthError{Reason: "login required; missing X_LOGIN_USERNAME/X_LOGIN_PASSWORD"}
 	}
-	waitCtx, cancel := context.WithTimeout(ctx, c.cfg.AuthWait)
-	defer cancel()
-	return c.withProfile(waitCtx, true, func(profileDir string) error {
-		return c.withBrowser(waitCtx, profileDir, func(bctx context.Context) error {
-			if err := chromedp.Run(bctx, chromedp.Navigate("https://x.com/home")); err != nil {
-				return err
-			}
-			for {
-				status, err := currentLoginState(bctx)
-				if err == nil && status == "ok" {
-					return nil
-				}
-				if waitCtx.Err() != nil {
-					if status == "" {
-						status = "unknown"
-					}
-					return &AuthError{Reason: status}
-				}
-				time.Sleep(2 * time.Second)
-			}
-		})
-	})
+	if c.cfg.Logf != nil {
+		c.cfg.Logf("x login required; signing in with configured credentials")
+	}
+	if err := chromedp.Run(ctx, chromedp.Navigate("https://x.com/i/flow/login")); err != nil {
+		return err
+	}
+	if err := submitXLoginText(ctx, strings.TrimSpace(c.cfg.LoginUsername)); err != nil {
+		return err
+	}
+	if err := maybeSubmitXLoginIdentifier(ctx, strings.TrimSpace(c.cfg.LoginUsername)); err != nil {
+		return err
+	}
+	if err := submitXLoginPassword(ctx, c.cfg.LoginPassword); err != nil {
+		return err
+	}
+	return waitForLoggedIn(ctx)
 }
 
 func (c *Client) Post(ctx context.Context, p PostParams) (PostResult, error) {
@@ -168,9 +186,9 @@ func (c *Client) Post(ctx context.Context, p PostParams) (PostResult, error) {
 		return PostResult{}, fmt.Errorf("x video path: %w", err)
 	}
 	var result PostResult
-	err := c.withProfile(ctx, false, func(profileDir string) error {
-		return c.withBrowser(ctx, profileDir, func(bctx context.Context) error {
-			if err := ensureLoggedIn(bctx); err != nil {
+	err := c.withProfile(ctx, true, true, func(profileDir string) error {
+		return c.withBrowser(ctx, profileDir, false, func(bctx context.Context) error {
+			if err := c.ensureAuthenticated(bctx); err != nil {
 				return err
 			}
 			postURL, err := createPost(bctx, p.Text, p.VideoPath, p.Progress)
@@ -207,9 +225,9 @@ func (c *Client) Schedule(ctx context.Context, p ScheduleParams) error {
 	if _, err := os.Stat(p.VideoPath); err != nil {
 		return fmt.Errorf("x video path: %w", err)
 	}
-	return c.withProfile(ctx, false, func(profileDir string) error {
-		return c.withBrowser(ctx, profileDir, func(bctx context.Context) error {
-			if err := ensureLoggedIn(bctx); err != nil {
+	return c.withProfile(ctx, true, true, func(profileDir string) error {
+		return c.withBrowser(ctx, profileDir, false, func(bctx context.Context) error {
+			if err := c.ensureAuthenticated(bctx); err != nil {
 				return err
 			}
 			return createScheduledPost(bctx, p.Text, p.VideoPath, p.Schedule, p.Timezone, p.Progress)
@@ -217,7 +235,7 @@ func (c *Client) Schedule(ctx context.Context, p ScheduleParams) error {
 	})
 }
 
-func (c *Client) withProfile(ctx context.Context, allowCreate bool, fn func(profileDir string) error) error {
+func (c *Client) withProfile(ctx context.Context, allowCreate, saveOnSuccess bool, fn func(profileDir string) error) error {
 	profileMu.Lock()
 	defer profileMu.Unlock()
 
@@ -242,6 +260,9 @@ func (c *Client) withProfile(ctx context.Context, allowCreate bool, fn func(prof
 	if err := fn(profileDir); err != nil {
 		return err
 	}
+	if !saveOnSuccess {
+		return nil
+	}
 	archived, err := archiveDir(profileDir)
 	if err != nil {
 		return fmt.Errorf("archive x profile: %w", err)
@@ -252,9 +273,9 @@ func (c *Client) withProfile(ctx context.Context, allowCreate bool, fn func(prof
 	return nil
 }
 
-func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(context.Context) error) error {
+func (c *Client) withBrowser(parent context.Context, profileDir string, authTimeout bool, fn func(context.Context) error) error {
 	timeout := c.cfg.PostTimeout
-	if c.cfg.Headed {
+	if c.cfg.Headed || authTimeout {
 		timeout = c.cfg.AuthWait
 	}
 	if c.cfg.Logf != nil {
@@ -266,7 +287,11 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 	opts := chromeOptions(profileDir, c.cfg.Headed)
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancelAlloc()
-	bctx, cancelBrowser := chromedp.NewContext(allocCtx)
+	bctx, cancelBrowser := chromedp.NewContext(
+		allocCtx,
+		chromedp.WithLogf(discardChromedpLogf),
+		chromedp.WithErrorf(discardChromedpLogf),
+	)
 	if err := installBrowserShims(bctx); err != nil {
 		cancelBrowser()
 		return wrapBrowserTimeout(err, timeout, c.cfg.Headed)
@@ -277,6 +302,8 @@ func (c *Client) withBrowser(parent context.Context, profileDir string, fn func(
 	}
 	return wrapBrowserTimeout(err, timeout, c.cfg.Headed)
 }
+
+func discardChromedpLogf(string, ...interface{}) {}
 
 func wrapBrowserTimeout(err error, timeout time.Duration, headed bool) error {
 	if err == nil {
@@ -294,6 +321,7 @@ func chromeOptions(profileDir string, headed bool) []chromedp.ExecAllocatorOptio
 			chromedp.UserDataDir(profileDir),
 			chromedp.NoFirstRun,
 			chromedp.NoDefaultBrowserCheck,
+			chromedp.UserAgent(xDesktopUserAgent),
 			chromedp.Flag("headless", false),
 			chromedp.Flag("enable-automation", false),
 			chromedp.Flag("disable-blink-features", "AutomationControlled"),
@@ -306,6 +334,7 @@ func chromeOptions(profileDir string, headed bool) []chromedp.ExecAllocatorOptio
 		chromedp.UserDataDir(profileDir),
 		chromedp.NoFirstRun,
 		chromedp.NoDefaultBrowserCheck,
+		chromedp.UserAgent(xDesktopUserAgent),
 		chromedp.Flag("headless", true),
 		chromedp.Flag("enable-automation", false),
 		chromedp.Flag("disable-blink-features", "AutomationControlled"),
@@ -317,7 +346,11 @@ func chromeOptions(profileDir string, headed bool) []chromedp.ExecAllocatorOptio
 func installBrowserShims(ctx context.Context) error {
 	return chromedp.Run(ctx, chromedp.ActionFunc(func(ctx context.Context) error {
 		_, err := page.AddScriptToEvaluateOnNewDocument(`
-Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+(() => {
+  const webdriverDescriptor = { get: () => undefined, configurable: true };
+  Object.defineProperty(navigator, 'webdriver', webdriverDescriptor);
+  Object.defineProperty(Navigator.prototype, 'webdriver', webdriverDescriptor);
+})();
 `).Do(ctx)
 		return err
 	}))
@@ -330,10 +363,16 @@ func detectLogin(ctx context.Context) (string, error) {
 	return currentLoginState(ctx)
 }
 
-func ensureLoggedIn(ctx context.Context) error {
+func (c *Client) ensureAuthenticated(ctx context.Context) error {
 	status, err := detectLogin(ctx)
 	if err != nil {
 		return err
+	}
+	if status == "ok" {
+		return nil
+	}
+	if status == "login required" {
+		return c.loginWithCredentials(ctx)
 	}
 	if status != "ok" {
 		return &AuthError{Reason: status}
@@ -348,6 +387,87 @@ func currentLoginState(ctx context.Context) (string, error) {
 		if (document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]')) return 'ok';
 		if (document.querySelector('a[href="/login"], a[href="/i/flow/login"], input[name="text"], input[name="password"]')) return 'login required';
 		if (body.includes('verification') || body.includes('challenge') || body.includes('unusual login') || body.includes('suspicious')) return 'challenge required';
+		return 'unknown';
+	})()`
+	err := chromedp.Run(ctx, chromedp.Evaluate(js, &status))
+	return status, err
+}
+
+func submitXLoginText(ctx context.Context, value string) error {
+	if value == "" {
+		return fmt.Errorf("x login username is required")
+	}
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`input[name="text"]`, chromedp.ByQuery),
+		chromedp.SendKeys(`input[name="text"]`, value+"\n", chromedp.ByQuery),
+	)
+}
+
+func maybeSubmitXLoginIdentifier(ctx context.Context, value string) error {
+	deadline := time.Now().Add(20 * time.Second)
+	for time.Now().Before(deadline) {
+		state, err := currentLoginFlowState(ctx)
+		if err != nil {
+			return err
+		}
+		switch state {
+		case "password", "ok":
+			return nil
+		case "identifier":
+			return submitXLoginText(ctx, value)
+		case "challenge required":
+			return &AuthError{Reason: state}
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return nil
+}
+
+func submitXLoginPassword(ctx context.Context, password string) error {
+	if password == "" {
+		return fmt.Errorf("x login password is required")
+	}
+	return chromedp.Run(ctx,
+		chromedp.WaitVisible(`input[name="password"]`, chromedp.ByQuery),
+		chromedp.SendKeys(`input[name="password"]`, password+"\n", chromedp.ByQuery),
+	)
+}
+
+func waitForLoggedIn(ctx context.Context) error {
+	for {
+		status, err := currentLoginState(ctx)
+		if err == nil && status == "ok" {
+			return nil
+		}
+		flowState, flowErr := currentLoginFlowState(ctx)
+		if flowErr == nil {
+			switch flowState {
+			case "challenge required", "invalid credentials":
+				return &AuthError{Reason: flowState}
+			}
+		}
+		if ctx.Err() != nil {
+			if status == "" {
+				status = "unknown"
+			}
+			return &AuthError{Reason: status}
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func currentLoginFlowState(ctx context.Context) (string, error) {
+	var status string
+	js := `(() => {
+		const body = (document.body && document.body.innerText || '').toLowerCase();
+		if (document.querySelector('[data-testid="SideNav_AccountSwitcher_Button"]')) return 'ok';
+		if (document.querySelector('input[name="password"]')) return 'password';
+		if (body.includes('wrong password') || body.includes('incorrect password') || body.includes('invalid password')) return 'invalid credentials';
+		if (body.includes('verification') || body.includes('challenge') || body.includes('unusual login') || body.includes('suspicious') || body.includes('captcha')) return 'challenge required';
+		if (document.querySelector('input[name="text"]')) return 'identifier';
 		return 'unknown';
 	})()`
 	err := chromedp.Run(ctx, chromedp.Evaluate(js, &status))

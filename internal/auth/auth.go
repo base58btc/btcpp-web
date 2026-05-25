@@ -314,22 +314,22 @@ func AuthRedirect(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	encEmail := q.Get("em")
 	encHMAC := q.Get("hr")
 	if encEmail == "" || encHMAC == "" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		redirectLoginError(w, r, "That login link is missing required information. Enter your email to get a fresh link.")
 		return
 	}
 	emailB, err := base64.RawURLEncoding.DecodeString(encEmail)
 	if err != nil {
-		http.Error(w, "bad link", http.StatusBadRequest)
+		redirectLoginError(w, r, "That login link is malformed. Enter your email to get a fresh link.")
 		return
 	}
 	hmacB, err := base64.RawURLEncoding.DecodeString(encHMAC)
 	if err != nil {
-		http.Error(w, "bad link", http.StatusBadRequest)
+		redirectLoginError(w, r, "That login link is malformed. Enter your email to get a fresh link.")
 		return
 	}
 	email := string(emailB)
 	if !helpers.VerifyEmailHMAC(ctx, string(hmacB), email) {
-		http.Error(w, "expired or invalid link", http.StatusForbidden)
+		redirectLoginError(w, r, "That login link has expired or is invalid. Enter your email to get a fresh link.")
 		return
 	}
 	if err := LoginEmail(ctx, r, email); err != nil {
@@ -338,5 +338,11 @@ func AuthRedirect(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 		return
 	}
 	dest := SafeNext(q.Get("next"), "/dashboard")
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+func redirectLoginError(w http.ResponseWriter, r *http.Request, message string) {
+	next := SafeNext(r.URL.Query().Get("next"), "/dashboard")
+	dest := "/login?next=" + url.QueryEscape(next) + "&error=" + url.QueryEscape(message)
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }

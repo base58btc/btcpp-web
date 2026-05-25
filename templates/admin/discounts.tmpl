@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Discounts - {{ .Conf.Desc }}</title>
+    {{ block "header" . }} {{ end }}
+    {{ template "admin_favicon" .Conf }}
+  </head>
+  <body class="bg-gray-50">
+    {{ block "mainnav" . }} {{ end }}
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-10">
+      <div class="mb-4">
+        <a href="/{{ .Conf.Tag }}/admin" class="text-xs text-gray-500 hover:text-gray-700">&larr; {{ .Conf.Desc }} dashboard</a>
+      </div>
+
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-900">Discounts</h1>
+          <p class="mt-1 text-sm text-gray-500">{{ .Conf.Desc }} &middot; {{ .Conf.DateDesc }}</p>
+        </div>
+      </div>
+
+      {{ if .Flash }}
+      <div class="mt-6 rounded-md bg-green-50 border border-green-200 px-4 py-3">
+        <p class="text-sm text-green-800">{{ .Flash }}</p>
+      </div>
+      {{ end }}
+      {{ if .FlashErr }}
+      <div class="mt-6 rounded-md bg-red-50 border border-red-200 px-4 py-3">
+        <p class="text-sm text-red-800">{{ .FlashErr }}</p>
+      </div>
+      {{ end }}
+
+      <section class="mt-6 bg-white shadow rounded-lg">
+        <div class="px-4 py-5 sm:p-6">
+          <h2 class="text-lg font-semibold text-gray-900">Create discount code</h2>
+          <form method="POST" action="/{{ .Conf.Tag }}/admin/discounts" class="mt-5 space-y-5">
+            <input type="hidden" name="action" value="create" />
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <label for="code_name" class="block text-sm font-medium text-gray-700">Code</label>
+                <input type="text" name="code_name" id="code_name" required
+                       value="{{ .Form.CodeName }}"
+                       placeholder="OSSTUDENT"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm uppercase focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <label for="discount_type" class="block text-sm font-medium text-gray-700">Discount type</label>
+                <select name="discount_type" id="discount_type" required
+                        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                  <option value="percent" {{ if or (eq .Form.DiscountType "") (eq .Form.DiscountType "percent") }}selected{{ end }}>% off</option>
+                  <option value="dollars" {{ if eq .Form.DiscountType "dollars" }}selected{{ end }}>Dollars off</option>
+                </select>
+              </div>
+              <div>
+                <label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
+                <input type="number" name="amount" id="amount" required min="1" step="1"
+                       value="{{ .Form.Amount }}"
+                       placeholder="20"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
+              <div>
+                <label for="valid_from" class="block text-sm font-medium text-gray-700">Valid from</label>
+                <input type="date" name="valid_from" id="valid_from"
+                       value="{{ .Form.ValidFrom }}"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <label for="expires_at" class="block text-sm font-medium text-gray-700">Expires at</label>
+                <input type="date" name="expires_at" id="expires_at"
+                       value="{{ .Form.ExpiresAt }}"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <label for="max_allowed" class="block text-sm font-medium text-gray-700">Max allowed</label>
+                <input type="number" name="max_allowed" id="max_allowed" min="1" step="1"
+                       value="{{ .Form.MaxAllowed }}"
+                       placeholder="Unlimited"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+              <div>
+                <label for="affiliate_email" class="block text-sm font-medium text-gray-700">Affiliate email</label>
+                <input type="email" name="affiliate_email" id="affiliate_email"
+                       value="{{ .Form.AffiliateEmail }}"
+                       placeholder="affiliate@example.com"
+                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 pt-1">
+              <button type="submit"
+                      class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                Create discount
+              </button>
+              <a href="/{{ .Conf.Tag }}/admin" class="text-sm text-gray-500 hover:text-gray-700">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="mt-8">
+        <div class="overflow-hidden bg-white shadow rounded-lg">
+          <div class="px-4 py-5 sm:p-6 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Existing discounts</h2>
+            <p class="mt-1 text-sm text-gray-500">Only codes scoped to {{ .Conf.Desc }} are shown.</p>
+          </div>
+          {{ if .Discounts }}
+          <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 text-sm">
+              <thead class="bg-gray-50">
+                <tr class="text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th class="px-4 py-3">Code</th>
+                  <th class="px-4 py-3">Expression</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Valid dates</th>
+                  <th class="px-4 py-3">Uses</th>
+                  <th class="px-4 py-3">Affiliate</th>
+                  <th class="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100 bg-white">
+                {{ range .Discounts }}
+                <tr>
+                  <td class="px-4 py-3 font-mono font-semibold text-gray-900">{{ .CodeName }}</td>
+                  <td class="px-4 py-3 font-mono text-xs text-gray-600">{{ .Expression }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ .AmountLabel }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ .ValidDates }}</td>
+                  <td class="px-4 py-3 text-gray-700">{{ .UsesLabel }}</td>
+                  <td class="px-4 py-3 text-gray-700">
+                    {{ if .AffiliateEmail }}{{ .AffiliateEmail }}{{ else }}-{{ end }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-700">
+                    <details>
+                      <summary class="cursor-pointer text-sm font-medium text-indigo-600 hover:text-indigo-700">Edit</summary>
+                      <div class="mt-3 w-[42rem] max-w-[80vw] rounded-md border border-gray-200 bg-gray-50 p-3">
+                        <form method="POST" action="/{{ $.Conf.Tag }}/admin/discounts" class="space-y-3">
+                          <input type="hidden" name="action" value="update" />
+                          <input type="hidden" name="discount_id" value="{{ .ID }}" />
+                          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Code</label>
+                              <input type="text" name="code_name" required value="{{ .Form.CodeName }}"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm uppercase focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Discount type</label>
+                              <select name="discount_type" required
+                                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <option value="percent" {{ if eq .Form.DiscountType "percent" }}selected{{ end }}>% off</option>
+                                <option value="dollars" {{ if eq .Form.DiscountType "dollars" }}selected{{ end }}>Dollars off</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Amount</label>
+                              <input type="number" name="amount" required min="1" step="1" value="{{ .Form.Amount }}"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                          </div>
+                          <div class="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Valid from</label>
+                              <input type="date" name="valid_from" value="{{ .Form.ValidFrom }}"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Expires at</label>
+                              <input type="date" name="expires_at" value="{{ .Form.ExpiresAt }}"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Max allowed</label>
+                              <input type="number" name="max_allowed" min="1" step="1" value="{{ .Form.MaxAllowed }}"
+                                     placeholder="Unlimited"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                            <div>
+                              <label class="block text-xs font-medium text-gray-600">Affiliate email</label>
+                              <input type="email" name="affiliate_email" value="{{ .Form.AffiliateEmail }}"
+                                     placeholder="affiliate@example.com"
+                                     class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" />
+                            </div>
+                          </div>
+                          <div class="flex items-center gap-3">
+                            <button type="submit"
+                                    class="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                              Save
+                            </button>
+                          </div>
+                        </form>
+                        <form method="POST" action="/{{ $.Conf.Tag }}/admin/discounts" class="mt-3">
+                          <input type="hidden" name="action" value="delete" />
+                          <input type="hidden" name="discount_id" value="{{ .ID }}" />
+                          <button type="submit"
+                                  onclick="return confirm('Delete discount code {{ .CodeName }}?');"
+                                  class="text-sm font-medium text-red-600 hover:text-red-700">
+                            Delete code
+                          </button>
+                        </form>
+                      </div>
+                    </details>
+                  </td>
+                </tr>
+                {{ end }}
+              </tbody>
+            </table>
+          </div>
+          {{ else }}
+          <div class="px-4 py-8 text-sm text-gray-500">No discounts are currently scoped to this event.</div>
+          {{ end }}
+        </div>
+      </section>
+    </div>
+    {{ block "footer" . }} {{ end }}
+  </body>
+</html>

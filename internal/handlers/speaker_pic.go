@@ -18,9 +18,11 @@ type photoSpaces interface {
 
 type spacesPkgAdapter struct{}
 
-func (spacesPkgAdapter) IsConfigured() bool                                                { return spaces.IsConfigured() }
-func (spacesPkgAdapter) Exists(key string) bool                                            { return spaces.Exists(key) }
-func (spacesPkgAdapter) Upload(key string, data []byte, ct, hash string) (string, error) { return spaces.Upload(key, data, ct, hash) }
+func (spacesPkgAdapter) IsConfigured() bool     { return spaces.IsConfigured() }
+func (spacesPkgAdapter) Exists(key string) bool { return spaces.Exists(key) }
+func (spacesPkgAdapter) Upload(key string, data []byte, ct, hash string) (string, error) {
+	return spaces.Upload(key, data, ct, hash)
+}
 
 // photoPipeline carries the side-effecting collaborators used by the photo
 // upload methods. Production code calls newPhotoPipeline; tests construct
@@ -64,10 +66,13 @@ func (p photoPipeline) mirrorPicToSpaces(raw []byte, contentType, ext string) {
 			return
 		}
 	}
+	updateSpeakerManifest(normPhoto, raw)
 
 	for _, size := range []int{800, 400} {
 		key := fmt.Sprintf("speakers/%s-%d.avif", shortID, size)
+		filename := fmt.Sprintf("%s-%d.avif", shortID, size)
 		if p.spaces.Exists(key) {
+			updateSpeakerManifest(filename, raw)
 			continue
 		}
 		avif, err := p.makeAVIF(raw, size)
@@ -77,7 +82,9 @@ func (p photoPipeline) mirrorPicToSpaces(raw []byte, contentType, ext string) {
 		}
 		if _, err := p.spaces.Upload(key, avif, "image/avif", ""); err != nil {
 			p.logf("speaker pic spaces avif%d upload failed (%s): %s", size, shortID, err)
+			continue
 		}
+		updateSpeakerManifest(filename, raw)
 	}
 }
 

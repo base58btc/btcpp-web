@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	texttemplate "text/template"
 	"time"
 
 	"btcpp-web/external/buffer"
@@ -108,6 +108,7 @@ func loadConfig() *types.EnvConfig {
 				config.CacheTTLSec = v
 			}
 		}
+		config.NotionRequestLogs = envBool("NOTION_REQUEST_LOGS")
 
 		// YouTube OAuth — uploader is disabled when any of these are
 		// blank; main flow stays alive so the rest of the app keeps
@@ -127,6 +128,8 @@ func loadConfig() *types.EnvConfig {
 				Enabled:        envBool("X_UPLOADER_ENABLED"),
 				ProfileObject:  os.Getenv("X_PROFILE_ARCHIVE_OBJECT"),
 				Headed:         envBool("X_BROWSER_HEADED"),
+				LoginUsername:  os.Getenv("X_LOGIN_USERNAME"),
+				LoginPassword:  os.Getenv("X_LOGIN_PASSWORD"),
 				PostTimeoutSec: envInt("X_POST_TIMEOUT_SEC", 0),
 				AuthWaitSec:    envInt("X_AUTH_WAIT_SEC", 0),
 			},
@@ -273,7 +276,7 @@ func run(env *types.EnvConfig) error {
 
 	// Initialize the application configuration
 	app.InProduction = env.Prod
-	app.EmailCache = make(map[string]*template.Template)
+	app.EmailCache = make(map[string]*texttemplate.Template)
 
 	app.Infos.Println("")
 	app.Infos.Println("~~~~app restarted, here we go~~~~~")
@@ -299,6 +302,10 @@ func run(env *types.EnvConfig) error {
 	}
 	app.Session = scs.New()
 	app.Session.Lifetime = 4 * 24 * time.Hour
+	// Use an app-specific cookie name. The SCS default is "session",
+	// which is easy for another localhost service to overwrite because
+	// browser cookies are scoped by host, not port.
+	app.Session.Cookie.Name = "btcpp_session"
 	app.Session.Cookie.Persist = true
 	app.Session.Cookie.SameSite = http.SameSiteLaxMode
 	app.Session.Cookie.Secure = app.InProduction
@@ -307,9 +314,13 @@ func run(env *types.EnvConfig) error {
 	app.Notion = &types.Notion{Config: &env.Notion}
 	app.Notion.Setup(env.Notion.Token)
 
-	// Per-request Notion timing → app log. Stays off in CLIs that build
-	// their own ad-hoc Notion clients without calling SetNotionRequestLogger.
-	types.SetNotionRequestLogger(app.Infos.Printf)
+	// Per-request Notion timing is noisy in production, so keep it opt-in.
+	// Recent-call tracking for /api/cache-stats remains enabled separately.
+	if env.NotionRequestLogs {
+		types.SetNotionRequestLogger(app.Infos.Printf)
+	} else {
+		types.SetNotionRequestLogger(nil)
+	}
 
 	return nil
 }

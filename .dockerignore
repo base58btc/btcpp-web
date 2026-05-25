@@ -1,0 +1,17 @@
+.git
+.do
+
+target
+tmp
+_cache
+
+media
+
+config.prod
+config.staging
+credentials.json
+sessions.bolt
+tokens.bolt
+
+*.log
+.DS_Store

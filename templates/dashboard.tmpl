@@ -717,47 +717,22 @@
 {{ end }}
 
 {{ if .IsGlobalAdmin }}
-<section id="role-manager" class="mt-8">
+<section id="global-admin-tools" class="mt-8">
   <div class="bg-white shadow rounded-lg overflow-hidden">
     <div class="px-4 py-5 sm:p-6">
       <div class="flex items-center justify-between gap-4">
         <div>
-          <h3 class="text-sm font-semibold text-gray-900">Role manager</h3>
-          <p class="mt-1 text-xs text-gray-500">Add or remove admin / volcoord roles for any speaker. Tag format: <code class="rounded bg-gray-100 px-1">{conftag}-admin</code> or <code class="rounded bg-gray-100 px-1">global-volcoord</code>. Comma-separated.</p>
+          <h3 class="text-sm font-semibold text-gray-900">Global admin tools</h3>
+          <p class="mt-1 text-xs text-gray-500">Manage site-wide newsletter templates and admin-only infrastructure.</p>
         </div>
         <span class="inline-flex items-center rounded-full bg-amber-100 text-amber-800 px-2 py-0.5 text-xs font-medium">global-admin</span>
       </div>
-
-      <form method="POST" action="/dashboard/admin/roles" class="mt-4 space-y-3">
-        <div class="relative">
-          <label for="RoleManagerEmail" class="block text-xs font-medium text-gray-700">Speaker (lookup by name or email)</label>
-          <input type="text" id="RoleManagerEmail" autocomplete="off"
-                 placeholder="Start typing a name or email…"
-                 class="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
-          <input type="hidden" id="RoleManagerSpeakerID" name="speakerID" value="">
-        </div>
-
-        <div id="role-manager-current" class="hidden text-xs text-gray-600">
-          Current roles for <span id="role-manager-name" class="font-semibold"></span>:
-          <span id="role-manager-existing" class="ml-1 inline-flex flex-wrap gap-1"></span>
-        </div>
-
-        <div>
-          <label for="RoleManagerRoles" class="block text-xs font-medium text-gray-700">Roles (comma-separated, leave empty to clear)</label>
-          <input type="text" id="RoleManagerRoles" name="roles"
-                 placeholder="e.g. vienna-admin, global-volcoord"
-                 class="mt-1 block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-bitcoin">
-        </div>
-
-        <div class="flex items-center justify-end gap-2">
-          <button type="submit"
-                  class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
-                  id="RoleManagerSave"
-                  disabled>
-            Save roles
-          </button>
-        </div>
-      </form>
+      <div class="mt-4 grid gap-3 sm:grid-cols-2">
+        <a href="/admin" class="block rounded-md border border-gray-200 px-4 py-3 hover:border-indigo-300 hover:bg-indigo-50">
+          <div class="text-sm font-medium text-gray-900">Global admin dashboard</div>
+          <div class="mt-1 text-xs text-gray-500">Manage templated newsletters, organizations, and global permissions.</div>
+        </a>
+      </div>
     </div>
   </div>
 </section>
@@ -811,103 +786,6 @@
           });
         });
       });
-    })();
-  </script>
-  {{ end }}
-  {{ if .IsGlobalAdmin }}
-  <script>
-    // Role-manager autocomplete: search /api/speakers/search, fill
-    // hidden speakerID + pre-populate the comma-separated Roles field
-    // with the picked speaker's current Roles. Mirrors the
-    // org-autocomplete pattern (no shared module — these are tiny).
-    (function () {
-      const emailInput = document.getElementById('RoleManagerEmail');
-      const hiddenID   = document.getElementById('RoleManagerSpeakerID');
-      const rolesInput = document.getElementById('RoleManagerRoles');
-      const saveBtn    = document.getElementById('RoleManagerSave');
-      const curBlock   = document.getElementById('role-manager-current');
-      const curName    = document.getElementById('role-manager-name');
-      const curRoles   = document.getElementById('role-manager-existing');
-      if (!emailInput || !hiddenID || !rolesInput) return;
-
-      const wrap = emailInput.parentElement;
-      wrap.style.position = 'relative';
-      const list = document.createElement('ul');
-      list.className = 'absolute z-10 left-0 right-0 mt-1 max-h-60 overflow-auto rounded-md border border-gray-200 bg-white shadow hidden';
-      list.setAttribute('role', 'listbox');
-      wrap.appendChild(list);
-
-      let debounceTimer = null;
-      let activeFetch = 0;
-
-      function renderHits(hits) {
-        list.replaceChildren();
-        if (!hits || hits.length === 0) { list.classList.add('hidden'); return; }
-        for (const hit of hits) {
-          const li = document.createElement('li');
-          li.className = 'px-3 py-2 text-sm hover:bg-indigo-50 cursor-pointer';
-          li.textContent = (hit.name || hit.email);
-          const sub = document.createElement('div');
-          sub.className = 'text-xs text-gray-500';
-          sub.textContent = hit.email;
-          li.appendChild(sub);
-          li.addEventListener('mousedown', function (ev) {
-            ev.preventDefault();
-            emailInput.value = hit.email;
-            hiddenID.value = hit.id;
-            saveBtn.disabled = false;
-            list.classList.add('hidden');
-            // Pull the picked speaker's existing Roles down so the
-            // admin can edit-then-save instead of re-typing.
-            fetchExistingRoles(hit.id, hit.name || hit.email);
-          });
-          list.appendChild(li);
-        }
-        list.classList.remove('hidden');
-      }
-
-      function fetchExistingRoles(speakerID, displayName) {
-        fetch('/api/speakers/' + encodeURIComponent(speakerID) + '/roles', { credentials: 'same-origin' })
-          .then(function (r) { return r.ok ? r.json() : { roles: [] }; })
-          .then(function (data) {
-            const roles = data.roles || [];
-            rolesInput.value = roles.join(', ');
-            curName.textContent = displayName;
-            curRoles.replaceChildren();
-            if (roles.length === 0) {
-              const span = document.createElement('span');
-              span.className = 'italic text-gray-400';
-              span.textContent = '(none)';
-              curRoles.appendChild(span);
-            } else {
-              for (const r of roles) {
-                const tag = document.createElement('span');
-                tag.className = 'inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px]';
-                tag.textContent = r;
-                curRoles.appendChild(tag);
-              }
-            }
-            curBlock.classList.remove('hidden');
-          })
-          .catch(function () { curBlock.classList.add('hidden'); });
-      }
-
-      emailInput.addEventListener('input', function () {
-        hiddenID.value = '';
-        saveBtn.disabled = true;
-        curBlock.classList.add('hidden');
-        const q = emailInput.value.trim();
-        if (debounceTimer) clearTimeout(debounceTimer);
-        if (q.length < 2) { list.classList.add('hidden'); return; }
-        debounceTimer = setTimeout(function () {
-          const id = ++activeFetch;
-          fetch('/api/speakers/search?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
-            .then(function (r) { return r.ok ? r.json() : []; })
-            .then(function (hits) { if (id !== activeFetch) return; renderHits(hits); })
-            .catch(function () {});
-        }, 200);
-      });
-      emailInput.addEventListener('blur', function () { setTimeout(function () { list.classList.add('hidden'); }, 150); });
     })();
   </script>
   {{ end }}

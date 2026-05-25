@@ -1,8 +1,9 @@
 package config
 
 import (
-	"html/template"
+	htmltemplate "html/template"
 	"log"
+	texttemplate "text/template"
 
 	"btcpp-web/internal/types"
 	"github.com/alexedwards/scs/v2"
@@ -19,6 +20,6 @@ type AppContext struct {
 	Err           *log.Logger
 	Infos         *log.Logger
 	Session       *scs.SessionManager
-	TemplateCache *template.Template
-	EmailCache    map[string]*template.Template
+	TemplateCache *htmltemplate.Template
+	EmailCache    map[string]*texttemplate.Template
 }
