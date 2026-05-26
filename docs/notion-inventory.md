@@ -471,6 +471,9 @@ temporary in-memory maps while it runs:
 - Volunteers use generated UUID primary keys. During migration, rerun this table
   with `-reset` to avoid duplicate rows; related conferences and job-type
   preferences are rebuilt from Notion relations.
+- Work shifts use generated UUID primary keys. During migration, rerun this
+  table with `-reset` to avoid duplicate rows; assignee and leader links are
+  rebuilt from Notion volunteer relations.
 
 Any migration command should fail loudly on ambiguous natural keys rather than
 silently picking a row.
