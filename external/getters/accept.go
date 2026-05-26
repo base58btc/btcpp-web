@@ -184,8 +184,11 @@ func UpdateSpeaker(n *types.Notion, speakerID string, up SpeakerUpdate) error {
 	if len(props) == 0 {
 		return nil
 	}
-	_, err := n.Client.UpdatePageProperties(context.Background(), speakerID, props)
-	return err
+	if _, err := n.Client.UpdatePageProperties(context.Background(), speakerID, props); err != nil {
+		return err
+	}
+	patchCachedSpeaker(speakerID, up)
+	return nil
 }
 
 func normalizeSpeakerInput(in SpeakerInput) SpeakerInput {
@@ -224,12 +227,77 @@ func normalizeSpeakerUpdate(up SpeakerUpdate) SpeakerUpdate {
 	return up
 }
 
+func patchCachedSpeaker(speakerID string, up SpeakerUpdate) {
+	for _, s := range cacheSpeakers {
+		if s == nil || s.ID != speakerID {
+			continue
+		}
+		if up.Photo != "" {
+			s.Photo = up.Photo
+		}
+		if up.Phone != "" {
+			s.Phone = up.Phone
+		}
+		if up.Signal != "" {
+			s.Signal = up.Signal
+		}
+		if up.Telegram != "" {
+			s.Telegram = up.Telegram
+		}
+		if up.Twitter != "" {
+			s.Twitter = types.ParseTwitter(up.Twitter)
+		}
+		if up.Nostr != "" {
+			s.Nostr = up.Nostr
+		}
+		if up.Github != "" {
+			s.Github = up.Github
+		}
+		if up.Instagram != "" {
+			s.Instagram = up.Instagram
+		}
+		if up.LinkedIn != "" {
+			s.LinkedIn = up.LinkedIn
+		}
+		if up.Website != "" {
+			s.Website = up.Website
+		}
+		if up.Company != "" {
+			s.Company = up.Company
+		}
+		if up.OrgLogo != "" {
+			s.OrgLogo = up.OrgLogo
+		}
+		if up.TShirt != "" {
+			s.TShirt = up.TShirt
+		}
+		return
+	}
+}
+
 // AllCachedSpeakers returns the in-memory Speaker slice. Read-only
 // access for callers outside the package — exposed so the dashboard's
 // role manager can look up a Speaker by ID without hammering Notion.
 // Don't mutate the returned slice.
 func AllCachedSpeakers() []*types.Speaker {
 	return cacheSpeakers
+}
+
+func FetchSpeakerByID(n *types.Notion, speakerID string) (*types.Speaker, error) {
+	speakerID = strings.TrimSpace(speakerID)
+	if speakerID == "" {
+		return nil, nil
+	}
+	for _, s := range cacheSpeakers {
+		if s != nil && s.ID == speakerID {
+			return s, nil
+		}
+	}
+	page, err := n.Client.RetrievePage(context.Background(), speakerID)
+	if err != nil {
+		return nil, err
+	}
+	return parseSpeaker(page.ID, page.Properties), nil
 }
 
 // UpdateSpeakerRoles overwrites the Roles multi-select on a Speakers

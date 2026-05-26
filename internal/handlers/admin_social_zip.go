@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"btcpp-web/external/getters"
 	"btcpp-web/external/spaces"
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/helpers"
+	"btcpp-web/internal/types"
 )
 
 // AdminSocialCardsZip streams a zip of every 1080p social card for
@@ -20,11 +22,12 @@ import (
 // when Clipart is set, and a brand-new talk may not have run through
 // refresh yet.
 //
-// Entries inside the zip use slugified names so a Finder/Explorer
-// browse is readable: "talks/why-bitcoin-matters.png",
-// "speakers/jos-lazet-why-bitcoin-matters.png". Collisions (two talks
-// with the same slug, or a speaker on multiple talks) are suffixed
-// "-2", "-3" so nothing overwrites.
+// Entries inside the zip use schedule-prefixed, slugified names so a
+// Finder/Explorer browse sorts in run-of-show order:
+// "talks/01main1530_why-bitcoin-matters.png",
+// "speakers/01main1530_jos-lazet-why-bitcoin-matters.png".
+// Collisions (two talks with the same slug, or a speaker on multiple
+// talks) are suffixed "-2", "-3" so nothing overwrites.
 func AdminSocialCardsZip(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	if id := requireConfStaff(w, r, ctx); id == nil {
 		return
@@ -83,14 +86,16 @@ func AdminSocialCardsZip(w http.ResponseWriter, r *http.Request, ctx *config.App
 		if t == nil {
 			continue
 		}
+		prefix := socialZipSchedulePrefix(conf, t)
 		talkSlug := socialZipSlug(t.Name)
 		if talkSlug == "" {
 			talkSlug = t.ID
 		}
+		talkName := prefix + talkSlug
 		// Talk's own card. Generated only when Clipart is set;
 		// otherwise the Spaces.Get call returns a NotFound and
 		// we move on.
-		addEntry("talks", talkSlug, fmt.Sprintf("%s/talks/%s-1080p.png", conf.Tag, t.ID))
+		addEntry("talks", talkName, fmt.Sprintf("%s/talks/%s-1080p.png", conf.Tag, t.ID))
 		// Per-speaker cards. One PNG per (talk, speaker) pair.
 		for _, sp := range t.Speakers {
 			if sp == nil {
@@ -100,7 +105,7 @@ func AdminSocialCardsZip(w http.ResponseWriter, r *http.Request, ctx *config.App
 			if spSlug == "" {
 				spSlug = sp.ID
 			}
-			entryName := fmt.Sprintf("%s-%s", spSlug, talkSlug)
+			entryName := fmt.Sprintf("%s%s-%s", prefix, spSlug, talkSlug)
 			addEntry("speakers", entryName, fmt.Sprintf("%s/speakers/%s-%s-1080p.png", conf.Tag, t.ID, sp.ID))
 		}
 	}
@@ -117,4 +122,46 @@ func socialZipSlug(s string) string {
 	s = socialZipSlugRe.ReplaceAllString(s, "-")
 	s = strings.Trim(s, "-")
 	return s
+}
+
+func socialZipSchedulePrefix(conf *types.Conf, talk *types.Talk) string {
+	if conf == nil || talk == nil || talk.Sched == nil {
+		return ""
+	}
+	loc := socialZipConfLoc(conf)
+	start := talk.Sched.Start.In(loc)
+	day := dayIndex(dayStart(conf.StartDate, loc), start, loc)
+	if day < 1 {
+		return ""
+	}
+	return fmt.Sprintf("%02d%s%s_", day, socialZipStageSlug(talk.Venue), start.Format("1504"))
+}
+
+func socialZipConfLoc(conf *types.Conf) *time.Location {
+	if conf == nil {
+		return time.Local
+	}
+	if conf.Timezone != "" {
+		if loc, err := time.LoadLocation(conf.Timezone); err == nil {
+			return loc
+		}
+	}
+	return conf.Loc()
+}
+
+func socialZipStageSlug(venue string) string {
+	switch strings.ToLower(strings.TrimSpace(venue)) {
+	case "one", "main", "main stage":
+		return "main"
+	case "two", "talks", "talks stage":
+		return "talks"
+	case "three", "workshop", "workshops", "workshops stage":
+		return "workshop"
+	case "four", "lounge", "lounge stage":
+		return "lounge"
+	}
+	if slug := socialZipSlug(types.NameVenue(venue)); slug != "" && slug != "not-listed-yet" {
+		return slug
+	}
+	return socialZipSlug(venue)
 }

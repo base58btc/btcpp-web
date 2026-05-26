@@ -604,6 +604,9 @@ type EditSpeakerPage struct {
 	EmailPlain   string // not base64 — used as the value for the create-mode email field
 	Mode         string // "edit" | "create"
 	FlashMessage string
+	IsAdmin      bool
+	BackURL      string
+	FormAction   string
 	Year         uint
 }
 
@@ -620,8 +623,11 @@ type EditSpeakerConfPage struct {
 	// RSVPFor is the speakers'-dinner date label ("Mon. Jan 5, 2026"),
 	// shown next to the DinnerRSVP toggle so the user knows which day
 	// they're agreeing to attend. Set from conf.DaysList()[0].
-	RSVPFor string
-	Year    uint
+	RSVPFor    string
+	IsAdmin    bool
+	BackURL    string
+	FormAction string
+	Year       uint
 }
 
 type ShiftDisplay struct {
@@ -705,11 +711,12 @@ type GiftRow struct {
 }
 
 type SpeakerRow struct {
-	ID     string
-	Name   string
-	Email  string
-	Signal string
-	Photo  string // bare filename in Spaces speakers/, "" if unset
+	ID      string
+	Name    string
+	Email   string
+	Signal  string
+	Photo   string // bare filename in Spaces speakers/, "" if unset
+	CardURL string
 	// Per-conf info from the matching SpeakerConf row. Empty
 	// when the speaker has no SpeakerConf for this conf yet
 	// (admin-imported speaker, freshly attached, etc.).
@@ -778,7 +785,8 @@ type ProposalAdminRow struct {
 	//   "none"    — scheduled but no CalNotif yet ("Send cal invite")
 	//   "fresh"   — CalNotif present, hash matches ("Resend cal invite")
 	//   "stale"   — CalNotif present, hash differs ("Update cal invite")
-	CalState string
+	CalState    string
+	TalkCardURL string
 }
 
 type ProposalAdminPage struct {

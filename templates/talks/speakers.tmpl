@@ -90,9 +90,19 @@
                         <input type="checkbox" name="speaker_refs" value="{{ .ID }}"
                                class="speaker-checkbox mt-1 rounded border-gray-300 shrink-0">
                         {{ end }}
-                        <img src="{{ if .Photo }}{{ speakerPhoto .Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
-                             alt="{{ .Name }}"
-                             class="size-10 rounded-full object-cover bg-gray-100 shrink-0" />
+                        <div class="flex shrink-0 items-start gap-2">
+                            <img src="{{ if .Photo }}{{ speakerPhoto .Photo }}{{ else }}/static/img/speaker-placeholder.png{{ end }}"
+                                 alt="{{ .Name }}"
+                                 class="size-10 rounded-full object-cover bg-gray-100 shrink-0" />
+                            {{ if .CardURL }}
+                            <a href="{{ .CardURL }}" target="_blank" rel="noopener noreferrer" class="shrink-0">
+                                <img src="{{ .CardURL }}"
+                                     alt="{{ .Name }} social card"
+                                     loading="lazy"
+                                     class="h-16 w-16 rounded-md object-cover bg-gray-100 ring-1 ring-gray-200" />
+                            </a>
+                            {{ end }}
+                        </div>
                         <div class="min-w-0 flex-1">
                             <h2 class="text-sm font-semibold text-gray-900 leading-snug break-words">{{ .Name }}</h2>
                             {{ if .Email }}
@@ -138,17 +148,23 @@
                     {{ end }}
 
                     <div class="mt-1 flex items-center gap-3 text-[11px]">
-                        <a href="https://www.notion.so/{{ .ID }}"
-                           target="_blank" rel="noopener noreferrer"
+                        <a href="/{{ $.Conf.Tag }}/admin/speakers/{{ .ID }}/edit"
                            class="text-indigo-600 hover:text-indigo-700">
                             Speaker &rarr;
                         </a>
                         {{ if .SpeakerConfID }}
-                        <a href="https://www.notion.so/{{ .SpeakerConfID }}"
-                           target="_blank" rel="noopener noreferrer"
+                        <a href="/{{ $.Conf.Tag }}/admin/speakerconfs/{{ .SpeakerConfID }}/edit"
                            class="text-indigo-600 hover:text-indigo-700">
                             SpeakerConf &rarr;
                         </a>
+                        {{ end }}
+                        {{ if and $.IsConfAdmin .CardURL }}
+                        <button type="submit"
+                                formaction="/{{ $.Conf.Tag }}/admin/speakers/{{ .ID }}/refresh-cards"
+                                formmethod="POST"
+                                class="text-purple-600 hover:text-purple-700 bg-transparent border-0 p-0">
+                            Refresh cards &rarr;
+                        </button>
                         {{ end }}
                     </div>
                 </article>

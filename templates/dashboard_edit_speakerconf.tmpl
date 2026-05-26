@@ -9,7 +9,11 @@
   {{ block "mainnav" . }} {{ end }}
   <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
     <div class="mb-6">
+      {{ if .BackURL }}
+      <a href="{{ .BackURL }}" class="text-sm text-indigo-600 hover:text-indigo-700">&larr; Back to speakers</a>
+      {{ else }}
       <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}" class="text-sm text-indigo-600 hover:text-indigo-700">&larr; Back to dashboard</a>
+      {{ end }}
     </div>
 
     {{ if .Conf }}{{ template "conf_hero" .Conf }}{{ end }}
@@ -24,13 +28,13 @@
     </div>
     {{ end }}
 
-    <form method="POST" action="/dashboard/{{ .Conf.Tag }}/edit?hr={{ .HMAC }}&em={{ .Email }}"
+    <form method="POST" action="{{ if .FormAction }}{{ .FormAction }}{{ else }}/dashboard/{{ .Conf.Tag }}/edit?hr={{ .HMAC }}&em={{ .Email }}{{ end }}"
           enctype="multipart/form-data"
           class="mt-8 space-y-6">
 
       <div>
         <label for="ComingFrom" class="block text-sm font-semibold text-gray-900">I'll be traveling from</label>
-        <input id="ComingFrom" name="ComingFrom" type="text" required {{ if .Locked }}disabled{{ end }}
+        <input id="ComingFrom" name="ComingFrom" type="text" {{ if not .IsAdmin }}required{{ end }} {{ if .Locked }}disabled{{ end }}
                value="{{ .SpeakerConf.ComingFrom }}"
                placeholder="Hometown, USA"
                class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300 disabled:bg-gray-100" />
@@ -94,7 +98,7 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label for="RecordOK" class="block text-sm font-semibold text-gray-900">Recording</label>
-          <select id="RecordOK" name="RecordOK" required {{ if .Locked }}disabled{{ end }}
+          <select id="RecordOK" name="RecordOK" {{ if not .IsAdmin }}required{{ end }} {{ if .Locked }}disabled{{ end }}
                   class="mt-1 block w-full rounded-md py-2 pl-3 pr-7 outline outline-1 -outline-offset-1 outline-gray-300 disabled:bg-gray-100">
             {{ $cur := .SpeakerConf.RecordOK }}
             {{ range .RecordingOptions }}
@@ -104,7 +108,7 @@
         </div>
         <div>
           <label for="Visa" class="block text-sm font-semibold text-gray-900">Need a visa?</label>
-          <select id="Visa" name="Visa" required {{ if .Locked }}disabled{{ end }}
+          <select id="Visa" name="Visa" {{ if not .IsAdmin }}required{{ end }} {{ if .Locked }}disabled{{ end }}
                   class="mt-1 block w-full rounded-md py-2 pl-3 pr-7 outline outline-1 -outline-offset-1 outline-gray-300 disabled:bg-gray-100">
             {{ $v := .SpeakerConf.Visa }}
             <option value="No" {{ if eq $v "No" }}selected{{ end }}>No</option>
@@ -145,7 +149,7 @@
 
       {{ if not .Locked }}
       <div class="flex items-center justify-end gap-3 pt-2">
-        <a href="/dashboard?hr={{ .HMAC }}&em={{ .Email }}"
+        <a href="{{ if .BackURL }}{{ .BackURL }}{{ else }}/dashboard?hr={{ .HMAC }}&em={{ .Email }}{{ end }}"
            class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900">Cancel</a>
         <button type="submit"
                 class="px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">

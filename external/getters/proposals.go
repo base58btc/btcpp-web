@@ -625,10 +625,15 @@ func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Tal
 	if proposalID == "" {
 		return talkFromConfTalk(ct, nil), nil
 	}
-	proposal, err := GetProposal(ctx, proposalID)
+	// Media-card rendering needs the current Proposal fields, especially
+	// Title, because the refresh CLI may be running against a web server
+	// whose proposal cache was warmed before the edit. Fetch the linked
+	// Proposal directly instead of taking the cache-first GetProposal path.
+	proposalPage, err := ctx.Notion.Client.RetrievePage(context.Background(), proposalID)
 	if err != nil {
 		return nil, err
 	}
+	proposal := parseProposal(ctx, proposalPage.ID, proposalPage.Properties)
 
 	speakers, err := ListSpeakers(ctx.Notion)
 	if err != nil {

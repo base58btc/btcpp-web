@@ -175,7 +175,7 @@
                     </div>
                     {{ end }}
                     {{ if and $.KnownSpeaker $.KnownSpeaker.Github }}
-                    <input type="hidden" name="Github" value="{{ $.KnownSpeaker.Github }}" />
+                    <input type="hidden" name="Github" value="{{ trim $.KnownSpeaker.Github }}" />
                     {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Github" class="block text-sm/6 font-semibold text-gray-900">Link to your Github profile</label>
@@ -189,7 +189,7 @@
                     </div>
                     {{ end }}
                     {{ if and $.KnownSpeaker $.KnownSpeaker.Website }}
-                    <input type="hidden" name="Website" value="{{ $.KnownSpeaker.Website }}" />
+                    <input type="hidden" name="Website" value="{{ trim $.KnownSpeaker.Website }}" />
                     {{ else }}
                     <div class="sm:col-span-2">
                         <label for="Website" class="block text-sm/6 font-semibold text-gray-900">Personal website</label>

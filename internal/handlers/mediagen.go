@@ -188,14 +188,6 @@ func generateAndUploadSpeakerPngWithRenderer(ctx *config.AppContext, renderer *h
 			return spaces.PublicURL(key), nil
 		}
 		cardHashesMu.Unlock()
-
-		// If already in Spaces, just record the hash without re-uploading
-		if spaces.Exists(key) {
-			cardHashesMu.Lock()
-			cardHashes[key] = hash
-			cardHashesMu.Unlock()
-			return spaces.PublicURL(key), nil
-		}
 	}
 
 	ctx.Infos.Printf("generating speaker media %s (%s)", key, hash)
@@ -241,20 +233,10 @@ func generateAndUploadTalkPngWithRenderer(ctx *config.AppContext, renderer *help
 		cardHashesMu.Lock()
 		if cardHashes[key] == hash {
 			cardHashesMu.Unlock()
-			return spaces.PublicURL(key), nil
-		}
-		cardHashesMu.Unlock()
-
-		// If already in Spaces, just record the hash without re-uploading.
-		// Still set ConfTalk.SocialCard since we may have generated the file
-		// in a previous run that didn't write back the path (or it got cleared).
-		if spaces.Exists(key) {
-			cardHashesMu.Lock()
-			cardHashes[key] = hash
-			cardHashesMu.Unlock()
 			writeSocialCardPath(ctx, talk.ID, key, card)
 			return spaces.PublicURL(key), nil
 		}
+		cardHashesMu.Unlock()
 	}
 
 	ctx.Infos.Printf("generating talks media %s (%s)", key, hash)
@@ -335,16 +317,6 @@ func generateAndUploadSponsorPngWithRenderer(ctx *config.AppContext, renderer *h
 			return spaces.PublicURL(key), nil
 		}
 		cardHashesMu.Unlock()
-	}
-
-	// If already in Spaces, just record the hash without re-uploading.
-	// Skipped under -force so a logo-content change (same filename,
-	// different bytes) actually rewrites the Spaces object.
-	if !force && spaces.Exists(key) {
-		cardHashesMu.Lock()
-		cardHashes[key] = hash
-		cardHashesMu.Unlock()
-		return spaces.PublicURL(key), nil
 	}
 
 	ctx.Infos.Printf("generating sponsor media %s (%s)", key, hash)

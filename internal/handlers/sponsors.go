@@ -27,6 +27,7 @@ type OrgDetailPage struct {
 	Org          *types.Org
 	IsNew        bool
 	FlashMessage string
+	SpacesReady  bool
 	Year         uint
 }
 
@@ -84,9 +85,10 @@ func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 
 	if ref == "new" {
 		err := ctx.TemplateCache.ExecuteTemplate(w, "sponsors/detail.tmpl", &OrgDetailPage{
-			Org:   &types.Org{},
-			IsNew: true,
-			Year:  helpers.CurrentYear(),
+			Org:         &types.Org{},
+			IsNew:       true,
+			SpacesReady: spaces.IsConfigured(),
+			Year:        helpers.CurrentYear(),
 		})
 		if err != nil {
 			http.Error(w, "Unable to load page", http.StatusInternalServerError)
@@ -104,6 +106,7 @@ func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	err = ctx.TemplateCache.ExecuteTemplate(w, "sponsors/detail.tmpl", &OrgDetailPage{
 		Org:          org,
 		FlashMessage: r.URL.Query().Get("flash"),
+		SpacesReady:  spaces.IsConfigured(),
 		Year:         helpers.CurrentYear(),
 	})
 	if err != nil {
@@ -214,6 +217,57 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	}
 	dest = appendFlash(dest, "Org "+org.Name+" created")
 	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+func OrgSave(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireGlobalAdmin(w, r, ctx); id == nil {
+		return
+	}
+
+	ref := strings.TrimSpace(mux.Vars(r)["ref"])
+	if ref == "" {
+		handle404(w, r, ctx)
+		return
+	}
+
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+
+	org := &types.Org{
+		Ref:       ref,
+		Name:      strings.TrimSpace(r.FormValue("Name")),
+		Tagline:   strings.TrimSpace(r.FormValue("Tagline")),
+		Email:     strings.TrimSpace(r.FormValue("Email")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
+		Twitter:   types.ParseTwitter(r.FormValue("Twitter")),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Matrix:    strings.TrimSpace(r.FormValue("Matrix")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		Youtube:   strings.TrimSpace(r.FormValue("Youtube")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		LogoLight: strings.TrimSpace(r.FormValue("LogoLight")),
+		LogoDark:  strings.TrimSpace(r.FormValue("LogoDark")),
+		Hiring:    r.FormValue("Hiring") == "on",
+		Notes:     strings.TrimSpace(r.FormValue("Notes")),
+	}
+	trimOrg(org)
+
+	if org.Name == "" {
+		http.Error(w, "Org name is required", http.StatusBadRequest)
+		return
+	}
+
+	if err := getters.UpdateOrgDetails(ctx.Notion, org); err != nil {
+		ctx.Err.Printf("/admin/orgs/%s save failed: %s", ref, err)
+		http.Error(w, "Failed to save org", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/orgs/"+url.PathEscape(ref)+"?flash="+url.QueryEscape("Org "+org.Name+" saved"), http.StatusFound)
 }
 
 // safeReturnTo accepts only same-site relative paths so the redirect

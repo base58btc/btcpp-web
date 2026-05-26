@@ -21,50 +21,50 @@ import (
 // because admins enter "TBD", "tbd", "TBD: speaker name", etc.
 // Drives two render decisions in the social-card pipeline:
 //
-//   1. Hide the talk row from the admin's "Talks" social-post section
-//      so we don't post a "JUST SCHEDULED: TBD" card.
-//   2. Render the speaker card without a talk title — the speaker is
-//      coming, but we don't want to broadcast a placeholder name on
-//      their card (or imply they have a known talk name yet).
+//  1. Hide the talk row from the admin's "Talks" social-post section
+//     so we don't post a "JUST SCHEDULED: TBD" card.
+//  2. Render the speaker card without a talk title — the speaker is
+//     coming, but we don't want to broadcast a placeholder name on
+//     their card (or imply they have a known talk name yet).
 func isTBDTitle(s string) bool {
 	return strings.Contains(strings.ToUpper(s), "TBD")
 }
 
 var speakerPostTmpl = template.Must(template.New("speaker").Parse(
-	`JUST IN {{.Conf.Emoji}}: {{.SpeakerName}} `+
+	`JUST IN {{.Conf.Emoji}}: {{.SpeakerName}} ` +
 		`{{if .TwitterHandle}}(@{{.TwitterHandle}}) {{end}}` +
-                `{{ if .Org }}of {{ .Org }} {{ end }}` +
-                `to speak at {{.Conf.Desc}} this coming {{ .Conf.DateDesc }}` +
+		`{{ if .Org }}of {{ .Org }} {{ end }}` +
+		`to speak at {{.Conf.Desc}} this coming {{ .Conf.DateDesc }}` +
 		`{{if .TalkName}}` + "\n\n" + `~~{{.TalkName}}{{end}}~~` +
 		"\n\n" + `Join us 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 var talkPostTmpl = template.Must(template.New("talk").Parse(
 	`JUST SCHEDULED {{ .Conf.Emoji }}: "{{.TalkName}}"` +
 		` by{{range .Speakers }}` +
-                ` {{ .Name }}{{ if .Twitter }} (@{{ .TwitterHandle }}) {{ end}}` +
+		` {{ .Name }}{{ if .Twitter }} (@{{ .TwitterHandle }}) {{ end}}` +
 		`{{ end }}` +
 		"\n\n" + `Don't miss it. Join us in {{ .Conf.Location }} this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 type speakerPostData struct {
 	SpeakerName   string
 	TwitterHandle string
-        Org           string
+	Org           string
 	TalkName      string
-        Conf          *types.Conf
+	Conf          *types.Conf
 }
 
 type talkPostData struct {
-	TalkName     string
-        Speakers     []*types.Speaker
-        Conf         *types.Conf
+	TalkName string
+	Speakers []*types.Speaker
+	Conf     *types.Conf
 }
 
 var sponsorPostTmpl = template.Must(template.New("sponsor").Parse(
 	`JUST IN: {{.OrgName}} ` +
-	`{{if ne .Twitter.Handle "" }}({{.Twitter.Mention }}) {{end}}` +
-        `to sponsor {{.Conf.Desc}} {{.Conf.Emoji}}` +
-        `{{ if .Level }} as our {{ .Level }} sponsor{{ end }}` +
-        "\n\n" + `Join us this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
+		`{{if ne .Twitter.Handle "" }}({{.Twitter.Mention }}) {{end}}` +
+		`to sponsor {{.Conf.Desc}} {{.Conf.Emoji}}` +
+		`{{ if .Level }} as our {{ .Level }} sponsor{{ end }}` +
+		"\n\n" + `Join us this {{ .Conf.DateDesc }} 👉  https://btcpp.dev/{{.Conf.Tag}}#tickets`))
 
 type sponsorPostData struct {
 	OrgName string
@@ -203,7 +203,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			speakerPostTmpl.Execute(&buf, &speakerPostData{
 				Conf:          conf,
 				SpeakerName:   speaker.Name,
-                                Org:           speaker.Company,
+				Org:           speaker.Company,
 				TwitterHandle: speaker.TwitterHandle(),
 				TalkName:      talkName,
 			})
@@ -213,7 +213,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 			instaURL := SpeakerCardURL(ctx, conf.Tag, "insta", speaker.ID, bestTalk.ID)
 			speakerRows = append(speakerRows, &SocialSpeakerRow{
 				ID:              speaker.ID,
-                                TalkID:          talk.ID,
+				TalkID:          talk.ID,
 				Name:            speaker.Name,
 				TwitterHandle:   speaker.TwitterHandle(),
 				TalkName:        talkName,
@@ -254,8 +254,8 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 		var buf bytes.Buffer
 		talkPostTmpl.Execute(&buf, &talkPostData{
-                        Conf:         conf,
-			TalkName:     talk.Name,
+			Conf:     conf,
+			TalkName: talk.Name,
 			Speakers: talk.Speakers,
 		})
 
@@ -294,10 +294,10 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 				continue
 			}
 
-                        level := sp.Level
-                        if sp.Level == "Bronze" {
-                                level = "" 
-                        }
+			level := sp.Level
+			if sp.Level == "Bronze" {
+				level = ""
+			}
 
 			var buf bytes.Buffer
 			sponsorPostTmpl.Execute(&buf, &sponsorPostData{
@@ -419,7 +419,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 
 		for _, ch := range targetChannels {
 			var imgs []string
-			if ch.Service == "instagram" && instaPhotoURL != "" {
+			if (ch.Service == "instagram" || ch.Service == "twitter") && instaPhotoURL != "" {
 				imgs = append(imgs, instaPhotoURL)
 			} else if photoURL != "" {
 				imgs = append(imgs, photoURL)
@@ -435,7 +435,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued speaker post for %s to %s", speakerID, ch.Service)
-                        id := helpers.SpeakerSocialPostRef(conf.Tag, talkID, speakerID)
+			id := helpers.SpeakerSocialPostRef(conf.Tag, talkID, speakerID)
 			getters.RecordSocialPost(ctx.Notion, id, postText, ch.Service, time.Now())
 		}
 	}
@@ -466,7 +466,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued talk post for %s to %s", talkID, ch.Service)
-                        postid := helpers.TalkSocialPostRef(conf.Tag, talkID)
+			postid := helpers.TalkSocialPostRef(conf.Tag, talkID)
 			getters.RecordSocialPost(ctx.Notion, postid, postText, ch.Service, time.Now())
 		}
 	}
@@ -510,7 +510,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			}
 			posted++
 			ctx.Infos.Printf("Queued sponsor post for %s to %s", sp.ref, ch.Service)
-                        postid := helpers.SponsorSocialPostRef(conf.Tag, sp.ref)
+			postid := helpers.SponsorSocialPostRef(conf.Tag, sp.ref)
 			getters.RecordSocialPost(ctx.Notion, postid, sp.text, ch.Service, time.Now())
 		}
 	}
@@ -537,18 +537,18 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 				posted++
 
 				ctx.Infos.Printf("Queued sponsor batch post to instagram with %d images", len(batchImgs))
-                                RecordInstagramBatch(ctx, conf, selectedSponsors, batchText, ch)
+				RecordInstagramBatch(ctx, conf, selectedSponsors, batchText, ch)
 			}
 		}
 	}
 
 	flash := fmt.Sprintf("%d posts queued to Buffer", posted)
-	http.Redirect(w, r, "/" + conf.Tag + "/admin/social"+"?flash="+strings.ReplaceAll(flash, " ", "+"), http.StatusFound)
+	http.Redirect(w, r, "/"+conf.Tag+"/admin/social"+"?flash="+strings.ReplaceAll(flash, " ", "+"), http.StatusFound)
 }
 
 func RecordInstagramBatch(ctx *config.AppContext, conf *types.Conf, sponsors []selectedSponsor, text string, channel buffer.Channel) {
-        for _, sponsor := range sponsors {
-                postid := helpers.SponsorSocialPostRef(conf.Tag, sponsor.ref)
-                getters.RecordSocialPost(ctx.Notion, postid, text, channel.Service, time.Now())
-        }
+	for _, sponsor := range sponsors {
+		postid := helpers.SponsorSocialPostRef(conf.Tag, sponsor.ref)
+		getters.RecordSocialPost(ctx.Notion, postid, text, channel.Service, time.Now())
+	}
 }

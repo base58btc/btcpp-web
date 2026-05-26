@@ -30,7 +30,7 @@
 
             <section class="mb-6">
                 <div class="bg-white shadow rounded-lg px-6 py-6">
-                    <form method="POST" action="/admin/orgs/new">
+                    <form method="POST" action="{{ if .IsNew }}/admin/orgs/new{{ else }}/admin/orgs/{{ .Org.Ref }}{{ end }}">
                         <div class="grid grid-cols-1 gap-y-4">
                             <div>
                                 <label for="Name" class="block text-sm font-medium text-gray-700">Org Name *</label>
@@ -93,16 +93,47 @@
 
                             <hr class="my-2">
 
-                            <div>
-                                <label for="LogoLight" class="block text-sm font-medium text-gray-700">Logo Light URL</label>
-                                <input type="url" name="LogoLight" id="LogoLight" value="{{ .Org.LogoLight }}"
-                                    class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <span class="block text-sm font-medium text-gray-700">Logo Light</span>
+                                    <p class="text-xs text-gray-500">Displayed on light backgrounds.</p>
+                                    <input id="LogoLight" name="LogoLight" type="hidden" value="{{ .Org.LogoLight }}">
+                                    <div class="mt-2 flex items-center gap-3">
+                                        <button type="button" data-target="LogoLight" {{ if not .SpacesReady }}disabled{{ end }}
+                                            class="logo-upload-trigger inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            Upload a file
+                                        </button>
+                                        <span class="inline-flex h-14 min-w-24 items-center justify-center rounded border border-gray-200 bg-white px-3 py-2">
+                                            <img id="LogoLight-preview" {{ if .Org.LogoLight }}src="{{ .Org.LogoLight }}"{{ end }} alt="" class="{{ if not .Org.LogoLight }}hidden {{ end }}max-h-10 w-auto max-w-[160px] object-contain">
+                                        </span>
+                                        <button type="button" data-target="LogoLight"
+                                            class="logo-clear-trigger {{ if not .Org.LogoLight }}hidden {{ end }}text-xs font-medium text-red-600 hover:text-red-700">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    <p id="LogoLight-status" class="mt-1 text-xs text-gray-500">{{ if .Org.LogoLight }}Uploaded logo selected.{{ else if .SpacesReady }}No file selected.{{ else }}Spaces is not configured, so uploads are disabled.{{ end }}</p>
+                                </div>
+                                <div>
+                                    <span class="block text-sm font-medium text-gray-700">Logo Dark</span>
+                                    <p class="text-xs text-gray-500">Displayed on dark backgrounds.</p>
+                                    <input id="LogoDark" name="LogoDark" type="hidden" value="{{ .Org.LogoDark }}">
+                                    <div class="mt-2 flex items-center gap-3">
+                                        <button type="button" data-target="LogoDark" {{ if not .SpacesReady }}disabled{{ end }}
+                                            class="logo-upload-trigger inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50">
+                                            Upload a file
+                                        </button>
+                                        <span class="inline-flex h-14 min-w-24 items-center justify-center rounded border border-gray-800 bg-gray-950 px-3 py-2">
+                                            <img id="LogoDark-preview" {{ if .Org.LogoDark }}src="{{ .Org.LogoDark }}"{{ end }} alt="" class="{{ if not .Org.LogoDark }}hidden {{ end }}max-h-10 w-auto max-w-[160px] object-contain">
+                                        </span>
+                                        <button type="button" data-target="LogoDark"
+                                            class="logo-clear-trigger {{ if not .Org.LogoDark }}hidden {{ end }}text-xs font-medium text-red-600 hover:text-red-700">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    <p id="LogoDark-status" class="mt-1 text-xs text-gray-500">{{ if .Org.LogoDark }}Uploaded logo selected.{{ else if .SpacesReady }}No file selected.{{ else }}Spaces is not configured, so uploads are disabled.{{ end }}</p>
+                                </div>
                             </div>
-                            <div>
-                                <label for="LogoDark" class="block text-sm font-medium text-gray-700">Logo Dark URL</label>
-                                <input type="url" name="LogoDark" id="LogoDark" value="{{ .Org.LogoDark }}"
-                                    class="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
-                            </div>
+                            <input type="file" id="LogoFilePicker" accept="image/*" class="hidden">
                             <div class="flex items-center gap-2">
                                 <input type="checkbox" name="Hiring" id="Hiring" {{ if .Org.Hiring }}checked{{ end }}
                                     class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
@@ -125,6 +156,72 @@
                             </div>
                         </div>
                     </form>
+                    <script>
+                      (function () {
+                        const picker = document.getElementById('LogoFilePicker');
+                        if (!picker) return;
+                        let activeTarget = null;
+
+                        document.querySelectorAll('.logo-upload-trigger').forEach(function (btn) {
+                          btn.addEventListener('click', function () {
+                            if (btn.disabled) return;
+                            activeTarget = btn.dataset.target;
+                            picker.value = '';
+                            picker.click();
+                          });
+                        });
+
+                        picker.addEventListener('change', function () {
+                          if (!activeTarget || !picker.files || picker.files.length === 0) return;
+                          const file = picker.files[0];
+                          const targetID = activeTarget;
+                          const status = document.getElementById(targetID + '-status');
+                          const input = document.getElementById(targetID);
+                          const preview = document.getElementById(targetID + '-preview');
+                          const clear = document.querySelector('.logo-clear-trigger[data-target="' + targetID + '"]');
+                          status.textContent = 'Uploading ' + file.name + '...';
+                          status.className = 'mt-1 text-xs text-gray-700';
+
+                          const fd = new FormData();
+                          fd.append('file', file);
+                          fetch('/admin/orgs/upload-logo', { method: 'POST', body: fd, credentials: 'same-origin' })
+                            .then(function (r) {
+                              if (!r.ok) return r.text().then(function (t) { throw new Error(t || ('HTTP ' + r.status)); });
+                              return r.json();
+                            })
+                            .then(function (data) {
+                              input.value = data.url;
+                              preview.src = data.url;
+                              preview.classList.remove('hidden');
+                              if (clear) clear.classList.remove('hidden');
+                              status.textContent = file.name + ' uploaded. Save changes to keep it.';
+                              status.className = 'mt-1 text-xs text-green-700';
+                            })
+                            .catch(function (err) {
+                              status.textContent = 'Upload failed: ' + (err.message || err);
+                              status.className = 'mt-1 text-xs text-red-700';
+                            })
+                            .finally(function () {
+                              if (activeTarget === targetID) activeTarget = null;
+                            });
+                        });
+
+                        document.querySelectorAll('.logo-clear-trigger').forEach(function (btn) {
+                          btn.addEventListener('click', function () {
+                            const targetID = btn.dataset.target;
+                            const status = document.getElementById(targetID + '-status');
+                            const input = document.getElementById(targetID);
+                            const preview = document.getElementById(targetID + '-preview');
+                            input.value = '';
+                            preview.removeAttribute('src');
+                            preview.classList.add('hidden');
+                            btn.classList.add('hidden');
+                            status.textContent = 'Logo removed. Save changes to clear it.';
+                            status.className = 'mt-1 text-xs text-gray-500';
+                          });
+                        });
+                      })();
+                    </script>
                 </div>
             </section>
         </div>

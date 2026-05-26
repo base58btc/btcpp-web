@@ -181,6 +181,7 @@ func loadTemplates(ctx *config.AppContext) error {
 			return false
 		},
 		"hasPrefix": strings.HasPrefix,
+		"trim":      strings.TrimSpace,
 		// dict builds a map[string]any from variadic key/value pairs
 		// — enables passing named params to template blocks (e.g.
 		// {{ template "cal_picker" (dict "Title" .Name "Start" ...) }}).
@@ -1074,6 +1075,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/admin/orgs/{ref}", func(w http.ResponseWriter, r *http.Request) {
 		OrgDetail(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/admin/orgs/{ref}", func(w http.ResponseWriter, r *http.Request) {
+		OrgSave(w, r, app)
+	}).Methods("POST")
 
 	r.HandleFunc("/{conf}/admin/sponsors", func(w http.ResponseWriter, r *http.Request) {
 		SponsorshipsList(w, r, app)
@@ -1094,6 +1098,18 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/speakers", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdmin(w, r, app)
 	}).Methods("GET")
+
+	r.HandleFunc("/{conf}/admin/speakers/{speakerID}/refresh-cards", func(w http.ResponseWriter, r *http.Request) {
+		AdminSpeakerRefreshCards(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/{conf}/admin/speakers/{speakerID}/edit", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerAdminEdit(w, r, app)
+	}).Methods("GET", "POST")
+
+	r.HandleFunc("/{conf}/admin/speakerconfs/{speakerConfID}/edit", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerConfAdminEdit(w, r, app)
+	}).Methods("GET", "POST")
 
 	r.HandleFunc("/{conf}/admin/speakers/email", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdminBulkEmail(w, r, app)
@@ -1203,6 +1219,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/applicants/{proposalID}/cancel", func(w http.ResponseWriter, r *http.Request) {
 		AdminCancelTalk(w, r, app)
+	}).Methods("POST")
+	r.HandleFunc("/{conf}/admin/applicants/{proposalID}/refresh-card", func(w http.ResponseWriter, r *http.Request) {
+		AdminProposalRefreshCard(w, r, app)
 	}).Methods("POST")
 	r.HandleFunc("/{conf}/admin/proposals/{proposalID}/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		AdminProposalSendCal(w, r, app)
@@ -2486,7 +2505,7 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 
 		mail := &emails.Mail{
 			JobKey:   fmt.Sprintf("sponsor-%s-%d", email, time.Now().Unix()),
-			Email:    "sponsors@btcpp.dev",
+			Email:    "sponsor@btcpp.dev",
 			ReplyTo:  email,
 			Title:    fmt.Sprintf("Sponsor Inquiry: %s (%s)", org, name),
 			SendAt:   time.Now(),
@@ -2505,7 +2524,7 @@ func SponsorPage(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 		copyMail := &emails.Mail{
 			JobKey:   fmt.Sprintf("sponsor-copy-%s-%d", email, time.Now().Unix()),
 			Email:    email,
-			ReplyTo:  "sponsors@btcpp.dev",
+			ReplyTo:  "sponsor@btcpp.dev",
 			Title:    fmt.Sprintf("Your Sponsor Inquiry: %s", org),
 			SendAt:   time.Now(),
 			HTMLBody: []byte("<p>Thanks for your interest in sponsoring bitcoin++! Here's a copy of your inquiry:</p><hr/>" + htmlBody),
@@ -5705,6 +5724,11 @@ func SpeakerAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 				Title:      p.Title,
 				Status:     p.Status,
 			})
+			if row.CardURL == "" {
+				if ct := getters.FetchConfTalkByProposal(p.ID); ct != nil {
+					row.CardURL = SpeakerCardURL(ctx, conf.Tag, "insta", sp.ID, ct.ID)
+				}
+			}
 		}
 	}
 	rows := make([]*SpeakerRow, 0, len(rowByID))
@@ -5855,6 +5879,233 @@ func SpeakerAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.A
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+speakers", sent, len(speakerRefs))
 	http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+func AdminSpeakerRefreshCards(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	speakerID := strings.TrimSpace(mux.Vars(r)["speakerID"])
+	if speakerID == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=Missing+speaker", conf.Tag), http.StatusSeeOther)
+		return
+	}
+	talks, err := talksForSpeakerMediaRefresh(ctx, conf, speakerID)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/%s/refresh-cards: %s", conf.Tag, speakerID, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=%s", conf.Tag, url.QueryEscape("Refresh failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	if len(talks) == 0 {
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=No+social+cards+for+speaker", conf.Tag), http.StatusSeeOther)
+		return
+	}
+	RefreshTalkCardsForceOpt(ctx, talks, true)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=%s", conf.Tag, url.QueryEscape(fmt.Sprintf("Force refreshed %d talk(s) for speaker.", len(talks)))), http.StatusSeeOther)
+}
+
+func SpeakerAdminEdit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	speakerID := mux.Vars(r)["speakerID"]
+	if !speakerIsOnConf(ctx, conf, speakerID) {
+		http.Error(w, "speaker is not attached to this event", http.StatusForbidden)
+		return
+	}
+	sp, err := getters.FetchSpeakerByID(ctx.Notion, speakerID)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/%s/edit load: %s", conf.Tag, speakerID, err)
+		http.Error(w, "speaker lookup failed", http.StatusInternalServerError)
+		return
+	}
+	if sp == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	backURL := fmt.Sprintf("/%s/admin/speakers", conf.Tag)
+	formAction := fmt.Sprintf("/%s/admin/speakers/%s/edit", conf.Tag, speakerID)
+	if r.Method == http.MethodPost {
+		adminUpdateSpeakerPOST(w, r, ctx, conf, sp, backURL)
+		return
+	}
+	page := &EditSpeakerPage{
+		Speaker:      sp,
+		Mode:         "edit",
+		FlashMessage: r.URL.Query().Get("flash"),
+		IsAdmin:      true,
+		BackURL:      backURL,
+		FormAction:   formAction,
+		Year:         helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speaker.tmpl", page); err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/%s/edit render: %s", conf.Tag, speakerID, err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+func adminUpdateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, sp *types.Speaker, backURL string) {
+	limitRequestBody(w, r, maxMultipartBodyBytes)
+	if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+	}
+	picRaw, picContentType, picExt, picErr := readMultipartFile(r, "PicFile")
+	hasNewPic := picErr == nil && len(picRaw) > 0
+	if picErr != nil && picErr != http.ErrMissingFile {
+		ctx.Err.Printf("/%s/admin/speakers/%s/edit read pic: %s", conf.Tag, sp.ID, picErr)
+		http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Photo upload failed."), http.StatusSeeOther)
+		return
+	}
+	up := getters.SpeakerUpdate{
+		Phone:     strings.TrimSpace(r.FormValue("Phone")),
+		Signal:    strings.TrimSpace(r.FormValue("Signal")),
+		Telegram:  strings.TrimSpace(r.FormValue("Telegram")),
+		Twitter:   strings.TrimSpace(r.FormValue("Twitter")),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
+		TShirt:    validShirtCode(strings.TrimSpace(r.FormValue("TShirt"))),
+	}
+	if hasNewPic {
+		up.Photo = imgproc.ShortID(picRaw) + picExt
+	}
+	if err := getters.UpdateSpeaker(ctx.Notion, sp.ID, up); err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/%s/edit update: %s", conf.Tag, sp.ID, err)
+		http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Update failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if hasNewPic {
+		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+	}
+	http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Speaker info updated."), http.StatusSeeOther)
+}
+
+func SpeakerConfAdminEdit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	speakerConfID := mux.Vars(r)["speakerConfID"]
+	sc, err := getters.FetchSpeakerConfWithSpeaker(ctx, speakerConfID)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/speakerconfs/%s/edit load: %s", conf.Tag, speakerConfID, err)
+		http.Error(w, "speaker conf lookup failed", http.StatusInternalServerError)
+		return
+	}
+	if sc == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if scConf := speakerConfConf(sc); scConf == nil || scConf.Tag != conf.Tag {
+		http.Error(w, "speaker conf is not attached to this event", http.StatusForbidden)
+		return
+	}
+
+	backURL := fmt.Sprintf("/%s/admin/speakers", conf.Tag)
+	formAction := fmt.Sprintf("/%s/admin/speakerconfs/%s/edit", conf.Tag, speakerConfID)
+	if r.Method == http.MethodPost {
+		adminUpdateSpeakerConfPOST(w, r, ctx, conf, sc, backURL)
+		return
+	}
+
+	var returning bool
+	if sc.Speaker != nil && sc.Speaker.Email != "" {
+		if reg, err := getters.EmailHasRegistration(ctx, sc.Speaker.Email); err == nil {
+			returning = reg
+		}
+	}
+	rsvpDayList := conf.DaysList("", true)
+	rsvpFor := ""
+	if len(rsvpDayList) > 0 {
+		rsvpFor = rsvpDayList[0].ItemDesc
+	}
+	page := &EditSpeakerConfPage{
+		SpeakerConf:         sc,
+		Conf:                conf,
+		Locked:              false,
+		DaysList:            conf.DaysList("", false),
+		RecordingOptions:    helpers.GetRecordingOptions(),
+		IsReturningAttendee: returning,
+		RSVPFor:             rsvpFor,
+		IsAdmin:             true,
+		BackURL:             backURL,
+		FormAction:          formAction,
+		Year:                helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speakerconf.tmpl", page); err != nil {
+		ctx.Err.Printf("/%s/admin/speakerconfs/%s/edit render: %s", conf.Tag, speakerConfID, err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+func adminUpdateSpeakerConfPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, sc *types.SpeakerConf, backURL string) {
+	limitRequestBody(w, r, maxMultipartBodyBytes)
+	if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
+		ctx.Err.Printf("/%s/admin/speakerconfs/%s/edit parseform: %s", conf.Tag, sc.ID, err)
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	fields := getters.SpeakerConfFields{
+		Company:      strings.TrimSpace(r.PostForm.Get("Company")),
+		OrgID:        strings.TrimSpace(r.PostForm.Get("OrgID")),
+		ComingFrom:   strings.TrimSpace(r.PostForm.Get("ComingFrom")),
+		Availability: r.PostForm["Availability"],
+		RecordOK:     strings.TrimSpace(r.PostForm.Get("RecordOK")),
+		Visa:         strings.TrimSpace(r.PostForm.Get("Visa")),
+		FirstEvent:   r.PostForm.Get("FirstEvent") == "on",
+		DinnerRSVP:   r.PostForm.Get("DinnerRSVP") == "on",
+		Sponsor:      r.PostForm.Get("Sponsor") == "on",
+	}
+	logoRaw, logoContentType, logoExt, logoErr := readMultipartFile(r, "OrgLogoFile")
+	hasLogo := logoErr == nil && len(logoRaw) > 0
+	if logoErr != nil && logoErr != http.ErrMissingFile {
+		ctx.Err.Printf("/%s/admin/speakerconfs/%s/edit read logo: %s", conf.Tag, sc.ID, logoErr)
+		http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Logo upload failed."), http.StatusSeeOther)
+		return
+	}
+	if hasLogo {
+		fields.OrgPhoto = imgproc.ShortID(logoRaw) + logoExt
+	}
+	if err := getters.UpdateSpeakerConf(ctx, sc.ID, fields); err != nil {
+		ctx.Err.Printf("/%s/admin/speakerconfs/%s/edit update: %s", conf.Tag, sc.ID, err)
+		http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Update failed: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if hasLogo {
+		go newPhotoPipeline(ctx).mirrorOrgLogoToSpaces(logoRaw, logoContentType, logoExt)
+	}
+	http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Speaker conf updated."), http.StatusSeeOther)
+}
+
+func speakerIsOnConf(ctx *config.AppContext, conf *types.Conf, speakerID string) bool {
+	for _, p := range loadConfProposals(ctx, conf) {
+		for _, sc := range resolveProposalSpeakers(p) {
+			if sc != nil && sc.Speaker != nil && sc.Speaker.ID == speakerID {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func RegistrationsAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -6141,6 +6392,7 @@ func loadProposalRowsForConf(ctx *config.AppContext, conf *types.Conf) ([]*Propo
 		// the proposal isn't in the schedule yet.
 		if ct := getters.FetchConfTalkByProposal(p.ID); ct != nil {
 			row.ConfTalk = ct
+			row.TalkCardURL = TalkCardURL(ctx, conf.Tag, "1080p", ct.ID)
 			if ct.Sched != nil {
 				row.StartLabel = ct.Sched.Start.In(loc).Format("Mon Jan 2 · 3:04 PM")
 				if ct.Sched.End != nil {
@@ -6174,6 +6426,132 @@ func computeCalState(ct *types.ConfTalk, p *types.Proposal, conf *types.Conf) st
 		return "fresh"
 	}
 	return "stale"
+}
+
+func AdminProposalRefreshCard(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	proposalID := strings.TrimSpace(mux.Vars(r)["proposalID"])
+	talk, err := talkForProposalMediaRefresh(ctx, conf, proposalID)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/applicants/%s/refresh-card: %s", conf.Tag, proposalID, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, url.QueryEscape("Refresh failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	RefreshTalkCardsForceOpt(ctx, []*types.Talk{talk}, true)
+	http.Redirect(w, r, fmt.Sprintf("/%s/admin/applicants?flash=%s", conf.Tag, url.QueryEscape("Force refreshed card for "+talk.Name)), http.StatusSeeOther)
+}
+
+func talkForProposalMediaRefresh(ctx *config.AppContext, conf *types.Conf, proposalID string) (*types.Talk, error) {
+	if proposalID == "" {
+		return nil, fmt.Errorf("missing proposal")
+	}
+	proposals, err := getters.ListProposals(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list proposals: %w", err)
+	}
+	proposalMap := make(map[string]*types.Proposal, len(proposals))
+	for _, p := range proposals {
+		if p != nil {
+			proposalMap[p.ID] = p
+		}
+	}
+	proposal := proposalMap[proposalID]
+	if proposal == nil {
+		return nil, fmt.Errorf("proposal not found")
+	}
+	if proposal.ScheduleFor == nil || proposal.ScheduleFor.Ref != conf.Ref {
+		return nil, fmt.Errorf("proposal is not attached to %s", conf.Tag)
+	}
+	confTalks, err := getters.ListConfTalks(ctx, proposalMap)
+	if err != nil {
+		return nil, fmt.Errorf("list conf talks: %w", err)
+	}
+	var target *types.ConfTalk
+	for _, ct := range confTalks {
+		if ct != nil && ct.Proposal != nil && ct.Proposal.ID == proposalID {
+			target = ct
+			break
+		}
+	}
+	if target == nil {
+		return nil, fmt.Errorf("proposal is not scheduled yet")
+	}
+	talks, err := getters.LoadTalksFromConfTalks(ctx, conf.Tag)
+	if err != nil {
+		return nil, fmt.Errorf("load talks: %w", err)
+	}
+	for _, talk := range talks {
+		if talk != nil && talk.ID == target.ID {
+			return talk, nil
+		}
+	}
+	return nil, fmt.Errorf("scheduled talk card source not found")
+}
+
+func talksForSpeakerMediaRefresh(ctx *config.AppContext, conf *types.Conf, speakerID string) ([]*types.Talk, error) {
+	var out []*types.Talk
+	for _, p := range loadConfProposals(ctx, conf) {
+		if p == nil {
+			continue
+		}
+		var matched bool
+		for _, sc := range resolveProposalSpeakers(p) {
+			if sc != nil && sc.Speaker != nil && sc.Speaker.ID == speakerID {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		ct := getters.FetchConfTalkByProposal(p.ID)
+		if ct == nil {
+			continue
+		}
+		out = append(out, talkForAdminMediaRefresh(conf, p, ct))
+	}
+	return out, nil
+}
+
+func talkForAdminMediaRefresh(conf *types.Conf, proposal *types.Proposal, ct *types.ConfTalk) *types.Talk {
+	talk := &types.Talk{
+		ID:          ct.ID,
+		Name:        proposal.Title,
+		Description: proposal.Description,
+		Type:        proposal.TalkType,
+		Status:      proposal.Status,
+		Event:       conf.Tag,
+		Clipart:     ct.Clipart,
+		Sched:       ct.Sched,
+		Venue:       ct.Venue,
+		Section:     ct.Section,
+		CalNotif:    ct.CalNotif,
+		TalkCardURL: ct.SocialCard,
+	}
+	if talk.Sched != nil {
+		talk.TimeDesc = talk.Sched.Desc()
+	}
+	for _, sc := range resolveProposalSpeakers(proposal) {
+		if sc == nil || sc.Speaker == nil {
+			continue
+		}
+		view := *sc.Speaker
+		if sc.Company != "" {
+			view.Company = sc.Company
+		}
+		if sc.OrgPhoto != "" {
+			view.OrgLogo = sc.OrgPhoto
+		}
+		talk.Speakers = append(talk.Speakers, &view)
+	}
+	return talk
 }
 
 func speakerName(sp *types.Speaker) string {

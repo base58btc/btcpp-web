@@ -394,6 +394,77 @@ func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
 	return err
 }
 
+// UpdateOrgDetails rewrites the editable fields from /admin/orgs/{ref}.
+// It uses the direct Notion JSON API so empty URL/email/rich_text values
+// can clear existing cells, which is required for the logo remove buttons.
+func UpdateOrgDetails(n *types.Notion, org *types.Org) error {
+	if org == nil || strings.TrimSpace(org.Ref) == "" {
+		return fmt.Errorf("UpdateOrgDetails: org ref is required")
+	}
+	normalizeOrgInput(org)
+	if org.Name == "" {
+		return fmt.Errorf("UpdateOrgDetails: org name is required")
+	}
+
+	props := map[string]interface{}{
+		"Name":      titleJSON(org.Name),
+		"Tagline":   richTextJSON(org.Tagline),
+		"Email":     emailJSON(org.Email),
+		"Website":   urlJSON(org.Website),
+		"Twitter":   richTextJSON(org.Twitter.Handle),
+		"Nostr":     richTextJSON(org.Nostr),
+		"Matrix":    richTextJSON(org.Matrix),
+		"LinkedIn":  urlJSON(org.LinkedIn),
+		"Instagram": urlJSON(org.Instagram),
+		"Youtube":   urlJSON(org.Youtube),
+		"Github":    urlJSON(org.Github),
+		"LogoLight": urlJSON(org.LogoLight),
+		"LogoDark":  urlJSON(org.LogoDark),
+		"Hiring":    map[string]interface{}{"checkbox": org.Hiring},
+		"Notes":     richTextJSON(org.Notes),
+	}
+	body := map[string]interface{}{"properties": props}
+	if err := notionPagePost(n.Config.Token, "PATCH", "/"+org.Ref, body); err != nil {
+		return err
+	}
+	queueRefresh(JobOrgs)
+	InvalidateSponsorshipsCache()
+	return nil
+}
+
+func titleJSON(value string) map[string]interface{} {
+	return map[string]interface{}{
+		"title": []map[string]interface{}{
+			{"text": map[string]interface{}{"content": value}},
+		},
+	}
+}
+
+func richTextJSON(value string) map[string]interface{} {
+	if value == "" {
+		return map[string]interface{}{"rich_text": []interface{}{}}
+	}
+	return map[string]interface{}{
+		"rich_text": []map[string]interface{}{
+			{"text": map[string]interface{}{"content": value}},
+		},
+	}
+}
+
+func urlJSON(value string) map[string]interface{} {
+	if value == "" {
+		return map[string]interface{}{"url": nil}
+	}
+	return map[string]interface{}{"url": value}
+}
+
+func emailJSON(value string) map[string]interface{} {
+	if value == "" {
+		return map[string]interface{}{"email": nil}
+	}
+	return map[string]interface{}{"email": value}
+}
+
 func normalizeOrgInput(org *types.Org) {
 	if org == nil {
 		return
