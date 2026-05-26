@@ -440,6 +440,8 @@ Because Notion page IDs are not retained in Postgres, the importer needs
 temporary in-memory maps while it runs:
 
 - Conferences map by `Name`/tag.
+- Conference days map by `(conference tag, day number)` and are upserted into
+  the table-level unique key `(conference_id, day_number)`.
 - Conference tickets, hotels, shifts, volunteer info, purchases, and
   sponsorships resolve conferences through the related row's conference tag.
 - Hotels use generated UUID primary keys. During migration, rerun this table

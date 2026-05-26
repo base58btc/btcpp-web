@@ -23,6 +23,7 @@ type options struct {
 	reset            bool
 	validate         bool
 	listConfTalkDups bool
+	skipConfDays     bool
 	skipTickets      bool
 	skipDiscounts    bool
 	skipPurchases    bool
@@ -68,6 +69,7 @@ func main() {
 		return
 	}
 	needDB := !opts.dryRun || opts.validate
+	importConfDays := !opts.skipConfDays
 	importTickets := !opts.skipTickets
 	importDiscounts := !opts.skipDiscounts
 	importPurchases := !opts.skipPurchases
@@ -95,7 +97,7 @@ func main() {
 	if importPurchases && !importDiscounts {
 		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
 	}
-	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -108,6 +110,18 @@ func main() {
 	}
 	log.Printf("fetched %d conferences from Notion", len(confs))
 	confTagByRef := conferenceTagByRef(confs)
+
+	var conferenceDays []*conferenceDayImportRow
+	if importConfDays {
+		conferenceDays, err = listConferenceDayImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch conference days from Notion: %s", err)
+		}
+		if err := validateConferenceDayRows(conferenceDays, confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d conference days from Notion", len(conferenceDays))
+	}
 
 	var tickets []*types.ConfTicket
 	if importTickets {
@@ -283,6 +297,9 @@ func main() {
 		for _, conf := range confs {
 			log.Printf("dry-run conference tag=%q uid=%d active=%t start=%s end=%s", conf.Tag, conf.UID, conf.Active, dateString(conf.StartDate), dateString(conf.EndDate))
 		}
+		for _, conferenceDay := range conferenceDays {
+			log.Printf("dry-run conference-day conf=%q day=%d venues=%d", conferenceDay.confTag, conferenceDay.dayNumber, len(conferenceDay.venues))
+		}
 		for _, ticket := range tickets {
 			confTag := confTagByRef[ticket.ConfRef]
 			log.Printf("dry-run conference-ticket conf=%q key=%q tier=%q local=%d btc=%d usd=%d max=%d", confTag, ticketKey(ticket), ticket.Tier, ticket.Local, ticket.BTC, ticket.USD, ticket.Max)
@@ -336,6 +353,12 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("upserted %d conferences into Postgres", len(confs))
+		if importConfDays {
+			if err := importConferenceDayRows(ctx, pool, conferenceDays); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d conference days into Postgres", len(conferenceDays))
+		}
 		if importTickets {
 			if err := importConferenceTickets(ctx, pool, tickets, confTagByRef); err != nil {
 				log.Fatal(err)
@@ -431,6 +454,12 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("validated conferences count and required tags")
+		if importConfDays {
+			if err := validateConferenceDays(ctx, pool, conferenceDays); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated conference day count")
+		}
 		if importTickets {
 			if err := validateConferenceTickets(ctx, pool, tickets, confTagByRef); err != nil {
 				log.Fatal(err)
@@ -518,6 +547,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.reset, "reset", false, "truncate imported tables before writing")
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
 	flag.BoolVar(&opts.listConfTalkDups, "list-conf-talk-duplicates", false, "print ConfTalkDb rows that share the same proposal relation and exit")
+	flag.BoolVar(&opts.skipConfDays, "skip-conference-days", false, "skip importing conference day schedule metadata")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
 	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
@@ -582,6 +612,9 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_CONFTALK_DB"); v != "" {
 		env.Notion.ConfTalkDb = v
 	}
+	if v := os.Getenv("NOTION_CONFINFO_DB"); v != "" {
+		env.Notion.ConfInfoDb = v
+	}
 	if v := os.Getenv("NOTION_RECORDINGS_DB"); v != "" {
 		env.Notion.RecordingsDb = v
 	}
@@ -597,13 +630,16 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
 	}
 	if strings.TrimSpace(env.Notion.ConfsDb) == "" {
 		missing = append(missing, "NOTION_CONFS_DB")
+	}
+	if importConfDays && strings.TrimSpace(env.Notion.ConfInfoDb) == "" {
+		missing = append(missing, "NOTION_CONFINFO_DB")
 	}
 	if importTickets && strings.TrimSpace(env.Notion.ConfsTixDb) == "" {
 		missing = append(missing, "NOTION_CONFSTIX_DB")
