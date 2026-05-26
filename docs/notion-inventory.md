@@ -468,6 +468,9 @@ temporary in-memory maps while it runs:
   repeated inserts.
 - Social posts map by `Ref`.
 - Job types map by `Tag`.
+- Volunteers use generated UUID primary keys. During migration, rerun this table
+  with `-reset` to avoid duplicate rows; related conferences and job-type
+  preferences are rebuilt from Notion relations.
 
 Any migration command should fail loudly on ambiguous natural keys rather than
 silently picking a row.
