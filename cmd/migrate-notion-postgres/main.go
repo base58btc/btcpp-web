@@ -27,6 +27,7 @@ type options struct {
 	skipDiscounts    bool
 	skipPurchases    bool
 	skipAffiliateUse bool
+	skipHotels       bool
 	skipSponsors     bool
 	skipSpeakers     bool
 	skipProposals    bool
@@ -71,6 +72,7 @@ func main() {
 	importDiscounts := !opts.skipDiscounts
 	importPurchases := !opts.skipPurchases
 	importAffiliateUse := !opts.skipAffiliateUse
+	importHotels := !opts.skipHotels
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
 	importProposals := !opts.skipProposals
@@ -93,7 +95,7 @@ func main() {
 	if importPurchases && !importDiscounts {
 		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
 	}
-	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -153,6 +155,18 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d affiliate usages from Notion", len(affiliateUsages))
+	}
+
+	var hotels []*types.Hotel
+	if importHotels {
+		hotels, err = getters.ListHotels(notion)
+		if err != nil {
+			log.Fatalf("fetch hotels from Notion: %s", err)
+		}
+		if err := validateHotelRows(hotels, confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d hotels from Notion", len(hotels))
 	}
 
 	var orgs []*types.Org
@@ -283,6 +297,10 @@ func main() {
 		for _, affiliateUsage := range affiliateUsages {
 			log.Printf("dry-run affiliate-usage code=%q conf=%q email=%q tickets=%d saved_sats=%d earned_sats=%d", affiliateUsage.codeName, affiliateUsage.confTag, affiliateUsage.affiliateEmail, affiliateUsage.ticketsCount, affiliateUsage.savedSats, affiliateUsage.earnedSats)
 		}
+		for _, hotel := range hotels {
+			confTag := confTagByRef[hotel.ConfRef]
+			log.Printf("dry-run hotel conf=%q name=%q order=%d type=%q", confTag, hotel.Name, hotel.Order, hotel.Type)
+		}
 		for _, org := range orgs {
 			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
 		}
@@ -343,6 +361,12 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("inserted %d affiliate usages into Postgres", len(affiliateUsages))
+		}
+		if importHotels {
+			if err := importHotelRows(ctx, pool, hotels, confTagByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("inserted %d hotels into Postgres", len(hotels))
 		}
 		var orgIDsByRef map[string]string
 		if importSponsors {
@@ -431,6 +455,12 @@ func main() {
 			}
 			log.Printf("validated affiliate usage count")
 		}
+		if importHotels {
+			if err := validateHotels(ctx, pool, hotels); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated hotel count")
+		}
 		if importSponsors {
 			if err := validateOrganizations(ctx, pool, orgs); err != nil {
 				log.Fatal(err)
@@ -492,6 +522,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
 	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
 	flag.BoolVar(&opts.skipAffiliateUse, "skip-affiliate-usages", false, "skip importing affiliate usage ledger rows")
+	flag.BoolVar(&opts.skipHotels, "skip-hotels", false, "skip importing hotels")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
@@ -560,10 +591,13 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_AFFILIATE_USE_DB"); v != "" {
 		env.Notion.AffiliateUsageDb = v
 	}
+	if v := os.Getenv("NOTION_HOTEL_DB"); v != "" {
+		env.Notion.HotelsDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -582,6 +616,9 @@ func validateConfig(env *types.EnvConfig, needDB, importTickets, importDiscounts
 	}
 	if importAffiliateUse && strings.TrimSpace(env.Notion.AffiliateUsageDb) == "" {
 		missing = append(missing, "NOTION_AFFILIATE_USE_DB")
+	}
+	if importHotels && strings.TrimSpace(env.Notion.HotelsDb) == "" {
+		missing = append(missing, "NOTION_HOTEL_DB")
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
 		missing = append(missing, "NOTION_ORGS_DB")

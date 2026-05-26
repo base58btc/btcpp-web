@@ -442,6 +442,8 @@ temporary in-memory maps while it runs:
 - Conferences map by `Name`/tag.
 - Conference tickets, hotels, shifts, volunteer info, purchases, and
   sponsorships resolve conferences through the related row's conference tag.
+- Hotels use generated UUID primary keys. During migration, rerun this table
+  with `-reset` to avoid duplicate rows from repeated imports.
 - Organizations currently map by case-insensitive `Name`.
 - Sponsorships use generated UUID primary keys. The importer allows duplicate
   names and should be rerun with `-reset` during migration to avoid repeated
