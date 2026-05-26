@@ -467,6 +467,7 @@ temporary in-memory maps while it runs:
   rows match, and should be rerun with `-reset` during migration to avoid
   repeated inserts.
 - Social posts map by `Ref`.
+- Job types map by `Tag`.
 
 Any migration command should fail loudly on ambiguous natural keys rather than
 silently picking a row.

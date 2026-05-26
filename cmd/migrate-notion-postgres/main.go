@@ -29,6 +29,7 @@ type options struct {
 	skipPurchases    bool
 	skipAffiliateUse bool
 	skipHotels       bool
+	skipJobTypes     bool
 	skipSponsors     bool
 	skipSpeakers     bool
 	skipProposals    bool
@@ -75,6 +76,7 @@ func main() {
 	importPurchases := !opts.skipPurchases
 	importAffiliateUse := !opts.skipAffiliateUse
 	importHotels := !opts.skipHotels
+	importJobTypes := !opts.skipJobTypes
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
 	importProposals := !opts.skipProposals
@@ -97,7 +99,7 @@ func main() {
 	if importPurchases && !importDiscounts {
 		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
 	}
-	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -181,6 +183,18 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d hotels from Notion", len(hotels))
+	}
+
+	var jobTypes []*types.JobType
+	if importJobTypes {
+		jobTypes, err = getters.ListJobs(notion)
+		if err != nil {
+			log.Fatalf("fetch job types from Notion: %s", err)
+		}
+		if err := validateJobTypeRows(jobTypes); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d job types from Notion", len(jobTypes))
 	}
 
 	var orgs []*types.Org
@@ -318,6 +332,9 @@ func main() {
 			confTag := confTagByRef[hotel.ConfRef]
 			log.Printf("dry-run hotel conf=%q name=%q order=%d type=%q", confTag, hotel.Name, hotel.Order, hotel.Type)
 		}
+		for _, jobType := range jobTypes {
+			log.Printf("dry-run job-type tag=%q title=%q order=%d show=%t", jobType.Tag, jobType.Title, jobType.DisplayOrder, jobType.Show)
+		}
 		for _, org := range orgs {
 			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
 		}
@@ -390,6 +407,12 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("inserted %d hotels into Postgres", len(hotels))
+		}
+		if importJobTypes {
+			if err := importJobTypeRows(ctx, pool, jobTypes); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d job types into Postgres", len(jobTypes))
 		}
 		var orgIDsByRef map[string]string
 		if importSponsors {
@@ -490,6 +513,12 @@ func main() {
 			}
 			log.Printf("validated hotel count")
 		}
+		if importJobTypes {
+			if err := validateJobTypes(ctx, pool, jobTypes); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated job type count")
+		}
 		if importSponsors {
 			if err := validateOrganizations(ctx, pool, orgs); err != nil {
 				log.Fatal(err)
@@ -553,6 +582,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
 	flag.BoolVar(&opts.skipAffiliateUse, "skip-affiliate-usages", false, "skip importing affiliate usage ledger rows")
 	flag.BoolVar(&opts.skipHotels, "skip-hotels", false, "skip importing hotels")
+	flag.BoolVar(&opts.skipJobTypes, "skip-job-types", false, "skip importing volunteer job type catalog")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
@@ -627,10 +657,13 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_HOTEL_DB"); v != "" {
 		env.Notion.HotelsDb = v
 	}
+	if v := os.Getenv("NOTION_JOBTYPE_DB"); v != "" {
+		env.Notion.JobTypeDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -655,6 +688,9 @@ func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets,
 	}
 	if importHotels && strings.TrimSpace(env.Notion.HotelsDb) == "" {
 		missing = append(missing, "NOTION_HOTEL_DB")
+	}
+	if importJobTypes && strings.TrimSpace(env.Notion.JobTypeDb) == "" {
+		missing = append(missing, "NOTION_JOBTYPE_DB")
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
 		missing = append(missing, "NOTION_ORGS_DB")
