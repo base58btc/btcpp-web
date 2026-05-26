@@ -527,7 +527,7 @@ CREATE UNIQUE INDEX work_shift_one_leader_idx
 ON work_shifts_volunteers (shift_id)
 WHERE role = 'leader';
 
-CREATE TABLE vol_infos (
+CREATE TABLE volunteer_info (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conference_id uuid NOT NULL UNIQUE REFERENCES conferences(id) ON DELETE CASCADE,
   orient_link_url text NOT NULL DEFAULT '',
@@ -539,8 +539,8 @@ CREATE TABLE vol_infos (
   CHECK (orient_end IS NULL OR orient_start IS NULL OR orient_end >= orient_start)
 );
 
-CREATE TRIGGER vol_infos_set_updated_at
-BEFORE UPDATE ON vol_infos
+CREATE TRIGGER volunteer_info_set_updated_at
+BEFORE UPDATE ON volunteer_info
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE subscribers (

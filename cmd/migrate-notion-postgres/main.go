@@ -17,27 +17,28 @@ import (
 )
 
 type options struct {
-	configPath       string
-	databaseURL      string
-	dryRun           bool
-	reset            bool
-	validate         bool
-	listConfTalkDups bool
-	skipConfDays     bool
-	skipTickets      bool
-	skipDiscounts    bool
-	skipPurchases    bool
-	skipAffiliateUse bool
-	skipHotels       bool
-	skipJobTypes     bool
-	skipVolunteers   bool
-	skipSponsors     bool
-	skipSpeakers     bool
-	skipProposals    bool
-	skipSpeakerConfs bool
-	skipConfTalks    bool
-	skipRecordings   bool
-	skipSocialPosts  bool
+	configPath        string
+	databaseURL       string
+	dryRun            bool
+	reset             bool
+	validate          bool
+	listConfTalkDups  bool
+	skipConfDays      bool
+	skipTickets       bool
+	skipDiscounts     bool
+	skipPurchases     bool
+	skipAffiliateUse  bool
+	skipHotels        bool
+	skipJobTypes      bool
+	skipVolunteers    bool
+	skipVolunteerInfo bool
+	skipSponsors      bool
+	skipSpeakers      bool
+	skipProposals     bool
+	skipSpeakerConfs  bool
+	skipConfTalks     bool
+	skipRecordings    bool
+	skipSocialPosts   bool
 }
 
 func main() {
@@ -79,6 +80,7 @@ func main() {
 	importHotels := !opts.skipHotels
 	importJobTypes := !opts.skipJobTypes
 	importVolunteers := !opts.skipVolunteers
+	importVolunteerInfo := !opts.skipVolunteerInfo
 	importSponsors := !opts.skipSponsors
 	importSpeakers := !opts.skipSpeakers
 	importProposals := !opts.skipProposals
@@ -104,7 +106,7 @@ func main() {
 	if importVolunteers && !importJobTypes {
 		log.Fatal("volunteer import requires job types; use -skip-volunteers when skipping job types")
 	}
-	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -212,6 +214,18 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("fetched %d volunteers from Notion", len(volunteers))
+	}
+
+	var volunteerInfo []*volunteerInfoImportRow
+	if importVolunteerInfo {
+		volunteerInfo, err = listVolunteerInfoImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch volunteer info from Notion: %s", err)
+		}
+		if err := validateVolunteerInfoRows(volunteerInfo, confTagByRef); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d volunteer info rows from Notion", len(volunteerInfo))
 	}
 
 	var orgs []*types.Org
@@ -355,6 +369,10 @@ func main() {
 		for _, volunteer := range volunteers {
 			log.Printf("dry-run volunteer name=%q email=%q schedule_for=%d work_yes=%d work_no=%d", volunteer.name, volunteer.email, len(volunteer.scheduleForRefs), len(volunteer.workYesRefs), len(volunteer.workNoRefs))
 		}
+		for _, info := range volunteerInfo {
+			confTag := confTagByRef[info.confRef]
+			log.Printf("dry-run volunteer-info conf=%q orient_link=%q", confTag, info.orientLink)
+		}
 		for _, org := range orgs {
 			log.Printf("dry-run organization name=%q website=%q", org.Name, org.Website)
 		}
@@ -441,6 +459,12 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("inserted %d volunteers into Postgres", len(volunteerIDsByRef))
+		}
+		if importVolunteerInfo {
+			if err := importVolunteerInfoRows(ctx, pool, volunteerInfo, confTagByRef); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d volunteer info rows into Postgres", len(volunteerInfo))
 		}
 		var orgIDsByRef map[string]string
 		if importSponsors {
@@ -553,6 +577,12 @@ func main() {
 			}
 			log.Printf("validated volunteer count and links")
 		}
+		if importVolunteerInfo {
+			if err := validateVolunteerInfo(ctx, pool, volunteerInfo); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated volunteer info count")
+		}
 		if importSponsors {
 			if err := validateOrganizations(ctx, pool, orgs); err != nil {
 				log.Fatal(err)
@@ -618,6 +648,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipHotels, "skip-hotels", false, "skip importing hotels")
 	flag.BoolVar(&opts.skipJobTypes, "skip-job-types", false, "skip importing volunteer job type catalog")
 	flag.BoolVar(&opts.skipVolunteers, "skip-volunteers", false, "skip importing volunteer applications")
+	flag.BoolVar(&opts.skipVolunteerInfo, "skip-volunteer-info", false, "skip importing volunteer orientation metadata")
 	flag.BoolVar(&opts.skipSponsors, "skip-sponsors", false, "skip importing organizations and sponsorships")
 	flag.BoolVar(&opts.skipSpeakers, "skip-speakers", false, "skip importing speakers and speaker roles")
 	flag.BoolVar(&opts.skipProposals, "skip-proposals", false, "skip importing proposals")
@@ -698,10 +729,13 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_VOLUNTEER_DB"); v != "" {
 		env.Notion.VolunteerDb = v
 	}
+	if v := os.Getenv("NOTION_VOLINFO_DB"); v != "" {
+		env.Notion.VolInfoDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -732,6 +766,9 @@ func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets,
 	}
 	if importVolunteers && strings.TrimSpace(env.Notion.VolunteerDb) == "" {
 		missing = append(missing, "NOTION_VOLUNTEER_DB")
+	}
+	if importVolunteerInfo && strings.TrimSpace(env.Notion.VolInfoDb) == "" {
+		missing = append(missing, "NOTION_VOLINFO_DB")
 	}
 	if importSponsors && strings.TrimSpace(env.Notion.OrgDb) == "" {
 		missing = append(missing, "NOTION_ORGS_DB")

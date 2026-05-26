@@ -27,7 +27,7 @@ Postgres IDs.
 | `VolunteerDb` / `NOTION_VOLUNTEER_DB` | Volunteer applications and status. | `Name`, `Email`, `Phone`, `Signal`, `Availability`, `ContactAt`, `Comments`, `DiscoveredVia`, `ScheduleFor`, `OtherEvents`, `WorkYes`, `WorkNo`, `FirstEvent`, `Hometown`, `Twitter`, `npub`, `Shirt`, `Status`, created date. | `ScheduleFor`/`OtherEvents` to conferences; `WorkYes`/`WorkNo` to job types; shifts relate back through assignees/leaders. | `volunteers`, `volunteers_conferences`, `volunteers_job_types` |
 | `JobTypeDb` / `NOTION_JOBTYPE_DB` | Volunteer work type catalog. | `Tag`, `DisplayOrder`, `Title`, `Tooltip`, `LongDesc`, `Show`. | Used by volunteers and work shifts. | `job_types` |
 | `ShiftDb` / `NOTION_SHIFTS_DB` | Volunteer work shifts. | `Name`, `MaxVols`, `TypeRef`, `ConfRef`, `ShiftTime`, `Assignees`, `ShiftLeader`, `Priority`, `CalNotif`. | `TypeRef` to `JobTypeDb`, `ConfRef` to `ConfsDb`, assignees/leader to `VolunteerDb`. | `work_shifts`, `work_shifts_volunteers` |
-| `VolInfoDb` / `NOTION_VOLINFO_DB` | Volunteer orientation metadata per conference. | `conf`, `OrientLink`, `OrientTimes`, `Notes`. | `conf` relation to `ConfsDb`. | `vol_infos` |
+| `VolInfoDb` / `NOTION_VOLINFO_DB` | Volunteer orientation metadata per conference. | `conf`, `OrientLink`, `OrientTimes`, `Notes`. | `conf` relation to `ConfsDb`. | `volunteer_info` |
 | `NewsletterDb` / `NOTION_NEWSLETTER_DB` | Email subscriber list. | `Email`, `Subs`. | Standalone; some forms check subscription state. | `subscribers`, `subscriber_subscriptions` |
 | `MissivesDb` / `NOTION_MISSIVES_DB` | Newsletter/email message catalog. | Notion unique `ID`, `Title`, `Newsletter`, `OnlyFor`, `Markdown`, `SendAt`, `SentAt`, `Expiry`. | Newsletter names are tags, not relations. | `missives` |
 
@@ -344,15 +344,15 @@ to avoid duplicate rows from repeated imports.
 | `Assignees` | `work_shifts_volunteers.shift_id`, `work_shifts_volunteers.volunteer_id`, `role='assignee'` | Multi-relation to volunteers. |
 | `ShiftLeader` | `work_shifts_volunteers.shift_id`, `work_shifts_volunteers.volunteer_id`, `role='leader'` | Relation to volunteer. |
 
-### `VolInfoDb` -> `vol_infos`
+### `VolInfoDb` -> `volunteer_info`
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| `conf` | `vol_infos.conference_id` | Relation to conference. |
-| `OrientLink` | `vol_infos.orient_link_url` | URL. |
-| `OrientTimes.start` | `vol_infos.orient_start` | Date range start. |
-| `OrientTimes.end` | `vol_infos.orient_end` | Date range end. |
-| `Notes` | `vol_infos.notes` | Rich text. |
+| `conf` | `volunteer_info.conference_id` | Relation to conference. |
+| `OrientLink` | `volunteer_info.orient_link_url` | URL. |
+| `OrientTimes.start` | `volunteer_info.orient_start` | Date range start. |
+| `OrientTimes.end` | `volunteer_info.orient_end` | Date range end. |
+| `Notes` | `volunteer_info.notes` | Rich text. |
 
 ### `NewsletterDb` -> `subscribers`, `subscriber_subscriptions`
 
@@ -427,7 +427,7 @@ UUID `id` columns remain the primary key unless a table is a pure join table.
 | `work_shifts` | `(conference_id, shift_start)` | separate index | no | Schedule/admin lookup by conference and time. |
 | `work_shifts_volunteers` | `(shift_id, volunteer_id, role)` primary key | table constraint | yes | Prevent duplicate shift assignment rows. |
 | `work_shifts_volunteers` | one leader per `shift_id` where `role='leader'` | separate index | yes | Enforces one shift leader while allowing many assignees. |
-| `vol_infos` | `conference_id` | table constraint | yes | One volunteer info/orientation row per conference. |
+| `volunteer_info` | `conference_id` | table constraint | yes | One volunteer info/orientation row per conference. |
 | `subscribers` | `email` | table constraint | yes | Subscriber email is the account/subscription identity. |
 | `subscriber_subscriptions` | `(subscriber_id, name)` primary key | table constraint | yes | Prevent duplicate subscription names per subscriber. |
 | `missives` | `public_uid` | table constraint | yes | Notion unique ID property when present; not the Notion page ID. |
