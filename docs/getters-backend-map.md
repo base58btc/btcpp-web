@@ -221,3 +221,11 @@ Current progress:
 - `listConfTicketsPostgres`, `listConferencesPostgres`, and
   `listConferencesOnlyPostgres` are implemented.
 - `ConfUpdateOrientCalNotif` and `ListConfInfos` are not split yet.
+
+## Current Progress: Hotels
+
+- `getHotels` moved to `external/getters/hotels.go`.
+- `FetchHotelsCached` moved to `external/getters/hotels.go`.
+- `ListHotels` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListHotelsNotion` is the renamed Notion implementation.
+- `listHotelsPostgres` is implemented in `external/getters/hotels_postgres.go`.

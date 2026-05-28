@@ -878,31 +878,6 @@ func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error)
 	return discounts, nil
 }
 
-func getHotels(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting hotels...")
-	hotels, err = ListHotels(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching hotels %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d hotels!", len(hotels))
-		writeCache("hotels", hotels)
-	}
-}
-
-/* This may return nil */
-func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if hotels == nil || lastHotelFetch.Before(deadline) {
-		lastHotelFetch = time.Now()
-		queueRefresh(JobHotels)
-	}
-
-	return hotels, nil
-}
-
 func getJobs(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting jobs...")
@@ -1233,7 +1208,7 @@ func GetTalk(ctx *config.AppContext, talkID string) (*types.Talk, error) {
 	return nil, fmt.Errorf("Talk %s not found", talkID)
 }
 
-func ListHotels(n *types.Notion) ([]*types.Hotel, error) {
+func ListHotelsNotion(n *types.Notion) ([]*types.Hotel, error) {
 	var hotels []*types.Hotel
 
 	hasMore := true

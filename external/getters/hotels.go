@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -26,6 +27,39 @@ type HotelInput struct {
 	Desc    string
 	Order   int
 	ConfRef string // Conference page ID for the `conf` relation
+}
+
+func getHotels(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting hotels...")
+	if UsePostgresBackend(ctx) {
+		hotels, err = listHotelsPostgres(ctx)
+	} else {
+		hotels, err = ListHotelsNotion(ctx.Notion)
+	}
+
+	if err != nil {
+		ctx.Err.Printf("error fetching hotels %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d hotels!", len(hotels))
+		writeCache("hotels", hotels)
+	}
+}
+
+/* This may return nil */
+func FetchHotelsCached(ctx *config.AppContext) ([]*types.Hotel, error) {
+	now := time.Now()
+	deadline := now.Add(-cacheTTL)
+	if hotels == nil || lastHotelFetch.Before(deadline) {
+		lastHotelFetch = time.Now()
+		queueRefresh(JobHotels)
+	}
+
+	return hotels, nil
+}
+
+func ListHotels(n *types.Notion) ([]*types.Hotel, error) {
+	return ListHotelsNotion(n)
 }
 
 // CreateHotel inserts a new row into the Hotels DB and returns the
