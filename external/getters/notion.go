@@ -755,30 +755,6 @@ func CacheStats() map[string]int {
 	}
 }
 
-func getConfs(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting confs...")
-	confs, err = ListConferences(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching confs %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d confs!", len(confs))
-		writeCache("confs", confs)
-	}
-}
-
-func FetchConfsCached(ctx *config.AppContext) ([]*types.Conf, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if confs == nil || lastConfsFetch.Before(deadline) {
-		lastConfsFetch = time.Now()
-		queueRefresh(JobConfs)
-	}
-
-	return confs, nil
-}
-
 func getSpeakers(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting speakers...")
@@ -1002,7 +978,7 @@ func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
 	return orgs, nil
 }
 
-func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
+func ListConfTicketsNotion(n *types.Notion) ([]*types.ConfTicket, error) {
 	var confTix []*types.ConfTicket
 
 	hasMore := true
@@ -1029,7 +1005,7 @@ func ListConfTickets(n *types.Notion) ([]*types.ConfTicket, error) {
 }
 
 /* Grabs the conferences + their tickets buckets */
-func ListConferences(n *types.Notion) ([]*types.Conf, error) {
+func ListConferencesNotion(n *types.Notion) ([]*types.Conf, error) {
 	var confs []*types.Conf
 
 	hasMore := true
@@ -1052,7 +1028,7 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 		}
 	}
 
-	confTix, err := ListConfTickets(n)
+	confTix, err := ListConfTicketsNotion(n)
 	if err != nil {
 		return nil, err
 	}
@@ -1070,7 +1046,7 @@ func ListConferences(n *types.Notion) ([]*types.Conf, error) {
 	return confs, nil
 }
 
-func ListConferencesOnly(n *types.Notion) ([]*types.Conf, error) {
+func ListConferencesOnlyNotion(n *types.Notion) ([]*types.Conf, error) {
 	var confs []*types.Conf
 
 	hasMore := true

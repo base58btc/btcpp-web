@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"btcpp-web/external/tokens"
 	youtubepkg "btcpp-web/external/youtube"
 	"btcpp-web/internal/config"
+	"btcpp-web/internal/db"
 	"btcpp-web/internal/emails"
 	"btcpp-web/internal/handlers"
 	"btcpp-web/internal/types"
@@ -314,6 +316,13 @@ func run(env *types.EnvConfig) error {
 
 	app.Notion = &types.Notion{Config: &env.Notion}
 	app.Notion.Setup(env.Notion.Token)
+	if getters.UsePostgresBackend(&app) {
+		pool, err := db.Open(context.Background(), env.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		app.DB = pool
+	}
 
 	// Per-request Notion timing is noisy in production, so keep it opt-in.
 	// Recent-call tracking for /api/cache-stats remains enabled separately.

@@ -12,7 +12,7 @@ const (
 	dataBackendPostgres = "postgres"
 )
 
-func usePostgresBackend(ctx *config.AppContext) bool {
+func UsePostgresBackend(ctx *config.AppContext) bool {
 	if ctx == nil || ctx.Env == nil {
 		return false
 	}

@@ -208,3 +208,16 @@ Initial Postgres methods:
 
 The exported app-facing names should stay stable for handlers while the
 backend-specific implementations split underneath them.
+
+Current progress:
+
+- `getConfs` moved to `external/getters/conferences.go`.
+- `FetchConfsCached` moved to `external/getters/conferences.go`.
+- `ListConfTickets` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListConferences` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListConferencesOnly` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListConfTicketsNotion`, `ListConferencesNotion`, and
+  `ListConferencesOnlyNotion` are the renamed Notion implementations.
+- `listConfTicketsPostgres`, `listConferencesPostgres`, and
+  `listConferencesOnlyPostgres` are implemented.
+- `ConfUpdateOrientCalNotif` and `ListConfInfos` are not split yet.

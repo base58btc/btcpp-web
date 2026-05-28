@@ -26,8 +26,8 @@ func TestUsePostgresBackend(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := usePostgresBackend(tt.ctx); got != tt.want {
-				t.Fatalf("usePostgresBackend() = %v, want %v", got, tt.want)
+			if got := UsePostgresBackend(tt.ctx); got != tt.want {
+				t.Fatalf("UsePostgresBackend() = %v, want %v", got, tt.want)
 			}
 		})
 	}
