@@ -300,3 +300,15 @@ Current progress:
 - Proposal write paths (`CreateProposal`, `UpdateProposal`,
   `UpdateProposalStatus`, invite-token updates, etc.) still need a dedicated
   Postgres write split.
+
+## Current Progress: Speakers / People
+
+- `getSpeakers` and `FetchSpeakersCached` moved to
+  `external/getters/speakers.go`.
+- `ListSpeakers` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListSpeakersNotion` is the renamed Notion implementation.
+- `listSpeakersPostgres` is implemented in `external/getters/speakers_postgres.go`.
+- Postgres reads the `people` table and hydrates `Speaker.Roles` from
+  `people_roles` as the existing raw role tag format, e.g. `global-admin`.
+- Speaker write paths (`CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`,
+  etc.) still need a dedicated Postgres write split.

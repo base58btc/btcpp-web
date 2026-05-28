@@ -699,36 +699,6 @@ func CacheStats() map[string]int {
 	}
 }
 
-func getSpeakers(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting speakers...")
-	cacheSpeakers, err = ListSpeakers(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching speakers %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d speakers!", len(cacheSpeakers))
-		writeCache("speakers", cacheSpeakers)
-		ctx.Infos.Printf("there are %d callbacks", len(onSpeakersRefresh))
-		for _, cb := range onSpeakersRefresh {
-			cb(ctx, cacheSpeakers)
-		}
-	}
-}
-
-/* This may return nil */
-func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if cacheSpeakers == nil || lastSpeakerFetch.Before(deadline) {
-		/* Set last fetch to now even if there's errors */
-		lastSpeakerFetch = time.Now()
-		queueRefresh(JobSpeakers)
-	}
-
-	return cacheSpeakers, nil
-}
-
 func getTalks(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting talks...")
@@ -998,7 +968,7 @@ func ConfUpdateOrientCalNotif(n *types.Notion, confRef string, calnotif string) 
 	return nil
 }
 
-func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
+func ListSpeakersNotion(n *types.Notion) ([]*types.Speaker, error) {
 	var speakers []*types.Speaker
 
 	hasMore := true
