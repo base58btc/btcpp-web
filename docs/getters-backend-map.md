@@ -249,3 +249,14 @@ Current progress:
 - `ListJobs` remains as a compatibility wrapper for Notion-shaped callers.
 - `ListJobsNotion` is the renamed Notion implementation.
 - `listJobsPostgres` is implemented in `external/getters/job_types_postgres.go`.
+
+## Current Progress: Work Shifts
+
+- `getShifts` moved to `external/getters/work_shifts.go`.
+- `FetchShiftsCached` moved to `external/getters/work_shifts.go`.
+- `GetShiftsForConf` moved to `external/getters/work_shifts.go`.
+- `ListWorkShifts` remains as a context-based app-facing wrapper.
+- `ListWorkShiftsNotion` is the renamed Notion implementation.
+- `listWorkShiftsPostgres` is implemented in `external/getters/work_shifts_postgres.go`.
+- Shift write paths (`CreateShift`, `UpdateShift`, assignment helpers, etc.) still need a
+  dedicated Postgres write split.
