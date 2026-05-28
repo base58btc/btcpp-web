@@ -852,31 +852,6 @@ func patchTalksStatusForProposal(proposalID, status string) {
 	}
 }
 
-func getJobs(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting jobs...")
-	jobs, err = ListJobs(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching jobs %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d jobs!", len(jobs))
-		writeCache("jobs", jobs)
-	}
-}
-
-/* This may return nil */
-func FetchJobsCached(ctx *config.AppContext) ([]*types.JobType, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if jobs == nil || lastJobTypeFetch.Before(deadline) {
-		lastJobTypeFetch = time.Now()
-		queueRefresh(JobJobs)
-	}
-
-	return jobs, nil
-}
-
 func getShifts(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting shifts...")
@@ -1208,7 +1183,7 @@ func ListHotelsNotion(n *types.Notion) ([]*types.Hotel, error) {
 	return hotels, nil
 }
 
-func ListJobs(n *types.Notion) ([]*types.JobType, error) {
+func ListJobsNotion(n *types.Notion) ([]*types.JobType, error) {
 	var jobs []*types.JobType
 
 	hasMore := true

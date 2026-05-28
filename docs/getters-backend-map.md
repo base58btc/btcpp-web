@@ -241,3 +241,11 @@ Current progress:
 - `ListDiscountsNotion` is the renamed Notion implementation.
 - `listDiscountsPostgres` and `incrementDiscountUsesPostgres` are implemented in
   `external/getters/discounts_postgres.go`.
+
+## Current Progress: Job Types
+
+- `getJobs` moved to `external/getters/job_types.go`.
+- `FetchJobsCached` moved to `external/getters/job_types.go`.
+- `ListJobs` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListJobsNotion` is the renamed Notion implementation.
+- `listJobsPostgres` is implemented in `external/getters/job_types_postgres.go`.
