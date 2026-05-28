@@ -286,3 +286,17 @@ Current progress:
 - `listOrgsPostgres` and `listSponsorshipsPostgres` are implemented in
   `external/getters/sponsors_postgres.go`.
 - Organization/sponsorship write paths still need a dedicated Postgres write split.
+
+## Current Progress: Proposals
+
+- `getProposals`, `FetchProposalsCached`, and `FetchProposalByID` moved to
+  `external/getters/proposals.go`.
+- `ListProposals` now dispatches by backend.
+- `ListProposalsNotion` and `ListProposalsOnlyNotion` are the renamed Notion
+  implementations.
+- `ListProposalsOnly` remains as a compatibility wrapper for Notion-shaped callers.
+- `listProposalsPostgres` and `getProposalPostgres` are implemented in
+  `external/getters/proposals_postgres.go`.
+- Proposal write paths (`CreateProposal`, `UpdateProposal`,
+  `UpdateProposalStatus`, invite-token updates, etc.) still need a dedicated
+  Postgres write split.

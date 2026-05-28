@@ -390,9 +390,73 @@ func GetProposal(ctx *config.AppContext, proposalID string) (*types.Proposal, er
 	return FetchProposalByID(ctx, proposalID)
 }
 
+// getProposals refreshes the in-memory Proposal cache + by-ID map.
+func getProposals(ctx *config.AppContext) {
+	ctx.Infos.Printf("getting proposals...")
+	props, err := ListProposals(ctx)
+	if err != nil {
+		ctx.Err.Printf("error fetching proposals %s", err)
+		return
+	}
+	idx := make(map[string]*types.Proposal, len(props))
+	for _, p := range props {
+		if p != nil {
+			idx[p.ID] = p
+		}
+	}
+	proposalCacheMu.Lock()
+	cacheProposals = props
+	proposalByID = idx
+	proposalCacheMu.Unlock()
+	ctx.Infos.Printf("Loaded %d proposals!", len(props))
+}
+
+// FetchProposalsCached returns the cached proposal slice. May trigger an
+// async refresh if the TTL has elapsed; the returned data may be stale by
+// up to one refresh cycle.
+func FetchProposalsCached(ctx *config.AppContext) ([]*types.Proposal, error) {
+	deadline := time.Now().Add(-cacheTTL)
+	proposalCacheMu.RLock()
+	stale := cacheProposals == nil || lastProposalFetch.Before(deadline)
+	out := cacheProposals
+	proposalCacheMu.RUnlock()
+	if stale {
+		lastProposalFetch = time.Now()
+		queueRefresh(JobProposals)
+	}
+	return out, nil
+}
+
+// FetchProposalByID is the hot-path lookup used by per-proposal handlers
+// (GetProposal, dashboard auth, etc.). O(1) map read; falls back to a direct
+// backend read only if the cache is empty.
+func FetchProposalByID(ctx *config.AppContext, id string) (*types.Proposal, error) {
+	proposalCacheMu.RLock()
+	p := proposalByID[id]
+	proposalCacheMu.RUnlock()
+	if p != nil {
+		return p, nil
+	}
+	if UsePostgresBackend(ctx) {
+		return getProposalPostgres(ctx, id)
+	}
+	page, err := ctx.Notion.Client.RetrievePage(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+	return parseProposal(ctx, page.ID, page.Properties), nil
+}
+
 // ListProposals fetches every Proposal page. Callers filter by conf in memory,
 // matching the existing pattern used for talk apps.
 func ListProposals(ctx *config.AppContext) ([]*types.Proposal, error) {
+	if UsePostgresBackend(ctx) {
+		return listProposalsPostgres(ctx)
+	}
+	return ListProposalsNotion(ctx)
+}
+
+func ListProposalsNotion(ctx *config.AppContext) ([]*types.Proposal, error) {
 	n := ctx.Notion
 	var out []*types.Proposal
 	hasMore := true
@@ -437,6 +501,10 @@ func parseProposalOnly(pageID string, props map[string]notion.PropertyValue) *ty
 }
 
 func ListProposalsOnly(n *types.Notion) ([]*types.Proposal, error) {
+	return ListProposalsOnlyNotion(n)
+}
+
+func ListProposalsOnlyNotion(n *types.Notion) ([]*types.Proposal, error) {
 	var out []*types.Proposal
 	hasMore := true
 	nextCursor := ""
