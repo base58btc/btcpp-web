@@ -2149,42 +2149,6 @@ func normalizeVolunteerInput(vol *types.Volunteer) {
 	vol.Shirt = strings.TrimSpace(vol.Shirt)
 }
 
-func GetVolInfo(ctx *config.AppContext, confRef string) (*types.VolInfo, error) {
-	infos, err := GetVolInfos(ctx, confRef)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(infos) == 0 {
-		return nil, fmt.Errorf("Invalid confref for volinfos %s", confRef)
-	}
-
-	return infos[0], nil
-}
-
-func GetVolInfoMap(ctx *config.AppContext) (map[string]*types.VolInfo, error) {
-	vmap := make(map[string]*types.VolInfo)
-	volinfos, err := GetVolInfos(ctx, "")
-	if err != nil {
-		return vmap, err
-	}
-
-	confs, err = FetchConfsCached(ctx)
-	if err != nil {
-		return vmap, err
-	}
-	for _, vi := range volinfos {
-		for _, conf := range confs {
-			if conf.Ref == vi.ConfRef {
-				vmap[conf.Tag] = vi
-				break
-			}
-		}
-	}
-
-	return vmap, nil
-}
-
 // ListConfInfos fetches every row in ConfInfoDb, optionally filtered to a
 // single conf by Tag. Each row is resolved against the cached confs
 // slice so the returned *Times carry the conf's timezone.
@@ -2261,7 +2225,7 @@ func GetConfInfoMap(ctx *config.AppContext) (map[string][]*types.ConfInfo, error
 	return out, nil
 }
 
-func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
+func GetVolInfosNotion(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
 	var vis []*types.VolInfo
 	hasMore := true
 	nextCursor := ""
@@ -2297,7 +2261,7 @@ func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, erro
 	return vis, nil
 }
 
-func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer, error) {
+func ListVolunteerAppsNotion(ctx *config.AppContext, email string) ([]*types.Volunteer, error) {
 	var vols []*types.Volunteer
 	hasMore := true
 	nextCursor := ""
@@ -2337,7 +2301,7 @@ func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer
 // strongly-consistent read (unlike QueryDatabase, which uses an
 // eventually-consistent index), so it should be used after writes when the
 // caller needs to render the just-updated state.
-func FetchVolunteer(ctx *config.AppContext, volRef string) (*types.Volunteer, error) {
+func FetchVolunteerNotion(ctx *config.AppContext, volRef string) (*types.Volunteer, error) {
 	page, err := ctx.Notion.Client.RetrievePage(context.Background(), volRef)
 	if err != nil {
 		return nil, err
@@ -2345,7 +2309,7 @@ func FetchVolunteer(ctx *config.AppContext, volRef string) (*types.Volunteer, er
 	return parseVolunteer(ctx, page.ID, page.Properties), nil
 }
 
-func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Volunteer, error) {
+func ListVolunteersForConfNotion(ctx *config.AppContext, confRef string) ([]*types.Volunteer, error) {
 	var vols []*types.Volunteer
 	hasMore := true
 	nextCursor := ""

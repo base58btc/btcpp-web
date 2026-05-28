@@ -260,3 +260,16 @@ Current progress:
 - `listWorkShiftsPostgres` is implemented in `external/getters/work_shifts_postgres.go`.
 - Shift write paths (`CreateShift`, `UpdateShift`, assignment helpers, etc.) still need a
   dedicated Postgres write split.
+
+## Current Progress: Volunteers
+
+- `GetVolInfo`, `GetVolInfoMap`, `GetVolInfos`, `ListVolunteerApps`,
+  `FetchVolunteer`, and `ListVolunteersForConf` moved to
+  `external/getters/volunteers.go`.
+- `GetVolInfosNotion`, `ListVolunteerAppsNotion`, `FetchVolunteerNotion`, and
+  `ListVolunteersForConfNotion` are the renamed Notion implementations.
+- `getVolInfosPostgres`, `listVolunteerAppsPostgres`, `fetchVolunteerPostgres`,
+  and `listVolunteersForConfPostgres` are implemented in
+  `external/getters/volunteers_postgres.go`.
+- Volunteer write paths (`RegisterVolunteer`, status/availability/work preference
+  updates, etc.) still need a dedicated Postgres write split.
