@@ -852,31 +852,6 @@ func patchTalksStatusForProposal(proposalID, status string) {
 	}
 }
 
-func getOrgs(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting orgs...")
-	orgs, err = ListOrgs(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching orgs %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d orgs!", len(orgs))
-		writeCache("orgs", orgs)
-	}
-}
-
-/* This may return nil */
-func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if orgs == nil || lastOrgFetch.Before(deadline) {
-		lastOrgFetch = time.Now()
-		queueRefresh(JobOrgs)
-	}
-
-	return orgs, nil
-}
-
 func ListConfTicketsNotion(n *types.Notion) ([]*types.ConfTicket, error) {
 	var confTix []*types.ConfTicket
 

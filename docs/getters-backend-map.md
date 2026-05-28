@@ -273,3 +273,16 @@ Current progress:
   `external/getters/volunteers_postgres.go`.
 - Volunteer write paths (`RegisterVolunteer`, status/availability/work preference
   updates, etc.) still need a dedicated Postgres write split.
+
+## Current Progress: Sponsors And Organizations
+
+- `getOrgs` moved to `external/getters/sponsors.go`.
+- `FetchOrgsCached` moved to `external/getters/sponsors.go`.
+- `ListOrgs`, `GetOrg`, and `ListSponsorshipsOnly` remain as compatibility
+  wrappers for Notion-shaped callers.
+- `ListOrgsNotion`, `GetOrgNotion`, `ListSponsorshipsNotion`, and
+  `ListSponsorshipsOnlyNotion` are the renamed Notion implementations.
+- `ListSponsorships` now dispatches by backend.
+- `listOrgsPostgres` and `listSponsorshipsPostgres` are implemented in
+  `external/getters/sponsors_postgres.go`.
+- Organization/sponsorship write paths still need a dedicated Postgres write split.

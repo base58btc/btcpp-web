@@ -49,7 +49,40 @@ func parseSponsorship(ctx *config.AppContext, pageID string, props map[string]no
 	return sp
 }
 
+func getOrgs(ctx *config.AppContext) {
+	var err error
+	ctx.Infos.Printf("getting orgs...")
+	if UsePostgresBackend(ctx) {
+		orgs, err = listOrgsPostgres(ctx)
+	} else {
+		orgs, err = ListOrgsNotion(ctx.Notion)
+	}
+
+	if err != nil {
+		ctx.Err.Printf("error fetching orgs %s", err)
+	} else {
+		ctx.Infos.Printf("Loaded %d orgs!", len(orgs))
+		writeCache("orgs", orgs)
+	}
+}
+
+/* This may return nil */
+func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
+	now := time.Now()
+	deadline := now.Add(-cacheTTL)
+	if orgs == nil || lastOrgFetch.Before(deadline) {
+		lastOrgFetch = time.Now()
+		queueRefresh(JobOrgs)
+	}
+
+	return orgs, nil
+}
+
 func ListOrgs(n *types.Notion) ([]*types.Org, error) {
+	return ListOrgsNotion(n)
+}
+
+func ListOrgsNotion(n *types.Notion) ([]*types.Org, error) {
 	var orgs []*types.Org
 
 	hasMore := true
@@ -94,7 +127,7 @@ func listOrgsCached(n *types.Notion) ([]*types.Org, error) {
 		return out, nil
 	}
 	orgListCacheMu.Unlock()
-	orgs, err := ListOrgs(n)
+	orgs, err := ListOrgsNotion(n)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +167,11 @@ func SearchOrgsByName(n *types.Notion, q string, limit int) ([]*types.Org, error
 }
 
 func GetOrg(n *types.Notion, ref string) (*types.Org, error) {
-	orgs, err := ListOrgs(n)
+	return GetOrgNotion(n, ref)
+}
+
+func GetOrgNotion(n *types.Notion, ref string) (*types.Org, error) {
+	orgs, err := ListOrgsNotion(n)
 	if err != nil {
 		return nil, err
 	}
@@ -207,6 +244,13 @@ func InvalidateSponsorshipsCache() {
 }
 
 func ListSponsorships(ctx *config.AppContext, confRef string) ([]*types.Sponsorship, error) {
+	if UsePostgresBackend(ctx) {
+		return listSponsorshipsPostgres(ctx, confRef)
+	}
+	return ListSponsorshipsNotion(ctx, confRef)
+}
+
+func ListSponsorshipsNotion(ctx *config.AppContext, confRef string) ([]*types.Sponsorship, error) {
 	n := ctx.Notion
 	cachedOrgs, err := FetchOrgsCached(ctx)
 	if err != nil {
@@ -269,6 +313,10 @@ func parseSponsorshipOnly(pageID string, props map[string]notion.PropertyValue) 
 }
 
 func ListSponsorshipsOnly(n *types.Notion) ([]*types.Sponsorship, error) {
+	return ListSponsorshipsOnlyNotion(n)
+}
+
+func ListSponsorshipsOnlyNotion(n *types.Notion) ([]*types.Sponsorship, error) {
 	var sponsorships []*types.Sponsorship
 
 	hasMore := true
@@ -505,7 +553,7 @@ func FindOrg(n *types.Notion, website, name string) (*types.Org, error) {
 	if wantSite == "" && wantName == "" {
 		return nil, nil
 	}
-	orgs, err := ListOrgs(n)
+	orgs, err := ListOrgsNotion(n)
 	if err != nil {
 		return nil, err
 	}
