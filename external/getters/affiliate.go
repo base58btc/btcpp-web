@@ -207,6 +207,13 @@ type AffiliateUsageInput struct {
 // and Notion rejects it. Empty cells read back as 0 from the
 // dashboard sum, so omitting is semantically equivalent.
 func RecordAffiliateUsage(ctx *config.AppContext, in AffiliateUsageInput) error {
+	if UsePostgresBackend(ctx) {
+		return recordAffiliateUsagePostgres(ctx, in)
+	}
+	return RecordAffiliateUsageNotion(ctx, in)
+}
+
+func RecordAffiliateUsageNotion(ctx *config.AppContext, in AffiliateUsageInput) error {
 	if ctx.Notion.Config.AffiliateUsageDb == "" {
 		return fmt.Errorf("RecordAffiliateUsage: AffiliateUsageDb not configured")
 	}
@@ -234,6 +241,13 @@ func RecordAffiliateUsage(ctx *config.AppContext, in AffiliateUsageInput) error 
 // AffiliateUsageDb row. This is intended for admin/backfill jobs, not
 // request paths.
 func ListAffiliateUsage(ctx *config.AppContext) ([]*types.AffiliateUsage, error) {
+	if UsePostgresBackend(ctx) {
+		return listAffiliateUsagePostgres(ctx)
+	}
+	return ListAffiliateUsageNotion(ctx)
+}
+
+func ListAffiliateUsageNotion(ctx *config.AppContext) ([]*types.AffiliateUsage, error) {
 	if ctx.Notion.Config.AffiliateUsageDb == "" {
 		return nil, fmt.Errorf("AffiliateUsageDb not configured")
 	}
@@ -263,6 +277,13 @@ func ListAffiliateUsage(ctx *config.AppContext) ([]*types.AffiliateUsage, error)
 // AffiliateUsage row. It uses the direct Notion JSON path so EarnedSats
 // can be set to zero; go-notion omits zero number values.
 func UpdateAffiliateUsageSats(ctx *config.AppContext, usageID string, savedSats, earnedSats int64) error {
+	if UsePostgresBackend(ctx) {
+		return updateAffiliateUsageSatsPostgres(ctx, usageID, savedSats, earnedSats)
+	}
+	return UpdateAffiliateUsageSatsNotion(ctx, usageID, savedSats, earnedSats)
+}
+
+func UpdateAffiliateUsageSatsNotion(ctx *config.AppContext, usageID string, savedSats, earnedSats int64) error {
 	if usageID == "" {
 		return fmt.Errorf("UpdateAffiliateUsageSats: usageID is required")
 	}
@@ -280,6 +301,13 @@ func UpdateAffiliateUsageSats(ctx *config.AppContext, usageID string, savedSats,
 // the given email. No caching — affiliates expect to see fresh stats
 // the moment they refresh the dashboard after a redemption.
 func QueryAffiliateUsageByEmail(ctx *config.AppContext, email string) ([]*types.AffiliateUsage, error) {
+	if UsePostgresBackend(ctx) {
+		return queryAffiliateUsageByEmailPostgres(ctx, email)
+	}
+	return QueryAffiliateUsageByEmailNotion(ctx, email)
+}
+
+func QueryAffiliateUsageByEmailNotion(ctx *config.AppContext, email string) ([]*types.AffiliateUsage, error) {
 	if email == "" {
 		return nil, nil
 	}
@@ -318,6 +346,13 @@ func QueryAffiliateUsageByEmail(ctx *config.AppContext, email string) ([]*types.
 // stats panel + top-affiliates table. No caching — same rationale
 // as QueryAffiliateUsageByEmail.
 func QueryAffiliateUsageByConf(ctx *config.AppContext, confTag string) ([]*types.AffiliateUsage, error) {
+	if UsePostgresBackend(ctx) {
+		return queryAffiliateUsageByConfPostgres(ctx, confTag)
+	}
+	return QueryAffiliateUsageByConfNotion(ctx, confTag)
+}
+
+func QueryAffiliateUsageByConfNotion(ctx *config.AppContext, confTag string) ([]*types.AffiliateUsage, error) {
 	if confTag == "" {
 		return nil, nil
 	}

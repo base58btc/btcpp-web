@@ -30,6 +30,7 @@ Rules:
 | `external/getters/volunteers_postgres.go` | Postgres volunteer, volunteer info, job type, shift reads/writes. |
 | `external/getters/purchases_postgres.go` | Postgres purchase/ticket/check-in reads/writes. |
 | `external/getters/sponsors_postgres.go` | Postgres organization/sponsorship reads/writes. |
+| `external/getters/affiliate_postgres.go` | Postgres affiliate usage reads/writes. |
 | `external/getters/socialposts_postgres.go` | Postgres social post reads/writes. |
 | `external/getters/missives_postgres.go` | Future Postgres missive/subscriber reads/writes; paused for now. |
 
@@ -312,3 +313,16 @@ Current progress:
   `people_roles` as the existing raw role tag format, e.g. `global-admin`.
 - Speaker write paths (`CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`,
   etc.) still need a dedicated Postgres write split.
+
+## Current Progress: Affiliate Usage
+
+- `RecordAffiliateUsage`, `ListAffiliateUsage`, `UpdateAffiliateUsageSats`,
+  `QueryAffiliateUsageByEmail`, and `QueryAffiliateUsageByConf` now dispatch by
+  backend.
+- The renamed Notion implementations are `RecordAffiliateUsageNotion`,
+  `ListAffiliateUsageNotion`, `UpdateAffiliateUsageSatsNotion`,
+  `QueryAffiliateUsageByEmailNotion`, and `QueryAffiliateUsageByConfNotion`.
+- The Postgres implementation lives in `external/getters/affiliate_postgres.go`
+  and reads/writes `affiliate_usages`.
+- Affiliate discount-code management (`CreateAffiliateCode`, `UpdateAffiliateCode`,
+  `ArchiveAffiliateCode`) still writes Notion via the existing discounts flow.
