@@ -852,32 +852,6 @@ func patchTalksStatusForProposal(proposalID, status string) {
 	}
 }
 
-func getDiscounts(ctx *config.AppContext) {
-	var err error
-	ctx.Infos.Printf("getting discounts...")
-	discounts, err = ListDiscounts(ctx.Notion)
-
-	if err != nil {
-		ctx.Err.Printf("error fetching discounts %s", err)
-	} else {
-		ctx.Infos.Printf("Loaded %d discounts!", len(discounts))
-		writeCache("discounts", discounts)
-	}
-}
-
-/* This may return nil */
-func FetchDiscountsCached(ctx *config.AppContext) ([]*types.DiscountCode, error) {
-	now := time.Now()
-	deadline := now.Add(-cacheTTL)
-	if discounts == nil || lastDiscountFetch.Before(deadline) {
-		/* Set last fetch to now even if there's errors */
-		lastDiscountFetch = time.Now()
-		queueRefresh(JobDiscounts)
-	}
-
-	return discounts, nil
-}
-
 func getJobs(ctx *config.AppContext) {
 	var err error
 	ctx.Infos.Printf("getting jobs...")
@@ -1697,7 +1671,7 @@ func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs
 	return err
 }
 
-func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
+func ListDiscountsNotion(n *types.Notion) ([]*types.DiscountCode, error) {
 	var discounts []*types.DiscountCode
 
 	hasMore := true
@@ -1721,98 +1695,6 @@ func ListDiscounts(n *types.Notion) ([]*types.DiscountCode, error) {
 	}
 
 	return discounts, nil
-}
-
-func FindDiscount(ctx *config.AppContext, code string) (*types.DiscountCode, error) {
-	discounts, err := FetchDiscountsCached(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	upcode := strings.ToUpper(code)
-	for _, discount := range discounts {
-		if strings.ToUpper(discount.CodeName) == upcode {
-			return discount, nil
-		}
-	}
-	return nil, nil
-}
-
-func CalcDiscount(ctx *config.AppContext, confRef string, code string, tixPrice uint, count uint) (uint, *types.DiscountCode, error) {
-	discount, err := FindDiscount(ctx, code)
-
-	if err != nil {
-		return tixPrice * count, nil, err
-	}
-
-	/* Discount not found! */
-	if discount == nil {
-		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" not found", code)
-	}
-
-	// Empty ConfRef = wildcard. Used by self-service affiliate
-	// codes (which mint without any Conference relation) so a
-	// single user code applies at every active event without an
-	// admin re-attaching it per launch. Admin-created codes that
-	// want this universal-redemption behavior can leave the
-	// Conference relation empty too.
-	if len(discount.ConfRef) > 0 {
-		found := false
-		for _, discountConfRef := range discount.ConfRef {
-			found = found || discountConfRef == confRef
-		}
-		if !found {
-			return tixPrice * count, nil, fmt.Errorf("%s not a valid code for conference (%s)", code, confRef)
-		}
-	}
-
-	if discount.MaxUses > 0 && discount.UsesCount >= discount.MaxUses {
-		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" has been fully redeemed", code)
-	}
-	if discount.IsDateExpired(time.Now().UTC()) {
-		return tixPrice * count, nil, fmt.Errorf("Discount code \"%s\" has expired", code)
-	}
-
-	if count == 0 {
-		count = 1
-	}
-
-	total := discount.CalcTotal(tixPrice, count)
-	return total, discount, nil
-}
-
-func IncrementDiscountUses(ctx *config.AppContext, discountRef string, addCount uint) error {
-	// Find the discount to get current uses count
-	cachedDiscounts, err := FetchDiscountsCached(ctx)
-	if err != nil {
-		return err
-	}
-
-	var currentUses uint
-	for _, d := range cachedDiscounts {
-		if d.Ref == discountRef {
-			currentUses = d.UsesCount
-			// Update the cached value immediately so subsequent
-			// checks see the new count without waiting for cache refresh
-			d.UsesCount += addCount
-			break
-		}
-	}
-
-	newCount := float64(currentUses + addCount)
-
-	_, err = ctx.Notion.Client.UpdatePageProperties(context.Background(), discountRef,
-		map[string]*notion.PropertyValue{
-			"UsesCount": {
-				Type:   notion.PropertyNumber,
-				Number: newCount,
-			},
-		})
-
-	// Force discount cache refresh on next access
-	lastDiscountFetch = time.Time{}
-
-	return err
 }
 
 func CheckIn(n *types.Notion, ticket string) (string, bool, error) {

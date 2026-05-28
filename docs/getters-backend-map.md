@@ -229,3 +229,15 @@ Current progress:
 - `ListHotels` remains as a compatibility wrapper for Notion-shaped callers.
 - `ListHotelsNotion` is the renamed Notion implementation.
 - `listHotelsPostgres` is implemented in `external/getters/hotels_postgres.go`.
+
+## Current Progress: Discounts
+
+- `getDiscounts` moved to `external/getters/discounts.go`.
+- `FetchDiscountsCached` moved to `external/getters/discounts.go`.
+- `FindDiscount` moved to `external/getters/discounts.go`.
+- `CalcDiscount` moved to `external/getters/discounts.go`.
+- `IncrementDiscountUses` moved to `external/getters/discounts.go` and dispatches by backend.
+- `ListDiscounts` remains as a compatibility wrapper for Notion-shaped callers.
+- `ListDiscountsNotion` is the renamed Notion implementation.
+- `listDiscountsPostgres` and `incrementDiscountUsesPostgres` are implemented in
+  `external/getters/discounts_postgres.go`.
