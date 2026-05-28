@@ -52,6 +52,7 @@ func loadConfig() *types.EnvConfig {
 
 		config.Host = os.Getenv("HOST")
 		config.DatabaseURL = os.Getenv("DATABASE_URL")
+		config.DataBackend = os.Getenv("DATA_BACKEND")
 		config.MailerSecret = os.Getenv("MAILER_SECRET")
 		config.MailEndpoint = os.Getenv("MAILER_ENDPOINT")
 		config.MailOff = false

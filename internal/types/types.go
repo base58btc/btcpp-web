@@ -33,6 +33,7 @@ type (
 		HMACSecret        string
 		HMACKey           [32]byte
 		DatabaseURL       string
+		DataBackend       string
 		BufferAPI         string
 		Spaces            SpacesConfig
 		CacheTTLSec       int
