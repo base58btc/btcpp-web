@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1957,19 +1956,7 @@ func normalizeVolunteerInput(vol *types.Volunteer) {
 	vol.Shirt = strings.TrimSpace(vol.Shirt)
 }
 
-// ListConfInfos fetches every row in ConfInfoDb, optionally filtered to a
-// single conf by Tag. Each row is resolved against the cached confs
-// slice so the returned *Times carry the conf's timezone.
-//
-// The Conf column stores a tag string (not a relation), so the confTag
-// filter is applied client-side after fetch — the DB is small enough
-// that a full scan is cheaper than maintaining two filter codepaths
-// (select vs rich_text).
-//
-// Rows whose tag can't be matched in the confs cache come back with
-// empty time fields rather than dropping out — useful for admin tools
-// that want to surface orphan rows.
-func ListConfInfos(ctx *config.AppContext, confTag string) ([]*types.ConfInfo, error) {
+func ListConfInfosNotion(ctx *config.AppContext, confTag string) ([]*types.ConfInfo, error) {
 	confs, err := FetchConfsCached(ctx)
 	if err != nil {
 		return nil, err
@@ -2006,29 +1993,6 @@ func ListConfInfos(ctx *config.AppContext, confTag string) ([]*types.ConfInfo, e
 			}
 			out = append(out, ci)
 		}
-	}
-	return out, nil
-}
-
-// GetConfInfoMap returns a Tag → []*ConfInfo map, sorted by Day within
-// each conf. Convenient for templates that want "the schedule strip for
-// this conf" without sifting by tag manually.
-func GetConfInfoMap(ctx *config.AppContext) (map[string][]*types.ConfInfo, error) {
-	infos, err := ListConfInfos(ctx, "")
-	if err != nil {
-		return nil, err
-	}
-	out := make(map[string][]*types.ConfInfo)
-	for _, ci := range infos {
-		if ci.ConfTag == "" {
-			continue
-		}
-		out[ci.ConfTag] = append(out[ci.ConfTag], ci)
-	}
-	for tag := range out {
-		sort.Slice(out[tag], func(i, j int) bool {
-			return out[tag][i].Day < out[tag][j].Day
-		})
 	}
 	return out, nil
 }

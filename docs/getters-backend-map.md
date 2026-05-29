@@ -342,3 +342,11 @@ Current progress:
   `registrations`.
 - Ticket creation/revoke paths (`AddTickets`, `RevokeTicket`,
   `ToggleTicketBlock`, etc.) still need a dedicated Postgres write split.
+
+## Current Progress: Conference Info
+
+- `ListConfInfos` and `GetConfInfoMap` moved to
+  `external/getters/conf_infos.go`.
+- `ListConfInfosNotion` is the renamed Notion implementation.
+- `listConfInfosPostgres` is implemented in
+  `external/getters/conf_infos_postgres.go` and reads `conference_days`.
