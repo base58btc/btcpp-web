@@ -379,7 +379,7 @@ CREATE TABLE discounts_conferences (
   PRIMARY KEY (discount_id, conference_id)
 );
 
-CREATE TABLE purchases (
+CREATE TABLE registrations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   ref_id text NOT NULL UNIQUE,
   checkout_id text NOT NULL DEFAULT '',
@@ -391,7 +391,7 @@ CREATE TABLE purchases (
   amount_paid numeric(12, 2),
   currency text NOT NULL DEFAULT '',
   platform text NOT NULL DEFAULT '',
-  purchased_at timestamptz,
+  registered_at timestamptz,
   checked_in_at timestamptz,
   revoked boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -400,12 +400,12 @@ CREATE TABLE purchases (
   CHECK (email <> '')
 );
 
-CREATE INDEX purchases_conference_idx ON purchases (conference_id);
-CREATE INDEX purchases_email_idx ON purchases (email);
-CREATE INDEX purchases_checkout_idx ON purchases (checkout_id) WHERE checkout_id <> '';
+CREATE INDEX registrations_conference_idx ON registrations (conference_id);
+CREATE INDEX registrations_email_idx ON registrations (email);
+CREATE INDEX registrations_checkout_idx ON registrations (checkout_id) WHERE checkout_id <> '';
 
-CREATE TRIGGER purchases_set_updated_at
-BEFORE UPDATE ON purchases
+CREATE TRIGGER registrations_set_updated_at
+BEFORE UPDATE ON registrations
 FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE affiliate_usages (

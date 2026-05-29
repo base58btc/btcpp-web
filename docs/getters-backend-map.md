@@ -28,7 +28,7 @@ Rules:
 | `external/getters/discounts_postgres.go` | Postgres discount reads/writes. |
 | `external/getters/hotels_postgres.go` | Postgres hotel reads/writes. |
 | `external/getters/volunteers_postgres.go` | Postgres volunteer, volunteer info, job type, shift reads/writes. |
-| `external/getters/purchases_postgres.go` | Postgres purchase/ticket/check-in reads/writes. |
+| `external/getters/registrations_postgres.go` | Postgres registration/ticket/check-in reads/writes. |
 | `external/getters/sponsors_postgres.go` | Postgres organization/sponsorship reads/writes. |
 | `external/getters/affiliate_postgres.go` | Postgres affiliate usage reads/writes. |
 | `external/getters/socialposts_postgres.go` | Postgres social post reads/writes. |
@@ -129,14 +129,14 @@ remain under the current names until callers are moved to runtime dispatchers.
 | `UpdateVolunteerWorkPrefs` | `UpdateVolunteerWorkPrefsNotion` | `volunteers.go` | `updateVolunteerWorkPrefsPostgres` |
 | `ListDiscounts` | `ListDiscountsNotion` | `discounts.go` | `listDiscountsPostgres` |
 | `IncrementDiscountUses` | `IncrementDiscountUsesNotion` | `discounts.go` | `incrementDiscountUsesPostgres` |
-| `CheckIn` | `CheckInNotion` | `purchases.go` | `checkInPostgres` |
-| `SoldTixCount` | `SoldTixCountNotion` | `purchases.go` | `soldTixCountPostgres` |
-| `LookupTicketPages` | `LookupTicketPagesNotion` | `purchases.go` | N/A |
-| `RefTicketPages` | `RefTicketPagesNotion` | `purchases.go` | N/A |
-| `TicketPages` | `TicketPagesNotion` | `purchases.go` | N/A |
-| `ToggleTicketBlock` | `ToggleTicketBlockNotion` | `purchases.go` | `toggleTicketBlockPostgres` |
-| `RevokeTicket` | `RevokeTicketNotion` | `purchases.go` | `revokeTicketPostgres` |
-| `AddTickets` | `AddTicketsNotion` | `purchases.go` | `addTicketsPostgres` |
+| `CheckIn` | `CheckInNotion` | `registrations.go` | `checkInPostgres` |
+| `SoldTixCount` | `SoldTixCountNotion` | `registrations.go` | `soldTixCountPostgres` |
+| `LookupTicketPages` | `LookupTicketPagesNotion` | `registrations.go` | N/A |
+| `RefTicketPages` | `RefTicketPagesNotion` | `registrations.go` | N/A |
+| `TicketPages` | `TicketPagesNotion` | `registrations.go` | N/A |
+| `ToggleTicketBlock` | `ToggleTicketBlockNotion` | `registrations.go` | `toggleTicketBlockPostgres` |
+| `RevokeTicket` | `RevokeTicketNotion` | `registrations.go` | `revokeTicketPostgres` |
+| `AddTickets` | `AddTicketsNotion` | `registrations.go` | `addTicketsPostgres` |
 | `RegisterVolunteer` | `RegisterVolunteerNotion` | `volunteers.go` | `registerVolunteerPostgres` |
 | `normalizeVolunteerInput` | `normalizeVolunteerInput` | Shared helper | Shared helper |
 | `ListConfInfos` | `ListConfInfosNotion` | `conferences.go` | `listConfInfosPostgres` |
@@ -164,15 +164,15 @@ domain file after the backing Notion function is identified.
 | `GetShiftsForConf` | Volunteers/shifts | Currently derived from shifts cache. |
 | `FindDiscount` | Discounts | Currently cache-backed lookup. |
 | `CalcDiscount` | Discounts | Business logic over cached discounts. |
-| `SoldTixCached` | Purchases | Cache/derived count. |
-| `UpdateSoldTix` | Purchases/conferences | Runtime cache patch plus count refresh. |
-| `FetchRegistrations` | Purchases | Runtime read. |
-| `ListRegistrationsByEmail` | Purchases | Runtime read. |
-| `EmailHasRegistration` | Purchases | Runtime read. |
-| `ticketMatch` | Purchases | Shared helper. |
-| `checkActive` | Conferences/purchases | Shared helper over conference cache. |
-| `FetchRegistrationsConf` | Purchases | Runtime read wrapper. |
-| `FetchBtcppRegistrations` | Purchases | Runtime read wrapper. |
+| `SoldTixCached` | Registrations | Cache/derived count. |
+| `UpdateSoldTix` | Registrations/conferences | Runtime cache patch plus count refresh. |
+| `FetchRegistrations` | Registrations | Runtime read. |
+| `ListRegistrationsByEmail` | Registrations | Runtime read. |
+| `EmailHasRegistration` | Registrations | Runtime read. |
+| `ticketMatch` | Registrations | Shared helper. |
+| `checkActive` | Conferences/registrations | Shared helper over conference cache. |
+| `FetchRegistrationsConf` | Registrations | Runtime read wrapper. |
+| `FetchBtcppRegistrations` | Registrations | Runtime read wrapper. |
 | `GetVolInfo` | Volunteers | Runtime read. |
 | `GetVolInfoMap` | Volunteers | Runtime read. |
 | `GetConfInfoMap` | Conferences | Runtime read. |

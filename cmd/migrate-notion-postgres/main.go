@@ -26,7 +26,7 @@ type options struct {
 	skipConfDays      bool
 	skipTickets       bool
 	skipDiscounts     bool
-	skipPurchases     bool
+	skipRegistrations bool
 	skipAffiliateUse  bool
 	skipHotels        bool
 	skipJobTypes      bool
@@ -76,7 +76,7 @@ func main() {
 	importConfDays := !opts.skipConfDays
 	importTickets := !opts.skipTickets
 	importDiscounts := !opts.skipDiscounts
-	importPurchases := !opts.skipPurchases
+	importRegistrations := !opts.skipRegistrations
 	importAffiliateUse := !opts.skipAffiliateUse
 	importHotels := !opts.skipHotels
 	importJobTypes := !opts.skipJobTypes
@@ -102,8 +102,8 @@ func main() {
 	if importSocialPosts && (!importConfTalks || !importRecordings) {
 		log.Fatal("social post import requires conf talks and recordings; use -skip-social-posts when skipping either import")
 	}
-	if importPurchases && !importDiscounts {
-		log.Fatal("purchase import requires discounts; use -skip-purchases when skipping discounts")
+	if importRegistrations && !importDiscounts {
+		log.Fatal("registration import requires discounts; use -skip-registrations when skipping discounts")
 	}
 	if importVolunteers && !importJobTypes {
 		log.Fatal("volunteer import requires job types; use -skip-volunteers when skipping job types")
@@ -111,7 +111,7 @@ func main() {
 	if importWorkShifts && (!importJobTypes || !importVolunteers) {
 		log.Fatal("work shift import requires job types and volunteers; use -skip-work-shifts when skipping either import")
 	}
-	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
 		log.Fatal(err)
 	}
 
@@ -161,16 +161,16 @@ func main() {
 		log.Printf("fetched %d discounts from Notion", len(discounts))
 	}
 
-	var purchases []*purchaseImportRow
-	if importPurchases {
-		purchases, err = listPurchaseImportRows(notion)
+	var registrations []*registrationImportRow
+	if importRegistrations {
+		registrations, err = listRegistrationImportRows(notion)
 		if err != nil {
-			log.Fatalf("fetch purchases from Notion: %s", err)
+			log.Fatalf("fetch registrations from Notion: %s", err)
 		}
-		if err := validatePurchaseRows(purchases, confTagByRef, discountRefsByRef(discounts)); err != nil {
+		if err := validateRegistrationRows(registrations, confTagByRef, discountRefsByRef(discounts)); err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("fetched %d purchases from Notion", len(purchases))
+		log.Printf("fetched %d registrations from Notion", len(registrations))
 	}
 
 	var affiliateUsages []*affiliateUsageImportRow
@@ -369,9 +369,9 @@ func main() {
 		for _, discount := range discounts {
 			log.Printf("dry-run discount code=%q expr=%q confs=%d uses=%d", discount.CodeName, discount.Discount, len(discount.ConfRef), discount.UsesCount)
 		}
-		for _, purchase := range purchases {
-			confTag := confTagByRef[purchase.confRef]
-			log.Printf("dry-run purchase ref=%q conf=%q email=%q item=%q amount=%.2f", purchase.refID, confTag, purchase.email, purchase.itemBought, purchase.amountPaid)
+		for _, registration := range registrations {
+			confTag := confTagByRef[registration.confRef]
+			log.Printf("dry-run registration ref=%q conf=%q email=%q item=%q amount=%.2f", registration.refID, confTag, registration.email, registration.itemBought, registration.amountPaid)
 		}
 		for _, affiliateUsage := range affiliateUsages {
 			log.Printf("dry-run affiliate-usage code=%q conf=%q email=%q tickets=%d saved_sats=%d earned_sats=%d", affiliateUsage.codeName, affiliateUsage.confTag, affiliateUsage.affiliateEmail, affiliateUsage.ticketsCount, affiliateUsage.savedSats, affiliateUsage.earnedSats)
@@ -449,11 +449,11 @@ func main() {
 			}
 			log.Printf("upserted %d discounts into Postgres", len(discounts))
 		}
-		if importPurchases {
-			if err := importPurchaseRows(ctx, pool, purchases, confTagByRef, discountIDsByRef); err != nil {
+		if importRegistrations {
+			if err := importRegistrationRows(ctx, pool, registrations, confTagByRef, discountIDsByRef); err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("upserted %d purchases into Postgres", len(purchases))
+			log.Printf("upserted %d registrations into Postgres", len(registrations))
 		}
 		if importAffiliateUse {
 			if err := importAffiliateUsageRows(ctx, pool, affiliateUsages); err != nil {
@@ -574,11 +574,11 @@ func main() {
 			}
 			log.Printf("validated discount count and conference links")
 		}
-		if importPurchases {
-			if err := validatePurchases(ctx, pool, purchases); err != nil {
+		if importRegistrations {
+			if err := validateRegistrations(ctx, pool, registrations); err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("validated purchase count")
+			log.Printf("validated registration count")
 		}
 		if importAffiliateUse {
 			if err := validateAffiliateUsages(ctx, pool, affiliateUsages); err != nil {
@@ -676,7 +676,7 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipConfDays, "skip-conference-days", false, "skip importing conference day schedule metadata")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
-	flag.BoolVar(&opts.skipPurchases, "skip-purchases", false, "skip importing purchases")
+	flag.BoolVar(&opts.skipRegistrations, "skip-registrations", false, "skip importing registrations")
 	flag.BoolVar(&opts.skipAffiliateUse, "skip-affiliate-usages", false, "skip importing affiliate usage ledger rows")
 	flag.BoolVar(&opts.skipHotels, "skip-hotels", false, "skip importing hotels")
 	flag.BoolVar(&opts.skipJobTypes, "skip-job-types", false, "skip importing volunteer job type catalog")
@@ -772,7 +772,7 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importPurchases, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -789,7 +789,7 @@ func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets,
 	if importDiscounts && strings.TrimSpace(env.Notion.DiscountsDb) == "" {
 		missing = append(missing, "NOTION_DISCOUNT_DB")
 	}
-	if importPurchases && strings.TrimSpace(env.Notion.PurchasesDb) == "" {
+	if importRegistrations && strings.TrimSpace(env.Notion.PurchasesDb) == "" {
 		missing = append(missing, "NOTION_PURCHASES_DB")
 	}
 	if importAffiliateUse && strings.TrimSpace(env.Notion.AffiliateUsageDb) == "" {
@@ -855,6 +855,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences, discounts, purchases, organizations, sponsorships, people, proposals, volunteers, job_types CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, discounts, registrations, organizations, sponsorships, people, proposals, volunteers, job_types CASCADE`)
 	return err
 }

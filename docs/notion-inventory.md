@@ -9,7 +9,7 @@ Postgres IDs.
 
 | Config key | Current role | Important fields | Relationships | Postgres target |
 | --- | --- | --- | --- | --- |
-| `ConfsDb` / `NOTION_CONFS_DB` | Conference/event catalog. | `Name` tag, Notion unique `ID`, `Active`, `Desc`, `OG_Flavor`, `Emoji`, `Tagline`, `DateDesc`, `StartDate`, `EndDate`, `Location`, `Venue`, `VenueMap`, `VenueWebsite`, `Show Hacks`, `Has Satellites`, `Timezone`, `OrientCalNotif`. | Parent of tickets, hotels, purchases, volunteers, shifts, sponsorships, conf talks, vol info. Some newer rows reference conferences by tag instead of relation. | `conferences` |
+| `ConfsDb` / `NOTION_CONFS_DB` | Conference/event catalog. | `Name` tag, Notion unique `ID`, `Active`, `Desc`, `OG_Flavor`, `Emoji`, `Tagline`, `DateDesc`, `StartDate`, `EndDate`, `Location`, `Venue`, `VenueMap`, `VenueWebsite`, `Show Hacks`, `Has Satellites`, `Timezone`, `OrientCalNotif`. | Parent of tickets, hotels, registrations, volunteers, shifts, sponsorships, conf talks, vol info. Some newer rows reference conferences by tag instead of relation. | `conferences` |
 | `ConfsTixDb` / `NOTION_CONFSTIX_DB` | Ticket tiers per conference. | `Tier`, `Local`, `BTC`, `USD`, `Expires`, `Max`, `Currency`, `Symbol`, `PostSymbol`. | `Conf` relation to `ConfsDb`. | `conference_tickets` |
 | `ConfInfoDb` / `NOTION_CONFINFO_DB` | Per-day public schedule metadata. | `Conf` tag/select or rich text, `Day`, `Doors`, `Breakfast`, `Lunch`, `Coffee`, `Venues`. | Uses conference tag, not a Notion relation. | `conference_days` |
 | `SpeakersDb` / `NOTION_SPEAKERS_DB` | People/contact profile and admin roles. | `Name`, `Email`, `NormPhoto`, `Phone`, `Signal`, `Telegram`, `Twitter`, `npub`, `Github`, `Instagram`, `LinkedIn`, `Website`, `Company`, `OrgPhoto`, `AvailToHire`, `LookingToHire`, `TShirt`, `Roles`. | Linked by `SpeakerConfDb`; role tags grant dashboard/admin access. Role tags split into `scope` and `position`, e.g. `global-admin` -> `global` / `admin`, `vienna-staff` -> `vienna` / `staff`. | `people`, `people_roles` |
@@ -18,8 +18,8 @@ Postgres IDs.
 | `ConfTalkDb` / `NOTION_CONFTALK_DB` | Scheduled talk row used by agenda/media/social. | `Event`, `proposal`, `Clipart`, `TalkTime`, `ProductionNotes`, `Venue`, `Section`, `CalNotif`, `SocialCard`. | `Event` is conference tag. `proposal` relates to `ProposalDb`. | `conf_talks` |
 | `RecordingsDb` / `NOTION_RECORDINGS_DB` | Publishing metadata for recorded talks. | `talk`, `TalkName`, `YTLink`, `XLink`, `XReplyLink`, `FileURI`, `PublishAt`. | `talk` relation to `ConfTalkDb`. | `recordings` |
 | `SocialPostsDb` / `NOTION_SOCIAL_POSTS_DB` | Social-post state for recordings and other refs. | `Ref`, `Text`, `PostedTo`, `Kind`, `Status`, `Recording`, `ConfTalk`, `URL`, `ReplyURL`, `Error`, `ErrorFingerprint`, `ScheduledAt`, `PostedAt`, `NotifiedAt`. | Optional relations to `RecordingsDb` and `ConfTalkDb`. | `social_posts` |
-| `PurchasesDb` / `NOTION_PURCHASES_DB` | One ticket/purchase row per purchased item. | `RefID`, `Timestamp`, `Platform`, `conf`, `Type`, `Currency`, `Email`, `Item Bought`, `Lookup ID`, `Amount Paid`, `discount`, `Revoked`, `Checked In`. | `conf` to `ConfsDb`; optional `discount` to `DiscountsDb`. | `purchases` |
-| `DiscountsDb` / `NOTION_DISCOUNT_DB` | Discount and affiliate codes. | `CodeName`, `Discount`, `UsesCount`, `AffiliateEmail`, `Conference`. | `Conference` relation to `ConfsDb`; empty means global/wildcard. Used by purchases and affiliate usage. | `discounts`, `discounts_conferences` |
+| `PurchasesDb` / `NOTION_PURCHASES_DB` | One ticket/registration row per purchased item. | `RefID`, `Timestamp`, `Platform`, `conf`, `Type`, `Currency`, `Email`, `Item Bought`, `Lookup ID`, `Amount Paid`, `discount`, `Revoked`, `Checked In`. | `conf` to `ConfsDb`; optional `discount` to `DiscountsDb`. | `registrations` |
+| `DiscountsDb` / `NOTION_DISCOUNT_DB` | Discount and affiliate codes. | `CodeName`, `Discount`, `UsesCount`, `AffiliateEmail`, `Conference`. | `Conference` relation to `ConfsDb`; empty means global/wildcard. Used by registrations and affiliate usage. | `discounts`, `discounts_conferences` |
 | `AffiliateUsageDb` / `NOTION_AFFILIATE_USE_DB` | Redemption ledger for self-service affiliate codes. | `DiscountCode`, `AffiliateEmail`, `Conference`, `SavedSats`, `EarnedSats`, `TicketsCount`, created time. | Conference is stored as tag/select; code name is stored as text snapshot. | `affiliate_usages` |
 | `HotelsDb` / `NOTION_HOTEL_DB` | Hotels listed for conference pages/admin. | `Name`, `URL`, `Img`, `Type`, `Desc`, `Order`, `conf`. | `conf` relation to `ConfsDb`. | `hotels` |
 | `OrgDb` / `NOTION_ORG_DB` | Sponsor/organization profile. | `Name`, `Tagline`, `LogoLight`, `LogoDark`, `Email`, `Website`, `LinkedIn`, `Instagram`, `Youtube`, `Github`, `Twitter`, `Nostr`, `Matrix`, `Hiring`, `Notes`. | Linked by sponsorships and speaker-conference org affiliation. | `organizations` |
@@ -197,23 +197,23 @@ used only in-memory during an import to resolve relations.
 | `PostedAt` | `social_posts.posted_at` | Date. |
 | `NotifiedAt` | `social_posts.notified_at` | Date. |
 
-### `PurchasesDb` -> `purchases`
+### `PurchasesDb` -> `registrations`
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| `RefID` | `purchases.ref_id` | Public stable ticket ID. |
-| `Lookup ID` | `purchases.checkout_id` | Checkout/payment identifier. |
-| `conf` | `purchases.conference_id` | Relation to conference. |
-| `discount` | `purchases.discount_id` | Optional relation to discount. |
-| `Type` | `purchases.type` | Select. |
-| `Email` | `purchases.email` | Case-insensitive email. |
-| `Item Bought` | `purchases.item_bought` | Rich text. |
-| `Amount Paid` | `purchases.amount_paid` | Number, already in main currency units. |
-| `Currency` | `purchases.currency` | Select. |
-| `Platform` | `purchases.platform` | Select, e.g. Stripe/OpenNode/admin. |
-| `Timestamp` | `purchases.purchased_at` | Rich text RFC3339 in current writer. |
-| `Checked In` | `purchases.checked_in_at` | Rich text RFC3339 in current writer. |
-| `Revoked` | `purchases.revoked` | Checkbox. |
+| `RefID` | `registrations.ref_id` | Public stable ticket ID. |
+| `Lookup ID` | `registrations.checkout_id` | Checkout/payment identifier. |
+| `conf` | `registrations.conference_id` | Relation to conference. |
+| `discount` | `registrations.discount_id` | Optional relation to discount. |
+| `Type` | `registrations.type` | Select. |
+| `Email` | `registrations.email` | Case-insensitive email. |
+| `Item Bought` | `registrations.item_bought` | Rich text. |
+| `Amount Paid` | `registrations.amount_paid` | Number, already in main currency units. |
+| `Currency` | `registrations.currency` | Select. |
+| `Platform` | `registrations.platform` | Select, e.g. Stripe/OpenNode/admin. |
+| `Timestamp` | `registrations.registered_at` | Rich text RFC3339 in current writer. |
+| `Checked In` | `registrations.checked_in_at` | Rich text RFC3339 in current writer. |
+| `Revoked` | `registrations.revoked` | Checkbox. |
 
 ### `DiscountsDb` -> `discounts`, `discounts_conferences`
 
@@ -414,10 +414,10 @@ UUID `id` columns remain the primary key unless a table is a pure join table.
 | `hotels` | `(conference_id, display_order, name)` | separate index | no | Conference hotel rendering order. |
 | `discounts` | `code_name` | separate index | yes | Discount codes are case-insensitive public identifiers. |
 | `discounts_conferences` | `(discount_id, conference_id)` primary key | table constraint | yes | Prevent duplicate discount/conference links. |
-| `purchases` | `ref_id` | table constraint | yes | Ticket/public purchase reference identity. |
-| `purchases` | `conference_id` | separate index | no | Conference attendee/report lookups. |
-| `purchases` | `email` | separate index | no | Attendee/email lookups; emails can repeat. |
-| `purchases` | `checkout_id` where non-empty | separate index | no | Payment lookup aid; blank checkout IDs are ignored. |
+| `registrations` | `ref_id` | table constraint | yes | Ticket/public registration reference identity. |
+| `registrations` | `conference_id` | separate index | no | Conference attendee/report lookups. |
+| `registrations` | `email` | separate index | no | Attendee/email lookups; emails can repeat. |
+| `registrations` | `checkout_id` where non-empty | separate index | no | Payment lookup aid; blank checkout IDs are ignored. |
 | `affiliate_usages` | `affiliate_email` | separate index | no | Affiliate reporting by email. |
 | `affiliate_usages` | `conference_id` | separate index | no | Affiliate reporting by conference. |
 | `job_types` | `tag` | table constraint | yes | Stable job type identifier. |
@@ -442,7 +442,7 @@ temporary in-memory maps while it runs:
 - Conferences map by `Name`/tag.
 - Conference days map by `(conference tag, day number)` and are upserted into
   the table-level unique key `(conference_id, day_number)`.
-- Conference tickets, hotels, shifts, volunteer info, purchases, and
+- Conference tickets, hotels, shifts, volunteer info, registrations, and
   sponsorships resolve conferences through the related row's conference tag.
 - Hotels use generated UUID primary keys. During migration, rerun this table
   with `-reset` to avoid duplicate rows from repeated imports.
@@ -461,7 +461,7 @@ temporary in-memory maps while it runs:
 - Organizations map by normalized name; website is not unique in current
   Notion data.
 - Discounts map by case-insensitive code name.
-- Purchases map by `RefID`, which is already the ticket's public stable ID.
+- Registrations map by `RefID`, which is already the ticket's public stable ID.
 - Affiliate usage rows are append-only ledger entries. The importer stores the
   code/email snapshots, resolves `discount_id` and `conference_id` when current
   rows match, and should be rerun with `-reset` during migration to avoid
