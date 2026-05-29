@@ -523,84 +523,10 @@ func InvalidateConfTalksCache() {
 	confTalkCacheMu.Unlock()
 }
 
-// getRecordings refreshes the Recording cache + by-ConfTalk index.
-func getRecordings(ctx *config.AppContext) {
-	ctx.Infos.Printf("getting recordings...")
-	recs, err := ListRecordings(ctx)
-	if err != nil {
-		ctx.Err.Printf("error fetching recordings %s", err)
-		return
-	}
-	byCT := make(map[string]*types.Recording, len(recs))
-	for _, r := range recs {
-		if r != nil && r.ConfTalkID != "" {
-			byCT[r.ConfTalkID] = r
-		}
-	}
-	recordingCacheMu.Lock()
-	cacheRecordings = recs
-	recordingByConfTalk = byCT
-	recordingCacheMu.Unlock()
-	ctx.Infos.Printf("Loaded %d recordings!", len(recs))
-}
-
-// FetchRecordingByConfTalk returns the cached Recording linked to
-// confTalkID, or nil if none.
-func FetchRecordingByConfTalk(confTalkID string) *types.Recording {
-	recordingCacheMu.RLock()
-	defer recordingCacheMu.RUnlock()
-	return recordingByConfTalk[confTalkID]
-}
-
-// FetchYTLinkForTalk bridges the legacy Talks-DB renderer (which uses
-// Talk.ID = Talks-DB page ID) to the new Recording cache (keyed by
-// ConfTalk.ID). Until GetTalksFor is fully replaced by
-// LoadTalksFromConfTalks, this lookup matches on the (conf tag, talk
-// title) pair which is unique within a conf — both ConfTalks and
-// Recordings carry the title.
-//
-// Returns "" when no matching ConfTalk or no Recording exists.
-func FetchYTLinkForTalk(confTag, name string) string {
-	if confTag == "" || name == "" {
-		return ""
-	}
-	confTalkCacheMu.RLock()
-	var matchID string
-	for _, ct := range cacheConfTalks {
-		if ct == nil || ct.Conf == nil || ct.Proposal == nil {
-			continue
-		}
-		if ct.Conf.Tag == confTag && ct.Proposal.Title == name {
-			matchID = ct.ID
-			break
-		}
-	}
-	confTalkCacheMu.RUnlock()
-	if matchID == "" {
-		return ""
-	}
-	if rec := FetchRecordingByConfTalk(matchID); rec != nil {
-		return rec.YTLink
-	}
-	return ""
-}
-
-func cacheRecordingsWarm() bool {
-	recordingCacheMu.RLock()
-	defer recordingCacheMu.RUnlock()
-	return cacheRecordings != nil
-}
-
 func cacheConfTalksWarm() bool {
 	confTalkCacheMu.RLock()
 	defer confTalkCacheMu.RUnlock()
 	return cacheConfTalks != nil
-}
-
-func InvalidateRecordingsCache() {
-	recordingCacheMu.Lock()
-	lastRecordingFetch = time.Time{}
-	recordingCacheMu.Unlock()
 }
 
 // getSiteStats recomputes the about-page aggregate counters from the

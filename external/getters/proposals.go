@@ -937,7 +937,7 @@ func UpdateProposal(ctx *config.AppContext, proposalID string, in ProposalInput)
 
 // ListRecordings fetches every row in RecordingsDb. Used by the warm-cache
 // bootstrap; callers should normally read from cacheRecordings instead.
-func ListRecordings(ctx *config.AppContext) ([]*types.Recording, error) {
+func ListRecordingsNotion(ctx *config.AppContext) ([]*types.Recording, error) {
 	n := ctx.Notion
 	if n.Config.RecordingsDb == "" {
 		return nil, nil
@@ -960,16 +960,7 @@ func ListRecordings(ctx *config.AppContext) ([]*types.Recording, error) {
 	return out, nil
 }
 
-// GetRecordingByConfTalk fetches the Recording row whose `talk` relation
-// points at confTalkID. Cache-first — when warm, a missing entry means
-// "no recording exists" and we return nil without re-querying Notion.
-func GetRecordingByConfTalk(ctx *config.AppContext, confTalkID string) (*types.Recording, error) {
-	if r := FetchRecordingByConfTalk(confTalkID); r != nil {
-		return r, nil
-	}
-	if cacheRecordingsWarm() {
-		return nil, nil
-	}
+func getRecordingByConfTalkNotion(ctx *config.AppContext, confTalkID string) (*types.Recording, error) {
 	n := ctx.Notion
 	if n.Config.RecordingsDb == "" {
 		return nil, nil
@@ -1021,7 +1012,7 @@ func ListRecordingsCached() []*types.Recording {
 // UpdateRecordingYTLink patches the YTLink URL property on a Recording row
 // and mirrors the value into the warm cache so the next render sees it
 // without waiting on a refresh tick. Mirrors TalkUpdateCalNotif's pattern.
-func UpdateRecordingYTLink(ctx *config.AppContext, recordingID, ytLink string) error {
+func updateRecordingYTLinkNotion(ctx *config.AppContext, recordingID, ytLink string) error {
 	n := ctx.Notion
 	_, err := n.Client.UpdatePageProperties(context.Background(), recordingID,
 		map[string]*notion.PropertyValue{
@@ -1030,21 +1021,16 @@ func UpdateRecordingYTLink(ctx *config.AppContext, recordingID, ytLink string) e
 	if err != nil {
 		return fmt.Errorf("notion update YTLink: %w", err)
 	}
-	recordingCacheMu.Lock()
-	for _, r := range cacheRecordings {
-		if r != nil && r.ID == recordingID {
-			r.YTLink = ytLink
-			break
-		}
-	}
-	recordingCacheMu.Unlock()
+	patchRecordingCache(recordingID, func(r *types.Recording) {
+		r.YTLink = ytLink
+	})
 	return nil
 }
 
 // UpdateRecordingXLink patches the XLink URL property on a Recording row
 // and mirrors the value into the warm cache. Symmetric to
 // UpdateRecordingYTLink — different column.
-func UpdateRecordingXLink(ctx *config.AppContext, recordingID, xLink string) error {
+func updateRecordingXLinkNotion(ctx *config.AppContext, recordingID, xLink string) error {
 	n := ctx.Notion
 	_, err := n.Client.UpdatePageProperties(context.Background(), recordingID,
 		map[string]*notion.PropertyValue{
@@ -1053,21 +1039,16 @@ func UpdateRecordingXLink(ctx *config.AppContext, recordingID, xLink string) err
 	if err != nil {
 		return fmt.Errorf("notion update XLink: %w", err)
 	}
-	recordingCacheMu.Lock()
-	for _, r := range cacheRecordings {
-		if r != nil && r.ID == recordingID {
-			r.XLink = xLink
-			break
-		}
-	}
-	recordingCacheMu.Unlock()
+	patchRecordingCache(recordingID, func(r *types.Recording) {
+		r.XLink = xLink
+	})
 	return nil
 }
 
 // UpdateRecordingPublishAt patches the PublishAt date on a Recording row
 // and mirrors the value into the warm cache. A nil publishAt clears the
 // Notion date property.
-func UpdateRecordingPublishAt(ctx *config.AppContext, recordingID string, publishAt *time.Time) error {
+func updateRecordingPublishAtNotion(ctx *config.AppContext, recordingID string, publishAt *time.Time) error {
 	dateValue := interface{}(nil)
 	if publishAt != nil {
 		dateValue = map[string]interface{}{
@@ -1084,26 +1065,20 @@ func UpdateRecordingPublishAt(ctx *config.AppContext, recordingID string, publis
 	if err := notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+recordingID, body); err != nil {
 		return fmt.Errorf("notion update PublishAt: %w", err)
 	}
-	recordingCacheMu.Lock()
-	for _, r := range cacheRecordings {
-		if r == nil || r.ID != recordingID {
-			continue
-		}
+	patchRecordingCache(recordingID, func(r *types.Recording) {
 		if publishAt == nil {
 			r.PublishAt = nil
 		} else {
 			when := *publishAt
 			r.PublishAt = &when
 		}
-		break
-	}
-	recordingCacheMu.Unlock()
+	})
 	return nil
 }
 
 // UpdateRecordingFileURI patches the FileURI rich-text property on a
 // Recording row and mirrors the value into the warm cache.
-func UpdateRecordingFileURI(ctx *config.AppContext, recordingID, fileURI string) error {
+func updateRecordingFileURINotion(ctx *config.AppContext, recordingID, fileURI string) error {
 	if strings.TrimSpace(fileURI) == "" {
 		return fmt.Errorf("FileURI is required")
 	}
@@ -1114,14 +1089,9 @@ func UpdateRecordingFileURI(ctx *config.AppContext, recordingID, fileURI string)
 	if err != nil {
 		return fmt.Errorf("notion update FileURI: %w", err)
 	}
-	recordingCacheMu.Lock()
-	for _, r := range cacheRecordings {
-		if r != nil && r.ID == recordingID {
-			r.FileURI = fileURI
-			break
-		}
-	}
-	recordingCacheMu.Unlock()
+	patchRecordingCache(recordingID, func(r *types.Recording) {
+		r.FileURI = fileURI
+	})
 	return nil
 }
 
@@ -1133,7 +1103,7 @@ type RecordingPublishingUpdate struct {
 	XReplyLink *string
 }
 
-func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up RecordingPublishingUpdate) error {
+func updateRecordingPublishingNotion(ctx *config.AppContext, recordingID string, up RecordingPublishingUpdate) error {
 	props := make(map[string]*notion.PropertyValue)
 	if up.YTLink != nil {
 		props["YTLink"] = notion.NewURLPropertyValue(*up.YTLink)
@@ -1150,11 +1120,7 @@ func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up Re
 	if _, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), recordingID, props); err != nil {
 		return fmt.Errorf("notion update recording publishing fields: %w", err)
 	}
-	recordingCacheMu.Lock()
-	for _, r := range cacheRecordings {
-		if r == nil || r.ID != recordingID {
-			continue
-		}
+	patchRecordingCache(recordingID, func(r *types.Recording) {
 		if up.YTLink != nil {
 			r.YTLink = *up.YTLink
 		}
@@ -1164,9 +1130,7 @@ func UpdateRecordingPublishing(ctx *config.AppContext, recordingID string, up Re
 		if up.XReplyLink != nil {
 			r.XReplyLink = *up.XReplyLink
 		}
-		break
-	}
-	recordingCacheMu.Unlock()
+	})
 	return nil
 }
 

@@ -350,3 +350,17 @@ Current progress:
 - `ListConfInfosNotion` is the renamed Notion implementation.
 - `listConfInfosPostgres` is implemented in
   `external/getters/conf_infos_postgres.go` and reads `conference_days`.
+
+## Current Progress: Recordings
+
+- `getRecordings`, `FetchRecordingByConfTalk`, `FetchYTLinkForTalk`,
+  `InvalidateRecordingsCache`, and recording cache helpers moved to
+  `external/getters/recordings.go`.
+- `ListRecordings`, `GetRecordingByConfTalk`, `UpdateRecordingYTLink`,
+  `UpdateRecordingXLink`, `UpdateRecordingPublishAt`,
+  `UpdateRecordingFileURI`, and `UpdateRecordingPublishing` now dispatch by
+  backend.
+- The renamed Notion implementations live in `external/getters/proposals.go`
+  with `Notion`/`notion` suffixes.
+- The Postgres implementation lives in
+  `external/getters/recordings_postgres.go` and reads/writes `recordings`.
