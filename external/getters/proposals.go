@@ -522,32 +522,6 @@ func ListProposalsOnlyNotion(n *types.Notion) ([]*types.Proposal, error) {
 	return out, nil
 }
 
-// GetSpeakerConfsByEmail looks up Speaker(s) by email and returns every
-// SpeakerConf row linked to those speakers, fully resolved.
-//
-// Cache-driven on the hot path — when caches are warm this does zero
-// Notion calls and a couple of map lookups. Falls back to a live query
-// only when the cache hasn't been populated yet (e.g. just after boot
-// before WaitFetch finishes).
-func GetSpeakerConfsByEmail(ctx *config.AppContext, email string) ([]*types.Speaker, []*types.SpeakerConf, error) {
-	if email == "" {
-		return nil, nil, nil
-	}
-	speakers, err := GetSpeakersByEmail(ctx.Notion, email)
-	if err != nil {
-		return nil, nil, fmt.Errorf("speakers by email: %w", err)
-	}
-	if len(speakers) == 0 {
-		return nil, nil, nil
-	}
-
-	var allConfs []*types.SpeakerConf
-	for _, sp := range speakers {
-		allConfs = append(allConfs, FetchSpeakerConfsForSpeaker(ctx, sp.ID)...)
-	}
-	return speakers, allConfs, nil
-}
-
 // SpeakerConfFields is the editable subset of a SpeakerConf row written
 // from the dashboard editor. Speaker / conf / talk relations stay put — the
 // editor only touches per-attendance fields.
@@ -606,34 +580,10 @@ func UpdateSpeakerConf(ctx *config.AppContext, speakerConfID string, in SpeakerC
 	return err
 }
 
-// FetchSpeakerConfWithSpeaker reads a SpeakerConf by ID with its `speaker`
-// relation resolved. Cache-first — only the first request after boot (or
-// after invalidation) actually hits Notion.
-func FetchSpeakerConfWithSpeaker(ctx *config.AppContext, speakerConfID string) (*types.SpeakerConf, error) {
-	if sc := FetchSpeakerConfByID(speakerConfID); sc != nil {
-		return sc, nil
-	}
-	page, err := ctx.Notion.Client.RetrievePage(context.Background(), speakerConfID)
-	if err != nil {
-		return nil, fmt.Errorf("retrieve speakerconf %s: %w", speakerConfID, err)
-	}
-	speakerID := parseRef(page.Properties, "speaker")
-	if speakerID == "" {
-		return nil, nil
-	}
-	spPage, err := ctx.Notion.Client.RetrievePage(context.Background(), speakerID)
-	if err != nil {
-		return nil, fmt.Errorf("retrieve speaker %s: %w", speakerID, err)
-	}
-	speaker := parseSpeaker(spPage.ID, spPage.Properties)
-	speakerMap := map[string]*types.Speaker{speakerID: speaker}
-	return parseSpeakerConf(ctx, page.ID, page.Properties, speakerMap, nil), nil
-}
-
 // ListSpeakerConfs fetches every SpeakerConf page, resolving Speaker and
 // Proposals (multi-relation `talk`) via the supplied maps. Pass nil for
 // either map to leave that side unresolved.
-func ListSpeakerConfs(ctx *config.AppContext, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) ([]*types.SpeakerConf, error) {
+func ListSpeakerConfsNotion(ctx *config.AppContext, speakerMap map[string]*types.Speaker, proposalMap map[string]*types.Proposal) ([]*types.SpeakerConf, error) {
 	n := ctx.Notion
 	var out []*types.SpeakerConf
 	hasMore := true
@@ -651,200 +601,6 @@ func ListSpeakerConfs(ctx *config.AppContext, speakerMap map[string]*types.Speak
 		}
 	}
 	return out, nil
-}
-
-// ListConfTalks fetches every ConfTalk page, resolving the Proposal relation
-// via proposalMap. Pass nil for proposalMap to leave the Proposal unresolved.
-// Callers filter by conf in memory.
-func ListConfTalks(ctx *config.AppContext, proposalMap map[string]*types.Proposal) ([]*types.ConfTalk, error) {
-	n := ctx.Notion
-	var out []*types.ConfTalk
-	hasMore := true
-	nextCursor := ""
-	for hasMore {
-		pages, next, more, err := n.Client.QueryDatabase(context.Background(),
-			n.Config.ConfTalkDb, notion.QueryDatabaseParam{StartCursor: nextCursor})
-		if err != nil {
-			return nil, err
-		}
-		nextCursor = next
-		hasMore = more
-		for _, page := range pages {
-			out = append(out, parseConfTalk(ctx, page.ID, page.Properties, proposalMap))
-		}
-	}
-	return out, nil
-}
-
-// LoadTalkFromConfTalk returns a single Talk-shaped value built from the
-// ConfTalk identified by confTalkID — used by the media-render route handlers
-// that previously looked up a Talk by Talks-DB page ID. Same denormalization
-// rules as LoadTalksFromConfTalks.
-func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Talk, error) {
-	page, err := ctx.Notion.Client.RetrievePage(context.Background(), confTalkID)
-	if err != nil {
-		return nil, err
-	}
-	ct := parseConfTalk(ctx, page.ID, page.Properties, nil)
-
-	// Resolve the proposal by ID off the page directly.
-	proposalID := parseRef(page.Properties, "proposal")
-	if proposalID == "" {
-		return talkFromConfTalk(ct, nil), nil
-	}
-	// Media-card rendering needs the current Proposal fields, especially
-	// Title, because the refresh CLI may be running against a web server
-	// whose proposal cache was warmed before the edit. Fetch the linked
-	// Proposal directly instead of taking the cache-first GetProposal path.
-	proposalPage, err := ctx.Notion.Client.RetrievePage(context.Background(), proposalID)
-	if err != nil {
-		return nil, err
-	}
-	proposal := parseProposal(ctx, proposalPage.ID, proposalPage.Properties)
-
-	speakers, err := ListSpeakers(ctx.Notion)
-	if err != nil {
-		return nil, err
-	}
-	speakerMap := make(map[string]*types.Speaker, len(speakers))
-	for _, sp := range speakers {
-		speakerMap[sp.ID] = sp
-	}
-	proposalMap := map[string]*types.Proposal{proposalID: proposal}
-	sps, err := ListSpeakerConfs(ctx, speakerMap, proposalMap)
-	if err != nil {
-		return nil, err
-	}
-	speakerConfMap := make(map[string]*types.SpeakerConf, len(sps))
-	for _, sc := range sps {
-		speakerConfMap[sc.ID] = sc
-	}
-	resolveProposalSpeakers(proposal, speakerConfMap)
-	return talkFromConfTalk(ct, proposal), nil
-}
-
-// resolveProposalSpeakers fills in Proposal.Speakers from SpeakerConfRefs
-// using the supplied speakerConfMap. Unknown refs are silently skipped.
-func resolveProposalSpeakers(p *types.Proposal, speakerConfMap map[string]*types.SpeakerConf) {
-	if p == nil {
-		return
-	}
-	p.Speakers = p.Speakers[:0]
-	for _, ref := range p.SpeakerConfRefs {
-		if sc, ok := speakerConfMap[ref]; ok {
-			p.Speakers = append(p.Speakers, sc)
-		}
-	}
-}
-
-// talkFromConfTalk denormalizes a (ConfTalk, Proposal) pair plus the
-// proposal's resolved Speakers list into the legacy *types.Talk shape used
-// by templates / mediagen / social. Each speaker is a copy with Company /
-// OrgLogo overlaid from the per-conf SpeakerConf data.
-func talkFromConfTalk(ct *types.ConfTalk, proposal *types.Proposal) *types.Talk {
-	talk := &types.Talk{
-		ID:          ct.ID,
-		Clipart:     ct.Clipart,
-		Sched:       ct.Sched,
-		Venue:       ct.Venue,
-		Section:     ct.Section,
-		CalNotif:    ct.CalNotif,
-		TalkCardURL: ct.SocialCard,
-	}
-	if ct.Conf != nil {
-		talk.Event = ct.Conf.Tag
-	}
-	if talk.Sched != nil {
-		talk.TimeDesc = talk.Sched.Desc()
-	}
-	// Pull the YouTube link from the Recording cache when available
-	// — drives the "Watch" badge on the agenda + /talks pages.
-	if rec := FetchRecordingByConfTalk(ct.ID); rec != nil {
-		talk.YTLink = rec.YTLink
-	}
-	if proposal != nil {
-		talk.Name = proposal.Title
-		talk.Description = proposal.Description
-		talk.Type = proposal.TalkType
-		talk.Status = proposal.Status
-		for _, sc := range proposal.Speakers {
-			if sc == nil || sc.Speaker == nil {
-				continue
-			}
-			view := *sc.Speaker
-			view.Company = sc.Company
-			view.OrgLogo = sc.OrgPhoto
-			talk.Speakers = append(talk.Speakers, &view)
-		}
-	}
-	return talk
-}
-
-// LoadTalksFromConfTalks returns Talk-shaped values populated from the new
-// ConfTalk → Proposal → speakers (SpeakerConf[]) → Speaker[] chain for a
-// given conf tag. Pass an empty string to load talks for every conf at
-// once. Each Speaker's Company and OrgPhoto come from the SpeakerConf
-// row — Speaker.Company is no longer authoritative.
-//
-// Talk.ID is set to ConfTalk.ID so existing card-URL / file-key derivation
-// stays stable as Talks-DB usage is wound down.
-func LoadTalksFromConfTalks(ctx *config.AppContext, confTag string) ([]*types.Talk, error) {
-	proposals, err := ListProposals(ctx)
-	if err != nil {
-		return nil, err
-	}
-	proposalMap := make(map[string]*types.Proposal, len(proposals))
-	for _, p := range proposals {
-		proposalMap[p.ID] = p
-	}
-
-	allConfTalks, err := ListConfTalks(ctx, proposalMap)
-	if err != nil {
-		return nil, err
-	}
-	confTalks := make([]*types.ConfTalk, 0, len(allConfTalks))
-	for _, ct := range allConfTalks {
-		if confTag == "" {
-			confTalks = append(confTalks, ct)
-			continue
-		}
-		if ct.Conf != nil && ct.Conf.Tag == confTag {
-			confTalks = append(confTalks, ct)
-		}
-	}
-	if len(confTalks) == 0 {
-		return nil, nil
-	}
-
-	speakers, err := ListSpeakers(ctx.Notion)
-	if err != nil {
-		return nil, err
-	}
-	speakerMap := make(map[string]*types.Speaker, len(speakers))
-	for _, sp := range speakers {
-		speakerMap[sp.ID] = sp
-	}
-
-	sps, err := ListSpeakerConfs(ctx, speakerMap, proposalMap)
-	if err != nil {
-		return nil, err
-	}
-	speakerConfMap := make(map[string]*types.SpeakerConf, len(sps))
-	for _, sc := range sps {
-		speakerConfMap[sc.ID] = sc
-	}
-
-	// Resolve each Proposal.Speakers from its SpeakerConfRefs (the
-	// "speakers" multi-relation written by the form-submit / accept flow).
-	for _, p := range proposalMap {
-		resolveProposalSpeakers(p, speakerConfMap)
-	}
-
-	talks := make([]*types.Talk, 0, len(confTalks))
-	for _, ct := range confTalks {
-		talks = append(talks, talkFromConfTalk(ct, ct.Proposal))
-	}
-	return talks, nil
 }
 
 // ConfTalkSetSocialCard writes the storage path of a generated talk-card
@@ -936,35 +692,6 @@ func UpdateProposal(ctx *config.AppContext, proposalID string, in ProposalInput)
 
 func selectProperty(name string) *notion.PropertyValue {
 	return notion.NewSelectPropertyValue(&notion.SelectOption{Name: name})
-}
-
-// GetConfTalkByProposal looks up the ConfTalk linked to a proposal via its
-// `proposal` relation. Cache-first — when the ConfTalks cache is warm,
-// a missing entry is authoritative ("no ConfTalk exists yet") and we
-// return nil without falling through to Notion. Live query is reserved
-// for the cold-cache path (boot before WaitFetch completes).
-func GetConfTalkByProposal(ctx *config.AppContext, proposalID string) (*types.ConfTalk, error) {
-	if ct := FetchConfTalkByProposal(proposalID); ct != nil {
-		return ct, nil
-	}
-	if cacheConfTalksWarm() {
-		return nil, nil
-	}
-	n := ctx.Notion
-	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
-		n.Config.ConfTalkDb, notion.QueryDatabaseParam{
-			Filter: &notion.Filter{
-				Property: "proposal",
-				Relation: &notion.RelationFilterCondition{Contains: proposalID},
-			},
-		})
-	if err != nil {
-		return nil, err
-	}
-	if len(pages) == 0 {
-		return nil, nil
-	}
-	return parseConfTalk(ctx, pages[0].ID, pages[0].Properties, nil), nil
 }
 
 // UpdateProposalStatus mirrors UpdateTalkAppStatus for the new Proposal DB.

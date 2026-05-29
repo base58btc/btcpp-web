@@ -23,6 +23,10 @@ Rules:
 | `external/getters/conferences_postgres.go` | Postgres conference reads/writes. |
 | `external/getters/speakers.go` | Speaker/person runtime/cache entrypoints and dispatchers. |
 | `external/getters/speakers_postgres.go` | Postgres people reads/writes. |
+| `external/getters/speaker_confs.go` | Speaker-conf runtime/cache entrypoints and dispatchers. |
+| `external/getters/speaker_confs_postgres.go` | Postgres speaker-conf reads. |
+| `external/getters/conf_talks.go` | Conf-talk runtime/cache entrypoints, dispatchers, and Talk derivation. |
+| `external/getters/conf_talks_postgres.go` | Postgres conf-talk reads. |
 | `external/getters/talks.go` | Talk, proposal, speaker-conf, conf-talk runtime entrypoints and dispatchers. |
 | `external/getters/talks_postgres.go` | Postgres talk/proposal/speaker-conf/conf-talk reads/writes. |
 | `external/getters/discounts_postgres.go` | Postgres discount reads/writes. |
@@ -313,6 +317,36 @@ Current progress:
   `people_roles` as the existing raw role tag format, e.g. `global-admin`.
 - Speaker write paths (`CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`,
   etc.) still need a dedicated Postgres write split.
+
+## Current Progress: Speaker Confs
+
+- `getSpeakerConfs`, `FetchSpeakerConfsForSpeaker`, `FetchSpeakerConfByID`,
+  `FetchSpeakerConfWithSpeaker`, `GetSpeakerConfsByEmail`,
+  `InvalidateSpeakerConfsCache`, and `CacheSpeakerConfInsert` moved to
+  `external/getters/speaker_confs.go`.
+- `ListSpeakerConfs` now dispatches by backend.
+- `ListSpeakerConfsNotion` is the renamed Notion implementation.
+- `listSpeakerConfsPostgres` is implemented in
+  `external/getters/speaker_confs_postgres.go` and hydrates speakers,
+  proposals, and `OtherEvents` from `proposals_speaker_confs` and
+  `speaker_confs_conferences`.
+- Speaker-conf write paths (`UpsertSpeakerConf`, `UpdateSpeakerConf`, date
+  stamps, proposal add/remove, etc.) still need a dedicated Postgres write
+  split.
+
+## Current Progress: Conf Talks
+
+- `getConfTalks`, `FetchConfTalkByProposal`, `FetchConfTalkByID`,
+  `InvalidateConfTalksCache`, `cacheConfTalksWarm`, `GetConfTalkByProposal`,
+  `LoadTalkFromConfTalk`, `LoadTalksFromConfTalks`, `resolveProposalSpeakers`,
+  and `talkFromConfTalk` moved to `external/getters/conf_talks.go`.
+- `ListConfTalks` now dispatches by backend.
+- The Notion implementations live in `external/getters/conf_talks_notion.go`.
+- `listConfTalksPostgres`, `getConfTalkByProposalPostgres`, and
+  `loadTalkFromConfTalkPostgres` are implemented in
+  `external/getters/conf_talks_postgres.go` and read `conf_talks`.
+- Conf-talk write paths (`CreateConfTalk`, schedule updates, archive/delete,
+  clipart/social-card updates) still need a dedicated Postgres write split.
 
 ## Current Progress: Affiliate Usage
 
