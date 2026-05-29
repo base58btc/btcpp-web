@@ -360,7 +360,7 @@ Current progress:
   `UpdateRecordingXLink`, `UpdateRecordingPublishAt`,
   `UpdateRecordingFileURI`, and `UpdateRecordingPublishing` now dispatch by
   backend.
-- The renamed Notion implementations live in `external/getters/proposals.go`
-  with `Notion`/`notion` suffixes.
+- The renamed Notion implementations live in
+  `external/getters/recordings_notion.go` with `Notion`/`notion` suffixes.
 - The Postgres implementation lives in
   `external/getters/recordings_postgres.go` and reads/writes `recordings`.

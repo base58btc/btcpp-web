@@ -7,6 +7,14 @@ import (
 	"btcpp-web/internal/types"
 )
 
+// RecordingPublishingUpdate mirrors final published URLs onto the Recording
+// row. Workflow state (status, errors, timestamps) lives in SocialPosts.
+type RecordingPublishingUpdate struct {
+	YTLink     *string
+	XLink      *string
+	XReplyLink *string
+}
+
 // getRecordings refreshes the Recording cache + by-ConfTalk index.
 func getRecordings(ctx *config.AppContext) {
 	ctx.Infos.Printf("getting recordings...")
@@ -57,6 +65,34 @@ func GetRecordingByConfTalk(ctx *config.AppContext, confTalkID string) (*types.R
 		return getRecordingByConfTalkPostgres(ctx, confTalkID)
 	}
 	return getRecordingByConfTalkNotion(ctx, confTalkID)
+}
+
+// FetchRecordingByID returns the cached Recording with the given page ID, or
+// nil. The Recordings cache is by-ConfTalkID; this helper walks the slice so
+// the admin-recordings page can address rows by their own ID.
+func FetchRecordingByID(recordingID string) *types.Recording {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	for _, r := range cacheRecordings {
+		if r != nil && r.ID == recordingID {
+			return r
+		}
+	}
+	return nil
+}
+
+// ListRecordingsCached returns the warm Recordings slice. Returns nil before
+// the first fetch completes; callers can treat that as still booting and render
+// an empty list rather than a hard error.
+func ListRecordingsCached() []*types.Recording {
+	recordingCacheMu.RLock()
+	defer recordingCacheMu.RUnlock()
+	if cacheRecordings == nil {
+		return nil
+	}
+	out := make([]*types.Recording, len(cacheRecordings))
+	copy(out, cacheRecordings)
+	return out
 }
 
 // FetchYTLinkForTalk bridges the legacy Talks-DB renderer (which uses Talk.ID =
