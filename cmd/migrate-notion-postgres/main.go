@@ -22,7 +22,6 @@ type options struct {
 	dryRun            bool
 	reset             bool
 	validate          bool
-	listConfTalkDups  bool
 	skipConfDays      bool
 	skipTickets       bool
 	skipDiscounts     bool
@@ -40,6 +39,8 @@ type options struct {
 	skipConfTalks     bool
 	skipRecordings    bool
 	skipSocialPosts   bool
+	skipSubscribers   bool
+	skipMissives      bool
 }
 
 func main() {
@@ -54,23 +55,6 @@ func main() {
 	}
 	if opts.databaseURL != "" {
 		env.DatabaseURL = opts.databaseURL
-	}
-	if opts.listConfTalkDups {
-		if err := validateConfTalkDuplicateConfig(env); err != nil {
-			log.Fatal(err)
-		}
-		notion := &types.Notion{Config: &env.Notion}
-		notion.Setup(env.Notion.Token)
-		proposals, err := getters.ListProposalsOnly(notion)
-		if err != nil {
-			log.Fatalf("fetch proposals from Notion: %s", err)
-		}
-		confTalks, err := listConfTalkImportRows(notion)
-		if err != nil {
-			log.Fatalf("fetch conf talks from Notion: %s", err)
-		}
-		printConfTalkProposalDuplicates(confTalks, proposalByRef(proposals))
-		return
 	}
 	needDB := !opts.dryRun || opts.validate
 	importConfDays := !opts.skipConfDays
@@ -90,6 +74,8 @@ func main() {
 	importConfTalks := !opts.skipConfTalks
 	importRecordings := !opts.skipRecordings
 	importSocialPosts := !opts.skipSocialPosts
+	importSubscribers := !opts.skipSubscribers
+	importMissives := !opts.skipMissives
 	if importSpeakerConfs && (!importSponsors || !importSpeakers || !importProposals) {
 		log.Fatal("speaker conf import requires sponsors, speakers, and proposals; use -skip-speaker-confs when skipping any of those imports")
 	}
@@ -111,7 +97,7 @@ func main() {
 	if importWorkShifts && (!importJobTypes || !importVolunteers) {
 		log.Fatal("work shift import requires job types and volunteers; use -skip-work-shifts when skipping either import")
 	}
-	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts); err != nil {
+	if err := validateConfig(env, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts, importSubscribers, importMissives); err != nil {
 		log.Fatal(err)
 	}
 
@@ -339,6 +325,30 @@ func main() {
 		log.Printf("fetched %d social posts from Notion", len(socialPosts))
 	}
 
+	var subscribers []*subscriberImportRow
+	if importSubscribers {
+		subscribers, err = listSubscriberImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch subscribers from Notion: %s", err)
+		}
+		if err := validateSubscriberRows(subscribers); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d subscribers from Notion", len(subscribers))
+	}
+
+	var missives []*missiveImportRow
+	if importMissives {
+		missives, err = listMissiveImportRows(notion)
+		if err != nil {
+			log.Fatalf("fetch missives from Notion: %s", err)
+		}
+		if err := validateMissiveRows(missives); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("fetched %d missives from Notion", len(missives))
+	}
+
 	var pool *pgxpool.Pool
 	if !opts.dryRun || opts.validate {
 		pool, err = db.Open(ctx, env.DatabaseURL)
@@ -423,6 +433,12 @@ func main() {
 		}
 		for _, socialPost := range socialPosts {
 			log.Printf("dry-run social-post ref=%q kind=%q status=%q recording_ref=%q conf_talk_ref=%q", socialPost.socialRef, socialPost.kind, socialPost.status, socialPost.recordingRef, socialPost.confTalkRef)
+		}
+		for _, subscriber := range subscribers {
+			log.Printf("dry-run subscriber email=%q subs=%q", subscriber.email, strings.Join(subscriber.subs, ","))
+		}
+		for _, missive := range missives {
+			log.Printf("dry-run missive uid=%d title=%q newsletters=%q only_for=%q", missive.publicUID, missive.title, strings.Join(missive.newsletters, ","), missive.onlyFor)
 		}
 	} else {
 		if err := importConferences(ctx, pool, confs); err != nil {
@@ -522,7 +538,7 @@ func main() {
 			log.Printf("inserted %d proposals into Postgres", len(proposals))
 		}
 		if importSpeakerConfs {
-			if err := importSpeakerConfsRows(ctx, pool, speakerConfs, speakerIDsByRef, orgIDsByRef, proposalIDsByRef, proposalByRef(proposals)); err != nil {
+			if err := importSpeakerConfsRows(ctx, pool, speakerConfs, speakerIDsByRef, orgIDsByRef, proposalIDsByRef); err != nil {
 				log.Fatal(err)
 			}
 			log.Printf("inserted %d speaker confs into Postgres", len(speakerConfs))
@@ -548,6 +564,18 @@ func main() {
 				log.Fatal(err)
 			}
 			log.Printf("upserted %d social posts into Postgres", len(socialPosts))
+		}
+		if importSubscribers {
+			if err := importSubscriberRows(ctx, pool, subscribers); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d subscribers into Postgres", len(mergeSubscriberRows(subscribers)))
+		}
+		if importMissives {
+			if err := importMissiveRows(ctx, pool, missives); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("upserted %d missives into Postgres", len(missives))
 		}
 	}
 
@@ -662,6 +690,18 @@ func main() {
 			}
 			log.Printf("validated social post count")
 		}
+		if importSubscribers {
+			if err := validateSubscribers(ctx, pool, subscribers); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated subscriber count")
+		}
+		if importMissives {
+			if err := validateMissives(ctx, pool, missives); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("validated missive count")
+		}
 	}
 }
 
@@ -672,7 +712,6 @@ func parseFlags() options {
 	flag.BoolVar(&opts.dryRun, "dry-run", false, "fetch and print planned imports without writing Postgres")
 	flag.BoolVar(&opts.reset, "reset", false, "truncate imported tables before writing")
 	flag.BoolVar(&opts.validate, "validate", false, "compare imported conference rows against Notion")
-	flag.BoolVar(&opts.listConfTalkDups, "list-conf-talk-duplicates", false, "print ConfTalkDb rows that share the same proposal relation and exit")
 	flag.BoolVar(&opts.skipConfDays, "skip-conference-days", false, "skip importing conference day schedule metadata")
 	flag.BoolVar(&opts.skipTickets, "skip-tickets", false, "skip importing conference ticket tiers")
 	flag.BoolVar(&opts.skipDiscounts, "skip-discounts", false, "skip importing discount codes")
@@ -690,6 +729,8 @@ func parseFlags() options {
 	flag.BoolVar(&opts.skipConfTalks, "skip-conf-talks", false, "skip importing scheduled conference talks")
 	flag.BoolVar(&opts.skipRecordings, "skip-recordings", false, "skip importing recording metadata")
 	flag.BoolVar(&opts.skipSocialPosts, "skip-social-posts", false, "skip importing social post state")
+	flag.BoolVar(&opts.skipSubscribers, "skip-subscribers", false, "skip importing newsletter subscribers")
+	flag.BoolVar(&opts.skipMissives, "skip-missives", false, "skip importing newsletter missives")
 	flag.Parse()
 	return opts
 }
@@ -769,10 +810,16 @@ func loadConfig(path string) (*types.EnvConfig, error) {
 	if v := os.Getenv("NOTION_SHIFTS_DB"); v != "" {
 		env.Notion.ShiftDb = v
 	}
+	if v := os.Getenv("NOTION_NEWSLETTER_DB"); v != "" {
+		env.Notion.NewsletterDb = v
+	}
+	if v := os.Getenv("NOTION_MISSIVES_DB"); v != "" {
+		env.Notion.MissivesDb = v
+	}
 	return &env, nil
 }
 
-func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts bool) error {
+func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets, importDiscounts, importRegistrations, importAffiliateUse, importHotels, importJobTypes, importVolunteers, importVolunteerInfo, importWorkShifts, importSponsors, importSpeakers, importProposals, importSpeakerConfs, importConfTalks, importRecordings, importSocialPosts, importSubscribers, importMissives bool) error {
 	var missing []string
 	if strings.TrimSpace(env.Notion.Token) == "" {
 		missing = append(missing, "NOTION_TOKEN")
@@ -834,6 +881,12 @@ func validateConfig(env *types.EnvConfig, needDB, importConfDays, importTickets,
 	if importSocialPosts && strings.TrimSpace(env.Notion.SocialPostsDb) == "" {
 		missing = append(missing, "NOTION_SOCIAL_POSTS_DB")
 	}
+	if importSubscribers && strings.TrimSpace(env.Notion.NewsletterDb) == "" {
+		missing = append(missing, "NOTION_NEWSLETTER_DB")
+	}
+	if importMissives && strings.TrimSpace(env.Notion.MissivesDb) == "" {
+		missing = append(missing, "NOTION_MISSIVES_DB")
+	}
 	if needDB && strings.TrimSpace(env.DatabaseURL) == "" {
 		missing = append(missing, "DATABASE_URL")
 	}
@@ -855,6 +908,6 @@ func conferenceTagByRef(confs []*types.Conf) map[string]string {
 }
 
 func resetDatabase(ctx context.Context, pool *pgxpool.Pool) error {
-	_, err := pool.Exec(ctx, `TRUNCATE conferences, discounts, registrations, organizations, sponsorships, people, proposals, volunteers, job_types CASCADE`)
+	_, err := pool.Exec(ctx, `TRUNCATE conferences, discounts, registrations, organizations, sponsorships, people, proposals, volunteers, job_types, subscribers, missives CASCADE`)
 	return err
 }

@@ -95,12 +95,11 @@ func validateSpeakerConfRows(rows []*speakerConfImportRow, speakersByRef map[str
 	return nil
 }
 
-func importSpeakerConfsRows(ctx context.Context, pool *pgxpool.Pool, rows []*speakerConfImportRow, speakerIDsByRef, orgIDsByRef, proposalIDsByRef map[string]string, proposalsByRef map[string]*types.Proposal) error {
+func importSpeakerConfsRows(ctx context.Context, pool *pgxpool.Pool, rows []*speakerConfImportRow, speakerIDsByRef, orgIDsByRef, proposalIDsByRef map[string]string) error {
 	for _, row := range rows {
 		if row == nil {
 			continue
 		}
-		confTag := inferSpeakerConfTag(row, proposalsByRef)
 		speakerID := speakerIDsByRef[row.speakerRef]
 		if speakerID == "" {
 			return fmt.Errorf("speaker conf %q has unresolved imported speaker", row.ref)
@@ -112,16 +111,14 @@ func importSpeakerConfsRows(ctx context.Context, pool *pgxpool.Pool, rows []*spe
 
 		var speakerConfID string
 		err := pool.QueryRow(ctx, `
-			INSERT INTO speaker_confs (
-				conference_id, speaker_id, organization_id, coming_from, availability,
-				record_ok, visa, first_event, dinner_rsvp, sponsor, company,
-				org_photo_path, invited_at, viewed_at, accepted_at
-			)
-			SELECT c.id, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
-			FROM (SELECT $1::text AS tag) input
-			LEFT JOIN conferences c ON c.tag = input.tag
-			RETURNING id::text
-		`, nullableString(confTag), speakerID, nullableString(orgID), row.comingFrom, row.availability,
+				INSERT INTO speaker_confs (
+					speaker_id, organization_id, coming_from, availability,
+					record_ok, visa, first_event, dinner_rsvp, sponsor, company,
+					org_photo_path, invited_at, viewed_at, accepted_at
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+				RETURNING id::text
+			`, speakerID, nullableString(orgID), row.comingFrom, row.availability,
 			row.recordOK, row.visa, row.firstEvent, row.dinnerRSVP, row.sponsor, row.company,
 			row.orgPhoto, nullableTimePtr(row.invitedAt), nullableTimePtr(row.viewedAt), nullableTimePtr(row.acceptedAt)).Scan(&speakerConfID)
 		if err != nil {
@@ -183,19 +180,6 @@ func validateSpeakerConfs(ctx context.Context, pool *pgxpool.Pool, rows []*speak
 		return fmt.Errorf("postgres proposal speaker conf link count %d is less than Notion relation count %d", linkCount, expectedLinks)
 	}
 	return nil
-}
-
-func inferSpeakerConfTag(row *speakerConfImportRow, proposalsByRef map[string]*types.Proposal) string {
-	if row == nil {
-		return ""
-	}
-	for _, proposalRef := range row.proposalRefs {
-		proposal := proposalsByRef[proposalRef]
-		if proposal != nil && proposal.ScheduleFor != nil && proposal.ScheduleFor.Tag != "" {
-			return proposal.ScheduleFor.Tag
-		}
-	}
-	return ""
 }
 
 func relationID(prop notion.PropertyValue) string {
@@ -266,4 +250,11 @@ func dateStart(prop notion.PropertyValue) *time.Time {
 		return nil
 	}
 	return &prop.Date.Start
+}
+
+func uniqueID(prop notion.PropertyValue) uint64 {
+	if prop.UniqueID == nil {
+		return 0
+	}
+	return uint64(prop.UniqueID.Number)
 }

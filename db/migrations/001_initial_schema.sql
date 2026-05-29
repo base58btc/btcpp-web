@@ -217,7 +217,6 @@ FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 CREATE TABLE speaker_confs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  conference_id uuid REFERENCES conferences(id) ON DELETE CASCADE,
   speaker_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
   organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL,
   coming_from text NOT NULL DEFAULT '',
@@ -233,8 +232,7 @@ CREATE TABLE speaker_confs (
   viewed_at timestamptz,
   accepted_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (conference_id, speaker_id)
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX speaker_confs_speaker_idx ON speaker_confs (speaker_id);

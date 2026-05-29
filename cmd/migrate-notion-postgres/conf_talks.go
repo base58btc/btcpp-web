@@ -104,21 +104,11 @@ func importConfTalkRows(ctx context.Context, pool *pgxpool.Pool, rows []*confTal
 				conference_id, proposal_id, clipart_path, scheduled_start, scheduled_end,
 				production_notes, venue, section, cal_notif, social_card_path
 			)
-			SELECT c.id, $2, $3, $4, $5, $6, $7, $8, $9, $10
-			FROM conferences c
-			WHERE c.tag = $1
-			ON CONFLICT (proposal_id) DO UPDATE SET
-				conference_id = EXCLUDED.conference_id,
-				clipart_path = EXCLUDED.clipart_path,
-				scheduled_start = EXCLUDED.scheduled_start,
-				scheduled_end = EXCLUDED.scheduled_end,
-				production_notes = EXCLUDED.production_notes,
-				venue = EXCLUDED.venue,
-				section = EXCLUDED.section,
-				cal_notif = EXCLUDED.cal_notif,
-				social_card_path = EXCLUDED.social_card_path
-			RETURNING id::text
-		`, row.confTag, nullableString(proposalID), row.clipart, nullableTimePtr(row.scheduledStart), nullableTimePtr(row.scheduledEnd),
+				SELECT c.id, $2, $3, $4, $5, $6, $7, $8, $9, $10
+				FROM conferences c
+				WHERE c.tag = $1
+				RETURNING id::text
+			`, row.confTag, nullableString(proposalID), row.clipart, nullableTimePtr(row.scheduledStart), nullableTimePtr(row.scheduledEnd),
 			row.productionNotes, row.venue, row.section, row.calNotif, row.socialCard).Scan(&id); err != nil {
 			return nil, fmt.Errorf("insert conf talk %q: %w", row.ref, err)
 		}
@@ -134,30 +124,10 @@ func validateConfTalks(ctx context.Context, pool *pgxpool.Pool, rows []*confTalk
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM conf_talks`).Scan(&count); err != nil {
 		return fmt.Errorf("count conf talks: %w", err)
 	}
-	expectedRows := dedupedConfTalkCount(rows)
-	if count < expectedRows {
-		return fmt.Errorf("postgres conf talk count %d is less than deduped Notion count %d", count, expectedRows)
+	if count < len(rows) {
+		return fmt.Errorf("postgres conf talk count %d is less than Notion count %d", count, len(rows))
 	}
 	return nil
-}
-
-func dedupedConfTalkCount(rows []*confTalkImportRow) int {
-	proposalRefs := make(map[string]bool)
-	count := 0
-	for _, row := range rows {
-		if row == nil {
-			continue
-		}
-		if row.proposalRef == "" {
-			count++
-			continue
-		}
-		if !proposalRefs[row.proposalRef] {
-			proposalRefs[row.proposalRef] = true
-			count++
-		}
-	}
-	return count
 }
 
 func dateRange(prop notion.PropertyValue) (*time.Time, *time.Time) {

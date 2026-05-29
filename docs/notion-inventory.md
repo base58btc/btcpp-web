@@ -14,7 +14,7 @@ Postgres IDs.
 | `ConfInfoDb` / `NOTION_CONFINFO_DB` | Per-day public schedule metadata. | `Conf` tag/select or rich text, `Day`, `Doors`, `Breakfast`, `Lunch`, `Coffee`, `Venues`. | Uses conference tag, not a Notion relation. | `conference_days` |
 | `SpeakersDb` / `NOTION_SPEAKERS_DB` | People/contact profile and admin roles. | `Name`, `Email`, `NormPhoto`, `Phone`, `Signal`, `Telegram`, `Twitter`, `npub`, `Github`, `Instagram`, `LinkedIn`, `Website`, `Company`, `OrgPhoto`, `AvailToHire`, `LookingToHire`, `TShirt`, `Roles`. | Linked by `SpeakerConfDb`; role tags grant dashboard/admin access. Role tags split into `scope` and `position`, e.g. `global-admin` -> `global` / `admin`, `vienna-staff` -> `vienna` / `staff`. | `people`, `people_roles` |
 | `ProposalDb` / `NOTION_PROPOSAL_DB` | Talk proposal/application content. | `Title`, `Desc`, `Setup`, `Comments`, `TalkType`, `Status`, `DesiredDuration`, `AvailDuration`, `ScheduleFor`, `speakers`, `InviteToken`. | `ScheduleFor` is a conference tag. `speakers` relates to `SpeakerConfDb`. One accepted proposal usually has one `ConfTalkDb` row. | `proposals`, `proposals_speaker_confs` |
-| `SpeakerConfDb` / `NOTION_SPEAKER_CONF_DB` | A speaker's attendance/application state for one conference. | `ComingFrom`, `speaker`, `talk`, `org`, `Company`, `OrgPhoto`, `Avails`, `RecordOK`, `Visa`, `FirstEvent`, `OtherEvents`, `DinnerRSVP`, `Sponsor`, `InvitedAt`, `ViewedAt`, `AcceptedAt`. | `speaker` to `SpeakersDb`, `talk` to `ProposalDb`, `org` to `OrgDb`, `OtherEvents` by conference tag. Runtime upsert key is speaker plus conference. | `speaker_confs`, `speaker_confs_conferences`, `proposals_speaker_confs` |
+| `SpeakerConfDb` / `NOTION_SPEAKER_CONF_DB` | A speaker's attendance/application state. | `ComingFrom`, `speaker`, `talk`, `org`, `Company`, `OrgPhoto`, `Avails`, `RecordOK`, `Visa`, `FirstEvent`, `OtherEvents`, `DinnerRSVP`, `Sponsor`, `InvitedAt`, `ViewedAt`, `AcceptedAt`. | `speaker` to `SpeakersDb`, `talk` to `ProposalDb`, `org` to `OrgDb`, `OtherEvents` by conference tag. Conference context comes from linked proposals. | `speaker_confs`, `speaker_confs_conferences`, `proposals_speaker_confs` |
 | `ConfTalkDb` / `NOTION_CONFTALK_DB` | Scheduled talk row used by agenda/media/social. | `Event`, `proposal`, `Clipart`, `TalkTime`, `ProductionNotes`, `Venue`, `Section`, `CalNotif`, `SocialCard`. | `Event` is conference tag. `proposal` relates to `ProposalDb`. | `conf_talks` |
 | `RecordingsDb` / `NOTION_RECORDINGS_DB` | Publishing metadata for recorded talks. | `talk`, `TalkName`, `YTLink`, `XLink`, `XReplyLink`, `FileURI`, `PublishAt`. | `talk` relation to `ConfTalkDb`. | `recordings` |
 | `SocialPostsDb` / `NOTION_SOCIAL_POSTS_DB` | Social-post state for recordings and other refs. | `Ref`, `Text`, `PostedTo`, `Kind`, `Status`, `Recording`, `ConfTalk`, `URL`, `ReplyURL`, `Error`, `ErrorFingerprint`, `ScheduledAt`, `PostedAt`, `NotifiedAt`. | Optional relations to `RecordingsDb` and `ConfTalkDb`. | `social_posts` |
@@ -132,7 +132,6 @@ used only in-memory during an import to resolve relations.
 
 | Notion column | Postgres column | Notes |
 | --- | --- | --- |
-| inferred conference | `speaker_confs.conference_id` | Nullable during migration. Infer from linked proposal `ScheduleFor` when present; backfill unresolved rows after migration cleanup. |
 | `speaker` | `speaker_confs.speaker_id` | Relation to `people.id` from `SpeakersDb`. |
 | `org` | `speaker_confs.organization_id` | Relation to `OrgDb`. |
 | `ComingFrom` | `speaker_confs.coming_from` | Title/rich text. |
@@ -402,7 +401,6 @@ UUID `id` columns remain the primary key unless a table is a pure join table.
 | `sponsorships_conferences` | `(sponsorship_id, conference_id)` primary key | table constraint | yes | Prevent duplicate conference links for the same sponsorship row. |
 | `proposals` | `(conference_id, status)` | separate index | no | Admin review/status filtering by conference. |
 | `proposals` | `invite_token` where non-empty | separate index | no | Lookup invite token when present; blank tokens are ignored. |
-| `speaker_confs` | `(conference_id, speaker_id)` | table constraint | yes | One speaker attendance/application row per known conference. `conference_id` may be null during migration cleanup. |
 | `speaker_confs` | `speaker_id` | separate index | no | Reverse lookup all conference rows for a speaker. |
 | `speaker_confs_conferences` | `(speaker_conf_id, conference_id)` primary key | table constraint | yes | Prevent duplicate related-event links. |
 | `proposals_speaker_confs` | `(proposal_id, speaker_conf_id)` primary key | table constraint | yes | Prevent duplicate speaker links on a proposal. |
@@ -454,8 +452,9 @@ temporary in-memory maps while it runs:
   disambiguator such as normalized name plus social/contact fields. Current
   migration imports people with generated UUID primary keys and should be
   rerun with `-reset` to avoid duplicate inserts.
-- Speaker-conference rows map by `(speaker, conference)`. The conference is
-  inferred from linked proposal `ScheduleFor` values or explicit context.
+- Speaker-conference rows keep their own generated UUIDs. Their proposal
+  relationships are imported into `proposals_speaker_confs`, and conference
+  context comes from `proposals.conference_id`.
 - Proposals map by generated UUID after import; while importing, resolve them
   by the current Notion row in memory, then discard the Notion key.
 - Organizations map by normalized name; website is not unique in current
@@ -468,6 +467,12 @@ temporary in-memory maps while it runs:
   repeated inserts.
 - Social posts map by `Ref`.
 - Job types map by `Tag`.
+- Subscribers map by case-insensitive email. Duplicate Notion subscriber pages
+  are merged during import and their `Subs` values are unioned into one
+  `subscriber_subscriptions` set.
+- Missives map by Notion's `ID` unique ID property in `missives.public_uid`.
+  The Notion page ID is only used while fetching the source row and is not
+  retained.
 - Volunteers use generated UUID primary keys. During migration, rerun this table
   with `-reset` to avoid duplicate rows; related conferences and job-type
   preferences are rebuilt from Notion relations.
@@ -479,14 +484,3 @@ Any migration command should fail loudly on ambiguous natural keys rather than
 silently picking a row.
 
 ## Open Migration Issues
-
-- `SpeakerConfDb` currently has 3 rows whose `speaker` relation appears blank
-  to the Notion API. In the Notion UI these look like `No access`, so this is
-  likely a Notion permission issue rather than truly blank data. Keep using
-  `-skip-speaker-confs` for full local validation until access is fixed, then
-  rerun that importer with `speaker_confs.speaker_id` still required.
-- `ConfTalkDb` has duplicate rows for a small number of proposal relations.
-  These appear to be duplicate schedule rows created while changing times. The
-  migration intentionally keeps `conf_talks.proposal_id` unique and collapses
-  duplicate ConfTalk rows for the same proposal. Use
-  `-list-conf-talk-duplicates` to print the source duplicate groups.
