@@ -364,3 +364,11 @@ Current progress:
   `external/getters/recordings_notion.go` with `Notion`/`notion` suffixes.
 - The Postgres implementation lives in
   `external/getters/recordings_postgres.go` and reads/writes `recordings`.
+
+## Current Progress: Site Stats
+
+- `getSiteStats`, `FetchSiteStats`, and `SiteStatsValues` moved to
+  `external/getters/site_stats.go`.
+- Notion attendee counting lives in `external/getters/site_stats_notion.go`.
+- Postgres attendee counting lives in `external/getters/site_stats_postgres.go`
+  and counts rows from `registrations`.

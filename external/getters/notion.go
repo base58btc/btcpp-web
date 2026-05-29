@@ -61,21 +61,10 @@ var (
 	lastRecordingFetch  time.Time
 	recordingCacheMu    sync.RWMutex
 
-	// Site-wide aggregate stats for the about page. Recomputed from the
-	// other warm caches + one paginated PurchasesDb scan; refreshed via
-	// the worker pool on TTL.
 	siteStats          SiteStatsValues
 	lastSiteStatsFetch time.Time
 	siteStatsMu        sync.RWMutex
 )
-
-// SiteStatsValues holds the raw counts behind the about-page numbers.
-// Format-for-display is left to callers.
-type SiteStatsValues struct {
-	PastConfs int // count of confs where EndDate is in the past
-	PastTalks int // count of Accepted ConfTalks at past confs
-	Attendees int // total rows in PurchasesDb (rough total attendees)
-}
 
 type (
 	JobType int
@@ -527,72 +516,6 @@ func cacheConfTalksWarm() bool {
 	confTalkCacheMu.RLock()
 	defer confTalkCacheMu.RUnlock()
 	return cacheConfTalks != nil
-}
-
-// getSiteStats recomputes the about-page aggregate counters from the
-// already-warm Confs / ConfTalks caches + one paginated PurchasesDb
-// scan. Idempotent and safe to run on a TTL refresh.
-func getSiteStats(ctx *config.AppContext) {
-	ctx.Infos.Printf("getting site stats...")
-	var s SiteStatsValues
-
-	// Past confs from the in-memory cache.
-	for _, c := range confs {
-		if c != nil && c.HasEnded() {
-			s.PastConfs++
-		}
-	}
-
-	// Accepted talks at past confs — read the ConfTalks cache.
-	confTalkCacheMu.RLock()
-	for _, ct := range cacheConfTalks {
-		if ct == nil || ct.Conf == nil || !ct.Conf.HasEnded() {
-			continue
-		}
-		if ct.Proposal != nil && ct.Proposal.Status == "Accepted" {
-			s.PastTalks++
-		}
-	}
-	confTalkCacheMu.RUnlock()
-
-	// Attendees: total rows in PurchasesDb. Slight over-count (test rows,
-	// upcoming-conf purchases) but rounded down to the nearest 50 in
-	// display, so the imprecision is invisible.
-	if db := ctx.Notion.Config.PurchasesDb; db != "" {
-		hasMore := true
-		nextCursor := ""
-		for hasMore {
-			pages, next, more, err := ctx.Notion.Client.QueryDatabase(context.Background(),
-				db, notion.QueryDatabaseParam{StartCursor: nextCursor})
-			if err != nil {
-				ctx.Err.Printf("site stats purchases scan: %s", err)
-				break
-			}
-			nextCursor = next
-			hasMore = more
-			s.Attendees += len(pages)
-		}
-	}
-
-	siteStatsMu.Lock()
-	siteStats = s
-	siteStatsMu.Unlock()
-	ctx.Infos.Printf("Loaded site stats: confs=%d talks=%d attendees=%d",
-		s.PastConfs, s.PastTalks, s.Attendees)
-}
-
-// FetchSiteStats returns the cached about-page counters and queues a
-// background refresh on TTL expiry.
-func FetchSiteStats(ctx *config.AppContext) SiteStatsValues {
-	siteStatsMu.RLock()
-	s := siteStats
-	stale := lastSiteStatsFetch.Before(time.Now().Add(-cacheTTL))
-	siteStatsMu.RUnlock()
-	if stale {
-		lastSiteStatsFetch = time.Now()
-		queueRefresh(JobSiteStats)
-	}
-	return s
 }
 
 // CacheStats reports the current row counts in each warm cache. Used by
