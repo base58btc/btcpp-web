@@ -18,7 +18,7 @@ Rules:
 | File | Purpose |
 | --- | --- |
 | `external/getters/backend.go` | Backend constants, backend selection helper, unsupported-backend error helper. |
-| `external/getters/runtime.go` | Worker pool, cache bootstrapping, generic runtime cache coordination. |
+| `external/getters/cache.go` | Worker pool, cache bootstrapping, generic cache coordination. |
 | `external/getters/conferences.go` | Conference runtime/cache entrypoints and dispatchers. |
 | `external/getters/conferences_postgres.go` | Postgres conference reads/writes. |
 | `external/getters/speakers.go` | Speaker/person runtime/cache entrypoints and dispatchers. |
@@ -37,6 +37,14 @@ Rules:
 | `external/getters/socialposts_postgres.go` | Postgres social post reads/writes. |
 | `external/getters/missives_postgres.go` | Future Postgres missive/subscriber reads/writes; paused for now. |
 
+## Current Progress: Cache
+
+- Shared cache state, `JobType`, work-pool startup, cache queueing,
+  `WaitFetch`, job dispatch, disk-cache bootstrap, refresh callbacks, and
+  `CacheStats` moved to `external/getters/cache.go`.
+- `external/getters/notion.go` now starts with Notion API implementations
+  instead of shared runtime/bootstrap code.
+
 ## `notion.go` Function Map
 
 ### Runtime / Cache Infrastructure
@@ -46,16 +54,16 @@ without gaining a `Notion` suffix.
 
 | Current function | Future location | Notes |
 | --- | --- | --- |
-| `queueRefresh` | `runtime.go` | Shared cache queue helper. |
-| `OnTalksRefresh` | `runtime.go` or `talks.go` | Runtime callback registration. |
-| `OnSpeakersRefresh` | `runtime.go` or `speakers.go` | Runtime callback registration. |
-| `StartWorkPool` | `runtime.go` | Runtime worker pool. |
-| `CloseWorkPool` | `runtime.go` | Runtime worker pool. |
-| `loadFromCache` | `runtime.go` | Disk cache bootstrap for legacy caches. |
-| `WaitFetch` | `runtime.go` | Runtime cache warmup. |
-| `runJob` | `runtime.go` | Runtime cache job dispatch. |
-| `workers` | `runtime.go` | Runtime cache worker loop. |
-| `CacheStats` | `runtime.go` | Runtime debug stats. |
+| `queueRefresh` | `cache.go` | Shared cache queue helper. |
+| `OnTalksRefresh` | `cache.go` or `talks.go` | Runtime callback registration. |
+| `OnSpeakersRefresh` | `cache.go` or `speakers.go` | Runtime callback registration. |
+| `StartWorkPool` | `cache.go` | Runtime worker pool. |
+| `CloseWorkPool` | `cache.go` | Runtime worker pool. |
+| `loadFromCache` | `cache.go` | Disk cache bootstrap for legacy caches. |
+| `WaitFetch` | `cache.go` | Runtime cache warmup. |
+| `runJob` | `cache.go` | Runtime cache job dispatch. |
+| `workers` | `cache.go` | Runtime cache worker loop. |
+| `CacheStats` | `cache.go` | Runtime debug stats. |
 | `InvalidateProposalsCache` | `talks.go` | Runtime cache invalidation. |
 | `InvalidateSpeakerConfsCache` | `talks.go` | Runtime cache invalidation. |
 | `CacheSpeakerInsert` | `speakers.go` | Runtime cache mutation after write. |
