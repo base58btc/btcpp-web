@@ -139,7 +139,7 @@ func SocialAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext)
 	}
 
 	// Load already-posted refs to hide them
-	postedRefs, err := getters.ListPostedRefs(ctx.Notion, conf)
+	postedRefs, err := getters.ListPostedRefs(ctx, conf)
 	if err != nil {
 		ctx.Err.Printf("/%s/admin/social failed to load posted refs: %s", conf.Tag, err.Error())
 		postedRefs = make(map[string]bool)
@@ -436,7 +436,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			posted++
 			ctx.Infos.Printf("Queued speaker post for %s to %s", speakerID, ch.Service)
 			id := helpers.SpeakerSocialPostRef(conf.Tag, talkID, speakerID)
-			getters.RecordSocialPost(ctx.Notion, id, postText, ch.Service, time.Now())
+			getters.RecordSocialPost(ctx, id, postText, ch.Service, time.Now())
 		}
 	}
 
@@ -467,7 +467,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			posted++
 			ctx.Infos.Printf("Queued talk post for %s to %s", talkID, ch.Service)
 			postid := helpers.TalkSocialPostRef(conf.Tag, talkID)
-			getters.RecordSocialPost(ctx.Notion, postid, postText, ch.Service, time.Now())
+			getters.RecordSocialPost(ctx, postid, postText, ch.Service, time.Now())
 		}
 	}
 
@@ -511,7 +511,7 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 			posted++
 			ctx.Infos.Printf("Queued sponsor post for %s to %s", sp.ref, ch.Service)
 			postid := helpers.SponsorSocialPostRef(conf.Tag, sp.ref)
-			getters.RecordSocialPost(ctx.Notion, postid, sp.text, ch.Service, time.Now())
+			getters.RecordSocialPost(ctx, postid, sp.text, ch.Service, time.Now())
 		}
 	}
 
@@ -549,6 +549,6 @@ func SocialPost(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 func RecordInstagramBatch(ctx *config.AppContext, conf *types.Conf, sponsors []selectedSponsor, text string, channel buffer.Channel) {
 	for _, sponsor := range sponsors {
 		postid := helpers.SponsorSocialPostRef(conf.Tag, sponsor.ref)
-		getters.RecordSocialPost(ctx.Notion, postid, text, channel.Service, time.Now())
+		getters.RecordSocialPost(ctx, postid, text, channel.Service, time.Now())
 	}
 }

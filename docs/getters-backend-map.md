@@ -372,3 +372,12 @@ Current progress:
 - Notion attendee counting lives in `external/getters/site_stats_notion.go`.
 - Postgres attendee counting lives in `external/getters/site_stats_postgres.go`
   and counts rows from `registrations`.
+
+## Current Progress: Social Posts
+
+- `ListPostedRefs`, `RecordSocialPost`, `ListSocialPosts`, and
+  `UpsertSocialPost` now dispatch by backend.
+- Shared cache and update helpers remain in `external/getters/socialposts.go`.
+- Notion implementations live in `external/getters/socialposts_notion.go`.
+- Postgres implementations live in `external/getters/socialposts_postgres.go`
+  and read/write `social_posts`.
