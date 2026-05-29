@@ -2895,7 +2895,7 @@ func CheckInGet(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) 
 	params := mux.Vars(r)
 	ticket := params["ticket"]
 
-	tix_type, ok, err := getters.CheckIn(ctx.Notion, ticket)
+	tix_type, ok, err := getters.CheckIn(ctx, ticket)
 	if !ok && err != nil {
 		http.Error(w, "Unable to load page, please try again later", http.StatusInternalServerError)
 		ctx.Err.Printf("Unable to check-in %s: %s", ticket, err.Error())

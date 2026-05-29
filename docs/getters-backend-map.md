@@ -326,3 +326,19 @@ Current progress:
   and reads/writes `affiliate_usages`.
 - Affiliate discount-code management (`CreateAffiliateCode`, `UpdateAffiliateCode`,
   `ArchiveAffiliateCode`) still writes Notion via the existing discounts flow.
+
+## Current Progress: Registrations
+
+- `CheckIn`, `SoldTixCount`, `FetchRegistrations`, and
+  `ListRegistrationsByEmail` now dispatch by backend.
+- `SoldTixCached`, `UpdateSoldTix`, `EmailHasRegistration`,
+  `FetchRegistrationsConf`, and `FetchBtcppRegistrations` moved to
+  `external/getters/registrations.go`.
+- The renamed Notion implementations are `CheckInNotion`,
+  `SoldTixCountNotion`, `FetchRegistrationsNotion`, and
+  `ListRegistrationsByEmailNotion`.
+- The Postgres implementation lives in
+  `external/getters/registrations_postgres.go` and reads/writes
+  `registrations`.
+- Ticket creation/revoke paths (`AddTickets`, `RevokeTicket`,
+  `ToggleTicketBlock`, etc.) still need a dedicated Postgres write split.

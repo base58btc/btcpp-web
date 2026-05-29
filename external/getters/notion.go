@@ -1521,7 +1521,7 @@ func ListDiscountsNotion(n *types.Notion) ([]*types.DiscountCode, error) {
 	return discounts, nil
 }
 
-func CheckIn(n *types.Notion, ticket string) (string, bool, error) {
+func CheckInNotion(n *types.Notion, ticket string) (string, bool, error) {
 	/* Make sure that the ticket is in the Purchases table and
 	is *NOT* already checked in */
 	pages, _, _, _ := n.Client.QueryDatabase(context.Background(), n.Config.PurchasesDb,
@@ -1568,24 +1568,7 @@ func CheckIn(n *types.Notion, ticket string) (string, bool, error) {
 	return "", true, fmt.Errorf("Already checked in")
 }
 
-func SoldTixCached(ctx *config.AppContext, conf *types.Conf) uint {
-	/* update the sold tix cache every time */
-	go UpdateSoldTix(ctx, conf)
-
-	return conf.TixSold
-}
-
-func UpdateSoldTix(ctx *config.AppContext, conf *types.Conf) {
-	soldTixCount, err := SoldTixCount(ctx.Notion, conf.Ref)
-	if err != nil {
-		ctx.Err.Printf("error fetching sold tix %s %s", conf.Ref, err)
-	} else {
-		ctx.Infos.Printf("Loaded sold tix count %s %d!", conf.Ref, soldTixCount)
-		conf.TixSold = soldTixCount
-	}
-}
-
-func SoldTixCount(n *types.Notion, confRef string) (uint, error) {
+func SoldTixCountNotion(n *types.Notion, confRef string) (uint, error) {
 	var regisCount uint
 
 	hasMore := true
@@ -1614,7 +1597,7 @@ func SoldTixCount(n *types.Notion, confRef string) (uint, error) {
 	return regisCount, nil
 }
 
-func FetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
+func FetchRegistrationsNotion(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
 	var regis []*types.Registration
 	hasMore := true
 	nextCursor := ""
@@ -1653,7 +1636,7 @@ func FetchRegistrations(ctx *config.AppContext, confRef string) ([]*types.Regist
 // ListRegistrationsByEmail returns every PurchasesDb row for this email.
 // Used by the dashboard to render "your tickets" and the apply-form
 // "returning attendee" check.
-func ListRegistrationsByEmail(ctx *config.AppContext, email string) ([]*types.Registration, error) {
+func ListRegistrationsByEmailNotion(ctx *config.AppContext, email string) ([]*types.Registration, error) {
 	if email == "" {
 		return nil, nil
 	}
@@ -1680,70 +1663,6 @@ func ListRegistrationsByEmail(ctx *config.AppContext, email string) ([]*types.Re
 		}
 	}
 	return out, nil
-}
-
-// EmailHasRegistration reports whether the email appears at all in
-// PurchasesDb — used by the talk-apply form to hide the "first bitcoin++"
-// checkbox for returning attendees.
-func EmailHasRegistration(ctx *config.AppContext, email string) (bool, error) {
-	regs, err := ListRegistrationsByEmail(ctx, email)
-	if err != nil {
-		return false, err
-	}
-	return len(regs) > 0, nil
-}
-
-func ticketMatch(tickets []string, rez *types.Registration) bool {
-	for _, tix := range tickets {
-		if strings.Contains(rez.ItemBought, tix) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func checkActive(ctx *config.AppContext, confRef string) bool {
-	confs, err := FetchConfsCached(ctx)
-	if err != nil {
-		ctx.Err.Printf("couldn't fetch confs?? %s", err)
-		return false
-	}
-
-	for _, conf := range confs {
-		if confRef == conf.Ref {
-			return conf.Active
-		}
-	}
-
-	return false
-}
-
-func FetchRegistrationsConf(ctx *config.AppContext, confRef string) ([]*types.Registration, error) {
-	return FetchRegistrations(ctx, confRef)
-}
-
-func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.Registration, error) {
-	var btcppres []*types.Registration
-	rezzies, err := FetchRegistrations(ctx, "")
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, r := range rezzies {
-		if r.RefID == "" {
-			continue
-		}
-
-		if activeOnly && !checkActive(ctx, r.ConfRef) {
-			continue
-		}
-
-		btcppres = append(btcppres, r)
-	}
-
-	return btcppres, nil
 }
 
 func LookupTicketPages(n *types.Notion, lookupID string) ([]*notion.Page, error) {
