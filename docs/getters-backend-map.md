@@ -27,8 +27,7 @@ Rules:
 | `external/getters/speaker_confs_postgres.go` | Postgres speaker-conf reads. |
 | `external/getters/conf_talks.go` | Conf-talk runtime/cache entrypoints, dispatchers, and Talk derivation. |
 | `external/getters/conf_talks_postgres.go` | Postgres conf-talk reads. |
-| `external/getters/talks.go` | Talk, proposal, speaker-conf, conf-talk runtime entrypoints and dispatchers. |
-| `external/getters/talks_postgres.go` | Postgres talk/proposal/speaker-conf/conf-talk reads/writes. |
+| `external/getters/talks.go` | Derived Talk runtime/cache entrypoints and helpers. |
 | `external/getters/discounts_postgres.go` | Postgres discount reads/writes. |
 | `external/getters/hotels_postgres.go` | Postgres hotel reads/writes. |
 | `external/getters/volunteers_postgres.go` | Postgres volunteer, volunteer info, job type, shift reads/writes. |
@@ -347,6 +346,15 @@ Current progress:
   `external/getters/conf_talks_postgres.go` and read `conf_talks`.
 - Conf-talk write paths (`CreateConfTalk`, schedule updates, archive/delete,
   clipart/social-card updates) still need a dedicated Postgres write split.
+
+## Current Progress: Talks
+
+- `getTalks`, `FetchTalksCached`, `InvalidateTalksCache`,
+  `patchTalksStatusForProposal`, `listTalks`, `GetTalksFor`, and `GetTalk`
+  moved to `external/getters/talks.go`.
+- Talk reads are derived from `conf_talks`, `proposals`, and
+  `speaker_confs`; they use the backend-specific readers behind those
+  dispatchers instead of a separate Postgres `talks` table.
 
 ## Current Progress: Affiliate Usage
 
