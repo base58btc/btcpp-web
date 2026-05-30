@@ -28,6 +28,7 @@ Rules:
 | `external/getters/conf_talks.go` | Conf-talk runtime/cache entrypoints, dispatchers, and Talk derivation. |
 | `external/getters/conf_talks_postgres.go` | Postgres conf-talk reads. |
 | `external/getters/talks.go` | Derived Talk runtime/cache entrypoints and helpers. |
+| `external/getters/notion_helpers.go` | Shared direct Notion HTTP helpers for page PATCH/POST workarounds. |
 | `external/getters/discounts_postgres.go` | Postgres discount reads/writes. |
 | `external/getters/hotels_postgres.go` | Postgres hotel reads/writes. |
 | `external/getters/volunteers_postgres.go` | Postgres volunteer, volunteer info, job type, shift reads/writes. |
@@ -268,7 +269,10 @@ Current progress:
 - `FetchShiftsCached` moved to `external/getters/work_shifts.go`.
 - `GetShiftsForConf` moved to `external/getters/work_shifts.go`.
 - `ListWorkShifts` remains as a context-based app-facing wrapper.
-- `ListWorkShiftsNotion` is the renamed Notion implementation.
+- `ListWorkShiftsNotion` and Notion-only shift write paths moved to
+  `external/getters/work_shifts_notion.go`.
+- Shared direct Notion page helpers moved to
+  `external/getters/notion_helpers.go`.
 - `listWorkShiftsPostgres` is implemented in `external/getters/work_shifts_postgres.go`.
 - Shift write paths (`CreateShift`, `UpdateShift`, assignment helpers, etc.) still need a
   dedicated Postgres write split.
