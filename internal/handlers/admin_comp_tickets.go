@@ -151,7 +151,7 @@ func issueCompTickets(ctx *config.AppContext, conf *types.Conf, email, tixType s
 		Email:    email,
 		Items:    items,
 	}
-	if err := getters.AddTickets(ctx.Notion, &entry, "admincomp"); err != nil {
+	if err := getters.AddTickets(ctx, &entry, "admincomp"); err != nil {
 		return fmt.Errorf("AddTickets: %w", err)
 	}
 	if err := missives.NewTicketSub(ctx, email, conf.Tag, tixType, false); err != nil {

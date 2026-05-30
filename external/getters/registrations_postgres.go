@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -129,4 +130,71 @@ func queryRegistrationsPostgres(ctx *config.AppContext, filter string, value str
 		return nil, fmt.Errorf("iterate registrations: %w", err)
 	}
 	return out, nil
+}
+
+func addTicketsPostgres(ctx *config.AppContext, entry *types.Entry, src string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	if entry == nil {
+		return fmt.Errorf("AddTickets: entry is nil")
+	}
+	email := strings.TrimSpace(entry.Email)
+	if email == "" {
+		return fmt.Errorf("AddTickets: entry email is required")
+	}
+	if strings.TrimSpace(entry.ConfRef) == "" {
+		return fmt.Errorf("AddTickets: entry conference ref is required")
+	}
+
+	for i, item := range entry.Items {
+		refID := types.UniqueID(entry.Email, entry.ID, int32(i))
+		amountPaid := float64(item.Total) / 100
+		_, err := ctx.DB.Exec(context.Background(), `
+			INSERT INTO registrations (
+				ref_id, checkout_id, conference_id, discount_id, type, email,
+				item_bought, amount_paid, currency, platform, registered_at, revoked
+			)
+			VALUES (
+				$1, $2, $3::uuid,
+				NULLIF($4, '')::uuid,
+				$5, $6, $7, $8, $9, $10, $11, false
+			)
+			ON CONFLICT (ref_id) DO UPDATE SET
+				checkout_id = EXCLUDED.checkout_id,
+				conference_id = EXCLUDED.conference_id,
+				discount_id = EXCLUDED.discount_id,
+				type = EXCLUDED.type,
+				email = EXCLUDED.email,
+				item_bought = EXCLUDED.item_bought,
+				amount_paid = EXCLUDED.amount_paid,
+				currency = EXCLUDED.currency,
+				platform = EXCLUDED.platform,
+				registered_at = EXCLUDED.registered_at,
+				revoked = false
+		`, refID, entry.ID, entry.ConfRef, entry.DiscountRef, item.Type, email,
+			item.Desc, amountPaid, entry.Currency, src, entry.Created)
+		if err != nil {
+			return fmt.Errorf("upsert registration %q: %w", refID, err)
+		}
+	}
+	return nil
+}
+
+func revokeTicketPostgres(ctx *config.AppContext, lookupID string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	tag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE registrations
+		SET revoked = true
+		WHERE checkout_id = $1
+	`, lookupID)
+	if err != nil {
+		return fmt.Errorf("revoke ticket %q: %w", lookupID, err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("ticket lookup %s not found", lookupID)
+	}
+	return nil
 }

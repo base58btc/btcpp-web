@@ -115,3 +115,17 @@ func FetchBtcppRegistrations(ctx *config.AppContext, activeOnly bool) ([]*types.
 
 	return btcppres, nil
 }
+
+func AddTickets(ctx *config.AppContext, entry *types.Entry, src string) error {
+	if UsePostgresBackend(ctx) {
+		return addTicketsPostgres(ctx, entry, src)
+	}
+	return addTicketsNotion(ctx.Notion, entry, src)
+}
+
+func RevokeTicket(ctx *config.AppContext, lookupID string) error {
+	if UsePostgresBackend(ctx) {
+		return revokeTicketPostgres(ctx, lookupID)
+	}
+	return revokeTicketNotion(ctx.Notion, lookupID)
+}

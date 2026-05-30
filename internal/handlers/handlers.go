@@ -3017,7 +3017,7 @@ func OpenNodeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		return
 	}
 
-	err = getters.AddTickets(ctx.Notion, &entry, "opennode")
+	err = getters.AddTickets(ctx, &entry, "opennode")
 
 	if err != nil {
 		ctx.Err.Printf("!!! Unable to add ticket %s: %v", err, entry)
@@ -3533,7 +3533,7 @@ func StripeCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 			return
 		}
 
-		err = getters.AddTickets(ctx.Notion, &entry, "stripe")
+		err = getters.AddTickets(ctx, &entry, "stripe")
 
 		if err != nil {
 			ctx.Err.Printf("!!! Unable to add ticket: %v", err)
@@ -4221,7 +4221,7 @@ func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.
 		},
 	}
 
-	err = getters.AddTickets(ctx.Notion, &entry, "volreg")
+	err = getters.AddTickets(ctx, &entry, "volreg")
 	if err != nil {
 		return fmt.Errorf("add ticket: %w", err)
 	}
@@ -4541,7 +4541,7 @@ func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 
 	// Revoke their ticket if one was issued
 	ctx.Infos.Printf("revoking ticket with id %s", vol.RegisID())
-	err = getters.RevokeTicket(ctx.Notion, vol.RegisID())
+	err = getters.RevokeTicket(ctx, vol.RegisID())
 	if err != nil {
 		ctx.Err.Printf("/vols/shift/%s/decline ticket revoke failed: %s", confTag, err.Error())
 	}

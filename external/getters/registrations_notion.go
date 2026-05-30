@@ -172,7 +172,7 @@ func TicketPages(n *types.Notion, field, uniqID string) ([]*notion.Page, error) 
 	return pages, err
 }
 
-func ToggleTicketBlock(n *types.Notion, pageID string, block bool) error {
+func toggleTicketBlockNotion(n *types.Notion, pageID string, block bool) error {
 	_, err := n.Client.UpdatePageProperties(context.Background(), pageID,
 		map[string]*notion.PropertyValue{
 			"Revoked": {
@@ -183,16 +183,16 @@ func ToggleTicketBlock(n *types.Notion, pageID string, block bool) error {
 	return err
 }
 
-func RevokeTicket(n *types.Notion, lookupID string) error {
+func revokeTicketNotion(n *types.Notion, lookupID string) error {
 	pages, err := LookupTicketPages(n, lookupID)
 
 	for _, page := range pages {
-		ToggleTicketBlock(n, page.ID, true)
+		toggleTicketBlockNotion(n, page.ID, true)
 	}
 	return err
 }
 
-func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
+func addTicketsNotion(n *types.Notion, entry *types.Entry, src string) error {
 	parent := notion.NewDatabaseParent(n.Config.PurchasesDb)
 
 	for i, item := range entry.Items {
@@ -204,7 +204,7 @@ func AddTickets(n *types.Notion, entry *types.Entry, src string) error {
 		}
 		if len(pages) > 0 {
 			for _, page := range pages {
-				ToggleTicketBlock(n, page.ID, false)
+				toggleTicketBlockNotion(n, page.ID, false)
 			}
 			continue
 		}

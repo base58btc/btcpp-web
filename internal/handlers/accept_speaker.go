@@ -150,7 +150,7 @@ func issueSpeakerTicket(ctx *config.AppContext, email string, conf *types.Conf) 
 			{Total: 1, Desc: conf.Desc, Type: tixType},
 		},
 	}
-	if err := getters.AddTickets(ctx.Notion, &entry, "spkreg"); err != nil {
+	if err := getters.AddTickets(ctx, &entry, "spkreg"); err != nil {
 		ctx.Err.Printf("issueSpeakerTicket add %s for %s: %s", email, conf.Tag, err)
 		return
 	}
