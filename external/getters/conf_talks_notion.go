@@ -85,3 +85,29 @@ func loadTalkFromConfTalkNotion(ctx *config.AppContext, confTalkID string) (*typ
 	resolveProposalSpeakers(proposal, speakerConfMap)
 	return talkFromConfTalk(ct, proposal), nil
 }
+
+func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
+	_, err := n.Client.UpdatePageProperties(context.Background(), talkID,
+		map[string]*notion.PropertyValue{
+			"CalNotif": notion.NewRichTextPropertyValue(
+				[]*notion.RichText{
+					{
+						Type: notion.RichTextText,
+						Text: &notion.Text{
+							Content: calnotif,
+						}},
+				}...),
+		})
+	if err != nil {
+		return err
+	}
+	confTalkCacheMu.Lock()
+	for _, ct := range cacheConfTalks {
+		if ct != nil && ct.ID == talkID {
+			ct.CalNotif = calnotif
+			break
+		}
+	}
+	confTalkCacheMu.Unlock()
+	return nil
+}

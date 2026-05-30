@@ -5,7 +5,8 @@ dispatchers with Notion and Postgres implementations.
 
 Rules:
 
-- `external/getters/notion.go` should remain Notion-only while it exists.
+- `external/getters/notion.go` has been removed; Notion implementations now
+  live in domain-specific `*_notion.go` files.
 - Notion API implementations should get a `Notion` suffix when renamed.
 - Runtime/cache dispatchers should live outside `notion.go`.
 - Postgres implementations should live in domain files named like
@@ -43,8 +44,18 @@ Rules:
 - Shared cache state, `JobType`, work-pool startup, cache queueing,
   `WaitFetch`, job dispatch, disk-cache bootstrap, refresh callbacks, and
   `CacheStats` moved to `external/getters/cache.go`.
-- `external/getters/notion.go` now starts with Notion API implementations
-  instead of shared runtime/bootstrap code.
+- `external/getters/notion.go` has been removed.
+
+## Current Progress: Notion Splits
+
+- The remaining `notion.go` functions were split into:
+  `conferences_notion.go`, `speakers_notion.go`, `hotels_notion.go`,
+  `job_types_notion.go`, `discounts_notion.go`, `registrations_notion.go`,
+  and `uploads_notion.go`.
+- Calendar notification writes now live with their domain:
+  `TalkUpdateCalNotif` in `conf_talks_notion.go`,
+  `ShiftUpdateCalNotif` in `work_shifts_notion.go`, and
+  `ConfUpdateOrientCalNotif` in `conferences_notion.go`.
 
 ## `notion.go` Function Map
 
@@ -389,9 +400,8 @@ Current progress:
 - `SoldTixCached`, `UpdateSoldTix`, `EmailHasRegistration`,
   `FetchRegistrationsConf`, and `FetchBtcppRegistrations` moved to
   `external/getters/registrations.go`.
-- The renamed Notion implementations are `CheckInNotion`,
-  `SoldTixCountNotion`, `FetchRegistrationsNotion`, and
-  `ListRegistrationsByEmailNotion`.
+- The renamed Notion implementations plus Notion-only ticket write helpers
+  live in `external/getters/registrations_notion.go`.
 - The Postgres implementation lives in
   `external/getters/registrations_postgres.go` and reads/writes
   `registrations`.
