@@ -282,8 +282,9 @@ Current progress:
 - `GetVolInfo`, `GetVolInfoMap`, `GetVolInfos`, `ListVolunteerApps`,
   `FetchVolunteer`, and `ListVolunteersForConf` moved to
   `external/getters/volunteers.go`.
-- `GetVolInfosNotion`, `ListVolunteerAppsNotion`, `FetchVolunteerNotion`, and
-  `ListVolunteersForConfNotion` are the renamed Notion implementations.
+- `GetVolInfosNotion`, `ListVolunteerAppsNotion`, `FetchVolunteerNotion`,
+  `ListVolunteersForConfNotion`, `RegisterVolunteer`, and volunteer update
+  helpers moved to `external/getters/volunteers_notion.go`.
 - `getVolInfosPostgres`, `listVolunteerAppsPostgres`, `fetchVolunteerPostgres`,
   and `listVolunteersForConfPostgres` are implemented in
   `external/getters/volunteers_postgres.go`.
