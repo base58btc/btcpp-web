@@ -37,7 +37,7 @@ Rules:
 | `external/getters/sponsors_postgres.go` | Postgres organization/sponsorship reads/writes. |
 | `external/getters/affiliate_postgres.go` | Postgres affiliate usage reads/writes. |
 | `external/getters/socialposts_postgres.go` | Postgres social post reads/writes. |
-| `external/getters/missives_postgres.go` | Future Postgres missive/subscriber reads/writes; paused for now. |
+| `external/getters/missives_postgres.go` | Postgres missive/subscriber reads/writes. |
 
 ## Current Progress: Cache
 

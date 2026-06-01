@@ -79,7 +79,7 @@ func PortRegistrationsToNewsletters(w http.ResponseWriter, r *http.Request, ctx 
 			newsletters = append(newsletters, newsletters[0]+"-genpop")
 		}
 
-		_, err := getters.SubscribeEmailList(ctx.Notion, rez.Email, newsletters)
+		_, err := getters.SubscribeEmailList(ctx, rez.Email, newsletters)
 		if err != nil {
 			ctx.Err.Println(err)
 			continue
@@ -175,7 +175,7 @@ func ConfirmEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 
 	/* Add to email list */
-	subscriber, err := getters.FindSubscriber(ctx.Notion, subToken.Email)
+	subscriber, err := getters.FindSubscriber(ctx, subToken.Email)
 	if err != nil {
 		ctx.Infos.Printf("Subscribe failed for newsletter confirmation request %s: %s", subToken.Email, err)
 		/* FIXME: show an error banner or something */
@@ -185,7 +185,7 @@ func ConfirmEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 	}
 
 	if subscriber == nil {
-		subscriber, err = getters.SubscribeEmail(ctx.Notion, subToken.Email, subToken.Newsletter)
+		subscriber, err = getters.SubscribeEmail(ctx, subToken.Email, subToken.Newsletter)
 		if err != nil {
 			ctx.Infos.Printf("Subscribe failed for newsletter confirmation request %s: %s", subToken.Email, err)
 			/* FIXME: show an error banner or something */
@@ -206,7 +206,7 @@ func ConfirmEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext
 			http.Redirect(w, r, "/", http.StatusSeeOther)
 			return
 		}
-		err = getters.UpdateSubs(ctx.Notion, subscriber)
+		err = getters.UpdateSubs(ctx, subscriber)
 		if err != nil {
 			ctx.Infos.Printf("Subscribe failed for newsletter confirmation request %s: %s", subToken.Email, err)
 			/* FIXME: show an error banner or something */
@@ -255,7 +255,7 @@ func UnsubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	}
 
 	/* Find record for that token */
-	subscriber, err := getters.FindSubscriber(ctx.Notion, subToken.Email)
+	subscriber, err := getters.FindSubscriber(ctx, subToken.Email)
 	if err != nil || subscriber == nil {
 		ctx.Infos.Printf("No subscriber found for token %s (%s)", token, subToken.Email)
 		if err != nil {
@@ -270,7 +270,7 @@ func UnsubscribeEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	if changed {
 
 		/* Update on Notion */
-		err := getters.UpdateSubs(ctx.Notion, subscriber)
+		err := getters.UpdateSubs(ctx, subscriber)
 		if err != nil {
 			ctx.Infos.Printf("notion error: unsubscribing %s from %s: %s", subscriber.Email, subToken.Newsletter, err)
 		}
@@ -322,7 +322,7 @@ func PreviewMissive(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 		return
 	}
 
-	missive, err := getters.GetLetter(ctx.Notion, uid)
+	missive, err := getters.GetLetter(ctx, uid)
 	if err != nil {
 		ctx.Infos.Printf("Unable to schedule missives: %s", err)
 		/* Return the homepage page */
@@ -369,7 +369,7 @@ func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	params := mux.Vars(r)
 	newsletter := params["newsletter"]
 
-	subscribers, err := getters.ListSubscribers(ctx.Notion, newsletter)
+	subscribers, err := getters.ListSubscribers(ctx, newsletter)
 	if err != nil {
 		ctx.Infos.Printf("Unable to schedule missives: %s", err)
 		/* Return the homepage page */
@@ -377,7 +377,7 @@ func ScheduleNewsMissives(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		return
 	}
 
-	letters, err := getters.GetLetters(ctx.Notion, newsletter)
+	letters, err := getters.GetLetters(ctx, newsletter)
 	if err != nil {
 		ctx.Infos.Printf("Unable to send missives: %s", err)
 		/* Return the homepage page */
@@ -413,7 +413,7 @@ func UnscheduleNewsMissive(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
-	missive, err := getters.GetLetter(ctx.Notion, uid)
+	missive, err := getters.GetLetter(ctx, uid)
 	if err != nil {
 		ctx.Infos.Printf("Unable to schedule missives: %s", err)
 		/* Return the homepage page */

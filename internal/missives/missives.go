@@ -76,11 +76,11 @@ func scheduleMissives(ctx *config.AppContext, subscribers []*mtypes.Subscriber, 
 }
 
 func ScheduleMissiveByUID(ctx *config.AppContext, uid uint64) (*mtypes.Letter, error) {
-	letter, err := getters.GetLetter(ctx.Notion, uid)
+	letter, err := getters.GetLetter(ctx, uid)
 	if err != nil {
 		return nil, err
 	}
-	subscribers, err := getters.ListSubscribersFor(ctx.Notion, letter.Newsletters)
+	subscribers, err := getters.ListSubscribersFor(ctx, letter.Newsletters)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func scheduleMissive(ctx *config.AppContext, subscribers []*mtypes.Subscriber, l
 	/* Update SentAt field! */
 	if letter.SetSentAt() && !isPreview {
 		now := time.Now()
-		err = getters.MarkLetterSent(ctx.Notion, letter, now)
+		err = getters.MarkLetterSent(ctx, letter, now)
 		if err != nil {
 			return nil, mtypes.ErrO, err
 		}
@@ -146,7 +146,7 @@ func scheduleMissive(ctx *config.AppContext, subscribers []*mtypes.Subscriber, l
 
 func NewSubscriberMissives(ctx *config.AppContext, subscriber *mtypes.Subscriber, newsletter string) error {
 
-	letters, err := getters.GetLetters(ctx.Notion, newsletter)
+	letters, err := getters.GetLetters(ctx, newsletter)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func MakeApplicationSublist(conftag, apptype string, gensub bool) []string {
 }
 
 func NewSubs(ctx *config.AppContext, email string, newsletters []string) error {
-	sub, err := getters.SubscribeEmailList(ctx.Notion, email, newsletters)
+	sub, err := getters.SubscribeEmailList(ctx, email, newsletters)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func NewTicketSub(ctx *config.AppContext, email, conf, tixtype string, gensub bo
 		newsletters = append(newsletters, "newsletter")
 	}
 
-	sub, err := getters.SubscribeEmailList(ctx.Notion, email, newsletters)
+	sub, err := getters.SubscribeEmailList(ctx, email, newsletters)
 	if err != nil {
 		return err
 	}

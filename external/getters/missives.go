@@ -1,436 +1,11 @@
 package getters
 
 import (
-	"btcpp-web/internal/mtypes"
-	"btcpp-web/internal/types"
-	"context"
-	"fmt"
-	"github.com/niftynei/go-notion"
-	"strings"
 	"time"
+
+	"btcpp-web/internal/config"
+	"btcpp-web/internal/mtypes"
 )
-
-func parseSubs(options *[]*notion.SelectOption) []*mtypes.Subscription {
-	var subs []*mtypes.Subscription
-
-	if options == nil {
-		return subs
-	}
-
-	for _, opt := range *options {
-		subs = append(subs, &mtypes.Subscription{
-			Name: opt.Name,
-			ID:   opt.ID,
-		})
-	}
-	return subs
-}
-
-func parseOptsToList(field string, props map[string]notion.PropertyValue) []string {
-	var list []string
-	opts := props[field].MultiSelect
-
-	if opts == nil {
-		return list
-	}
-
-	for _, opt := range *opts {
-		list = append(list, opt.Name)
-	}
-
-	return list
-}
-
-func parseLetter(pageID string, props map[string]notion.PropertyValue) *mtypes.Letter {
-	letter := &mtypes.Letter{
-		PageID:      pageID,
-		UID:         parseUniqueID("ID", props),
-		Title:       parseRichText("Title", props),
-		Newsletters: parseOptsToList("Newsletter", props),
-		Markdown:    parseRichText("Markdown", props),
-		SendAt:      parseRichText("SendAt", props),
-		OnlyFor:     parseSelect("OnlyFor", props),
-		Expiry:      parseDate("Expiry", props),
-		SentAt:      parseDate("SentAt", props),
-	}
-
-	return letter
-}
-
-func FindSubscriber(n *types.Notion, email string) (*mtypes.Subscriber, error) {
-	pages, _, _, err := n.Client.QueryDatabase(context.Background(),
-		n.Config.NewsletterDb, notion.QueryDatabaseParam{
-			Filter: &notion.Filter{
-				Property: "Email",
-				Text: &notion.TextFilterCondition{
-					Equals: email,
-				},
-			},
-		})
-
-	if err != nil {
-		return nil, err
-	}
-	if len(pages) == 0 {
-		return nil, nil
-	}
-
-	sub := &mtypes.Subscriber{
-		Pages: make([]string, len(pages)),
-	}
-
-	for i, page := range pages {
-		sub.Pages[i] = page.ID
-		sub.Email = parseRichText("Email", page.Properties)
-		sub.Subs = parseSubs(page.Properties["Subs"].MultiSelect)
-	}
-	return sub, err
-}
-
-func ListSubscribersFor(n *types.Notion, newsletters []string) ([]*mtypes.Subscriber, error) {
-	hasMore := true
-	nextCursor := ""
-	var subs []*mtypes.Subscriber
-	var orfilters []*notion.Filter
-	var andfilters []*notion.Filter
-	var filter *notion.Filter
-
-	for _, nl := range newsletters {
-		if strings.HasPrefix(nl, "!") {
-			filter := &notion.Filter{
-				Property: "Subs",
-				MultiSelect: &notion.MultiSelectFilterCondition{
-					/* Get rid of ! */
-					DoesNotContain: nl[1:],
-				},
-			}
-			andfilters = append(andfilters, filter)
-		} else {
-			filter = &notion.Filter{
-				Property: "Subs",
-				MultiSelect: &notion.MultiSelectFilterCondition{
-					Contains: nl,
-				},
-			}
-			orfilters = append(orfilters, filter)
-		}
-	}
-
-	if len(orfilters) == 0 {
-		return nil, fmt.Errorf("Must have at least 1 !!newsletter %v", newsletters)
-	}
-
-	/* or: [ orfilters... ] */
-	filter = &notion.Filter{
-		Or: orfilters,
-	}
-	if len(andfilters) != 0 {
-		/* and: [ andfilters..., { or: [ orfilters...] } ] */
-		andfilters = append(andfilters, filter)
-		filter = &notion.Filter{
-			And: andfilters,
-		}
-	}
-
-	for hasMore {
-
-		var err error
-		var pages []*notion.Page
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.NewsletterDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-				Filter:      filter,
-			})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, page := range pages {
-			sub := &mtypes.Subscriber{
-				Email: parseRichText("Email", page.Properties),
-				Subs:  parseSubs(page.Properties["Subs"].MultiSelect),
-			}
-			subs = append(subs, sub)
-		}
-	}
-
-	return subs, nil
-}
-
-// IsSubscribedTo reports whether email is in NewsletterDb with the named
-// subscription active. Used by the talk-apply form to hide the newsletter
-// opt-in checkbox for already-subscribed speakers.
-//
-// Returns (false, nil) when the email has no subscriber row at all (the
-// common case for first-time applicants).
-func IsSubscribedTo(n *types.Notion, email, newsletter string) (bool, error) {
-	if email == "" || newsletter == "" {
-		return false, nil
-	}
-	sub, err := FindSubscriber(n, email)
-	if err != nil {
-		return false, err
-	}
-	if sub == nil {
-		return false, nil
-	}
-	for _, s := range sub.Subs {
-		if s != nil && s.Name == newsletter {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func ListSubscribers(n *types.Notion, newsletter string) ([]*mtypes.Subscriber, error) {
-	letters := []string{newsletter}
-	return ListSubscribersFor(n, letters)
-}
-
-func NewSubscriber(n *types.Notion, email, newsletter string) (*mtypes.Subscriber, error) {
-	nls := []string{newsletter}
-	return NewSubscriberList(n, email, nls)
-}
-
-func NewSubscriberList(n *types.Notion, email string, newsletters []string) (*mtypes.Subscriber, error) {
-
-	opts := make([]*notion.SelectOption, len(newsletters))
-	for i, nl := range newsletters {
-		opts[i] = &notion.SelectOption{
-			Name: nl,
-		}
-	}
-
-	parent := notion.NewDatabaseParent(n.Config.NewsletterDb)
-	props := map[string]*notion.PropertyValue{
-		"Email": notion.NewTitlePropertyValue(
-			[]*notion.RichText{
-				{
-					Type: notion.RichTextText,
-					Text: &notion.Text{Content: email},
-				},
-			}...),
-		"Subs": notion.NewMultiSelectPropertyValue(opts...),
-	}
-
-	page, err := n.Client.CreatePage(context.Background(), parent, props)
-	if err != nil {
-		return nil, err
-	}
-	subscriber := &mtypes.Subscriber{
-		Pages: []string{page.ID},
-		Email: email,
-	}
-	subscriber.AddSublist(newsletters)
-	return subscriber, nil
-}
-
-func SubscribeEmailList(n *types.Notion, email string, newsletters []string) (*mtypes.Subscriber, error) {
-	subscriber, err := FindSubscriber(n, email)
-	if err != nil {
-		return nil, err
-	}
-
-	if subscriber == nil {
-		return NewSubscriberList(n, email, newsletters)
-	}
-
-	for _, nl := range newsletters {
-		subscriber.AddSubscription(nl)
-	}
-	err = UpdateSubs(n, subscriber)
-
-	return subscriber, err
-}
-
-func SubscribeEmail(n *types.Notion, email, newsletter string) (*mtypes.Subscriber, error) {
-	subscriber, err := FindSubscriber(n, email)
-	if err != nil {
-		return nil, err
-	}
-
-	if subscriber == nil {
-		return NewSubscriber(n, email, newsletter)
-	}
-
-	subscriber.AddSubscription(newsletter)
-	err = UpdateSubs(n, subscriber)
-
-	return subscriber, err
-}
-
-func makeSubList(sub *mtypes.Subscriber) []*notion.SelectOption {
-	subList := make([]*notion.SelectOption, len(sub.Subs))
-	for i, subscription := range sub.Subs {
-		subList[i] = &notion.SelectOption{
-			Name: subscription.Name,
-			ID:   subscription.ID,
-		}
-	}
-	return subList
-}
-
-func UpdateSubs(n *types.Notion, sub *mtypes.Subscriber) error {
-	subList := makeSubList(sub)
-
-	for _, pageID := range sub.Pages {
-		_, err := n.Client.UpdatePageProperties(context.Background(), pageID,
-			map[string]*notion.PropertyValue{
-				"Subs": notion.NewMultiSelectPropertyValue(subList...),
-			})
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func GetLetter(n *types.Notion, uniqueID uint64) (*mtypes.Letter, error) {
-	var err error
-	var pages []*notion.Page
-	pages, _, _, err = n.Client.QueryDatabase(context.Background(),
-		n.Config.MissivesDb, notion.QueryDatabaseParam{
-			Filter: &notion.Filter{
-				Property: "ID",
-				ID: &notion.UniqueIDFilterCondition{
-					Equals: float64(uniqueID),
-				},
-			},
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(pages) == 0 {
-		return nil, fmt.Errorf("Couldn't find missive with UID#%d", uniqueID)
-	}
-
-	letter := parseLetter(pages[0].ID, pages[0].Properties)
-	return letter, nil
-}
-
-func GetLetterFor(n *types.Notion, onlyfor string) (*mtypes.Letter, error) {
-	var err error
-	var pages []*notion.Page
-	pages, _, _, err = n.Client.QueryDatabase(context.Background(),
-		n.Config.MissivesDb, notion.QueryDatabaseParam{
-			Filter: &notion.Filter{
-				Property: "OnlyFor",
-				Select: &notion.SelectFilterCondition{
-					Equals: onlyfor,
-				},
-			},
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(pages) == 0 {
-		return nil, fmt.Errorf("Couldn't find missive OnlyFor %s", onlyfor)
-	}
-
-	letter := parseLetter(pages[0].ID, pages[0].Properties)
-	return letter, nil
-}
-
-func GetLetters(n *types.Notion, newsletter string) ([]*mtypes.Letter, error) {
-	hasMore := true
-	nextCursor := ""
-	var letters []*mtypes.Letter
-	var filter *notion.Filter
-
-	/* "all" keyword sends everything */
-	if newsletter != "all" {
-		filter = &notion.Filter{
-			Property: "Newsletter",
-			MultiSelect: &notion.MultiSelectFilterCondition{
-				Contains: newsletter,
-			},
-		}
-	}
-
-	for hasMore {
-		var err error
-		var pages []*notion.Page
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.MissivesDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-				Filter:      filter,
-			})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, page := range pages {
-			letter := parseLetter(page.ID, page.Properties)
-			if !letter.HasNewsletter(newsletter) {
-				continue
-			}
-			letters = append(letters, letter)
-		}
-	}
-
-	return letters, nil
-}
-
-// ListOnlyForLetters returns all missives that have a non-empty OnlyFor slug.
-// Used to populate the missive picker on the volunteer admin dashboard.
-func ListOnlyForLetters(n *types.Notion) ([]*mtypes.Letter, error) {
-	hasMore := true
-	nextCursor := ""
-	var letters []*mtypes.Letter
-
-	for hasMore {
-		var err error
-		var pages []*notion.Page
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.MissivesDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-			})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, page := range pages {
-			letter := parseLetter(page.ID, page.Properties)
-			if letter.OnlyFor == "" {
-				continue
-			}
-			letters = append(letters, letter)
-		}
-	}
-
-	return letters, nil
-}
-
-func ListTemplatedLetters(n *types.Notion) ([]*mtypes.Letter, error) {
-	hasMore := true
-	nextCursor := ""
-	var letters []*mtypes.Letter
-
-	for hasMore {
-		var err error
-		var pages []*notion.Page
-		pages, nextCursor, hasMore, err = n.Client.QueryDatabase(context.Background(),
-			n.Config.MissivesDb, notion.QueryDatabaseParam{
-				StartCursor: nextCursor,
-			})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, page := range pages {
-			letter := parseLetter(page.ID, page.Properties)
-			if letter.OnlyFor != mtypes.OnlyForTemplated {
-				continue
-			}
-			letters = append(letters, letter)
-		}
-	}
-
-	return letters, nil
-}
 
 type MissiveInput struct {
 	Title       string
@@ -441,76 +16,128 @@ type MissiveInput struct {
 	Expiry      *time.Time
 }
 
-func CreateTemplatedMissive(n *types.Notion, in MissiveInput) (*mtypes.Letter, error) {
-	in.OnlyFor = mtypes.OnlyForTemplated
-	props := missiveProps(in)
-	page, err := n.Client.CreatePage(context.Background(),
-		notion.NewDatabaseParent(n.Config.MissivesDb), props)
-	if err != nil {
-		return nil, err
+func FindSubscriber(ctx *config.AppContext, email string) (*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return findSubscriberPostgres(ctx, email)
 	}
-	return parseLetter(page.ID, page.Properties), nil
+	return findSubscriberNotion(ctx.Notion, email)
 }
 
-func UpdateTemplatedMissive(n *types.Notion, pageID string, in MissiveInput) error {
-	in.OnlyFor = mtypes.OnlyForTemplated
-	props := missiveProps(in)
-	_, err := n.Client.UpdatePageProperties(context.Background(), pageID, props)
-	return err
+func ListSubscribersFor(ctx *config.AppContext, newsletters []string) ([]*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return listSubscribersForPostgres(ctx, newsletters)
+	}
+	return listSubscribersForNotion(ctx.Notion, newsletters)
 }
 
-func missiveProps(in MissiveInput) map[string]*notion.PropertyValue {
-	props := map[string]*notion.PropertyValue{
-		"Title":      titleValue(in.Title),
-		"Markdown":   richTextValue(in.Markdown),
-		"SendAt":     richTextValue(in.SendAt),
-		"Newsletter": multiSelectValue(in.Newsletters),
-		"OnlyFor":    selectValue(in.OnlyFor),
+func IsSubscribedTo(ctx *config.AppContext, email, newsletter string) (bool, error) {
+	if UsePostgresBackend(ctx) {
+		return isSubscribedToPostgres(ctx, email, newsletter)
 	}
-	if in.Expiry != nil {
-		props["Expiry"] = notion.NewDatePropertyValue(&notion.Date{Start: *in.Expiry})
-	}
-	return props
+	return isSubscribedToNotion(ctx.Notion, email, newsletter)
 }
 
-func CreateMissive(n *types.Notion, title, markdown, sendAt string, newsletters []string) error {
-	// Build multi-select for newsletters
-	opts := make([]*notion.SelectOption, len(newsletters))
-	for i, nl := range newsletters {
-		opts[i] = &notion.SelectOption{Name: nl}
+func ListSubscribers(ctx *config.AppContext, newsletter string) ([]*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return listSubscribersPostgres(ctx, newsletter)
 	}
-
-	props := map[string]*notion.PropertyValue{
-		"Title": notion.NewTitlePropertyValue(
-			[]*notion.RichText{
-				{Type: notion.RichTextText, Text: &notion.Text{Content: title}},
-			}...),
-		"Markdown": notion.NewRichTextPropertyValue(
-			[]*notion.RichText{
-				{Type: notion.RichTextText, Text: &notion.Text{Content: markdown}},
-			}...),
-		"SendAt": notion.NewRichTextPropertyValue(
-			[]*notion.RichText{
-				{Type: notion.RichTextText, Text: &notion.Text{Content: sendAt}},
-			}...),
-		"Newsletter": {
-			Type:        notion.PropertyMultiSelect,
-			MultiSelect: &opts,
-		},
-	}
-
-	_, err := n.Client.CreatePage(context.Background(),
-		notion.NewDatabaseParent(n.Config.MissivesDb), props)
-	return err
+	return listSubscribersNotion(ctx.Notion, newsletter)
 }
 
-func MarkLetterSent(n *types.Notion, letter *mtypes.Letter, sentAt time.Time) error {
+func NewSubscriber(ctx *config.AppContext, email, newsletter string) (*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return newSubscriberPostgres(ctx, email, newsletter)
+	}
+	return newSubscriberNotion(ctx.Notion, email, newsletter)
+}
 
-	_, err := n.Client.UpdatePageProperties(context.Background(), letter.PageID,
-		map[string]*notion.PropertyValue{
-			"SentAt": notion.NewDatePropertyValue(&notion.Date{
-				Start: sentAt,
-			}),
-		})
-	return err
+func NewSubscriberList(ctx *config.AppContext, email string, newsletters []string) (*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return newSubscriberListPostgres(ctx, email, newsletters)
+	}
+	return newSubscriberListNotion(ctx.Notion, email, newsletters)
+}
+
+func SubscribeEmailList(ctx *config.AppContext, email string, newsletters []string) (*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return subscribeEmailListPostgres(ctx, email, newsletters)
+	}
+	return subscribeEmailListNotion(ctx.Notion, email, newsletters)
+}
+
+func SubscribeEmail(ctx *config.AppContext, email, newsletter string) (*mtypes.Subscriber, error) {
+	if UsePostgresBackend(ctx) {
+		return subscribeEmailPostgres(ctx, email, newsletter)
+	}
+	return subscribeEmailNotion(ctx.Notion, email, newsletter)
+}
+
+func UpdateSubs(ctx *config.AppContext, sub *mtypes.Subscriber) error {
+	if UsePostgresBackend(ctx) {
+		return updateSubsPostgres(ctx, sub)
+	}
+	return updateSubsNotion(ctx.Notion, sub)
+}
+
+func GetLetter(ctx *config.AppContext, uniqueID uint64) (*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return getLetterPostgres(ctx, uniqueID)
+	}
+	return getLetterNotion(ctx.Notion, uniqueID)
+}
+
+func GetLetterFor(ctx *config.AppContext, onlyfor string) (*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return getLetterForPostgres(ctx, onlyfor)
+	}
+	return getLetterForNotion(ctx.Notion, onlyfor)
+}
+
+func GetLetters(ctx *config.AppContext, newsletter string) ([]*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return getLettersPostgres(ctx, newsletter)
+	}
+	return getLettersNotion(ctx.Notion, newsletter)
+}
+
+func ListOnlyForLetters(ctx *config.AppContext) ([]*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return listOnlyForLettersPostgres(ctx)
+	}
+	return listOnlyForLettersNotion(ctx.Notion)
+}
+
+func ListTemplatedLetters(ctx *config.AppContext) ([]*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return listTemplatedLettersPostgres(ctx)
+	}
+	return listTemplatedLettersNotion(ctx.Notion)
+}
+
+func CreateTemplatedMissive(ctx *config.AppContext, in MissiveInput) (*mtypes.Letter, error) {
+	if UsePostgresBackend(ctx) {
+		return createTemplatedMissivePostgres(ctx, in)
+	}
+	return createTemplatedMissiveNotion(ctx.Notion, in)
+}
+
+func UpdateTemplatedMissive(ctx *config.AppContext, pageID string, in MissiveInput) error {
+	if UsePostgresBackend(ctx) {
+		return updateTemplatedMissivePostgres(ctx, pageID, in)
+	}
+	return updateTemplatedMissiveNotion(ctx.Notion, pageID, in)
+}
+
+func CreateMissive(ctx *config.AppContext, title, markdown, sendAt string, newsletters []string) error {
+	if UsePostgresBackend(ctx) {
+		return createMissivePostgres(ctx, title, markdown, sendAt, newsletters)
+	}
+	return createMissiveNotion(ctx.Notion, title, markdown, sendAt, newsletters)
+}
+
+func MarkLetterSent(ctx *config.AppContext, letter *mtypes.Letter, sentAt time.Time) error {
+	if UsePostgresBackend(ctx) {
+		return markLetterSentPostgres(ctx, letter, sentAt)
+	}
+	return markLetterSentNotion(ctx.Notion, letter, sentAt)
 }

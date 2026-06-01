@@ -65,7 +65,7 @@ func TemplatedMissivesAdmin(w http.ResponseWriter, r *http.Request, ctx *config.
 		return
 	}
 
-	letters, err := getters.ListTemplatedLetters(ctx.Notion)
+	letters, err := getters.ListTemplatedLetters(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load templated missives", http.StatusInternalServerError)
 		ctx.Err.Printf("/admin/missives list failed: %s", err)
@@ -97,7 +97,7 @@ func TemplatedMissivesAdmin(w http.ResponseWriter, r *http.Request, ctx *config.
 			http.Error(w, "Bad missive UID", http.StatusBadRequest)
 			return
 		}
-		letter, err := getters.GetLetter(ctx.Notion, uid)
+		letter, err := getters.GetLetter(ctx, uid)
 		if err != nil {
 			http.Error(w, "Missive not found", http.StatusNotFound)
 			return
@@ -151,7 +151,7 @@ func TemplatedMissivesSave(w http.ResponseWriter, r *http.Request, ctx *config.A
 	}
 
 	if form.UID == 0 {
-		letter, err := getters.CreateTemplatedMissive(ctx.Notion, input)
+		letter, err := getters.CreateTemplatedMissive(ctx, input)
 		if err != nil {
 			renderTemplatedMissivesAdminWithForm(w, r, ctx, form, "Create failed: "+err.Error())
 			return
@@ -160,7 +160,7 @@ func TemplatedMissivesSave(w http.ResponseWriter, r *http.Request, ctx *config.A
 		return
 	}
 
-	letter, err := getters.GetLetter(ctx.Notion, form.UID)
+	letter, err := getters.GetLetter(ctx, form.UID)
 	if err != nil {
 		renderTemplatedMissivesAdminWithForm(w, r, ctx, form, "Missive not found: "+err.Error())
 		return
@@ -169,7 +169,7 @@ func TemplatedMissivesSave(w http.ResponseWriter, r *http.Request, ctx *config.A
 		renderTemplatedMissivesAdminWithForm(w, r, ctx, form, "Refusing to edit a non-templated missive")
 		return
 	}
-	if err := getters.UpdateTemplatedMissive(ctx.Notion, letter.PageID, input); err != nil {
+	if err := getters.UpdateTemplatedMissive(ctx, letter.PageID, input); err != nil {
 		renderTemplatedMissivesAdminWithForm(w, r, ctx, form, "Update failed: "+err.Error())
 		return
 	}
@@ -267,7 +267,7 @@ func renderTemplatedMissivesAdminWithForm(w http.ResponseWriter, r *http.Request
 }
 
 func renderTemplatedMissivesAdminWithMessages(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, form TemplatedMissiveForm, flash, errMsg string) {
-	letters, _ := getters.ListTemplatedLetters(ctx.Notion)
+	letters, _ := getters.ListTemplatedLetters(ctx)
 	renderTemplatedMissivesAdmin(w, r, ctx, &TemplatedMissivesPage{
 		Letters:      letters,
 		Form:         form,

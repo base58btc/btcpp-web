@@ -1907,7 +1907,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 			}
 			// Best-effort lookups: failures just leave the
 			// checkbox visible. The form still works.
-			if s, err := getters.IsSubscribedTo(ctx.Notion, email, "newsletter"); err == nil {
+			if s, err := getters.IsSubscribedTo(ctx, email, "newsletter"); err == nil {
 				subscribed = s
 			}
 			if reg, err := getters.EmailHasRegistration(ctx, email); err == nil {
@@ -2031,7 +2031,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		   list-welcome missives — the OnlyFor "talkapp"
 		   letter below is what they actually get. */
 		newslist := missives.MakeApplicationSublist(conf.Tag, "talkapp", talkapp.Subscribe)
-		if _, err := getters.SubscribeEmailList(ctx.Notion, talkapp.Email, newslist); err != nil {
+		if _, err := getters.SubscribeEmailList(ctx, talkapp.Email, newslist); err != nil {
 			ctx.Err.Printf("!!! Unable to subscribe to newsletter %s: %v", err, talkapp)
 		}
 
@@ -4328,7 +4328,7 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		vols = filtered
 	}
 
-	missiveList, err := getters.ListOnlyForLetters(ctx.Notion)
+	missiveList, err := getters.ListOnlyForLetters(ctx)
 	if err != nil {
 		ctx.Err.Printf("/%s/volcoord failed to load missives: %s", conf.Tag, err.Error())
 		// continue without missives
