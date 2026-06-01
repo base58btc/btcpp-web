@@ -255,7 +255,7 @@ func main() {
 
 	var speakers []*types.Speaker
 	if importSpeakers {
-		speakers, err = getters.ListSpeakers(notion)
+		speakers, err = getters.ListSpeakersNotion(notion)
 		if err != nil {
 			log.Fatalf("fetch speakers from Notion: %s", err)
 		}

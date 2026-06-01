@@ -151,7 +151,7 @@ func main() {
 	}
 	log.Printf("loaded %d confs (tags: %d)", len(confs), len(validTags))
 
-	speakers, err := getters.ListSpeakers(n)
+	speakers, err := getters.ListSpeakersNotion(n)
 	if err != nil {
 		log.Fatalf("list speakers: %s", err)
 	}

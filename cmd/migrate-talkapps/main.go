@@ -263,7 +263,7 @@ func main() {
 // Idempotent. Pure fill: never overwrites a non-empty Company or an existing
 // org link.
 func runSPCompanyBackfill(n *types.Notion, dryRun bool) error {
-	speakers, err := getters.ListSpeakers(n)
+	speakers, err := getters.ListSpeakersNotion(n)
 	if err != nil {
 		return fmt.Errorf("list speakers: %w", err)
 	}
@@ -434,7 +434,7 @@ type photoSource struct {
 // Idempotent on both paths via spaces.Exists.
 func runPhotoBackfill(n *types.Notion, talkAppDB string, dryRun bool) error {
 	appCtx := appContextForNotion(n)
-	speakers, err := getters.ListSpeakers(n)
+	speakers, err := getters.ListSpeakersNotion(n)
 	if err != nil {
 		return fmt.Errorf("list speakers: %w", err)
 	}

@@ -81,8 +81,11 @@ func FetchSpeakersCached(ctx *config.AppContext) ([]*types.Speaker, error) {
 	return cacheSpeakers, nil
 }
 
-func ListSpeakers(n *types.Notion) ([]*types.Speaker, error) {
-	return ListSpeakersNotion(n)
+func ListSpeakers(ctx *config.AppContext) ([]*types.Speaker, error) {
+	if UsePostgresBackend(ctx) {
+		return listSpeakersPostgres(ctx)
+	}
+	return ListSpeakersNotion(ctx.Notion)
 }
 
 func GetSpeakersByEmail(ctx *config.AppContext, email string) ([]*types.Speaker, error) {
