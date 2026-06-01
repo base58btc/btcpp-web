@@ -234,7 +234,7 @@ func main() {
 	var orgs []*types.Org
 	var sponsorships []*types.Sponsorship
 	if importSponsors {
-		orgs, err = getters.ListOrgs(notion)
+		orgs, err = getters.ListOrgsNotion(notion)
 		if err != nil {
 			log.Fatalf("fetch organizations from Notion: %s", err)
 		}

@@ -177,7 +177,7 @@ func richText(s string) []*notion.RichText {
 	}
 }
 
-func RegisterOrg(n *types.Notion, org *types.Org) (string, error) {
+func RegisterOrgNotion(n *types.Notion, org *types.Org) (string, error) {
 	normalizeOrgInput(org)
 	props := map[string]*notion.PropertyValue{
 		"Name": notion.NewTitlePropertyValue(richText(org.Name)...),
@@ -233,7 +233,7 @@ func RegisterOrg(n *types.Notion, org *types.Org) (string, error) {
 	return page.ID, nil
 }
 
-func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
+func UpdateOrgNotion(n *types.Notion, orgID string, up OrgUpdate) error {
 	up = normalizeOrgUpdate(up)
 	props := map[string]*notion.PropertyValue{}
 	if up.Website != "" {
@@ -264,7 +264,7 @@ func UpdateOrg(n *types.Notion, orgID string, up OrgUpdate) error {
 // UpdateOrgDetails rewrites the editable fields from /admin/orgs/{ref}.
 // It uses the direct Notion JSON API so empty URL/email/rich_text values
 // can clear existing cells, which is required for the logo remove buttons.
-func UpdateOrgDetails(n *types.Notion, org *types.Org) error {
+func UpdateOrgDetailsNotion(n *types.Notion, org *types.Org) error {
 	if org == nil || strings.TrimSpace(org.Ref) == "" {
 		return fmt.Errorf("UpdateOrgDetails: org ref is required")
 	}
@@ -366,7 +366,7 @@ func normalizeOrgUpdate(up OrgUpdate) OrgUpdate {
 // or whose Name matches `name` (fallback). Both sides are normalized
 // (lowercase + trim, websites also strip trailing /). Returns nil, nil when
 // no match — letting callers decide whether to create a new Org.
-func FindOrg(n *types.Notion, website, name string) (*types.Org, error) {
+func FindOrgNotion(n *types.Notion, website, name string) (*types.Org, error) {
 	wantSite := normalizeWebsite(website)
 	wantName := normalizeName(name)
 	if wantSite == "" && wantName == "" {
@@ -403,7 +403,7 @@ func normalizeName(s string) string {
 	return strings.TrimSpace(strings.ToLower(s))
 }
 
-func RegisterSponsorship(n *types.Notion, sp *types.Sponsorship) error {
+func RegisterSponsorshipNotion(n *types.Notion, sp *types.Sponsorship) error {
 	name := sp.Level + " Sponsorship"
 	if sp.Org != nil {
 		name = sp.Org.Name + " @ " + sp.Level
@@ -449,7 +449,7 @@ func RegisterSponsorship(n *types.Notion, sp *types.Sponsorship) error {
 	return err
 }
 
-func UpdateSponsorshipStatus(n *types.Notion, ref string, status string) error {
+func UpdateSponsorshipStatusNotion(n *types.Notion, ref string, status string) error {
 	_, err := n.Client.UpdatePageProperties(context.Background(), ref,
 		map[string]*notion.PropertyValue{
 			"Status": {

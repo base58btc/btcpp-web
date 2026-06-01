@@ -1,6 +1,7 @@
 package getters
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -38,8 +39,11 @@ func FetchOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
 	return orgs, nil
 }
 
-func ListOrgs(n *types.Notion) ([]*types.Org, error) {
-	return ListOrgsNotion(n)
+func ListOrgs(ctx *config.AppContext) ([]*types.Org, error) {
+	if UsePostgresBackend(ctx) {
+		return listOrgsPostgres(ctx)
+	}
+	return ListOrgsNotion(ctx.Notion)
 }
 
 // orgListCache memoizes ListOrgs for the autocomplete endpoint, which can
@@ -53,7 +57,7 @@ var (
 
 const orgListCacheTTL = 5 * time.Minute
 
-func listOrgsCached(n *types.Notion) ([]*types.Org, error) {
+func listOrgsCached(ctx *config.AppContext) ([]*types.Org, error) {
 	orgListCacheMu.Lock()
 	if orgListCached != nil && time.Since(orgListCachedAt) < orgListCacheTTL {
 		out := orgListCached
@@ -61,7 +65,8 @@ func listOrgsCached(n *types.Notion) ([]*types.Org, error) {
 		return out, nil
 	}
 	orgListCacheMu.Unlock()
-	orgs, err := ListOrgsNotion(n)
+
+	orgs, err := ListOrgs(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -76,12 +81,12 @@ func listOrgsCached(n *types.Notion) ([]*types.Org, error) {
 // (case-insensitive substring). Used by the autocomplete on the speaker
 // info editor. Backed by listOrgsCached so rapid keystrokes don't hammer
 // Notion.
-func SearchOrgsByName(n *types.Notion, q string, limit int) ([]*types.Org, error) {
+func SearchOrgsByName(ctx *config.AppContext, q string, limit int) ([]*types.Org, error) {
 	q = strings.TrimSpace(strings.ToLower(q))
 	if q == "" {
 		return nil, nil
 	}
-	orgs, err := listOrgsCached(n)
+	orgs, err := listOrgsCached(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -100,8 +105,20 @@ func SearchOrgsByName(n *types.Notion, q string, limit int) ([]*types.Org, error
 	return out, nil
 }
 
-func GetOrg(n *types.Notion, ref string) (*types.Org, error) {
-	return GetOrgNotion(n, ref)
+func GetOrg(ctx *config.AppContext, ref string) (*types.Org, error) {
+	if UsePostgresBackend(ctx) {
+		orgs, err := listOrgsPostgres(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, org := range orgs {
+			if org != nil && org.Ref == ref {
+				return org, nil
+			}
+		}
+		return nil, fmt.Errorf("org %s not found", ref)
+	}
+	return GetOrgNotion(ctx.Notion, ref)
 }
 
 // sponsorshipsCache memoizes ListSponsorships across requests so the
@@ -184,4 +201,46 @@ type OrgUpdate struct {
 	Github    string
 	LogoLight string // full Spaces URL
 	LogoDark  string
+}
+
+func RegisterOrg(ctx *config.AppContext, org *types.Org) (string, error) {
+	if UsePostgresBackend(ctx) {
+		return "", unsupportedPostgresBackend("RegisterOrg")
+	}
+	return RegisterOrgNotion(ctx.Notion, org)
+}
+
+func UpdateOrg(ctx *config.AppContext, orgID string, up OrgUpdate) error {
+	if UsePostgresBackend(ctx) {
+		return unsupportedPostgresBackend("UpdateOrg")
+	}
+	return UpdateOrgNotion(ctx.Notion, orgID, up)
+}
+
+func UpdateOrgDetails(ctx *config.AppContext, org *types.Org) error {
+	if UsePostgresBackend(ctx) {
+		return unsupportedPostgresBackend("UpdateOrgDetails")
+	}
+	return UpdateOrgDetailsNotion(ctx.Notion, org)
+}
+
+func FindOrg(ctx *config.AppContext, website, name string) (*types.Org, error) {
+	if UsePostgresBackend(ctx) {
+		return findOrgPostgres(ctx, website, name)
+	}
+	return FindOrgNotion(ctx.Notion, website, name)
+}
+
+func RegisterSponsorship(ctx *config.AppContext, sp *types.Sponsorship) error {
+	if UsePostgresBackend(ctx) {
+		return unsupportedPostgresBackend("RegisterSponsorship")
+	}
+	return RegisterSponsorshipNotion(ctx.Notion, sp)
+}
+
+func UpdateSponsorshipStatus(ctx *config.AppContext, ref string, status string) error {
+	if UsePostgresBackend(ctx) {
+		return unsupportedPostgresBackend("UpdateSponsorshipStatus")
+	}
+	return UpdateSponsorshipStatusNotion(ctx.Notion, ref, status)
 }

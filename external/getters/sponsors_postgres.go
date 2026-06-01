@@ -57,6 +57,33 @@ func listOrgsPostgres(ctx *config.AppContext) ([]*types.Org, error) {
 	return out, nil
 }
 
+func findOrgPostgres(ctx *config.AppContext, website, name string) (*types.Org, error) {
+	wantSite := normalizeWebsite(website)
+	wantName := normalizeName(name)
+	if wantSite == "" && wantName == "" {
+		return nil, nil
+	}
+	orgs, err := listOrgsPostgres(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if wantSite != "" {
+		for _, org := range orgs {
+			if org != nil && normalizeWebsite(org.Website) == wantSite {
+				return org, nil
+			}
+		}
+	}
+	if wantName != "" {
+		for _, org := range orgs {
+			if org != nil && normalizeName(org.Name) == wantName {
+				return org, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
 func listSponsorshipsPostgres(ctx *config.AppContext, confRef string) ([]*types.Sponsorship, error) {
 	if ctx == nil || ctx.DB == nil {
 		return nil, fmt.Errorf("postgres backend selected but AppContext.DB is nil")

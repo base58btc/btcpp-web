@@ -31,7 +31,7 @@ import (
 // conf pages. Empty queries return an empty list.
 func OrgSearch(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	q := r.URL.Query().Get("q")
-	orgs, err := getters.SearchOrgsByName(ctx.Notion, q, 10)
+	orgs, err := getters.SearchOrgsByName(ctx, q, 10)
 	if err != nil {
 		ctx.Err.Printf("/api/orgs/search: %s", err)
 		http.Error(w, "search failed", http.StatusInternalServerError)

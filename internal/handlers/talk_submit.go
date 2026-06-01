@@ -53,10 +53,10 @@ func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
 			return getters.UpdateSpeaker(ctx, id, up)
 		},
 		findOrg: func(website, name string) (*types.Org, error) {
-			return getters.FindOrg(ctx.Notion, website, name)
+			return getters.FindOrg(ctx, website, name)
 		},
 		createOrg: func(org *types.Org) (string, error) {
-			return getters.RegisterOrg(ctx.Notion, org)
+			return getters.RegisterOrg(ctx, org)
 		},
 		createProposal: func(in getters.ProposalInput) (string, error) {
 			return getters.CreateProposal(ctx, in)

@@ -272,7 +272,7 @@ func runSPCompanyBackfill(n *types.Notion, dryRun bool) error {
 		speakerByID[sp.ID] = sp
 	}
 
-	orgs, err := getters.ListOrgs(n)
+	orgs, err := getters.ListOrgsNotion(n)
 	if err != nil {
 		return fmt.Errorf("list orgs: %w", err)
 	}
@@ -721,7 +721,7 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 	// (one of OrgWebsite / OrgTwitter / OrgNostr / OrgGithub). For matched
 	// existing Orgs, fill empty fields from this TalkApp.
 	if orgWebsite != "" || ta.Org != "" {
-		existing, err := getters.FindOrg(n, orgWebsite, ta.Org)
+		existing, err := getters.FindOrgNotion(n, orgWebsite, ta.Org)
 		if err != nil {
 			return res, fmt.Errorf("find org: %w", err)
 		}
@@ -743,11 +743,11 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 			if existing.LogoLight == "" {
 				up.LogoLight = logoURL
 			}
-			if err := getters.UpdateOrg(n, existing.Ref, up); err != nil {
+			if err := getters.UpdateOrgNotion(n, existing.Ref, up); err != nil {
 				return res, fmt.Errorf("update org %s: %w", existing.Ref, err)
 			}
 		} else if orgWebsite != "" || ta.OrgTwitter != "" || ta.OrgNostr != "" || ta.OrgGithub != "" {
-			orgID, err := getters.RegisterOrg(n, &types.Org{
+			orgID, err := getters.RegisterOrgNotion(n, &types.Org{
 				Name:      ta.Org,
 				Website:   orgWebsite,
 				Twitter:   types.Twitter{Handle: ta.OrgTwitter},
@@ -986,7 +986,7 @@ func otherEventTags(rest, others []string, confTagByID map[string]string) []stri
 // the legacy OrgLogo file: downloads it, re-uploads to Spaces if missing,
 // and writes the Spaces public URL onto Org.LogoLight when blank.
 func backfillOrgFromTalkApp(n *types.Notion, ta *talkApp, orgID string) error {
-	org, err := getters.GetOrg(n, orgID)
+	org, err := getters.GetOrgNotion(n, orgID)
 	if err != nil {
 		return fmt.Errorf("load org %s: %w", orgID, err)
 	}
@@ -1023,7 +1023,7 @@ func backfillOrgFromTalkApp(n *types.Notion, ta *talkApp, orgID string) error {
 	if org.LogoLight == "" && logoURL != "" {
 		up.LogoLight = logoURL
 	}
-	return getters.UpdateOrg(n, orgID, up)
+	return getters.UpdateOrgNotion(n, orgID, up)
 }
 
 // backfillSpeakerFromTalkApp loads an already-migrated Speaker and applies a

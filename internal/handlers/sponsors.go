@@ -53,7 +53,7 @@ func OrgList(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	orgs, err := getters.ListOrgs(ctx.Notion)
+	orgs, err := getters.ListOrgs(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load orgs", http.StatusInternalServerError)
 		ctx.Err.Printf("/admin/orgs failed: %s", err.Error())
@@ -97,7 +97,7 @@ func OrgDetail(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	org, err := getters.GetOrg(ctx.Notion, ref)
+	org, err := getters.GetOrg(ctx, ref)
 	if err != nil {
 		handle404(w, r, ctx)
 		return
@@ -204,7 +204,7 @@ func OrgCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	_, err := getters.RegisterOrg(ctx.Notion, org)
+	_, err := getters.RegisterOrg(ctx, org)
 	if err != nil {
 		ctx.Err.Printf("/admin/orgs/new failed: %s", err.Error())
 		http.Error(w, "Failed to create org", http.StatusInternalServerError)
@@ -261,7 +261,7 @@ func OrgSave(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		return
 	}
 
-	if err := getters.UpdateOrgDetails(ctx.Notion, org); err != nil {
+	if err := getters.UpdateOrgDetails(ctx, org); err != nil {
 		ctx.Err.Printf("/admin/orgs/%s save failed: %s", ref, err)
 		http.Error(w, "Failed to save org", http.StatusInternalServerError)
 		return
@@ -314,7 +314,7 @@ func SponsorshipsList(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		return
 	}
 
-	orgs, err := getters.ListOrgs(ctx.Notion)
+	orgs, err := getters.ListOrgs(ctx)
 	if err != nil {
 		http.Error(w, "Unable to load orgs", http.StatusInternalServerError)
 		ctx.Err.Printf("/%s/admin/sponsors failed to load orgs: %s", conf.Tag, err.Error())
@@ -363,7 +363,7 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		return
 	}
 
-	org, _ := getters.GetOrg(ctx.Notion, orgRef)
+	org, _ := getters.GetOrg(ctx, orgRef)
 
 	sp := &types.Sponsorship{
 		Org:    org,
@@ -372,7 +372,7 @@ func SponsorshipCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		Status: "Pending",
 	}
 
-	err = getters.RegisterSponsorship(ctx.Notion, sp)
+	err = getters.RegisterSponsorship(ctx, sp)
 	if err != nil {
 		ctx.Err.Printf("/%s/admin/sponsors/new failed: %s", conf.Tag, err.Error())
 		http.Error(w, "Failed to create sponsorship", http.StatusInternalServerError)

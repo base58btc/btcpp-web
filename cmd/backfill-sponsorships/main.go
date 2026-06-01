@@ -63,9 +63,9 @@ var canonicalTier = []struct {
 	{"satoshi level", "Diamond"},
 	{"finney level", "Gold"},
 	{"wuille level", "Silver"},
-	{"vip dinner", "Gold"},      // matches "VIP Dinner Party" + "VIP Dinner Sponsor"
+	{"vip dinner", "Gold"}, // matches "VIP Dinner Party" + "VIP Dinner Sponsor"
 	{"headline sponsor", "Diamond"},
-	{"pool party", "Workshop"},  // atx25 themed = workshop tier
+	{"pool party", "Workshop"}, // atx25 themed = workshop tier
 	{"networking partner", "Networking"},
 	{"media partner", "Media"},
 	{"community partner", "Community"},
@@ -196,9 +196,9 @@ func scanTemplate(path, tag string) []tsvRow {
 	}
 
 	var (
-		rows           []tsvRow
-		currentLabel   string
-		currentTier    string
+		rows         []tsvRow
+		currentLabel string
+		currentTier  string
 	)
 
 	tokenRE := regexp.MustCompile(`(?s)<h3[^>]*>(.*?)</h3>|<a\s+href="([^"]+)"[^>]*>\s*<img[^>]*\salt="([^"]*)"[^>]*\ssrc="([^"]+)"|<a\s+href="([^"]+)"[^>]*>\s*<img[^>]*\ssrc="([^"]+)"[^>]*\salt="([^"]*)"`)
@@ -290,7 +290,7 @@ func runUpload(inPath string, dry bool) {
 		}
 	}
 
-	orgs, err := getters.ListOrgs(n)
+	orgs, err := getters.ListOrgsNotion(n)
 	if err != nil {
 		log.Fatalf("list orgs: %s", err)
 	}
@@ -376,7 +376,7 @@ func runUpload(inPath string, dry bool) {
 			written++
 			continue
 		}
-		if err := getters.RegisterSponsorship(n, sp); err != nil {
+		if err := getters.RegisterSponsorshipNotion(n, sp); err != nil {
 			log.Printf("register %s @ %s: %s", org.Name, conf.Tag, err)
 			continue
 		}
@@ -473,11 +473,11 @@ func hostOnly(raw string) string {
 
 type cfgFile struct {
 	Notion struct {
-		Token             string `toml:"token"`
-		ConfsDb           string `toml:"confsdb"`
-		ConfsTixDb        string `toml:"confstixdb"`
-		OrgDb             string `toml:"orgdb"`
-		SponsorshipsDb    string `toml:"sponsorshipsdb"`
+		Token          string `toml:"token"`
+		ConfsDb        string `toml:"confsdb"`
+		ConfsTixDb     string `toml:"confstixdb"`
+		OrgDb          string `toml:"orgdb"`
+		SponsorshipsDb string `toml:"sponsorshipsdb"`
 	} `toml:"notion"`
 }
 
