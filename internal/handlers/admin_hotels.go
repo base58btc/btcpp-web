@@ -148,7 +148,7 @@ func HotelsAdminSave(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 			// New row — create only when at least one
 			// non-Order field is filled. Pure-blank rows are
 			// no-ops.
-			_, err := getters.CreateHotel(ctx.Notion, getters.HotelInput{
+			_, err := getters.CreateHotel(ctx, getters.HotelInput{
 				Name:    name,
 				URL:     hotelURL,
 				Img:     img,
