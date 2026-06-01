@@ -44,13 +44,13 @@ type SubmitResult struct {
 func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
 	return submitPipeline{deps: submitDeps{
 		findSpeakers: func(email string) ([]*types.Speaker, error) {
-			return getters.GetSpeakersByEmail(ctx.Notion, email)
+			return getters.GetSpeakersByEmail(ctx, email)
 		},
 		createSpeaker: func(in getters.SpeakerInput) (string, error) {
-			return getters.CreateSpeaker(ctx.Notion, in)
+			return getters.CreateSpeaker(ctx, in)
 		},
 		updateSpeaker: func(id string, up getters.SpeakerUpdate) error {
-			return getters.UpdateSpeaker(ctx.Notion, id, up)
+			return getters.UpdateSpeaker(ctx, id, up)
 		},
 		findOrg: func(website, name string) (*types.Org, error) {
 			return getters.FindOrg(ctx.Notion, website, name)

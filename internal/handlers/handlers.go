@@ -1901,7 +1901,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 		if email, h, err := validateVolEmail(r, ctx); err == nil {
 			encodedHMAC = h
 			encodedEmail = r.URL.Query().Get("em")
-			speakers, lerr := getters.GetSpeakersByEmail(ctx.Notion, email)
+			speakers, lerr := getters.GetSpeakersByEmail(ctx, email)
 			if lerr == nil && len(speakers) == 1 {
 				knownSpeaker = speakers[0]
 			}
@@ -5923,7 +5923,7 @@ func SpeakerAdminEdit(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 		http.Error(w, "speaker is not attached to this event", http.StatusForbidden)
 		return
 	}
-	sp, err := getters.FetchSpeakerByID(ctx.Notion, speakerID)
+	sp, err := getters.FetchSpeakerByID(ctx, speakerID)
 	if err != nil {
 		ctx.Err.Printf("/%s/admin/speakers/%s/edit load: %s", conf.Tag, speakerID, err)
 		http.Error(w, "speaker lookup failed", http.StatusInternalServerError)
@@ -5985,7 +5985,7 @@ func adminUpdateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.
 	if hasNewPic {
 		up.Photo = imgproc.ShortID(picRaw) + picExt
 	}
-	if err := getters.UpdateSpeaker(ctx.Notion, sp.ID, up); err != nil {
+	if err := getters.UpdateSpeaker(ctx, sp.ID, up); err != nil {
 		ctx.Err.Printf("/%s/admin/speakers/%s/edit update: %s", conf.Tag, sp.ID, err)
 		http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Update failed: "+err.Error()), http.StatusSeeOther)
 		return

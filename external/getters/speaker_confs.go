@@ -145,7 +145,7 @@ func GetSpeakerConfsByEmail(ctx *config.AppContext, email string) ([]*types.Spea
 	if UsePostgresBackend(ctx) {
 		return getSpeakerConfsByEmailPostgres(ctx, email)
 	}
-	speakers, err := GetSpeakersByEmail(ctx.Notion, email)
+	speakers, err := GetSpeakersByEmail(ctx, email)
 	if err != nil {
 		return nil, nil, fmt.Errorf("speakers by email: %w", err)
 	}

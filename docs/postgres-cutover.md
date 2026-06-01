@@ -19,7 +19,6 @@ before cutover.
 
 | Domain | Current Notion entrypoints | Why it matters |
 | --- | --- | --- |
-| Speakers / people | `CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`, `GetSpeakersByEmail`, `FetchSpeakerByID` | Talk submission, speaker dashboard, invite/admin flows. |
 | Proposals / speaker confs / conf talks | `CreateProposal`, `UpdateProposal`, `UpdateProposalStatus`, `UpsertSpeakerConf`, `UpdateSpeakerConf`, `CreateConfTalk`, `UpdateConfTalkSchedule`, `DeleteConfTalk`, `AddSpeakerConfToProposal`, `RemoveProposalFromSpeakerConf`, speaker-conf date stamps | CFP/admin scheduling/dashboard workflows. |
 | Volunteers / shifts | `RegisterVolunteer`, `UpdateVolunteerStatus`, `UpdateVolunteerAvailability`, `UpdateVolunteerWorkPrefs`, `CreateShift`, `UpdateShift`, `UpdateShiftTimes`, `AssignVolunteerToShift`, `RemoveVolunteerFromShift` | Volunteer signup, coordinator/admin shift management. |
 | Sponsors / organizations | `RegisterOrg`, `UpdateOrg`, `UpdateOrgDetails`, `RegisterSponsorship`, `UpdateSponsorshipStatus`, `FindOrg`, `SearchOrgsByName` | Sponsor dashboard and talk-submit organization lookup/create. |
@@ -42,6 +41,7 @@ speaker/proposal, and volunteer writes.
 | Domain | Completed entrypoints | Notes |
 | --- | --- | --- |
 | Registrations / tickets | `AddTickets`, `RevokeTicket` | Now dispatch by `AppContext`; Postgres writes insert/update `registrations`, and Notion remains the fallback. |
+| Speakers / people | `CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`, `GetSpeakersByEmail`, `FetchSpeakerByID` | Now dispatch by `AppContext`; Postgres writes `people` and `people_roles`, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 

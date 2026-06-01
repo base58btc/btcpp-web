@@ -216,7 +216,7 @@ func Resolve(r *http.Request, ctx *config.AppContext) (*Identity, error) {
 	if email == "" {
 		return nil, nil
 	}
-	speakers, err := getters.GetSpeakersByEmail(ctx.Notion, email)
+	speakers, err := getters.GetSpeakersByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("lookup speaker: %w", err)
 	}

@@ -56,13 +56,13 @@ const (
 // Field names match the lowercase TOML keys via tags.
 type migrateConfig struct {
 	Notion struct {
-		Token             string `toml:"token"`
-		ConfsDb           string `toml:"confsdb"`
-		ConfsTixDb        string `toml:"confstixdb"`
-		SpeakersDb        string `toml:"speakersdb"`
-		OrgDb             string `toml:"orgdb"`
-		TalkAppDb         string `toml:"talkappdb"`
-		ProposalDb        string `toml:"proposaldb"`
+		Token         string `toml:"token"`
+		ConfsDb       string `toml:"confsdb"`
+		ConfsTixDb    string `toml:"confstixdb"`
+		SpeakersDb    string `toml:"speakersdb"`
+		OrgDb         string `toml:"orgdb"`
+		TalkAppDb     string `toml:"talkappdb"`
+		ProposalDb    string `toml:"proposaldb"`
 		SpeakerConfDb string `toml:"speakerconfdb"`
 	} `toml:"notion"`
 	Spaces struct {
@@ -146,13 +146,13 @@ func main() {
 
 	talkAppDB := mc.Notion.TalkAppDb
 	cfg := &types.NotionConfig{
-		Token:             mc.Notion.Token,
-		ConfsDb:           mc.Notion.ConfsDb,
-		ConfsTixDb:        mc.Notion.ConfsTixDb,
-		SpeakersDb:        mc.Notion.SpeakersDb,
-		OrgDb:             mc.Notion.OrgDb,
-		ProposalDb:        mc.Notion.ProposalDb,
-		SpeakerConfDb:     mc.Notion.SpeakerConfDb,
+		Token:         mc.Notion.Token,
+		ConfsDb:       mc.Notion.ConfsDb,
+		ConfsTixDb:    mc.Notion.ConfsTixDb,
+		SpeakersDb:    mc.Notion.SpeakersDb,
+		OrgDb:         mc.Notion.OrgDb,
+		ProposalDb:    mc.Notion.ProposalDb,
+		SpeakerConfDb: mc.Notion.SpeakerConfDb,
 	}
 	n := &types.Notion{Config: cfg}
 	n.Setup(cfg.Token)
@@ -433,6 +433,7 @@ type photoSource struct {
 //
 // Idempotent on both paths via spaces.Exists.
 func runPhotoBackfill(n *types.Notion, talkAppDB string, dryRun bool) error {
+	appCtx := appContextForNotion(n)
 	speakers, err := getters.ListSpeakers(n)
 	if err != nil {
 		return fmt.Errorf("list speakers: %w", err)
@@ -513,7 +514,7 @@ func runPhotoBackfill(n *types.Notion, talkAppDB string, dryRun bool) error {
 			filled++
 			continue
 		}
-		if err := getters.UpdateSpeaker(n, sp.ID, getters.SpeakerUpdate{Photo: newPhoto}); err != nil {
+		if err := getters.UpdateSpeaker(appCtx, sp.ID, getters.SpeakerUpdate{Photo: newPhoto}); err != nil {
 			log.Printf("  FAILED: %s", err)
 			failed++
 			continue
@@ -636,8 +637,17 @@ func mustVal(v, name string) {
 	}
 }
 
+func appContextForNotion(n *types.Notion) *config.AppContext {
+	return &config.AppContext{
+		Notion: n,
+		Err:    log.New(os.Stderr, "ERR ", log.LstdFlags),
+		Infos:  log.New(os.Stdout, "INFO ", log.LstdFlags),
+	}
+}
+
 func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migrationResult, error) {
 	res := migrationResult{OriginalStatus: ta.Status}
+	appCtx := appContextForNotion(n)
 
 	if ta.Email == "" {
 		return res, errors.New("no email; cannot upsert speaker")
@@ -657,7 +667,7 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 	}
 
 	// Speaker upsert.
-	matches, err := getters.GetSpeakersByEmail(n, ta.Email)
+	matches, err := getters.GetSpeakersByEmail(appCtx, ta.Email)
 	if err != nil {
 		return res, fmt.Errorf("find speakers: %w", err)
 	}
@@ -666,7 +676,7 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 	}
 	var speakerID string
 	if len(matches) == 0 {
-		speakerID, err = getters.CreateSpeaker(n, getters.SpeakerInput{
+		speakerID, err = getters.CreateSpeaker(appCtx, getters.SpeakerInput{
 			Name:      ta.Name,
 			Email:     ta.Email,
 			Photo:     avif400(ta.NormPhoto),
@@ -689,7 +699,7 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 		// Fill-only update: backfill any blank fields on the existing
 		// Speaker from this TalkApp.
 		up := buildSpeakerFillUpdate(existing, ta)
-		if err := getters.UpdateSpeaker(n, speakerID, up); err != nil {
+		if err := getters.UpdateSpeaker(appCtx, speakerID, up); err != nil {
 			return res, fmt.Errorf("update speaker %s: %w", speakerID, err)
 		}
 	}
@@ -783,12 +793,6 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 	recording := ta.Recording
 	if strings.TrimSpace(recording) == "" {
 		recording = "RecordingOK"
-	}
-	// Minimal AppContext just for UpsertSpeakerConf, which needs ctx.Notion.
-	appCtx := &config.AppContext{
-		Notion: n,
-		Err:    log.New(os.Stderr, "ERR ", log.LstdFlags),
-		Infos:  log.New(os.Stdout, "INFO ", log.LstdFlags),
 	}
 	spID, err := getters.UpsertSpeakerConf(appCtx, getters.SpeakerConfInput{
 		SpeakerID:      speakerID,
@@ -1025,12 +1029,13 @@ func backfillOrgFromTalkApp(n *types.Notion, ta *talkApp, orgID string) error {
 // backfillSpeakerFromTalkApp loads an already-migrated Speaker and applies a
 // fill-only update from the TalkApp's data. No-op when nothing's blank.
 func backfillSpeakerFromTalkApp(n *types.Notion, ta *talkApp, speakerID string) error {
+	appCtx := appContextForNotion(n)
 	sp, err := loadSpeakerByID(n, speakerID)
 	if err != nil {
 		return fmt.Errorf("load speaker %s: %w", speakerID, err)
 	}
 	up := buildSpeakerFillUpdate(sp, ta)
-	if err := getters.UpdateSpeaker(n, speakerID, up); err != nil {
+	if err := getters.UpdateSpeaker(appCtx, speakerID, up); err != nil {
 		return fmt.Errorf("update speaker %s: %w", speakerID, err)
 	}
 	return nil

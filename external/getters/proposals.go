@@ -940,7 +940,7 @@ func AddSpeakerConfToProposal(ctx *config.AppContext, proposalID, speakerConfID 
 	return nil
 }
 
-// --- internal property-builder helpers shared by accept.go ---
+// --- internal property-builder helpers shared by Notion writers ---
 
 func numberValue(n float64) *notion.PropertyValue {
 	return &notion.PropertyValue{

@@ -232,7 +232,7 @@ func resolveOrCreateSpeaker(ctx *config.AppContext, speakerID, name, email strin
 		// Fall through — the picked speaker disappeared from cache for
 		// some reason; treat as if no ID was picked.
 	}
-	matches, err := getters.GetSpeakersByEmail(ctx.Notion, email)
+	matches, err := getters.GetSpeakersByEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("lookup by email: %w", err)
 	}
@@ -242,7 +242,7 @@ func resolveOrCreateSpeaker(ctx *config.AppContext, speakerID, name, email strin
 	if len(matches) == 1 {
 		return matches[0], nil
 	}
-	id, err := getters.CreateSpeaker(ctx.Notion, getters.SpeakerInput{
+	id, err := getters.CreateSpeaker(ctx, getters.SpeakerInput{
 		Name:  name,
 		Email: email,
 	})

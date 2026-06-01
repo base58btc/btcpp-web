@@ -135,7 +135,7 @@ func SpeakerRolesUpdate(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		}
 		roles = append(roles, t)
 	}
-	if err := getters.UpdateSpeakerRoles(ctx.Notion, speakerID, roles); err != nil {
+	if err := getters.UpdateSpeakerRoles(ctx, speakerID, roles); err != nil {
 		ctx.Err.Printf("%s update roles %s: %s", r.URL.Path, speakerID, err)
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
@@ -469,7 +469,7 @@ func DashboardEditSpeaker(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 	}
 	encEmail := r.URL.Query().Get("em")
 
-	speakers, err := getters.GetSpeakersByEmail(ctx.Notion, email)
+	speakers, err := getters.GetSpeakersByEmail(ctx, email)
 	if err != nil {
 		ctx.Err.Printf("/dashboard/speaker lookup %s: %s", email, err)
 		http.Error(w, "lookup failed", http.StatusInternalServerError)
@@ -546,7 +546,7 @@ func handleUpdateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 	if hasNewPic {
 		up.Photo = imgproc.ShortID(picRaw) + picExt
 	}
-	if err := getters.UpdateSpeaker(ctx.Notion, sp.ID, up); err != nil {
+	if err := getters.UpdateSpeaker(ctx, sp.ID, up); err != nil {
 		ctx.Err.Printf("/dashboard/speaker update %s: %s", sp.ID, err)
 		http.Redirect(w, r,
 			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
@@ -615,7 +615,7 @@ func handleCreateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config
 	if hasNewPic {
 		in.Photo = imgproc.ShortID(picRaw) + picExt
 	}
-	if _, err := getters.CreateSpeaker(ctx.Notion, in); err != nil {
+	if _, err := getters.CreateSpeaker(ctx, in); err != nil {
 		ctx.Err.Printf("/dashboard/speaker create %s: %s", email, err)
 		http.Redirect(w, r,
 			fmt.Sprintf("/dashboard/speaker?hr=%s&em=%s&flash=%s",
