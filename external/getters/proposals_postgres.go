@@ -3,10 +3,38 @@ package getters
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
+	"github.com/jackc/pgx/v5"
 )
+
+func createProposalPostgres(ctx *config.AppContext, in ProposalInput) (string, error) {
+	if ctx == nil || ctx.DB == nil {
+		return "", fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	confID, err := proposalConferenceIDPostgres(ctx, in.ScheduleForTag)
+	if err != nil {
+		return "", err
+	}
+	var proposalID string
+	err = ctx.DB.QueryRow(context.Background(), `
+		INSERT INTO proposals (
+			conference_id, title, description, setup, comments, talk_type,
+			status, desired_duration_min, avail_duration_min
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+		RETURNING id::text
+	`, confID, strings.TrimSpace(in.Title), in.Description, in.Setup, in.Comments,
+		in.TalkType, in.Status, in.DesiredDuration, in.AvailDuration).Scan(&proposalID)
+	if err != nil {
+		return "", fmt.Errorf("insert proposal %q: %w", in.Title, err)
+	}
+	InvalidateProposalsCache()
+	return proposalID, nil
+}
 
 func listProposalsPostgres(ctx *config.AppContext) ([]*types.Proposal, error) {
 	return queryProposalsPostgres(ctx, "")
@@ -116,4 +144,129 @@ func hydrateProposalSpeakerConfRefsPostgres(ctx *config.AppContext, ids []string
 		return fmt.Errorf("iterate proposal speaker-conf links: %w", err)
 	}
 	return nil
+}
+
+func updateProposalPostgres(ctx *config.AppContext, proposalID string, in ProposalInput) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	if strings.TrimSpace(proposalID) == "" {
+		return fmt.Errorf("UpdateProposal: empty proposalID")
+	}
+
+	setParts := []string{}
+	args := []interface{}{}
+	addSet := func(column string, value interface{}) {
+		args = append(args, value)
+		setParts = append(setParts, fmt.Sprintf("%s = $%d", column, len(args)))
+	}
+
+	if in.Title != "" {
+		addSet("title", strings.TrimSpace(in.Title))
+	}
+	if in.Description != "" {
+		addSet("description", in.Description)
+	}
+	if in.Setup != "" {
+		addSet("setup", in.Setup)
+	}
+	if in.Comments != "" {
+		addSet("comments", in.Comments)
+	}
+	if in.TalkType != "" {
+		addSet("talk_type", in.TalkType)
+	}
+	if in.DesiredDuration > 0 {
+		addSet("desired_duration_min", in.DesiredDuration)
+	}
+	if in.AvailDuration > 0 {
+		addSet("avail_duration_min", in.AvailDuration)
+	}
+	if len(setParts) == 0 {
+		return nil
+	}
+
+	args = append(args, proposalID)
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE proposals
+		SET `+strings.Join(setParts, ", ")+`
+		WHERE id = $`+fmt.Sprint(len(args))+`
+	`, args...)
+	if err != nil {
+		return fmt.Errorf("update proposal %s: %w", proposalID, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("proposal %s not found", proposalID)
+	}
+	InvalidateProposalsCache()
+	return nil
+}
+
+func updateProposalStatusPostgres(ctx *config.AppContext, proposalID, status string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE proposals
+		SET status = $2
+		WHERE id = $1
+	`, proposalID, status)
+	if err != nil {
+		return fmt.Errorf("update proposal status %s: %w", proposalID, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("proposal %s not found", proposalID)
+	}
+	InvalidateProposalsCache()
+	InvalidateSpeakerConfsCache()
+	proposalCacheMu.Lock()
+	if p := proposalByID[proposalID]; p != nil {
+		p.Status = status
+	}
+	proposalCacheMu.Unlock()
+	patchTalksStatusForProposal(proposalID, status)
+	return nil
+}
+
+func setProposalInviteTokenPostgres(ctx *config.AppContext, proposalID, token string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	if token == "" {
+		return fmt.Errorf("SetProposalInviteToken: empty token")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE proposals
+		SET invite_token = $2
+		WHERE id = $1
+	`, proposalID, token)
+	if err != nil {
+		return fmt.Errorf("set invite token on %s: %w", proposalID, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("proposal %s not found", proposalID)
+	}
+	InvalidateProposalsCache()
+	return nil
+}
+
+func proposalConferenceIDPostgres(ctx *config.AppContext, tag string) (*string, error) {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return nil, nil
+	}
+	var id string
+	err := ctx.DB.QueryRow(context.Background(), `
+		SELECT id::text
+		FROM conferences
+		WHERE tag = $1
+		LIMIT 1
+	`, tag).Scan(&id)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, fmt.Errorf("conference %q not found", tag)
+		}
+		return nil, fmt.Errorf("query conference %q: %w", tag, err)
+	}
+	return &id, nil
 }

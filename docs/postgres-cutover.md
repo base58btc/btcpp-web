@@ -43,6 +43,7 @@ speaker/proposal, and volunteer writes.
 | Registrations / tickets | `AddTickets`, `RevokeTicket` | Now dispatch by `AppContext`; Postgres writes insert/update `registrations`, and Notion remains the fallback. |
 | Speakers / people | `CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`, `GetSpeakersByEmail`, `FetchSpeakerByID` | Now dispatch by `AppContext`; Postgres writes `people` and `people_roles`, and Notion remains the fallback. |
 | Missives / subscribers | `FindSubscriber`, `ListSubscribersFor`, `IsSubscribedTo`, `SubscribeEmailList`, `SubscribeEmail`, `UpdateSubs`, `GetLetter`, `GetLetterFor`, `GetLetters`, `ListOnlyForLetters`, `ListTemplatedLetters`, `CreateTemplatedMissive`, `UpdateTemplatedMissive`, `CreateMissive`, `MarkLetterSent` | Now dispatch by `AppContext`; Postgres reads/writes `subscribers`, `subscriber_subscriptions`, and `missives`, and Notion remains the fallback. |
+| Proposal core writes | `CreateProposal`, `UpdateProposal`, `UpdateProposalStatus`, `SetProposalInviteToken` | Now dispatch by `AppContext`; Postgres writes `proposals`, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 

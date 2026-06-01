@@ -62,7 +62,7 @@ type SpeakerConfFields struct {
 
 func CreateProposal(ctx *config.AppContext, in ProposalInput) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("CreateProposal")
+		return createProposalPostgres(ctx, in)
 	}
 	return createProposalNotion(ctx.Notion, in)
 }
@@ -118,14 +118,14 @@ func ConfTalkSetClipart(ctx *config.AppContext, confTalkID, filename string) err
 
 func UpdateProposal(ctx *config.AppContext, proposalID string, in ProposalInput) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateProposal")
+		return updateProposalPostgres(ctx, proposalID, in)
 	}
 	return updateProposalNotion(ctx, proposalID, in)
 }
 
 func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateProposalStatus")
+		return updateProposalStatusPostgres(ctx, proposalID, status)
 	}
 	return updateProposalStatusNotion(ctx, proposalID, status)
 }
@@ -139,7 +139,7 @@ func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, propos
 
 func SetProposalInviteToken(ctx *config.AppContext, proposalID, token string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("SetProposalInviteToken")
+		return setProposalInviteTokenPostgres(ctx, proposalID, token)
 	}
 	return setProposalInviteTokenNotion(ctx, proposalID, token)
 }
