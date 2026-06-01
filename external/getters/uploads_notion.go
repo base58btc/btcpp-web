@@ -8,7 +8,7 @@ import (
 	"github.com/niftynei/go-notion"
 )
 
-func UploadFile(n *types.Notion, contentType, filename string, data []byte) (string, error) {
+func uploadFileNotion(n *types.Notion, contentType, filename string, data []byte) (string, error) {
 	upload, err := n.Client.CreateFileUpload(context.Background())
 	if err != nil {
 		return "", err
