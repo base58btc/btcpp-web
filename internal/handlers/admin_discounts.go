@@ -106,7 +106,7 @@ func AdminDiscounts(w http.ResponseWriter, r *http.Request, ctx *config.AppConte
 				return
 			}
 
-			_, err = getters.CreateDiscount(ctx.Notion, getters.DiscountInput{
+			_, err = getters.CreateDiscount(ctx, getters.DiscountInput{
 				CodeName:       strings.ToUpper(page.Form.CodeName),
 				DiscountExpr:   expr,
 				ConfRef:        conf.Ref,
