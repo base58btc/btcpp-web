@@ -297,7 +297,7 @@ func DispatchTalkICSForTalk(ctx *config.AppContext, talk *types.Talk, conf *type
 		}
 	}
 	stamp := ics.CalNotif{UID: uid, Sequence: seq, HashHex: stampHash}.String()
-	if err := getters.TalkUpdateCalNotif(ctx.Notion, talk.ID, stamp); err != nil {
+	if err := getters.TalkUpdateCalNotif(ctx, talk.ID, stamp); err != nil {
 		ctx.Err.Printf("dispatchTalkICS %q calnotif writeback: %s", talk.Name, err)
 	} else {
 		ctx.Infos.Printf("dispatchTalkICS %q: %s seq=%d sent=%d/%d hash=%s",
@@ -408,7 +408,7 @@ func DispatchShiftICS(ctx *config.AppContext, shift *types.WorkShift, conf *type
 		}
 	}
 	stamp := ics.CalNotif{UID: uid, Sequence: seq, HashHex: stampHash}.String()
-	if err := getters.ShiftUpdateCalNotif(ctx.Notion, shift.Ref, stamp); err != nil {
+	if err := getters.ShiftUpdateCalNotif(ctx, shift.Ref, stamp); err != nil {
 		ctx.Err.Printf("dispatchShiftICS %q calnotif writeback: %s", shift.Name, err)
 	} else {
 		ctx.Infos.Printf("dispatchShiftICS %q: %s seq=%d sent=%d/%d hash=%s",

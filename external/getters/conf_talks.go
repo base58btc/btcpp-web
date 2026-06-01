@@ -99,6 +99,13 @@ func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Tal
 	return loadTalkFromConfTalkNotion(ctx, confTalkID)
 }
 
+func TalkUpdateCalNotif(ctx *config.AppContext, talkID string, calnotif string) error {
+	if UsePostgresBackend(ctx) {
+		return unsupportedPostgresBackend("TalkUpdateCalNotif")
+	}
+	return talkUpdateCalNotifNotion(ctx.Notion, talkID, calnotif)
+}
+
 // resolveProposalSpeakers fills in Proposal.Speakers from SpeakerConfRefs using
 // the supplied speakerConfMap. Unknown refs are silently skipped.
 func resolveProposalSpeakers(p *types.Proposal, speakerConfMap map[string]*types.SpeakerConf) {

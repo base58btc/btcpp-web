@@ -258,7 +258,7 @@ func RemoveVolunteerFromShift(ctx *config.AppContext, volRef, shiftRef string) e
 	return err
 }
 
-func ShiftUpdateCalNotif(n *types.Notion, shiftID string, calnotif string) error {
+func shiftUpdateCalNotifNotion(n *types.Notion, shiftID string, calnotif string) error {
 	_, err := n.Client.UpdatePageProperties(context.Background(), shiftID,
 		map[string]*notion.PropertyValue{
 			"CalNotif": notion.NewRichTextPropertyValue(

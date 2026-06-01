@@ -86,7 +86,7 @@ func loadTalkFromConfTalkNotion(ctx *config.AppContext, confTalkID string) (*typ
 	return talkFromConfTalk(ct, proposal), nil
 }
 
-func TalkUpdateCalNotif(n *types.Notion, talkID string, calnotif string) error {
+func talkUpdateCalNotifNotion(n *types.Notion, talkID string, calnotif string) error {
 	_, err := n.Client.UpdatePageProperties(context.Background(), talkID,
 		map[string]*notion.PropertyValue{
 			"CalNotif": notion.NewRichTextPropertyValue(
