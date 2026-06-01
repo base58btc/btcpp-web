@@ -103,7 +103,7 @@ func ListConferencesOnlyNotion(n *types.Notion) ([]*types.Conf, error) {
 
 // ConfUpdateOrientCalNotif stamps the orientation-invite state triple
 // ("UID:Sequence:Hashbytes") on a conf row's OrientCalNotif rich_text column.
-func ConfUpdateOrientCalNotif(n *types.Notion, confRef string, calnotif string) error {
+func confUpdateOrientCalNotifNotion(n *types.Notion, confRef string, calnotif string) error {
 	_, err := n.Client.UpdatePageProperties(context.Background(), confRef,
 		map[string]*notion.PropertyValue{
 			"OrientCalNotif": notion.NewRichTextPropertyValue(

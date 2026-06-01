@@ -547,7 +547,7 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 	// reuse the existing CalNotif unchanged.
 	if stamp {
 		s := ics.CalNotif{UID: uid, Sequence: seq, HashHex: newHash}.String()
-		if err := getters.ConfUpdateOrientCalNotif(ctx.Notion, conf.Ref, s); err != nil {
+		if err := getters.ConfUpdateOrientCalNotif(ctx, conf.Ref, s); err != nil {
 			ctx.Err.Printf("dispatchOrientICS %s calnotif writeback: %s", conf.Tag, err)
 		}
 	}
@@ -642,7 +642,7 @@ func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end tim
 	}
 
 	stamp := ics.CalNotif{UID: uid, Sequence: seq, HashHex: newHash}.String()
-	if wErr := getters.ConfUpdateOrientCalNotif(ctx.Notion, conf.Ref, stamp); wErr != nil {
+	if wErr := getters.ConfUpdateOrientCalNotif(ctx, conf.Ref, stamp); wErr != nil {
 		ctx.Err.Printf("broadcastOrientICS %s calnotif writeback: %s", conf.Tag, wErr)
 	}
 	ctx.Infos.Printf("broadcastOrientICS %s: seq=%d sent=%d/%d hash=%s", conf.Tag, seq, sent, len(recipients), newHash)
