@@ -2175,7 +2175,7 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 			vol.ScheduleFor = append(vol.ScheduleFor, conf)
 		}
 
-		err = getters.RegisterVolunteer(ctx.Notion, &vol)
+		err = getters.RegisterVolunteer(ctx, &vol)
 		if err != nil {
 			ctx.Err.Printf("/volunteer/{conf} unable to register volunteer %s", err)
 			w.Write([]byte(helpers.ErrVolApp("Unable to register you.")))

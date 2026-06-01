@@ -88,7 +88,7 @@ func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs
 	return err
 }
 
-func RegisterVolunteer(n *types.Notion, vol *types.Volunteer) error {
+func registerVolunteerNotion(n *types.Notion, vol *types.Volunteer) error {
 	normalizeVolunteerInput(vol)
 	parent := notion.NewDatabaseParent(n.Config.VolunteerDb)
 
