@@ -76,21 +76,21 @@ func UpsertSpeakerConf(ctx *config.AppContext, in SpeakerConfInput) (string, err
 
 func CreateConfTalk(ctx *config.AppContext, in ConfTalkInput) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("CreateConfTalk")
+		return createConfTalkPostgres(ctx, in)
 	}
 	return createConfTalkNotion(ctx.Notion, in)
 }
 
 func UpdateConfTalkSchedule(ctx *config.AppContext, confTalkID, venue string, start, end time.Time) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateConfTalkSchedule")
+		return updateConfTalkSchedulePostgres(ctx, confTalkID, venue, start, end)
 	}
 	return updateConfTalkScheduleNotion(ctx, confTalkID, venue, start, end)
 }
 
 func DeleteConfTalk(ctx *config.AppContext, confTalkID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("DeleteConfTalk")
+		return deleteConfTalkPostgres(ctx, confTalkID)
 	}
 	return deleteConfTalkNotion(ctx, confTalkID)
 }
@@ -104,14 +104,14 @@ func UpdateSpeakerConf(ctx *config.AppContext, speakerConfID string, in SpeakerC
 
 func ConfTalkSetSocialCard(ctx *config.AppContext, confTalkID, path string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ConfTalkSetSocialCard")
+		return confTalkSetSocialCardPostgres(ctx, confTalkID, path)
 	}
 	return confTalkSetSocialCardNotion(ctx.Notion, confTalkID, path)
 }
 
 func ConfTalkSetClipart(ctx *config.AppContext, confTalkID, filename string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ConfTalkSetClipart")
+		return confTalkSetClipartPostgres(ctx, confTalkID, filename)
 	}
 	return confTalkSetClipartNotion(ctx.Notion, confTalkID, filename)
 }

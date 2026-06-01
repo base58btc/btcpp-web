@@ -101,7 +101,7 @@ func LoadTalkFromConfTalk(ctx *config.AppContext, confTalkID string) (*types.Tal
 
 func TalkUpdateCalNotif(ctx *config.AppContext, talkID string, calnotif string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("TalkUpdateCalNotif")
+		return talkUpdateCalNotifPostgres(ctx, talkID, calnotif)
 	}
 	return talkUpdateCalNotifNotion(ctx.Notion, talkID, calnotif)
 }

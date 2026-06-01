@@ -44,6 +44,7 @@ speaker/proposal, and volunteer writes.
 | Speakers / people | `CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`, `GetSpeakersByEmail`, `FetchSpeakerByID` | Now dispatch by `AppContext`; Postgres writes `people` and `people_roles`, and Notion remains the fallback. |
 | Missives / subscribers | `FindSubscriber`, `ListSubscribersFor`, `IsSubscribedTo`, `SubscribeEmailList`, `SubscribeEmail`, `UpdateSubs`, `GetLetter`, `GetLetterFor`, `GetLetters`, `ListOnlyForLetters`, `ListTemplatedLetters`, `CreateTemplatedMissive`, `UpdateTemplatedMissive`, `CreateMissive`, `MarkLetterSent` | Now dispatch by `AppContext`; Postgres reads/writes `subscribers`, `subscriber_subscriptions`, and `missives`, and Notion remains the fallback. |
 | Proposal core writes | `CreateProposal`, `UpdateProposal`, `UpdateProposalStatus`, `SetProposalInviteToken` | Now dispatch by `AppContext`; Postgres writes `proposals`, and Notion remains the fallback. |
+| Conf talk writes | `CreateConfTalk`, `UpdateConfTalkSchedule`, `DeleteConfTalk`, `ConfTalkSetSocialCard`, `ConfTalkSetClipart`, `TalkUpdateCalNotif` | Now dispatch by `AppContext`; Postgres writes `conf_talks`, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 
