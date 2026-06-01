@@ -118,7 +118,7 @@ func AffiliateCreate(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 	// CalcDiscount treats an empty ConfRef as "valid at any
 	// active event," so a single user code works wherever they
 	// share it without an admin re-attaching it per conf launch.
-	if _, err := getters.CreateAffiliateCode(ctx.Notion, email, codeName, buyerPct, nil); err != nil {
+	if _, err := getters.CreateAffiliateCode(ctx, email, codeName, buyerPct, nil); err != nil {
 		ctx.Err.Printf("/dashboard/affiliate/new create: %s", err)
 		formErr("Couldn't save the code — try again.")
 		return
