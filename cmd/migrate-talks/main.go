@@ -46,15 +46,15 @@ const (
 
 type cfgFile struct {
 	Notion struct {
-		Token             string `toml:"token"`
-		TalksDb           string `toml:"talksdb"`
-		SpeakersDb        string `toml:"speakersdb"`
-		ConfsDb           string `toml:"confsdb"`
-		ConfsTixDb        string `toml:"confstixdb"`
-		OrgDb             string `toml:"orgdb"`
-		ProposalDb        string `toml:"proposaldb"`
+		Token         string `toml:"token"`
+		TalksDb       string `toml:"talksdb"`
+		SpeakersDb    string `toml:"speakersdb"`
+		ConfsDb       string `toml:"confsdb"`
+		ConfsTixDb    string `toml:"confstixdb"`
+		OrgDb         string `toml:"orgdb"`
+		ProposalDb    string `toml:"proposaldb"`
 		SpeakerConfDb string `toml:"speakerconfdb"`
-		ConfTalkDb        string `toml:"conftalkdb"`
+		ConfTalkDb    string `toml:"conftalkdb"`
 	} `toml:"notion"`
 }
 
@@ -95,14 +95,14 @@ func main() {
 		log.Fatalf("read %s: %s", configFile, err)
 	}
 	for k, v := range map[string]string{
-		"notion.token":             c.Notion.Token,
-		"notion.talksdb":           c.Notion.TalksDb,
-		"notion.speakersdb":        c.Notion.SpeakersDb,
-		"notion.confsdb":           c.Notion.ConfsDb,
-		"notion.confstixdb":        c.Notion.ConfsTixDb,
-		"notion.proposaldb":        c.Notion.ProposalDb,
+		"notion.token":         c.Notion.Token,
+		"notion.talksdb":       c.Notion.TalksDb,
+		"notion.speakersdb":    c.Notion.SpeakersDb,
+		"notion.confsdb":       c.Notion.ConfsDb,
+		"notion.confstixdb":    c.Notion.ConfsTixDb,
+		"notion.proposaldb":    c.Notion.ProposalDb,
 		"notion.speakerconfdb": c.Notion.SpeakerConfDb,
-		"notion.conftalkdb":        c.Notion.ConfTalkDb,
+		"notion.conftalkdb":    c.Notion.ConfTalkDb,
 	} {
 		if v == "" {
 			log.Fatalf("missing %s in %s", k, configFile)
@@ -110,8 +110,8 @@ func main() {
 	}
 
 	nc := &types.NotionConfig{
-		Token:             c.Notion.Token,
-		SpeakersDb:        c.Notion.SpeakersDb,
+		Token:         c.Notion.Token,
+		SpeakersDb:    c.Notion.SpeakersDb,
 		ConfsDb:       c.Notion.ConfsDb,
 		ConfsTixDb:    c.Notion.ConfsTixDb,
 		OrgDb:         c.Notion.OrgDb,
@@ -280,7 +280,7 @@ func migrateTalk(n *types.Notion, ctx *config.AppContext, t *oldTalk,
 		}
 	} else {
 		// Create new Proposal.
-		id, err := getters.CreateProposal(n, getters.ProposalInput{
+		id, err := getters.CreateProposal(ctx, getters.ProposalInput{
 			Title:           t.Title,
 			Description:     t.Description,
 			TalkType:        talkType,
@@ -334,7 +334,7 @@ func migrateTalk(n *types.Notion, ctx *config.AppContext, t *oldTalk,
 	// Conf + proposal; the rest (Clipart, TalkTime, Venue, SocialCard,
 	// CalNotif) we patch in directly to keep the live submit-flow getter
 	// minimal.
-	confTalkID, err := getters.CreateConfTalk(n, getters.ConfTalkInput{
+	confTalkID, err := getters.CreateConfTalk(ctx, getters.ConfTalkInput{
 		ConfTag:    t.Event,
 		ProposalID: proposalID,
 	})

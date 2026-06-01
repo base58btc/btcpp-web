@@ -275,7 +275,7 @@ func writeSocialCardPath(ctx *config.AppContext, talkID, key, card string) {
 	if card != "1080p" {
 		return
 	}
-	if err := getters.ConfTalkSetSocialCard(ctx.Notion, talkID, "/"+key); err != nil {
+	if err := getters.ConfTalkSetSocialCard(ctx, talkID, "/"+key); err != nil {
 		ctx.Err.Printf("ConfTalkSetSocialCard %s: %s", talkID, err)
 	}
 }

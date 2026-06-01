@@ -269,7 +269,7 @@ func resolveOrCreateInvitedProposal(ctx *config.AppContext, conf *types.Conf, sp
 		return p, true, nil
 	}
 	title := types.PlaceholderTitlePrefix + speaker.Name + ")"
-	pid, err := getters.CreateProposal(ctx.Notion, getters.ProposalInput{
+	pid, err := getters.CreateProposal(ctx, getters.ProposalInput{
 		Title:          title,
 		Description:    types.PlaceholderDescription,
 		TalkType:       talkType,

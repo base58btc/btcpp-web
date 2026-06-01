@@ -226,7 +226,7 @@ func SchedulePlace(w http.ResponseWriter, r *http.Request, ctx *config.AppContex
 	}
 
 	if existing == nil {
-		newID, err := getters.CreateConfTalk(ctx.Notion, getters.ConfTalkInput{
+		newID, err := getters.CreateConfTalk(ctx, getters.ConfTalkInput{
 			ConfTag:    conf.Tag,
 			ProposalID: req.ProposalID,
 		})
@@ -434,7 +434,7 @@ func ScheduleAddTalk(w http.ResponseWriter, r *http.Request, ctx *config.AppCont
 		return
 	}
 
-	if _, err := getters.CreateProposal(ctx.Notion, getters.ProposalInput{
+	if _, err := getters.CreateProposal(ctx, getters.ProposalInput{
 		Title:           title,
 		TalkType:        talkType,
 		DesiredDuration: dur,
@@ -492,7 +492,7 @@ func ScheduleAddHackathon(w http.ResponseWriter, r *http.Request, ctx *config.Ap
 		if existing[strings.ToLower(h.Title)] {
 			continue
 		}
-		_, err := getters.CreateProposal(ctx.Notion, getters.ProposalInput{
+		_, err := getters.CreateProposal(ctx, getters.ProposalInput{
 			Title:           h.Title,
 			TalkType:        "hackathon",
 			DesiredDuration: h.Duration,

@@ -168,7 +168,7 @@ func AdminClipartsUpload(w http.ResponseWriter, r *http.Request, ctx *config.App
 		confTalkID = ct.ID
 	}
 	if confTalkID == "" {
-		newID, err := getters.CreateConfTalk(ctx.Notion, getters.ConfTalkInput{
+		newID, err := getters.CreateConfTalk(ctx, getters.ConfTalkInput{
 			ConfTag:    conf.Tag,
 			ProposalID: proposalID,
 		})
@@ -238,7 +238,7 @@ func AdminClipartsUpload(w http.ResponseWriter, r *http.Request, ctx *config.App
 	}
 	InvalidateTalkManifest()
 
-	if err := getters.ConfTalkSetClipart(ctx.Notion, confTalkID, clean+".png"); err != nil {
+	if err := getters.ConfTalkSetClipart(ctx, confTalkID, clean+".png"); err != nil {
 		bail("Patch Notion ConfTalk.Clipart: " + err.Error())
 		return
 	}

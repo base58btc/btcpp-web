@@ -59,7 +59,7 @@ func newSubmitPipeline(ctx *config.AppContext) submitPipeline {
 			return getters.RegisterOrg(ctx.Notion, org)
 		},
 		createProposal: func(in getters.ProposalInput) (string, error) {
-			return getters.CreateProposal(ctx.Notion, in)
+			return getters.CreateProposal(ctx, in)
 		},
 		upsertSpeakerConf: func(in getters.SpeakerConfInput) (string, error) {
 			return getters.UpsertSpeakerConf(ctx, in)

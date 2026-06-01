@@ -764,7 +764,7 @@ func migrate(n *types.Notion, ta *talkApp, confTagByID map[string]string) (migra
 
 	// Proposal — preserve original Status.
 	dur := durationFromPresType(ta.PresType)
-	proposalID, err := getters.CreateProposal(n, getters.ProposalInput{
+	proposalID, err := getters.CreateProposal(appCtx, getters.ProposalInput{
 		Title:           ta.TalkTitle,
 		Description:     ta.Description,
 		Setup:           ta.Setup,
