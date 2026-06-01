@@ -69,7 +69,7 @@ func CreateProposal(ctx *config.AppContext, in ProposalInput) (string, error) {
 
 func UpsertSpeakerConf(ctx *config.AppContext, in SpeakerConfInput) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("UpsertSpeakerConf")
+		return upsertSpeakerConfPostgres(ctx, in)
 	}
 	return upsertSpeakerConfNotion(ctx, in)
 }
@@ -97,7 +97,7 @@ func DeleteConfTalk(ctx *config.AppContext, confTalkID string) error {
 
 func UpdateSpeakerConf(ctx *config.AppContext, speakerConfID string, in SpeakerConfFields) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateSpeakerConf")
+		return updateSpeakerConfPostgres(ctx, speakerConfID, in)
 	}
 	return updateSpeakerConfNotion(ctx, speakerConfID, in)
 }
@@ -132,7 +132,7 @@ func UpdateProposalStatus(ctx *config.AppContext, proposalID, status string) err
 
 func RemoveProposalFromSpeakerConf(ctx *config.AppContext, speakerConfID, proposalID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("RemoveProposalFromSpeakerConf")
+		return removeProposalFromSpeakerConfPostgres(ctx, speakerConfID, proposalID)
 	}
 	return removeProposalFromSpeakerConfNotion(ctx, speakerConfID, proposalID)
 }
@@ -146,28 +146,28 @@ func SetProposalInviteToken(ctx *config.AppContext, proposalID, token string) er
 
 func SetSpeakerConfInvitedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("SetSpeakerConfInvitedAt")
+		return setSpeakerConfDatePostgres(ctx, speakerConfID, "invited_at", when, false)
 	}
 	return setSpeakerConfInvitedAtNotion(ctx, speakerConfID, when)
 }
 
 func SetSpeakerConfViewedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("SetSpeakerConfViewedAt")
+		return setSpeakerConfDatePostgres(ctx, speakerConfID, "viewed_at", when, true)
 	}
 	return setSpeakerConfViewedAtNotion(ctx, speakerConfID, when)
 }
 
 func SetSpeakerConfAcceptedAt(ctx *config.AppContext, speakerConfID string, when time.Time) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("SetSpeakerConfAcceptedAt")
+		return setSpeakerConfDatePostgres(ctx, speakerConfID, "accepted_at", when, true)
 	}
 	return setSpeakerConfAcceptedAtNotion(ctx, speakerConfID, when)
 }
 
 func AddSpeakerConfToProposal(ctx *config.AppContext, proposalID, speakerConfID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("AddSpeakerConfToProposal")
+		return addSpeakerConfToProposalPostgres(ctx, proposalID, speakerConfID)
 	}
 	return addSpeakerConfToProposalNotion(ctx, proposalID, speakerConfID)
 }
