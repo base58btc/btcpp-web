@@ -3,11 +3,33 @@ package getters
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 )
+
+func createAffiliateCodePostgres(ctx *config.AppContext, email, codeName string, buyerPct uint, confRefs []string) (string, error) {
+	if strings.TrimSpace(email) == "" {
+		return "", fmt.Errorf("CreateAffiliateCode: empty email")
+	}
+	if strings.TrimSpace(codeName) == "" {
+		return "", fmt.Errorf("CreateAffiliateCode: empty codeName")
+	}
+	return insertDiscountPostgres(ctx, codeName, fmt.Sprintf("%%%d", buyerPct), email, confRefs)
+}
+
+func updateAffiliateCodePostgres(ctx *config.AppContext, codeID, codeName string, buyerPct uint, confRefs []string) error {
+	if strings.TrimSpace(codeID) == "" {
+		return fmt.Errorf("UpdateAffiliateCode: empty codeID")
+	}
+	return updateDiscountRowPostgres(ctx, codeID, codeName, fmt.Sprintf("%%%d", buyerPct), nil, confRefs)
+}
+
+func archiveAffiliateCodePostgres(ctx *config.AppContext, codeID string) error {
+	return archiveDiscountRowPostgres(ctx, codeID)
+}
 
 func recordAffiliateUsagePostgres(ctx *config.AppContext, in AffiliateUsageInput) error {
 	if ctx == nil || ctx.DB == nil {

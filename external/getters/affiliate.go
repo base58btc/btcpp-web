@@ -13,7 +13,7 @@ import (
 // IsCodeNameAvailable.
 func CreateAffiliateCode(ctx *config.AppContext, email, codeName string, buyerPct uint, confRefs []string) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("CreateAffiliateCode")
+		return createAffiliateCodePostgres(ctx, email, codeName, buyerPct, confRefs)
 	}
 	if email == "" {
 		return "", fmt.Errorf("CreateAffiliateCode: empty email")
@@ -28,7 +28,7 @@ func CreateAffiliateCode(ctx *config.AppContext, email, codeName string, buyerPc
 // an affiliate.
 func UpdateAffiliateCode(ctx *config.AppContext, codeID, codeName string, buyerPct uint, confRefs []string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateAffiliateCode")
+		return updateAffiliateCodePostgres(ctx, codeID, codeName, buyerPct, confRefs)
 	}
 	if codeID == "" {
 		return fmt.Errorf("UpdateAffiliateCode: empty codeID")
@@ -40,7 +40,7 @@ func UpdateAffiliateCode(ctx *config.AppContext, codeID, codeName string, buyerP
 // AffiliateUsage rows stay put.
 func ArchiveAffiliateCode(ctx *config.AppContext, codeID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ArchiveAffiliateCode")
+		return archiveAffiliateCodePostgres(ctx, codeID)
 	}
 	return archiveAffiliateCodeNotion(ctx, codeID)
 }

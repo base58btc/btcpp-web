@@ -48,6 +48,7 @@ speaker/proposal, and volunteer writes.
 | Speaker-conf writes | `UpsertSpeakerConf`, `UpdateSpeakerConf`, `AddSpeakerConfToProposal`, `RemoveProposalFromSpeakerConf`, `SetSpeakerConfInvitedAt`, `SetSpeakerConfViewedAt`, `SetSpeakerConfAcceptedAt` | Now dispatch by `AppContext`; Postgres writes `speaker_confs`, `proposals_speaker_confs`, and `speaker_confs_conferences`, and Notion remains the fallback. |
 | Volunteer writes | `RegisterVolunteer`, `ShiftUpdateCalNotif` | Now dispatch by `AppContext`; Postgres writes `volunteers`, volunteer relation join tables, and work-shift calendar notification stamps, and Notion remains the fallback. |
 | Sponsor / organization writes | `RegisterOrg`, `UpdateOrg`, `UpdateOrgDetails`, `RegisterSponsorship`, `UpdateSponsorshipStatus` | Now dispatch by `AppContext`; Postgres writes `organizations`, `sponsorships`, and `sponsorships_conferences`, and Notion remains the fallback. |
+| Discount / affiliate writes | `CreateDiscount`, `UpdateDiscount`, `ArchiveDiscount`, `CreateAffiliateCode`, `UpdateAffiliateCode`, `ArchiveAffiliateCode` | Now dispatch by `AppContext`; Postgres writes `discounts` and `discounts_conferences`, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 

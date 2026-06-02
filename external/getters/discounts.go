@@ -123,7 +123,7 @@ func IncrementDiscountUses(ctx *config.AppContext, discountRef string, addCount 
 // checkouts using the code will be credited to that affiliate.
 func CreateDiscount(ctx *config.AppContext, in DiscountInput) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("CreateDiscount")
+		return createDiscountPostgres(ctx, in)
 	}
 	if in.CodeName == "" {
 		return "", fmt.Errorf("CreateDiscount: CodeName is required")
@@ -143,7 +143,7 @@ func CreateDiscount(ctx *config.AppContext, in DiscountInput) (string, error) {
 // optional affiliate email together.
 func UpdateDiscount(ctx *config.AppContext, discountID string, in DiscountInput) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateDiscount")
+		return updateDiscountPostgres(ctx, discountID, in)
 	}
 	if discountID == "" {
 		return fmt.Errorf("UpdateDiscount: discountID is required")
@@ -165,7 +165,7 @@ func UpdateDiscount(ctx *config.AppContext, discountID string, in DiscountInput)
 // lookups stop seeing the archived code after cache refresh.
 func ArchiveDiscount(ctx *config.AppContext, discountID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ArchiveDiscount")
+		return archiveDiscountPostgres(ctx, discountID)
 	}
 	if discountID == "" {
 		return fmt.Errorf("ArchiveDiscount: discountID is required")
