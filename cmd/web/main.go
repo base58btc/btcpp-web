@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	texttemplate "text/template"
 	"time"
@@ -243,12 +244,16 @@ func main() {
 
 	/* Start media card refresh after server is listening */
 	if spaces.IsConfigured() {
-		go func() {
-			time.Sleep(3 * time.Second)
-			handlers.InitMediaRefresh(&app)
-			app.Infos.Printf("media refresh done")
-		}()
-		app.Infos.Printf("scheduling media refresh")
+		if mediaRendererAvailable() {
+			go func() {
+				time.Sleep(3 * time.Second)
+				handlers.InitMediaRefresh(&app)
+				app.Infos.Printf("media refresh done")
+			}()
+			app.Infos.Printf("scheduling media refresh")
+		} else {
+			app.Infos.Printf("media refresh disabled: Chrome/Chromium executable not found")
+		}
 	}
 
 	handlers.StartRecordingAutopublisher(&app)
@@ -336,4 +341,13 @@ func run(env *types.EnvConfig) error {
 	}
 
 	return nil
+}
+
+func mediaRendererAvailable() bool {
+	for _, name := range []string{"google-chrome", "google-chrome-stable", "chromium", "chromium-browser"} {
+		if _, err := exec.LookPath(name); err == nil {
+			return true
+		}
+	}
+	return false
 }
