@@ -163,3 +163,27 @@ func listConfTicketsPostgres(ctx *config.AppContext) ([]*types.ConfTicket, error
 	}
 	return tickets, nil
 }
+
+func confUpdateOrientCalNotifPostgres(ctx *config.AppContext, confRef string, calnotif string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE conferences
+		SET orient_cal_notif = $2
+		WHERE id = $1
+	`, confRef, calnotif)
+	if err != nil {
+		return fmt.Errorf("update conference %s orientation cal notif: %w", confRef, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("conference %s not found", confRef)
+	}
+	for _, conf := range confs {
+		if conf != nil && conf.Ref == confRef {
+			conf.OrientCalNotif = calnotif
+			break
+		}
+	}
+	return nil
+}

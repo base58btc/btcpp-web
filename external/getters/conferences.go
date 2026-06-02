@@ -49,7 +49,7 @@ func ListConferencesOnly(n *types.Notion) ([]*types.Conf, error) {
 
 func ConfUpdateOrientCalNotif(ctx *config.AppContext, confRef string, calnotif string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ConfUpdateOrientCalNotif")
+		return confUpdateOrientCalNotifPostgres(ctx, confRef, calnotif)
 	}
 	return confUpdateOrientCalNotifNotion(ctx.Notion, confRef, calnotif)
 }

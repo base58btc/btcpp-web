@@ -61,7 +61,7 @@ func ListHotels(n *types.Notion) ([]*types.Hotel, error) {
 // else is optional and gets written when non-empty.
 func CreateHotel(ctx *config.AppContext, in HotelInput) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("CreateHotel")
+		return createHotelPostgres(ctx, in)
 	}
 	if in.ConfRef == "" {
 		return "", fmt.Errorf("CreateHotel: ConfRef is required")
@@ -74,7 +74,7 @@ func CreateHotel(ctx *config.AppContext, in HotelInput) (string, error) {
 // blank a field the admin didn't intend to clear.
 func UpdateHotel(ctx *config.AppContext, hotelID string, in HotelInput) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateHotel")
+		return updateHotelPostgres(ctx, hotelID, in)
 	}
 	return updateHotelNotion(ctx, hotelID, in)
 }
@@ -85,7 +85,7 @@ func UpdateHotel(ctx *config.AppContext, hotelID string, in HotelInput) error {
 // UpdatePageProperties wrapper, mirroring DeleteConfTalk.
 func ArchiveHotel(ctx *config.AppContext, hotelID string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ArchiveHotel")
+		return archiveHotelPostgres(ctx, hotelID)
 	}
 	return archiveHotelNotion(ctx, hotelID)
 }

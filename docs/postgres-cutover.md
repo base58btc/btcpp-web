@@ -49,6 +49,7 @@ speaker/proposal, and volunteer writes.
 | Volunteer writes | `RegisterVolunteer`, `ShiftUpdateCalNotif` | Now dispatch by `AppContext`; Postgres writes `volunteers`, volunteer relation join tables, and work-shift calendar notification stamps, and Notion remains the fallback. |
 | Sponsor / organization writes | `RegisterOrg`, `UpdateOrg`, `UpdateOrgDetails`, `RegisterSponsorship`, `UpdateSponsorshipStatus` | Now dispatch by `AppContext`; Postgres writes `organizations`, `sponsorships`, and `sponsorships_conferences`, and Notion remains the fallback. |
 | Discount / affiliate writes | `CreateDiscount`, `UpdateDiscount`, `ArchiveDiscount`, `CreateAffiliateCode`, `UpdateAffiliateCode`, `ArchiveAffiliateCode` | Now dispatch by `AppContext`; Postgres writes `discounts` and `discounts_conferences`, and Notion remains the fallback. |
+| Hotel / conference calendar writes | `CreateHotel`, `UpdateHotel`, `ArchiveHotel`, `ConfUpdateOrientCalNotif` | Now dispatch by `AppContext`; Postgres writes `hotels` and conference orientation calendar notification stamps, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 
