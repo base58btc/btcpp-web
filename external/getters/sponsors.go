@@ -205,21 +205,21 @@ type OrgUpdate struct {
 
 func RegisterOrg(ctx *config.AppContext, org *types.Org) (string, error) {
 	if UsePostgresBackend(ctx) {
-		return "", unsupportedPostgresBackend("RegisterOrg")
+		return registerOrgPostgres(ctx, org)
 	}
 	return RegisterOrgNotion(ctx.Notion, org)
 }
 
 func UpdateOrg(ctx *config.AppContext, orgID string, up OrgUpdate) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateOrg")
+		return updateOrgPostgres(ctx, orgID, up)
 	}
 	return UpdateOrgNotion(ctx.Notion, orgID, up)
 }
 
 func UpdateOrgDetails(ctx *config.AppContext, org *types.Org) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateOrgDetails")
+		return updateOrgDetailsPostgres(ctx, org)
 	}
 	return UpdateOrgDetailsNotion(ctx.Notion, org)
 }
@@ -233,14 +233,14 @@ func FindOrg(ctx *config.AppContext, website, name string) (*types.Org, error) {
 
 func RegisterSponsorship(ctx *config.AppContext, sp *types.Sponsorship) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("RegisterSponsorship")
+		return registerSponsorshipPostgres(ctx, sp)
 	}
 	return RegisterSponsorshipNotion(ctx.Notion, sp)
 }
 
 func UpdateSponsorshipStatus(ctx *config.AppContext, ref string, status string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("UpdateSponsorshipStatus")
+		return updateSponsorshipStatusPostgres(ctx, ref, status)
 	}
 	return UpdateSponsorshipStatusNotion(ctx.Notion, ref, status)
 }
