@@ -314,7 +314,9 @@ Current progress:
 - `ListSponsorships` now dispatches by backend.
 - `listOrgsPostgres` and `listSponsorshipsPostgres` are implemented in
   `external/getters/sponsors_postgres.go`.
-- Organization/sponsorship write paths still need a dedicated Postgres write split.
+- Organization/sponsorship writes (`RegisterOrg`, `UpdateOrg`,
+  `UpdateOrgDetails`, `RegisterSponsorship`, `UpdateSponsorshipStatus`) now
+  dispatch by backend.
 
 ## Current Progress: Proposals
 
@@ -327,8 +329,7 @@ Current progress:
 - `listProposalsPostgres` and `getProposalPostgres` are implemented in
   `external/getters/proposals_postgres.go`.
 - Proposal write paths (`CreateProposal`, `UpdateProposal`,
-  `UpdateProposalStatus`, invite-token updates, etc.) still need a dedicated
-  Postgres write split.
+  `UpdateProposalStatus`, and invite-token updates) now dispatch by backend.
 
 ## Current Progress: Speakers / People
 
@@ -340,7 +341,7 @@ Current progress:
 - Postgres reads the `people` table and hydrates `Speaker.Roles` from
   `people_roles` as the existing raw role tag format, e.g. `global-admin`.
 - Speaker write paths (`CreateSpeaker`, `UpdateSpeaker`, `UpdateSpeakerRoles`,
-  etc.) still need a dedicated Postgres write split.
+  `GetSpeakersByEmail`, and `FetchSpeakerByID`) now dispatch by backend.
 
 ## Current Progress: Speaker Confs
 
@@ -355,8 +356,7 @@ Current progress:
   proposals, and `OtherEvents` from `proposals_speaker_confs` and
   `speaker_confs_conferences`.
 - Speaker-conf write paths (`UpsertSpeakerConf`, `UpdateSpeakerConf`, date
-  stamps, proposal add/remove, etc.) still need a dedicated Postgres write
-  split.
+  stamps, and proposal add/remove) now dispatch by backend.
 
 ## Current Progress: Conf Talks
 
@@ -370,7 +370,7 @@ Current progress:
   `loadTalkFromConfTalkPostgres` are implemented in
   `external/getters/conf_talks_postgres.go` and read `conf_talks`.
 - Conf-talk write paths (`CreateConfTalk`, schedule updates, archive/delete,
-  clipart/social-card updates) still need a dedicated Postgres write split.
+  and clipart/social-card updates) now dispatch by backend.
 
 ## Current Progress: Talks
 
@@ -391,8 +391,8 @@ Current progress:
   `QueryAffiliateUsageByEmailNotion`, and `QueryAffiliateUsageByConfNotion`.
 - The Postgres implementation lives in `external/getters/affiliate_postgres.go`
   and reads/writes `affiliate_usages`.
-- Affiliate discount-code management (`CreateAffiliateCode`, `UpdateAffiliateCode`,
-  `ArchiveAffiliateCode`) still writes Notion via the existing discounts flow.
+- Affiliate discount-code management (`CreateAffiliateCode`,
+  `UpdateAffiliateCode`, `ArchiveAffiliateCode`) now dispatches by backend.
 
 ## Current Progress: Registrations
 
@@ -406,8 +406,9 @@ Current progress:
 - The Postgres implementation lives in
   `external/getters/registrations_postgres.go` and reads/writes
   `registrations`.
-- Ticket creation/revoke paths (`AddTickets`, `RevokeTicket`,
-  `ToggleTicketBlock`, etc.) still need a dedicated Postgres write split.
+- Ticket creation/revoke paths (`AddTickets`, `RevokeTicket`) now dispatch by
+  backend; `ToggleTicketBlock` remains an internal Notion helper used only by
+  the Notion add/revoke implementation.
 
 ## Current Progress: Conference Info
 
