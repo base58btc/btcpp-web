@@ -7,8 +7,71 @@ import (
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+func registerVolunteerPostgres(ctx *config.AppContext, vol *types.Volunteer) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	if vol == nil {
+		return fmt.Errorf("RegisterVolunteer: volunteer is nil")
+	}
+	normalizeVolunteerInput(vol)
+	if len(vol.ScheduleFor) == 0 || vol.ScheduleFor[0] == nil || vol.ScheduleFor[0].Ref == "" {
+		return fmt.Errorf("RegisterVolunteer: ScheduleFor required")
+	}
+
+	status := vol.Status
+	if status == "" {
+		status = "Applied"
+	}
+
+	tx, err := ctx.DB.Begin(context.Background())
+	if err != nil {
+		return fmt.Errorf("begin volunteer registration: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	var volunteerID string
+	err = tx.QueryRow(context.Background(), `
+		INSERT INTO volunteers (
+			name, email, phone, signal, availability, contact_at, comments,
+			discovered_via, first_event, hometown, twitter_handle, nostr,
+			shirt, status, captcha, subscribe
+		) VALUES (
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+		)
+		RETURNING id::text
+	`, vol.Name, vol.Email, vol.Phone, vol.Signal, vol.Availability,
+		vol.ContactAt, vol.Comments, vol.DiscoveredVia, vol.FirstEvent,
+		vol.Hometown, vol.Twitter.Handle, vol.Nostr, vol.Shirt, status,
+		vol.Captcha, vol.Subscribe).Scan(&volunteerID)
+	if err != nil {
+		return fmt.Errorf("insert volunteer %q: %w", vol.Email, err)
+	}
+
+	if err := insertVolunteerConferenceLinksPostgres(tx, volunteerID, vol.ScheduleFor, "schedule_for"); err != nil {
+		return err
+	}
+	if err := insertVolunteerConferenceLinksPostgres(tx, volunteerID, vol.OtherEvents, "other_event"); err != nil {
+		return err
+	}
+	if err := insertVolunteerJobLinksPostgres(tx, volunteerID, vol.WorkYes, "yes"); err != nil {
+		return err
+	}
+	if err := insertVolunteerJobLinksPostgres(tx, volunteerID, vol.WorkNo, "no"); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(context.Background()); err != nil {
+		return fmt.Errorf("commit volunteer registration: %w", err)
+	}
+	vol.Ref = volunteerID
+	vol.Status = status
+	return nil
+}
 
 func getVolInfosPostgres(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
 	if ctx == nil || ctx.DB == nil {
@@ -220,6 +283,38 @@ func hydrateVolunteerConferenceRelationsPostgres(ctx *config.AppContext, ids []s
 	}
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("iterate volunteer conference links: %w", err)
+	}
+	return nil
+}
+
+func insertVolunteerConferenceLinksPostgres(tx pgx.Tx, volunteerID string, confs []*types.Conf, kind string) error {
+	for _, conf := range confs {
+		if conf == nil || strings.TrimSpace(conf.Ref) == "" {
+			continue
+		}
+		if _, err := tx.Exec(context.Background(), `
+			INSERT INTO volunteers_conferences (volunteer_id, conference_id, kind)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (volunteer_id, conference_id, kind) DO NOTHING
+		`, volunteerID, conf.Ref, kind); err != nil {
+			return fmt.Errorf("insert volunteer conference link %s/%s/%s: %w", volunteerID, conf.Ref, kind, err)
+		}
+	}
+	return nil
+}
+
+func insertVolunteerJobLinksPostgres(tx pgx.Tx, volunteerID string, jobs []*types.JobType, preference string) error {
+	for _, job := range jobs {
+		if job == nil || strings.TrimSpace(job.Ref) == "" {
+			continue
+		}
+		if _, err := tx.Exec(context.Background(), `
+			INSERT INTO volunteers_job_types (volunteer_id, job_type_id, preference)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (volunteer_id, job_type_id, preference) DO NOTHING
+		`, volunteerID, job.Ref, preference); err != nil {
+			return fmt.Errorf("insert volunteer job link %s/%s/%s: %w", volunteerID, job.Ref, preference, err)
+		}
 	}
 	return nil
 }

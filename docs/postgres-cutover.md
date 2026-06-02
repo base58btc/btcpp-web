@@ -46,6 +46,7 @@ speaker/proposal, and volunteer writes.
 | Proposal core writes | `CreateProposal`, `UpdateProposal`, `UpdateProposalStatus`, `SetProposalInviteToken` | Now dispatch by `AppContext`; Postgres writes `proposals`, and Notion remains the fallback. |
 | Conf talk writes | `CreateConfTalk`, `UpdateConfTalkSchedule`, `DeleteConfTalk`, `ConfTalkSetSocialCard`, `ConfTalkSetClipart`, `TalkUpdateCalNotif` | Now dispatch by `AppContext`; Postgres writes `conf_talks`, and Notion remains the fallback. |
 | Speaker-conf writes | `UpsertSpeakerConf`, `UpdateSpeakerConf`, `AddSpeakerConfToProposal`, `RemoveProposalFromSpeakerConf`, `SetSpeakerConfInvitedAt`, `SetSpeakerConfViewedAt`, `SetSpeakerConfAcceptedAt` | Now dispatch by `AppContext`; Postgres writes `speaker_confs`, `proposals_speaker_confs`, and `speaker_confs_conferences`, and Notion remains the fallback. |
+| Volunteer writes | `RegisterVolunteer`, `ShiftUpdateCalNotif` | Now dispatch by `AppContext`; Postgres writes `volunteers`, volunteer relation join tables, and work-shift calendar notification stamps, and Notion remains the fallback. |
 
 ## Paused / Separate Work
 

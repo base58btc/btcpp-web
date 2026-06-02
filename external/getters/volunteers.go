@@ -73,7 +73,7 @@ func ListVolunteersForConf(ctx *config.AppContext, confRef string) ([]*types.Vol
 
 func RegisterVolunteer(ctx *config.AppContext, vol *types.Volunteer) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("RegisterVolunteer")
+		return registerVolunteerPostgres(ctx, vol)
 	}
 	return registerVolunteerNotion(ctx.Notion, vol)
 }

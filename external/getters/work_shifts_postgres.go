@@ -97,3 +97,27 @@ func listWorkShiftsPostgres(ctx *config.AppContext) ([]*types.WorkShift, error) 
 	}
 	return out, nil
 }
+
+func shiftUpdateCalNotifPostgres(ctx *config.AppContext, shiftID string, calnotif string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE work_shifts
+		SET cal_notif = $2
+		WHERE id = $1
+	`, shiftID, calnotif)
+	if err != nil {
+		return fmt.Errorf("update work shift %s cal notif: %w", shiftID, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("work shift %s not found", shiftID)
+	}
+	for _, shift := range shifts {
+		if shift != nil && shift.Ref == shiftID {
+			shift.CalNotif = calnotif
+			break
+		}
+	}
+	return nil
+}

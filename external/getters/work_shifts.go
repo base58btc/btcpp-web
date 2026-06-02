@@ -60,7 +60,7 @@ func GetShiftsForConf(ctx *config.AppContext, confTag string) ([]*types.WorkShif
 
 func ShiftUpdateCalNotif(ctx *config.AppContext, shiftID string, calnotif string) error {
 	if UsePostgresBackend(ctx) {
-		return unsupportedPostgresBackend("ShiftUpdateCalNotif")
+		return shiftUpdateCalNotifPostgres(ctx, shiftID, calnotif)
 	}
 	return shiftUpdateCalNotifNotion(ctx.Notion, shiftID, calnotif)
 }
