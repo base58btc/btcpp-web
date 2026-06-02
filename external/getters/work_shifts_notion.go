@@ -42,11 +42,6 @@ func ListWorkShiftsNotion(ctx *config.AppContext) ([]*types.WorkShift, error) {
 	return shiftList, nil
 }
 
-// invalidateShiftCache forces the next FetchShiftsCached call to refetch.
-func invalidateShiftCache() {
-	shifts = nil
-}
-
 // buildShiftPropertiesJSON constructs the Notion properties payload for a
 // shift page. We build this by hand because go-notion omits zero-value Numbers.
 func buildShiftPropertiesJSON(name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) map[string]interface{} {
@@ -82,7 +77,7 @@ func buildShiftPropertiesJSON(name string, jobType *types.JobType, start, end ti
 // CreateShift creates a new WorkShift page in the Notion ShiftDb. ShiftTime
 // must have a non-nil End. Bypasses go-notion's CreatePage to avoid the
 // omitempty zero-value bug for Number properties.
-func CreateShift(ctx *config.AppContext, conf *types.Conf, jobType *types.JobType, name string, start, end time.Time, maxVols, priority uint) error {
+func CreateShiftNotion(ctx *config.AppContext, conf *types.Conf, jobType *types.JobType, name string, start, end time.Time, maxVols, priority uint) error {
 	if conf == nil || conf.Ref == "" {
 		return fmt.Errorf("CreateShift: conf is nil or has empty ref")
 	}
@@ -110,7 +105,7 @@ func CreateShift(ctx *config.AppContext, conf *types.Conf, jobType *types.JobTyp
 
 // UpdateShiftTimes patches only the ShiftTime property on a shift, leaving
 // Name / JobType / MaxVols / Priority / Assignees untouched.
-func UpdateShiftTimes(ctx *config.AppContext, shiftRef string, start, end time.Time) error {
+func UpdateShiftTimesNotion(ctx *config.AppContext, shiftRef string, start, end time.Time) error {
 	if start.IsZero() {
 		return fmt.Errorf("UpdateShiftTimes: start required")
 	}
@@ -128,19 +123,13 @@ func UpdateShiftTimes(ctx *config.AppContext, shiftRef string, start, end time.T
 	if err := notionPagePost(ctx.Notion.Config.Token, "PATCH", "/"+shiftRef, body); err != nil {
 		return err
 	}
-	if fresh, err := ListWorkShifts(ctx); err == nil {
-		shifts = fresh
-		lastShiftFetch = time.Now()
-		writeCache("shifts", shifts)
-	} else {
-		ctx.Err.Printf("UpdateShiftTimes: cache reload (continuing): %s", err)
-	}
+	refreshShiftCache(ctx, "UpdateShiftTimes")
 	return nil
 }
 
 // UpdateShift updates a WorkShift's mutable fields. Pass nil for jobType to
 // skip updating the type. Pass a zero start to skip updating the time.
-func UpdateShift(ctx *config.AppContext, shiftRef, name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) error {
+func UpdateShiftNotion(ctx *config.AppContext, shiftRef, name string, jobType *types.JobType, start, end time.Time, maxVols, priority uint) error {
 	props := buildShiftPropertiesJSON(name, jobType, start, end, maxVols, priority)
 
 	body := map[string]interface{}{
@@ -156,7 +145,7 @@ func UpdateShift(ctx *config.AppContext, shiftRef, name string, jobType *types.J
 	return nil
 }
 
-func AssignVolunteerToShift(ctx *config.AppContext, volRef, shiftRef string) error {
+func AssignVolunteerToShiftNotion(ctx *config.AppContext, volRef, shiftRef string) error {
 	n := ctx.Notion
 
 	allShifts, err := FetchShiftsCached(ctx)
@@ -208,7 +197,7 @@ func AssignVolunteerToShift(ctx *config.AppContext, volRef, shiftRef string) err
 	return err
 }
 
-func RemoveVolunteerFromShift(ctx *config.AppContext, volRef, shiftRef string) error {
+func RemoveVolunteerFromShiftNotion(ctx *config.AppContext, volRef, shiftRef string) error {
 	n := ctx.Notion
 
 	allShifts, err := FetchShiftsCached(ctx)

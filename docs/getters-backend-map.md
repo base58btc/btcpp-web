@@ -280,13 +280,14 @@ Current progress:
 - `FetchShiftsCached` moved to `external/getters/work_shifts.go`.
 - `GetShiftsForConf` moved to `external/getters/work_shifts.go`.
 - `ListWorkShifts` remains as a context-based app-facing wrapper.
-- `ListWorkShiftsNotion` and Notion-only shift write paths moved to
+- `CreateShift`, `UpdateShift`, `UpdateShiftTimes`, `AssignVolunteerToShift`,
+  and `RemoveVolunteerFromShift` now dispatch by backend.
+- `ListWorkShiftsNotion` and shift write Notion implementations moved to
   `external/getters/work_shifts_notion.go`.
 - Shared direct Notion page helpers moved to
   `external/getters/notion_helpers.go`.
-- `listWorkShiftsPostgres` is implemented in `external/getters/work_shifts_postgres.go`.
-- Shift write paths (`CreateShift`, `UpdateShift`, assignment helpers, etc.) still need a
-  dedicated Postgres write split.
+- `listWorkShiftsPostgres` and shift write implementations are in
+  `external/getters/work_shifts_postgres.go`.
 
 ## Current Progress: Volunteers
 
@@ -299,8 +300,9 @@ Current progress:
 - `getVolInfosPostgres`, `listVolunteerAppsPostgres`, `fetchVolunteerPostgres`,
   and `listVolunteersForConfPostgres` are implemented in
   `external/getters/volunteers_postgres.go`.
-- Volunteer write paths (`RegisterVolunteer`, status/availability/work preference
-  updates, etc.) still need a dedicated Postgres write split.
+- `RegisterVolunteer` now dispatches by backend.
+- Volunteer status/availability/work preference updates still need a dedicated
+  Postgres write split.
 
 ## Current Progress: Sponsors And Organizations
 
