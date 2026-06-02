@@ -77,3 +77,24 @@ func RegisterVolunteer(ctx *config.AppContext, vol *types.Volunteer) error {
 	}
 	return registerVolunteerNotion(ctx.Notion, vol)
 }
+
+func UpdateVolunteerStatus(ctx *config.AppContext, volRef, status string) error {
+	if UsePostgresBackend(ctx) {
+		return updateVolunteerStatusPostgres(ctx, volRef, status)
+	}
+	return UpdateVolunteerStatusNotion(ctx, volRef, status)
+}
+
+func UpdateVolunteerAvailability(ctx *config.AppContext, volRef string, days []string) error {
+	if UsePostgresBackend(ctx) {
+		return updateVolunteerAvailabilityPostgres(ctx, volRef, days)
+	}
+	return UpdateVolunteerAvailabilityNotion(ctx, volRef, days)
+}
+
+func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs, workNoRefs []string) error {
+	if UsePostgresBackend(ctx) {
+		return updateVolunteerWorkPrefsPostgres(ctx, volRef, workYesRefs, workNoRefs)
+	}
+	return UpdateVolunteerWorkPrefsNotion(ctx, volRef, workYesRefs, workNoRefs)
+}

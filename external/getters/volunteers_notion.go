@@ -9,7 +9,7 @@ import (
 	"github.com/niftynei/go-notion"
 )
 
-func UpdateVolunteerStatus(ctx *config.AppContext, volRef, status string) error {
+func UpdateVolunteerStatusNotion(ctx *config.AppContext, volRef, status string) error {
 	n := ctx.Notion
 
 	_, err := n.Client.UpdatePageProperties(context.Background(), volRef,
@@ -25,7 +25,7 @@ func UpdateVolunteerStatus(ctx *config.AppContext, volRef, status string) error 
 	return err
 }
 
-func UpdateVolunteerAvailability(ctx *config.AppContext, volRef string, days []string) error {
+func UpdateVolunteerAvailabilityNotion(ctx *config.AppContext, volRef string, days []string) error {
 	n := ctx.Notion
 
 	availability := make([]*notion.SelectOption, len(days))
@@ -44,7 +44,7 @@ func UpdateVolunteerAvailability(ctx *config.AppContext, volRef string, days []s
 	return err
 }
 
-func UpdateVolunteerWorkPrefs(ctx *config.AppContext, volRef string, workYesRefs, workNoRefs []string) error {
+func UpdateVolunteerWorkPrefsNotion(ctx *config.AppContext, volRef string, workYesRefs, workNoRefs []string) error {
 	n := ctx.Notion
 
 	if len(workYesRefs) == 0 {

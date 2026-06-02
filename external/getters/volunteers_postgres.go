@@ -73,6 +73,84 @@ func registerVolunteerPostgres(ctx *config.AppContext, vol *types.Volunteer) err
 	return nil
 }
 
+func updateVolunteerStatusPostgres(ctx *config.AppContext, volRef, status string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE volunteers
+		SET status = $2
+		WHERE id = $1
+	`, volRef, status)
+	if err != nil {
+		return fmt.Errorf("update volunteer %s status: %w", volRef, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("volunteer %s not found", volRef)
+	}
+	return nil
+}
+
+func updateVolunteerAvailabilityPostgres(ctx *config.AppContext, volRef string, days []string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE volunteers
+		SET availability = $2
+		WHERE id = $1
+	`, volRef, days)
+	if err != nil {
+		return fmt.Errorf("update volunteer %s availability: %w", volRef, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("volunteer %s not found", volRef)
+	}
+	return nil
+}
+
+func updateVolunteerWorkPrefsPostgres(ctx *config.AppContext, volRef string, workYesRefs, workNoRefs []string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	tx, err := ctx.DB.Begin(context.Background())
+	if err != nil {
+		return fmt.Errorf("begin volunteer work preference update: %w", err)
+	}
+	defer tx.Rollback(context.Background())
+
+	commandTag, err := tx.Exec(context.Background(), `
+		DELETE FROM volunteers_job_types
+		WHERE volunteer_id = $1
+	`, volRef)
+	if err != nil {
+		return fmt.Errorf("clear volunteer %s work preferences: %w", volRef, err)
+	}
+
+	if commandTag.RowsAffected() == 0 {
+		var exists bool
+		if err := tx.QueryRow(context.Background(), `
+			SELECT EXISTS(SELECT 1 FROM volunteers WHERE id = $1)
+		`, volRef).Scan(&exists); err != nil {
+			return fmt.Errorf("check volunteer %s: %w", volRef, err)
+		}
+		if !exists {
+			return fmt.Errorf("volunteer %s not found", volRef)
+		}
+	}
+
+	if err := insertVolunteerJobRefLinksPostgres(tx, volRef, workYesRefs, "yes"); err != nil {
+		return err
+	}
+	if err := insertVolunteerJobRefLinksPostgres(tx, volRef, workNoRefs, "no"); err != nil {
+		return err
+	}
+	if err := tx.Commit(context.Background()); err != nil {
+		return fmt.Errorf("commit volunteer work preference update: %w", err)
+	}
+	return nil
+}
+
 func getVolInfosPostgres(ctx *config.AppContext, confRef string) ([]*types.VolInfo, error) {
 	if ctx == nil || ctx.DB == nil {
 		return nil, fmt.Errorf("postgres backend selected but AppContext.DB is nil")
@@ -304,16 +382,28 @@ func insertVolunteerConferenceLinksPostgres(tx pgx.Tx, volunteerID string, confs
 }
 
 func insertVolunteerJobLinksPostgres(tx pgx.Tx, volunteerID string, jobs []*types.JobType, preference string) error {
+	refs := make([]string, 0, len(jobs))
 	for _, job := range jobs {
 		if job == nil || strings.TrimSpace(job.Ref) == "" {
+			continue
+		}
+		refs = append(refs, job.Ref)
+	}
+	return insertVolunteerJobRefLinksPostgres(tx, volunteerID, refs, preference)
+}
+
+func insertVolunteerJobRefLinksPostgres(tx pgx.Tx, volunteerID string, jobRefs []string, preference string) error {
+	for _, jobRef := range jobRefs {
+		jobRef = strings.TrimSpace(jobRef)
+		if jobRef == "" {
 			continue
 		}
 		if _, err := tx.Exec(context.Background(), `
 			INSERT INTO volunteers_job_types (volunteer_id, job_type_id, preference)
 			VALUES ($1, $2, $3)
 			ON CONFLICT (volunteer_id, job_type_id, preference) DO NOTHING
-		`, volunteerID, job.Ref, preference); err != nil {
-			return fmt.Errorf("insert volunteer job link %s/%s/%s: %w", volunteerID, job.Ref, preference, err)
+		`, volunteerID, jobRef, preference); err != nil {
+			return fmt.Errorf("insert volunteer job link %s/%s/%s: %w", volunteerID, jobRef, preference, err)
 		}
 	}
 	return nil

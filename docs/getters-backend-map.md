@@ -300,9 +300,8 @@ Current progress:
 - `getVolInfosPostgres`, `listVolunteerAppsPostgres`, `fetchVolunteerPostgres`,
   and `listVolunteersForConfPostgres` are implemented in
   `external/getters/volunteers_postgres.go`.
-- `RegisterVolunteer` now dispatches by backend.
-- Volunteer status/availability/work preference updates still need a dedicated
-  Postgres write split.
+- `RegisterVolunteer`, `UpdateVolunteerStatus`, `UpdateVolunteerAvailability`,
+  and `UpdateVolunteerWorkPrefs` now dispatch by backend.
 
 ## Current Progress: Sponsors And Organizations
 
