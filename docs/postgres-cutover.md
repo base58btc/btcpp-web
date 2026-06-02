@@ -34,7 +34,6 @@ speaker/proposal, and volunteer writes.
 | Hotels | `CreateHotel`, `UpdateHotel`, `ArchiveHotel` | Admin hotel management. |
 | Calendar notification stamps | `TalkUpdateCalNotif`, `ShiftUpdateCalNotif`, `ConfUpdateOrientCalNotif` | Prevents duplicate calendar sends; should be durable in Postgres. |
 | Conf talk media fields | `ConfTalkSetSocialCard`, `ConfTalkSetClipart` | Used by media/card/clipart flows. |
-| File upload | `UploadFile` | This is Notion file-upload specific; likely needs a separate storage-backed replacement rather than Postgres. |
 
 ## Completed Write Splits
 
@@ -50,6 +49,7 @@ speaker/proposal, and volunteer writes.
 | Sponsor / organization writes | `RegisterOrg`, `UpdateOrg`, `UpdateOrgDetails`, `RegisterSponsorship`, `UpdateSponsorshipStatus` | Now dispatch by `AppContext`; Postgres writes `organizations`, `sponsorships`, and `sponsorships_conferences`, and Notion remains the fallback. |
 | Discount / affiliate writes | `CreateDiscount`, `UpdateDiscount`, `ArchiveDiscount`, `CreateAffiliateCode`, `UpdateAffiliateCode`, `ArchiveAffiliateCode` | Now dispatch by `AppContext`; Postgres writes `discounts` and `discounts_conferences`, and Notion remains the fallback. |
 | Hotel / conference calendar writes | `CreateHotel`, `UpdateHotel`, `ArchiveHotel`, `ConfUpdateOrientCalNotif` | Now dispatch by `AppContext`; Postgres writes `hotels` and conference orientation calendar notification stamps, and Notion remains the fallback. |
+| Generic file upload | `UploadFile` | Now dispatches by `AppContext`; Postgres uploads content-addressed objects to Spaces and returns the public URL, while Notion remains the fallback. |
 
 ## Paused / Separate Work
 

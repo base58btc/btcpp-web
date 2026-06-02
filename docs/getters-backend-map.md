@@ -167,7 +167,7 @@ remain under the current names until callers are moved to runtime dispatchers.
 | `ListVolunteerApps` | `ListVolunteerAppsNotion` | `volunteers.go` | `listVolunteerAppsPostgres` |
 | `FetchVolunteer` | `FetchVolunteerNotion` | `volunteers.go` | `fetchVolunteerPostgres` |
 | `ListVolunteersForConf` | `ListVolunteersForConfNotion` | `volunteers.go` | `listVolunteersForConfPostgres` |
-| `UploadFile` | `UploadFileNotion` | `files.go` | No direct Postgres equivalent; probably storage-backed. |
+| `UploadFile` | `UploadFileNotion` | `uploads.go` | `uploadFilePostgres` |
 
 ### App-Facing Functions That Need Case-By-Case Review
 
