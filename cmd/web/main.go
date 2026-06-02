@@ -42,6 +42,9 @@ func loadConfig() *types.EnvConfig {
 		if config.DatabaseURL == "" {
 			config.DatabaseURL = os.Getenv("DATABASE_URL")
 		}
+		if dataBackend := os.Getenv("DATA_BACKEND"); dataBackend != "" {
+			config.DataBackend = dataBackend
+		}
 
 		config.HMACKey, err = types.DeriveHMACKey(config.HMACSecret)
 		if err != nil {
