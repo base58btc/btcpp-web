@@ -268,7 +268,7 @@ CREATE TABLE conf_talks (
   archived_at timestamptz,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (proposal_id),
+  UNIQUE NULLS NOT DISTINCT (proposal_id, scheduled_start),
   CHECK (scheduled_end IS NULL OR scheduled_start IS NULL OR scheduled_end >= scheduled_start)
 );
 

@@ -404,7 +404,7 @@ UUID `id` columns remain the primary key unless a table is a pure join table.
 | `speaker_confs` | `speaker_id` | separate index | no | Reverse lookup all conference rows for a speaker. |
 | `speaker_confs_conferences` | `(speaker_conf_id, conference_id)` primary key | table constraint | yes | Prevent duplicate related-event links. |
 | `proposals_speaker_confs` | `(proposal_id, speaker_conf_id)` primary key | table constraint | yes | Prevent duplicate speaker links on a proposal. |
-| `conf_talks` | `proposal_id` | table constraint | yes | At most one scheduled talk row per accepted proposal. |
+| `conf_talks` | `(proposal_id, scheduled_start)` | table constraint | yes | Allows a proposal to appear at different scheduled times while preventing duplicate rows for the same proposal/time. Null scheduled starts are treated as equal. |
 | `conf_talks` | `(conference_id, scheduled_start)` | separate index | no | Schedule rendering/query order by conference. |
 | `recordings` | `conf_talk_id` | table constraint | yes | One recording metadata row per scheduled talk. |
 | `social_posts` | `ref` | separate index | no | Lookup/grouping key for app-generated social posts. Multiple rows can share a ref when they are distinct posts. |

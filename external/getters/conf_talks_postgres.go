@@ -34,7 +34,7 @@ func createConfTalkPostgres(ctx *config.AppContext, in ConfTalkInput) (string, e
 	err = ctx.DB.QueryRow(context.Background(), `
 		INSERT INTO conf_talks (conference_id, proposal_id)
 		VALUES ($1, NULLIF($2, '')::uuid)
-		ON CONFLICT (proposal_id) DO UPDATE SET
+		ON CONFLICT (proposal_id, scheduled_start) DO UPDATE SET
 			conference_id = EXCLUDED.conference_id
 		RETURNING id::text
 	`, *confID, strings.TrimSpace(in.ProposalID)).Scan(&confTalkID)
