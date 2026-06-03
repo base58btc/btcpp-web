@@ -55,6 +55,7 @@ type (
 		Volunteer    *types.Volunteer
 		Conf         *types.Conf
 		VolInfo      *types.VolInfo
+		DiscountCode *types.DiscountCode
 		Email        string
 		VolShiftLink string
 		URI          string
@@ -326,10 +327,15 @@ func templatizeTitle(title string, tmplData interface{}) string {
 // volunteer using the VolShifts data shape. The markdown is parsed as a Go
 // template so admins can use {{ .Volunteer.Name }} etc. in the body and title.
 func SendCustomToVol(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf, volinfo *types.VolInfo, title, markdown string) ([]byte, error) {
+	return SendCustomToVolWithDiscount(ctx, vol, conf, volinfo, nil, title, markdown)
+}
+
+func SendCustomToVolWithDiscount(ctx *config.AppContext, vol *types.Volunteer, conf *types.Conf, volinfo *types.VolInfo, discount *types.DiscountCode, title, markdown string) ([]byte, error) {
 	tmplData := &VolCustom{
 		Volunteer:    vol,
 		Conf:         conf,
 		VolInfo:      volinfo,
+		DiscountCode: discount,
 		Email:        vol.Email,
 		VolShiftLink: helpers.EmailLink(ctx, vol.Email, "/vols/shift"),
 		URI:          ctx.Env.GetURI(),

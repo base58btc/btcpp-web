@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"btcpp-web/external/getters"
@@ -464,7 +465,7 @@ func DispatchShiftICSCancelForVol(ctx *config.AppContext, shift *types.WorkShift
 // stamped (UID stable, seq+1) and the new time. Already-invited
 // vols don't get an automatic update; the volcoord broadcast
 // button covers that case.
-func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attendee, start, end time.Time) error {
+func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attendee, start, end time.Time, orientLink string) error {
 	if conf == nil {
 		return fmt.Errorf("dispatchOrientICS: nil conf")
 	}
@@ -512,7 +513,7 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 		Status:        ics.StatusConfirmed,
 		Summary:       fmt.Sprintf("vol orientation @ btc++: %s", conf.Desc),
 		Description:   "Volunteer orientation — please attend before doors open.",
-		Location:      conf.Venue,
+		Location:      orientationLocation(orientLink),
 		Start:         start,
 		End:           end,
 		TZ:            conf.Loc(),
@@ -522,7 +523,7 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 	}
 	icsBytes := ics.Render(event)
 	body := fmt.Sprintf("Volunteer orientation for %s\n\nWhen: %s (%s)\nWhere: %s\n",
-		conf.Desc, start.In(conf.Loc()).Format("Mon Jan 2 · 3:04 PM"), conf.Timezone, conf.Venue)
+		conf.Desc, start.In(conf.Loc()).Format("Mon Jan 2 · 3:04 PM"), conf.Timezone, orientationLocation(orientLink))
 	htmlBody, _ := emails.BuildHTMLEmail(ctx, []byte(body))
 	mail := &emails.Mail{
 		JobKey:   fmt.Sprintf("orient-%s-s%d-%s", conf.Tag, seq, vol.Email),
@@ -567,7 +568,7 @@ func DispatchOrientICS(ctx *config.AppContext, conf *types.Conf, vol ics.Attende
 //
 // Returns nil + a counts log on partial success; first error
 // otherwise. Empty recipients is a no-op.
-func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end time.Time, recipients []ics.Attendee) (sent int, err error) {
+func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end time.Time, orientLink string, recipients []ics.Attendee) (sent int, err error) {
 	if conf == nil {
 		return 0, fmt.Errorf("broadcastOrientICS: nil conf")
 	}
@@ -589,7 +590,7 @@ func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end tim
 	seq, _ := ics.NextSeq(prev, prevValid, newHash, true)
 
 	body := fmt.Sprintf("Volunteer orientation for %s\n\nWhen: %s (%s)\nWhere: %s\n",
-		conf.Desc, start.In(conf.Loc()).Format("Mon Jan 2 · 3:04 PM"), conf.Timezone, conf.Venue)
+		conf.Desc, start.In(conf.Loc()).Format("Mon Jan 2 · 3:04 PM"), conf.Timezone, orientationLocation(orientLink))
 	htmlBody, _ := emails.BuildHTMLEmail(ctx, []byte(body))
 
 	var firstErr error
@@ -604,7 +605,7 @@ func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end tim
 			Status:        ics.StatusConfirmed,
 			Summary:       fmt.Sprintf("vol orientation @ btc++: %s", conf.Desc),
 			Description:   "Volunteer orientation — please attend before doors open.",
-			Location:      conf.Venue,
+			Location:      orientationLocation(orientLink),
 			Start:         start,
 			End:           end,
 			TZ:            conf.Loc(),
@@ -647,6 +648,13 @@ func BroadcastOrientICS(ctx *config.AppContext, conf *types.Conf, start, end tim
 	}
 	ctx.Infos.Printf("broadcastOrientICS %s: seq=%d sent=%d/%d hash=%s", conf.Tag, seq, sent, len(recipients), newHash)
 	return sent, nil
+}
+
+func orientationLocation(orientLink string) string {
+	if strings.TrimSpace(orientLink) != "" {
+		return strings.TrimSpace(orientLink)
+	}
+	return "Online"
 }
 
 func statusForKind(k dispatchKind) string {

@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 
 	"btcpp-web/internal/types"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
@@ -91,7 +93,11 @@ func UploadStream(key string, body io.Reader, contentType string, size int64) (s
 	if size > 0 {
 		input.ContentLength = aws.Int64(size)
 	}
-	_, err := client.PutObject(context.Background(), input)
+	uploader := manager.NewUploader(client, func(u *manager.Uploader) {
+		u.PartSize = 64 * 1024 * 1024
+		u.Concurrency = 4
+	})
+	_, err := uploader.Upload(context.Background(), input)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload %s: %w", key, err)
 	}
@@ -117,10 +123,14 @@ func PutPrivate(key string, data []byte, contentType string) error {
 	return nil
 }
 
-// DeletePrivate removes a private object. It is intentionally narrow:
-// public assets should continue to flow through the purpose-built
-// upload/update paths above.
+// DeletePrivate removes a private object. Kept for callers that use the
+// older private-object naming.
 func DeletePrivate(key string) error {
+	return Delete(key)
+}
+
+// Delete removes an object by key.
+func Delete(key string) error {
 	if client == nil {
 		return fmt.Errorf("spaces not configured")
 	}
@@ -129,7 +139,40 @@ func DeletePrivate(key string) error {
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to delete private object %s: %w", key, err)
+		return fmt.Errorf("failed to delete object %s: %w", key, err)
+	}
+	return nil
+}
+
+// MovePublic copies an object to a new key with public-read ACL, then
+// deletes the source key. It is intended for in-bucket object renames where
+// downloading multi-GB videos through this process would be wasteful.
+func MovePublic(sourceKey, targetKey string) error {
+	if client == nil {
+		return fmt.Errorf("spaces not configured")
+	}
+	if sourceKey == "" || targetKey == "" {
+		return fmt.Errorf("source and target keys are required")
+	}
+	if sourceKey == targetKey {
+		return nil
+	}
+	copySource := bucket + "/" + url.PathEscape(strings.TrimPrefix(sourceKey, "/"))
+	_, err := client.CopyObject(context.Background(), &s3.CopyObjectInput{
+		Bucket:     aws.String(bucket),
+		Key:        aws.String(strings.TrimPrefix(targetKey, "/")),
+		CopySource: aws.String(copySource),
+		ACL:        s3types.ObjectCannedACLPublicRead,
+	})
+	if err != nil {
+		return fmt.Errorf("copy %s -> %s: %w", sourceKey, targetKey, err)
+	}
+	_, err = client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(strings.TrimPrefix(sourceKey, "/")),
+	})
+	if err != nil {
+		return fmt.Errorf("delete source %s after copy: %w", sourceKey, err)
 	}
 	return nil
 }

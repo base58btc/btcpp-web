@@ -749,6 +749,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/volcoord/send-orientation", func(w http.ResponseWriter, r *http.Request) {
 		SendVolOrientation(w, r, app)
 	}).Methods("POST")
+	r.HandleFunc("/{conf}/volcoord/orientation", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminScheduleOrientation(w, r, app)
+	}).Methods("POST")
 	r.HandleFunc("/{conf}/volcoord/sendcal", func(w http.ResponseWriter, r *http.Request) {
 		if id := requireConfVolcoord(w, r, app); id == nil {
 			return
@@ -818,6 +821,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 
 	r.HandleFunc("/{conf}/volcoord/email", func(w http.ResponseWriter, r *http.Request) {
 		VolAdminBulkEmail(w, r, app)
+	}).Methods("POST")
+
+	r.HandleFunc("/{conf}/volcoord/decline-selected", func(w http.ResponseWriter, r *http.Request) {
+		VolAdminDeclineSelected(w, r, app)
 	}).Methods("POST")
 
 	r.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
@@ -1008,6 +1015,9 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/recordings/oauth/youtube/start", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsYTOAuthStart(w, r, app)
 	}).Methods("GET")
+	r.HandleFunc("/admin/recordings/oauth/youtube/callback", func(w http.ResponseWriter, r *http.Request) {
+		RecordingsYTOAuthCallback(w, r, app)
+	}).Methods("GET")
 	r.HandleFunc("/{conf}/admin/recordings/oauth/youtube/callback", func(w http.ResponseWriter, r *http.Request) {
 		RecordingsYTOAuthCallback(w, r, app)
 	}).Methods("GET")
@@ -1098,6 +1108,10 @@ func Routes(app *config.AppContext) (http.Handler, error) {
 	r.HandleFunc("/{conf}/admin/speakers", func(w http.ResponseWriter, r *http.Request) {
 		SpeakerAdmin(w, r, app)
 	}).Methods("GET")
+
+	r.HandleFunc("/{conf}/admin/speakers/new", func(w http.ResponseWriter, r *http.Request) {
+		SpeakerAdminNew(w, r, app)
+	}).Methods("GET", "POST")
 
 	r.HandleFunc("/{conf}/admin/speakers/{speakerID}/refresh-cards", func(w http.ResponseWriter, r *http.Request) {
 		AdminSpeakerRefreshCards(w, r, app)
@@ -4249,7 +4263,7 @@ func runScheduledFlow(ctx *config.AppContext, vol *types.Volunteer, conf *types.
 	}
 
 	if volinfo != nil && volinfo.OrientTimes != nil && volinfo.OrientTimes.End != nil {
-		if err := DispatchOrientICS(ctx, conf, recipient, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End); err != nil {
+		if err := DispatchOrientICS(ctx, conf, recipient, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End, volinfo.OrientLink); err != nil {
 			ctx.Err.Printf("scheduled flow: orientation cal invite failed: %s", err)
 		}
 	}
@@ -4314,6 +4328,7 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 	// Compute dashboard stats from the *unfiltered* volunteer list so
 	// the headline numbers don't shift when admins click filter chips.
 	stats := computeVolAdminStats(vols, shifts)
+	allVols := vols
 
 	statusFilter := r.URL.Query().Get("status")
 
@@ -4339,17 +4354,24 @@ func VolAdmin(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
 		ctx.Err.Printf("/%s/volcoord failed to load volinfo: %s", conf.Tag, err.Error())
 		// continue without volinfo
 	}
+	orientStartInput, orientEndInput := orientationInputValues(volinfo, conf)
+	orientationRecipientCt := len(dedupeAttendees(append(scheduledVolunteerAttendees(allVols), orientationStaffRecipients(ctx, conf.Tag)...)))
 
 	err = ctx.TemplateCache.ExecuteTemplate(w, "volunteers/admin.tmpl", &VolAdminPage{
-		Conf:         conf,
-		Volunteers:   vols,
-		Shifts:       shifts,
-		VolInfo:      volinfo,
-		StatusFilter: statusFilter,
-		Missives:     missiveList,
-		FlashMessage: r.URL.Query().Get("flash"),
-		Year:         helpers.CurrentYear(),
-		Stats:        stats,
+		Conf:                   conf,
+		Volunteers:             vols,
+		Shifts:                 shifts,
+		VolInfo:                volinfo,
+		OrientationStartInput:  orientStartInput,
+		OrientationEndInput:    orientEndInput,
+		OrientationRecipientCt: orientationRecipientCt,
+		StatusFilter:           statusFilter,
+		Missives:               missiveList,
+		FlashMessage:           r.URL.Query().Get("flash"),
+		Year:                   helpers.CurrentYear(),
+		DeclineTitle:           defaultVolDeclineTitle(conf),
+		DeclineBody:            defaultVolDeclineBody(),
+		Stats:                  stats,
 		EmailCompose: &EmailComposeData{
 			Title:            "Email Selected Volunteers",
 			Description:      "Write a one-off email to volunteers. Uses Go template syntax.",
@@ -4512,19 +4534,7 @@ func VolunteerDecline(w http.ResponseWriter, r *http.Request, ctx *config.AppCon
 	if err != nil {
 		ctx.Err.Printf("/vols/shift/%s/decline failed to load shifts: %s", confTag, err.Error())
 	} else {
-		selectedShifts := getSelectedShifts(vol, confShifts)
-		for _, shift := range selectedShifts {
-			err = getters.RemoveVolunteerFromShift(ctx, vol.Ref, shift.Ref)
-			if err != nil {
-				ctx.Err.Printf("/vols/shift/%s/decline failed to remove shift %s: %s", confTag, shift.Name, err.Error())
-				continue
-			}
-			// CANCEL ICS so the dropped shift vanishes from
-			// the volunteer's calendar.
-			if dErr := DispatchShiftICSCancelForVol(ctx, shift, conf, vol.Email, vol.Name); dErr != nil {
-				ctx.Err.Printf("/vols/shift/%s/decline cancel-cal %q: %s", confTag, shift.Name, dErr)
-			}
-		}
+		releaseVolunteerShifts(ctx, conf, vol, confShifts, "vols/shift/decline")
 	}
 
 	// Update status to Declined
@@ -5131,6 +5141,188 @@ func VolAdminBulkEmail(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 
 	flash := fmt.Sprintf("Sent+to+%d+of+%d+volunteers", sent, len(targets))
 	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, flash), http.StatusSeeOther)
+}
+
+func defaultVolDeclineTitle(conf *types.Conf) string {
+	return fmt.Sprintf("Volunteer update for %s", conf.Desc)
+}
+
+func defaultVolDeclineBody() string {
+	return "Hi {{ .Volunteer.Name }},\n\nThank you again for applying to volunteer at {{ .Conf.Desc }}. We had more volunteer interest than available shifts this time, so we are not able to add you to the volunteer roster for this event.\n\nWe would still love to have you join us as an attendee. You can use discount code `{{ .DiscountCode.CodeName }}` for a discounted ticket.\n\nThank you for being willing to help make bitcoin++ happen.\n\n- bitcoin++"
+}
+
+func VolAdminDeclineSelected(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
+
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+
+	limitRequestBody(w, r, maxFormBodyBytes)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	volRefs := r.Form["vol_refs"]
+	testEmail := strings.TrimSpace(r.FormValue("decline_test_email"))
+	isTest := r.FormValue("decline_send_test") == "1"
+	if isTest && testEmail == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Test email is required")), http.StatusSeeOther)
+		return
+	}
+	if len(volRefs) == 0 && !isTest {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("No volunteers selected")), http.StatusSeeOther)
+		return
+	}
+
+	title := strings.TrimSpace(r.FormValue("decline_title"))
+	body := strings.TrimSpace(r.FormValue("decline_body"))
+	if title == "" || body == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Decline title and body are required")), http.StatusSeeOther)
+		return
+	}
+
+	discount, err := validateVolDeclineDiscount(ctx, conf, r.FormValue("decline_discount_code"))
+	if err != nil {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape(err.Error())), http.StatusSeeOther)
+		return
+	}
+
+	allVols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		http.Error(w, "Unable to load volunteers", http.StatusInternalServerError)
+		return
+	}
+
+	shifts, err := getters.GetShiftsForConf(ctx, conf.Tag)
+	if err != nil {
+		ctx.Err.Printf("/%s/volcoord/decline-selected failed to load shifts: %s", conf.Tag, err.Error())
+	}
+
+	refSet := make(map[string]bool, len(volRefs))
+	for _, ref := range volRefs {
+		refSet[ref] = true
+	}
+
+	var targets []*types.Volunteer
+	var firstEligible *types.Volunteer
+	for _, v := range allVols {
+		if !volBulkDeclineStatusAllowed(v.Status) {
+			continue
+		}
+		v.WorkShifts = getSelectedShifts(v, shifts)
+		if firstEligible == nil {
+			firstEligible = v
+		}
+		if refSet[v.Ref] {
+			targets = append(targets, v)
+		}
+	}
+
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/%s/volcoord/decline-selected failed to load volinfo: %s", conf.Tag, err.Error())
+	}
+
+	if isTest {
+		testVol := firstEligible
+		if len(targets) > 0 {
+			testVol = targets[0]
+		}
+		if testVol == nil {
+			http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("No Applied or Pending Shifts volunteers available for test")), http.StatusSeeOther)
+			return
+		}
+		tv := *testVol
+		tv.Email = testEmail
+		if _, err := emails.SendCustomToVolWithDiscount(ctx, &tv, conf, volinfo, discount, title, body); err != nil {
+			ctx.Err.Printf("/%s/volcoord/decline-selected test -> %s failed: %s", conf.Tag, testEmail, err)
+			http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Test decline email failed")), http.StatusSeeOther)
+			return
+		}
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Test decline email sent to "+testEmail)), http.StatusSeeOther)
+		return
+	}
+
+	sent := 0
+	declined := 0
+	for _, v := range targets {
+		if _, err := emails.SendCustomToVolWithDiscount(ctx, v, conf, volinfo, discount, title, body); err != nil {
+			ctx.Err.Printf("/%s/volcoord/decline-selected custom -> %s failed: %s", conf.Tag, v.Email, err)
+			continue
+		}
+		sent++
+
+		releaseVolunteerShifts(ctx, conf, v, shifts, "volcoord/decline-selected")
+		if err := getters.UpdateVolunteerStatus(ctx, v.Ref, "Declined"); err != nil {
+			ctx.Err.Printf("/%s/volcoord/decline-selected status %s failed: %s", conf.Tag, v.Email, err)
+			continue
+		}
+		declined++
+	}
+
+	flash := fmt.Sprintf("Sent decline email to %d of %d selected volunteers. Moved %d to Declined.", sent, len(targets), declined)
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape(flash)), http.StatusSeeOther)
+}
+
+func volBulkDeclineStatusAllowed(status string) bool {
+	return status == "Applied" || status == "PendingShifts"
+}
+
+func validateVolDeclineDiscount(ctx *config.AppContext, conf *types.Conf, code string) (*types.DiscountCode, error) {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, fmt.Errorf("Discount code is required")
+	}
+	discount, err := getters.FindDiscount(ctx, code)
+	if err != nil {
+		return nil, fmt.Errorf("Discount lookup failed: %w", err)
+	}
+	if discount == nil {
+		return nil, fmt.Errorf("Discount code %q was not found", code)
+	}
+	if len(discount.ConfRef) > 0 {
+		found := false
+		for _, ref := range discount.ConfRef {
+			if ref == conf.Ref {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("Discount code %q is not valid for %s", discount.CodeName, conf.Desc)
+		}
+	}
+	if discount.MaxUses > 0 && discount.UsesCount >= discount.MaxUses {
+		return nil, fmt.Errorf("Discount code %q has been fully redeemed", discount.CodeName)
+	}
+	if discount.IsDateExpired(time.Now().UTC()) {
+		return nil, fmt.Errorf("Discount code %q is not active today", discount.CodeName)
+	}
+	return discount, nil
+}
+
+func releaseVolunteerShifts(ctx *config.AppContext, conf *types.Conf, vol *types.Volunteer, shifts []*types.WorkShift, label string) {
+	selectedShifts := vol.WorkShifts
+	if selectedShifts == nil {
+		selectedShifts = getSelectedShifts(vol, shifts)
+	}
+	for _, shift := range selectedShifts {
+		if shift == nil {
+			continue
+		}
+		if err := getters.RemoveVolunteerFromShift(ctx, vol.Ref, shift.Ref); err != nil {
+			ctx.Err.Printf("/%s/%s remove shift %s for %s failed: %s", conf.Tag, label, shift.Name, vol.Email, err)
+			continue
+		}
+		if dErr := DispatchShiftICSCancelForVol(ctx, shift, conf, vol.Email, vol.Name); dErr != nil {
+			ctx.Err.Printf("/%s/%s cancel-cal %q for %s: %s", conf.Tag, label, shift.Name, vol.Email, dErr)
+		}
+	}
 }
 
 // parseShiftFormTimes turns a date (YYYY-MM-DD or 01/02/2006) plus two HH:MM
@@ -5907,6 +6099,96 @@ func AdminSpeakerRefreshCards(w http.ResponseWriter, r *http.Request, ctx *confi
 	}
 	RefreshTalkCardsForceOpt(ctx, talks, true)
 	http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers?flash=%s", conf.Tag, url.QueryEscape(fmt.Sprintf("Force refreshed %d talk(s) for speaker.", len(talks)))), http.StatusSeeOther)
+}
+
+func SpeakerAdminNew(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfAdmin(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	backURL := fmt.Sprintf("/%s/admin/speakers", conf.Tag)
+	formAction := fmt.Sprintf("/%s/admin/speakers/new", conf.Tag)
+	if r.Method == http.MethodPost {
+		adminCreateSpeakerPOST(w, r, ctx, conf, backURL)
+		return
+	}
+	page := &EditSpeakerPage{
+		Mode:       "create",
+		IsAdmin:    true,
+		BackURL:    backURL,
+		FormAction: formAction,
+		Year:       helpers.CurrentYear(),
+	}
+	if err := ctx.TemplateCache.ExecuteTemplate(w, "dashboard_edit_speaker.tmpl", page); err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/new render: %s", conf.Tag, err)
+		http.Error(w, "render failed", http.StatusInternalServerError)
+	}
+}
+
+func adminCreateSpeakerPOST(w http.ResponseWriter, r *http.Request, ctx *config.AppContext, conf *types.Conf, backURL string) {
+	limitRequestBody(w, r, maxMultipartBodyBytes)
+	if err := r.ParseMultipartForm(maxUploadFileBytes); err != nil {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+	}
+	name := strings.TrimSpace(r.FormValue("Name"))
+	email := strings.TrimSpace(r.FormValue("Email"))
+	if name == "" || email == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers/new?flash=%s", conf.Tag, url.QueryEscape("Name and email are required.")), http.StatusSeeOther)
+		return
+	}
+	existing, err := getters.GetSpeakersByEmail(ctx, email)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/new lookup %s: %s", conf.Tag, email, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers/new?flash=%s", conf.Tag, url.QueryEscape("Speaker lookup failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	if len(existing) > 0 && existing[0] != nil {
+		sp := existing[0]
+		flash := "Speaker already exists for " + email + ". Edit the existing profile, then attach them to a proposal."
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers/%s/edit?flash=%s", conf.Tag, sp.ID, url.QueryEscape(flash)), http.StatusSeeOther)
+		return
+	}
+	picRaw, picContentType, picExt, picErr := readMultipartFile(r, "PicFile")
+	hasNewPic := picErr == nil && len(picRaw) > 0
+	if picErr != nil && picErr != http.ErrMissingFile {
+		ctx.Err.Printf("/%s/admin/speakers/new read pic: %s", conf.Tag, picErr)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers/new?flash=%s", conf.Tag, url.QueryEscape("Photo upload failed.")), http.StatusSeeOther)
+		return
+	}
+	in := getters.SpeakerInput{
+		Name:      name,
+		Email:     email,
+		Phone:     strings.TrimSpace(r.FormValue("Phone")),
+		Signal:    strings.TrimSpace(r.FormValue("Signal")),
+		Telegram:  strings.TrimSpace(r.FormValue("Telegram")),
+		Twitter:   strings.TrimSpace(r.FormValue("Twitter")),
+		Nostr:     strings.TrimSpace(r.FormValue("Nostr")),
+		Github:    strings.TrimSpace(r.FormValue("Github")),
+		Instagram: strings.TrimSpace(r.FormValue("Instagram")),
+		LinkedIn:  strings.TrimSpace(r.FormValue("LinkedIn")),
+		Website:   strings.TrimSpace(r.FormValue("Website")),
+		TShirt:    validShirtCode(strings.TrimSpace(r.FormValue("TShirt"))),
+	}
+	if hasNewPic {
+		in.Photo = imgproc.ShortID(picRaw) + picExt
+	}
+	speakerID, err := getters.CreateSpeaker(ctx, in)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/speakers/new create %s: %s", conf.Tag, email, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/admin/speakers/new?flash=%s", conf.Tag, url.QueryEscape("Create failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	if hasNewPic {
+		go newPhotoPipeline(ctx).mirrorPicToSpaces(picRaw, picContentType, picExt)
+	}
+	http.Redirect(w, r, backURL+"?flash="+url.QueryEscape("Speaker created. Attach them to a proposal from the proposal editor. ID: "+speakerID), http.StatusSeeOther)
 }
 
 func SpeakerAdminEdit(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -6911,15 +7193,18 @@ func SendVolOrientation(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 		recipients = append(recipients, ics.Attendee{Email: v.Email, Name: v.Name})
 	}
 
+	recipients = append(recipients, orientationStaffRecipients(ctx, conf.Tag)...)
+	recipients = dedupeAttendees(recipients)
+
 	if len(recipients) == 0 {
 		http.Redirect(w, r,
 			fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
-				url.QueryEscape("No Scheduled volunteers to notify.")),
+				url.QueryEscape("No Scheduled volunteers or staff/admin recipients to notify.")),
 			http.StatusSeeOther)
 		return
 	}
 
-	sent, err := BroadcastOrientICS(ctx, conf, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End, recipients)
+	sent, err := BroadcastOrientICS(ctx, conf, volinfo.OrientTimes.Start, *volinfo.OrientTimes.End, volinfo.OrientLink, recipients)
 	if err != nil && sent == 0 {
 		ctx.Err.Printf("/%s/volcoord/send-orientation: %s", conf.Tag, err)
 		http.Redirect(w, r,
@@ -6931,8 +7216,149 @@ func SendVolOrientation(w http.ResponseWriter, r *http.Request, ctx *config.AppC
 
 	http.Redirect(w, r,
 		fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag,
-			url.QueryEscape(fmt.Sprintf("Orientation invite re-sent to %d volunteer(s).", sent))),
+			url.QueryEscape(fmt.Sprintf("Orientation invite re-sent to %d recipient(s).", sent))),
 		http.StatusSeeOther)
+}
+
+func VolAdminScheduleOrientation(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
+	if id := requireConfVolcoord(w, r, ctx); id == nil {
+		return
+	}
+	conf, err := helpers.FindConf(r, ctx)
+	if err != nil {
+		handle404(w, r, ctx)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Bad orientation form.")), http.StatusSeeOther)
+		return
+	}
+	start, err := parseOrientationTime(r.FormValue("start"), conf)
+	if err != nil {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation start time is required.")), http.StatusSeeOther)
+		return
+	}
+	end, err := parseOrientationTime(r.FormValue("end"), conf)
+	if err != nil || !end.After(start) {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation end time must be after the start time.")), http.StatusSeeOther)
+		return
+	}
+	orientLink := strings.TrimSpace(r.FormValue("orient_link"))
+	if orientLink == "" {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation link is required.")), http.StatusSeeOther)
+		return
+	}
+	volinfo, err := getters.GetVolInfo(ctx, conf.Ref)
+	if err != nil || volinfo == nil {
+		ctx.Err.Printf("/%s/volcoord/orientation volinfo: %s", conf.Tag, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("No VolInfo row found for this conference.")), http.StatusSeeOther)
+		return
+	}
+	if err := getters.UpdateVolInfoOrientation(ctx, volinfo.Ref, start, end, orientLink); err != nil {
+		ctx.Err.Printf("/%s/volcoord/orientation update: %s", conf.Tag, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation update failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	vols, err := getters.ListVolunteersForConf(ctx, conf.Ref)
+	if err != nil {
+		ctx.Err.Printf("/%s/volcoord/orientation list vols: %s", conf.Tag, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation saved, but volunteers could not be loaded.")), http.StatusSeeOther)
+		return
+	}
+	recipients := dedupeAttendees(append(scheduledVolunteerAttendees(vols), orientationStaffRecipients(ctx, conf.Tag)...))
+	if len(recipients) == 0 {
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation saved. No Scheduled volunteers or staff/admin recipients to notify.")), http.StatusSeeOther)
+		return
+	}
+	sent, err := BroadcastOrientICS(ctx, conf, start, end, orientLink, recipients)
+	if err != nil && sent == 0 {
+		ctx.Err.Printf("/%s/volcoord/orientation broadcast: %s", conf.Tag, err)
+		http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape("Orientation saved, but invite send failed: "+err.Error())), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/%s/volcoord?flash=%s", conf.Tag, url.QueryEscape(fmt.Sprintf("Orientation scheduled and invite sent to %d recipient(s).", sent))), http.StatusSeeOther)
+}
+
+func orientationInputValues(volinfo *types.VolInfo, conf *types.Conf) (string, string) {
+	if volinfo == nil || volinfo.OrientTimes == nil {
+		return "", ""
+	}
+	loc := time.Local
+	if conf != nil {
+		loc = conf.Loc()
+	}
+	start := volinfo.OrientTimes.Start.In(loc).Format("2006-01-02T15:04")
+	end := ""
+	if volinfo.OrientTimes.End != nil {
+		end = volinfo.OrientTimes.End.In(loc).Format("2006-01-02T15:04")
+	}
+	return start, end
+}
+
+func parseOrientationTime(raw string, conf *types.Conf) (time.Time, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return time.Time{}, fmt.Errorf("empty orientation time")
+	}
+	loc := time.Local
+	if conf != nil {
+		loc = conf.Loc()
+	}
+	return time.ParseInLocation("2006-01-02T15:04", raw, loc)
+}
+
+func scheduledVolunteerAttendees(vols []*types.Volunteer) []ics.Attendee {
+	out := make([]ics.Attendee, 0, len(vols))
+	for _, v := range vols {
+		if v == nil || v.Email == "" || v.Status != "Scheduled" {
+			continue
+		}
+		out = append(out, ics.Attendee{Email: v.Email, Name: v.Name})
+	}
+	return out
+}
+
+func orientationStaffRecipients(ctx *config.AppContext, confTag string) []ics.Attendee {
+	speakers, err := getters.FetchSpeakersCached(ctx)
+	if err != nil || len(speakers) == 0 {
+		return nil
+	}
+	out := make([]ics.Attendee, 0)
+	for _, sp := range speakers {
+		if sp == nil || sp.Email == "" || !speakerGetsOrientationStaffInvite(sp, confTag) {
+			continue
+		}
+		out = append(out, ics.Attendee{Email: sp.Email, Name: sp.Name})
+	}
+	return out
+}
+
+func speakerGetsOrientationStaffInvite(sp *types.Speaker, confTag string) bool {
+	for _, role := range auth.ParseRoles(sp.Roles) {
+		if role.Scope != auth.GlobalScope && role.Scope != confTag {
+			continue
+		}
+		switch role.Name {
+		case auth.RoleAdmin, auth.RoleVolcoord, auth.RoleStaff:
+			return true
+		}
+	}
+	return false
+}
+
+func dedupeAttendees(in []ics.Attendee) []ics.Attendee {
+	seen := map[string]bool{}
+	out := make([]ics.Attendee, 0, len(in))
+	for _, a := range in {
+		email := strings.ToLower(strings.TrimSpace(a.Email))
+		if email == "" || seen[email] {
+			continue
+		}
+		seen[email] = true
+		a.Email = strings.TrimSpace(a.Email)
+		out = append(out, a)
+	}
+	return out
 }
 
 // scheduled volunteer shift for a conf. Mirrors SendCals on the

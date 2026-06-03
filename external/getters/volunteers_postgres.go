@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -195,6 +196,26 @@ func getVolInfosPostgres(ctx *config.AppContext, confRef string) ([]*types.VolIn
 		return nil, fmt.Errorf("iterate volunteer info: %w", err)
 	}
 	return out, nil
+}
+
+func updateVolInfoOrientationPostgres(ctx *config.AppContext, volInfoRef string, start, end time.Time, orientLink string) error {
+	if ctx == nil || ctx.DB == nil {
+		return fmt.Errorf("postgres backend selected but AppContext.DB is nil")
+	}
+	commandTag, err := ctx.DB.Exec(context.Background(), `
+		UPDATE volunteer_info
+		SET orient_start = $2,
+			orient_end = $3,
+			orient_link_url = $4
+		WHERE id = $1
+	`, volInfoRef, start, end, orientLink)
+	if err != nil {
+		return fmt.Errorf("update volunteer info orientation %s: %w", volInfoRef, err)
+	}
+	if commandTag.RowsAffected() == 0 {
+		return fmt.Errorf("volunteer info %s not found", volInfoRef)
+	}
+	return nil
 }
 
 func listVolunteerAppsPostgres(ctx *config.AppContext, email string) ([]*types.Volunteer, error) {

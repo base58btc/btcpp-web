@@ -3,11 +3,25 @@ package getters
 import (
 	"context"
 	"strings"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
 	"github.com/niftynei/go-notion"
 )
+
+func UpdateVolInfoOrientationNotion(ctx *config.AppContext, volInfoRef string, start, end time.Time, orientLink string) error {
+	endCopy := end
+	_, err := ctx.Notion.Client.UpdatePageProperties(context.Background(), volInfoRef,
+		map[string]*notion.PropertyValue{
+			"OrientTimes": notion.NewDatePropertyValue(&notion.Date{
+				Start: start,
+				End:   &endCopy,
+			}),
+			"OrientLink": notion.NewURLPropertyValue(orientLink),
+		})
+	return err
+}
 
 func UpdateVolunteerStatusNotion(ctx *config.AppContext, volRef, status string) error {
 	n := ctx.Notion

@@ -84,6 +84,11 @@
                   </td>
                   <td class="px-4 py-3 text-sm text-gray-700">
                     {{ if .Recording.PublishAt }}{{ .Recording.PublishAt.Format "Jan 2, 2006 3:04 PM MST" }}{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .YTPublishAt }}
+                    <div class="mt-1 text-xs text-red-700">YT: {{ .YTPublishAt.Format "Jan 2, 2006 3:04 PM MST" }}</div>
+                    {{ else if .YTPrivacyStatus }}
+                    <div class="mt-1 text-xs text-gray-400">YT: {{ .YTPrivacyStatus }}</div>
+                    {{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
                     {{ if .HasFile }}
@@ -97,6 +102,8 @@
                   </td>
                   <td class="px-4 py-3 text-center">
                     {{ if .HasYT }}<a href="{{ .YTURL }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .YTStatus }}<span class="text-xs text-gray-600">{{ .YTStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}
+                    {{ if .YTPrivacyStatus }}<div class="text-[11px] text-gray-400">{{ .YTPrivacyStatus }}{{ if .YTUploadStatus }} / {{ .YTUploadStatus }}{{ end }}</div>{{ end }}
+                    {{ if .YTStatusError }}<div class="text-[11px] text-red-500">status error</div>{{ end }}
                   </td>
                   <td class="px-4 py-3 text-center">
                     {{ if .HasX }}<a href="{{ .XURL }}" class="text-green-600" target="_blank" rel="noopener">✓</a>{{ else if .XStatus }}<span class="text-xs text-gray-600">{{ .XStatus }}</span>{{ else }}<span class="text-gray-300">—</span>{{ end }}

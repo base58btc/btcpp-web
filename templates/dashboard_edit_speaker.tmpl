@@ -17,10 +17,10 @@
     </div>
 
     <h1 class="text-2xl font-bold text-gray-900">
-      {{ if eq .Mode "edit" }}Your speaker profile{{ else }}Create your speaker profile{{ end }}
+      {{ if eq .Mode "edit" }}{{ if .IsAdmin }}Edit speaker profile{{ else }}Your speaker profile{{ end }}{{ else }}{{ if .IsAdmin }}Create speaker profile{{ else }}Create your speaker profile{{ end }}{{ end }}
     </h1>
     <p class="text-sm text-gray-500 mt-1">
-      {{ if eq .Mode "edit" }}This is your row in the bitcoin++ speakers directory. Updates apply across every talk you've given or are giving.{{ else }}Add yourself to the bitcoin++ speakers directory so we have your contact info on file when you apply for a talk.{{ end }}
+      {{ if eq .Mode "edit" }}This is the row in the bitcoin++ speakers directory. Updates apply across every talk this speaker has given or is giving.{{ else }}Create a row in the bitcoin++ speakers directory. Attach the speaker to an event proposal from the proposal editor after saving.{{ end }}
     </p>
 
     {{ if .FlashMessage }}
@@ -34,7 +34,7 @@
           class="mt-8 space-y-6 bg-white shadow rounded-lg p-6">
 
       <div>
-        <label for="PicFile" class="block text-sm font-semibold text-gray-900">Photo {{ if eq .Mode "create" }}*{{ end }}</label>
+        <label for="PicFile" class="block text-sm font-semibold text-gray-900">Photo {{ if and (eq .Mode "create") (not .IsAdmin) }}*{{ end }}</label>
         <p class="text-xs text-gray-500">You'll get a 1:1 cropper after picking the file. {{ if eq .Mode "edit" }}Leave empty to keep your current photo.{{ else }}Square crops work best.{{ end }}</p>
         <div class="mt-2 flex items-start gap-4">
           {{ if and .Speaker .Speaker.Photo }}
@@ -47,7 +47,7 @@
           {{ end }}
           <div class="min-w-0 flex-1">
             <input name="PicFile" id="PicFile" type="file" accept="image/*"
-                   {{ if eq .Mode "create" }}required{{ end }}
+                   {{ if and (eq .Mode "create") (not .IsAdmin) }}required{{ end }}
                    class="block w-full rounded-md bg-white px-3 py-2 text-sm text-gray-900 outline outline-1 -outline-offset-1 outline-gray-300 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" />
             <div id="PicError" class="mt-2 hidden rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert" aria-live="polite"></div>
             <div id="PicPreview" class="mt-2 hidden">
@@ -74,8 +74,13 @@
       </div>
       <div>
         <label class="block text-sm font-semibold text-gray-900">Email</label>
+        {{ if .IsAdmin }}
+        <input id="Email" name="Email" type="email" required
+               class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
+        {{ else }}
         <p class="mt-1 text-sm text-gray-700">{{ .EmailPlain }}</p>
         <p class="mt-1 text-xs text-gray-500">Locked to your magic-link email — sign in with a different address to use that one instead.</p>
+        {{ end }}
       </div>
       {{ else }}
       <div class="grid grid-cols-1 gap-y-1 sm:grid-cols-2 sm:gap-x-6">
@@ -99,7 +104,7 @@
           <input id="Phone" name="Phone" type="tel" value="{{ if .Speaker }}{{ .Speaker.Phone }}{{ end }}" class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
         </div>
         <div>
-          <label for="Signal" class="block text-sm font-semibold text-gray-900">Signal *</label>
+          <label for="Signal" class="block text-sm font-semibold text-gray-900">Signal {{ if not .IsAdmin }}*{{ end }}</label>
           <input id="Signal" name="Signal" type="text" {{ if not .IsAdmin }}required{{ end }} value="{{ if .Speaker }}{{ .Speaker.Signal }}{{ end }}" class="mt-1 block w-full rounded-md py-2 px-3 outline outline-1 -outline-offset-1 outline-gray-300" />
         </div>
         <div>

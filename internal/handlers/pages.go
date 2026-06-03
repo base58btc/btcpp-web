@@ -659,16 +659,21 @@ type ShiftSignupPage struct {
 }
 
 type VolAdminPage struct {
-	Conf         *types.Conf
-	Volunteers   []*types.Volunteer
-	Shifts       []*types.WorkShift
-	VolInfo      *types.VolInfo
-	StatusFilter string
-	Missives     []*mtypes.Letter
-	FlashMessage string
-	Year         uint
-	EmailCompose *EmailComposeData
-	Stats        *VolAdminStats
+	Conf                   *types.Conf
+	Volunteers             []*types.Volunteer
+	Shifts                 []*types.WorkShift
+	VolInfo                *types.VolInfo
+	OrientationStartInput  string
+	OrientationEndInput    string
+	OrientationRecipientCt int
+	StatusFilter           string
+	Missives               []*mtypes.Letter
+	FlashMessage           string
+	Year                   uint
+	EmailCompose           *EmailComposeData
+	DeclineTitle           string
+	DeclineBody            string
+	Stats                  *VolAdminStats
 }
 
 // VolAdminStats are derived shift+volunteer counts shown in the

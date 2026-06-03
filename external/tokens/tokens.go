@@ -102,6 +102,24 @@ func Get(key string) (*Token, error) {
 	return t, nil
 }
 
+// RefreshLocalFromRemote overwrites the local token cache for key with the
+// encrypted remote copy, when remote token storage is configured. This is
+// useful for one-off CLIs that may have an old local tokens.bolt while the
+// deployed app has already refreshed the Spaces-backed token.
+func RefreshLocalFromRemote(key string) (*Token, error) {
+	if db == nil {
+		return nil, fmt.Errorf("tokens store not initialized")
+	}
+	t, err := getRemote(key)
+	if err != nil || t == nil {
+		return t, err
+	}
+	if err := setLocal(key, t); err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 func getLocal(key string) (*Token, error) {
 	var raw []byte
 	err := db.View(func(tx *bolt.Tx) error {

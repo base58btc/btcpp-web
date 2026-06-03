@@ -2,6 +2,7 @@ package getters
 
 import (
 	"fmt"
+	"time"
 
 	"btcpp-web/internal/config"
 	"btcpp-web/internal/types"
@@ -48,6 +49,13 @@ func GetVolInfos(ctx *config.AppContext, confRef string) ([]*types.VolInfo, erro
 		return getVolInfosPostgres(ctx, confRef)
 	}
 	return GetVolInfosNotion(ctx, confRef)
+}
+
+func UpdateVolInfoOrientation(ctx *config.AppContext, volInfoRef string, start, end time.Time, orientLink string) error {
+	if UsePostgresBackend(ctx) {
+		return updateVolInfoOrientationPostgres(ctx, volInfoRef, start, end, orientLink)
+	}
+	return UpdateVolInfoOrientationNotion(ctx, volInfoRef, start, end, orientLink)
 }
 
 func ListVolunteerApps(ctx *config.AppContext, email string) ([]*types.Volunteer, error) {

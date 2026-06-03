@@ -63,6 +63,10 @@ type RecordingRow struct {
 	YTError           string
 	XError            string
 	XErrorFingerprint string
+	YTPrivacyStatus   string
+	YTUploadStatus    string
+	YTPublishAt       *time.Time
+	YTStatusError     string
 	HasFile           bool
 	HasYT             bool
 	HasX              bool
@@ -220,17 +224,8 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 	if _, err := getters.FetchSocialPostsCached(ctx); err != nil {
 		ctx.Err.Printf("/%s/admin/recordings socialposts: %s", conf.Tag, err)
 	}
-	recs := getters.ListRecordingsCached()
-	rows := make([]*RecordingRow, 0, len(recs))
-	for _, rec := range recs {
-		if rec == nil {
-			continue
-		}
-		row := buildRecordingRow(rec)
-		if recordingRowBelongsToConf(row, conf.Tag) {
-			rows = append(rows, row)
-		}
-	}
+	rows := recordingRowsForConf(ctx, conf.Tag)
+	enrichRowsWithYouTubeStatus(ctx, rows)
 	sort.SliceStable(rows, func(i, j int) bool {
 		return rowSortKey(rows[i]) > rowSortKey(rows[j])
 	})
@@ -264,6 +259,72 @@ func RecordingsAdminList(w http.ResponseWriter, r *http.Request, ctx *config.App
 	}
 }
 
+func recordingRowsForConf(ctx *config.AppContext, confTag string) []*RecordingRow {
+	recs := getters.ListRecordingsCached()
+	rows := recordingRowsFromList(recs, confTag)
+	if len(rows) > 0 || len(recs) > 0 {
+		return rows
+	}
+
+	// The admin page is a control surface; if the warm cache missed at
+	// startup, do a synchronous refresh instead of rendering an empty page
+	// that suggests the Notion DB itself has no rows.
+	ctx.Infos.Printf("/%s/admin/recordings cache empty; refreshing Notion caches", confTag)
+	getters.WaitFetch(ctx)
+	recs = getters.ListRecordingsCached()
+	rows = recordingRowsFromList(recs, confTag)
+	if len(rows) > 0 || len(recs) > 0 {
+		return rows
+	}
+
+	live, err := getters.ListRecordings(ctx)
+	if err != nil {
+		ctx.Err.Printf("/%s/admin/recordings live recordings fetch failed: %s", confTag, err)
+		return rows
+	}
+	ctx.Infos.Printf("/%s/admin/recordings live recordings fallback loaded %d rows", confTag, len(live))
+	return recordingRowsFromList(live, confTag)
+}
+
+func recordingRowsFromList(recs []*types.Recording, confTag string) []*RecordingRow {
+	rows := make([]*RecordingRow, 0, len(recs))
+	for _, rec := range recs {
+		if rec == nil {
+			continue
+		}
+		row := buildRecordingRow(rec)
+		if recordingRowBelongsToConf(row, confTag) {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
+func enrichRowsWithYouTubeStatus(ctx *config.AppContext, rows []*RecordingRow) {
+	if !youtubepkg.IsConfigured() || !youtubepkg.IsConnected() {
+		return
+	}
+	for _, row := range rows {
+		if row == nil || row.Recording == nil || strings.TrimSpace(row.Recording.YTLink) == "" {
+			continue
+		}
+		videoID := youtubeVideoID(row.Recording.YTLink)
+		if videoID == "" {
+			row.YTStatusError = "could not parse video ID"
+			continue
+		}
+		status, err := youtubepkg.GetVideoStatus(context.Background(), videoID)
+		if err != nil {
+			row.YTStatusError = err.Error()
+			ctx.Err.Printf("recording youtube status recording=%s video=%s: %s", row.Recording.ID, videoID, err)
+			continue
+		}
+		row.YTPrivacyStatus = status.PrivacyStatus
+		row.YTUploadStatus = status.UploadStatus
+		row.YTPublishAt = status.PublishAt
+	}
+}
+
 // rowSortKey returns a string that, when sorted descending, puts the
 // newest talks first. Falls back to title when the ConfTalk has no
 // scheduled time (e.g., past talk imported without a timestamp).
@@ -283,6 +344,7 @@ func RecordingsAdminDetail(w http.ResponseWriter, r *http.Request, ctx *config.A
 	}
 
 	ytTitle, ytBody := defaultYouTubeCopy(ctx, row)
+	enrichRowsWithYouTubeStatus(ctx, []*RecordingRow{row})
 	xBody := recordingXMainCopy(ctx, row)
 	xReplyBody := defaultXReplyCopy(ctx, row)
 	intentURL := "https://x.com/intent/post?" + url.Values{"text": []string{xBody}}.Encode()
@@ -504,6 +566,10 @@ func RecordingsAdminSchedule(w http.ResponseWriter, r *http.Request, ctx *config
 			redirectWithErr(w, r, conf.Tag, recordingID, "couldn't parse publish time: "+err.Error())
 			return
 		}
+		if strings.TrimSpace(rec.YTLink) != "" && !when.After(time.Now()) {
+			redirectWithErr(w, r, conf.Tag, recordingID, "YouTube scheduled publish time must be in the future")
+			return
+		}
 		publishAt = &when
 	}
 
@@ -512,11 +578,47 @@ func RecordingsAdminSchedule(w http.ResponseWriter, r *http.Request, ctx *config
 		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update PublishAt: "+err.Error())
 		return
 	}
+	ytScheduleResult, err := updateRecordingYouTubeSchedule(ctx, rec, publishAt)
+	if err != nil {
+		ctx.Err.Printf("recording youtube schedule recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "saved Notion PublishAt, but couldn't update YouTube schedule: "+err.Error())
+		return
+	}
 	flash := "Schedule cleared"
 	if publishAt != nil {
 		flash = "Schedule saved"
+		if ytScheduleResult == "updated" {
+			flash = "Schedule saved and YouTube updated"
+		} else if ytScheduleResult == "public" {
+			flash = "Schedule saved. YouTube is already public, so it was not changed."
+		}
+	} else if ytScheduleResult == "updated" {
+		flash = "Schedule cleared and YouTube set to unlisted"
+	} else if ytScheduleResult == "public" {
+		flash = "Schedule cleared. YouTube is already public, so it was not changed."
 	}
 	http.Redirect(w, r, recordingDetailPath(conf.Tag, recordingID)+"?flash="+url.QueryEscape(flash), http.StatusSeeOther)
+}
+
+func updateRecordingYouTubeSchedule(ctx *config.AppContext, rec *types.Recording, publishAt *time.Time) (string, error) {
+	if rec == nil || strings.TrimSpace(rec.YTLink) == "" || !youtubepkg.IsConfigured() || !youtubepkg.IsConnected() {
+		return "", nil
+	}
+	videoID := youtubeVideoID(rec.YTLink)
+	if videoID == "" {
+		return "", fmt.Errorf("could not parse video ID from %q", rec.YTLink)
+	}
+	status, err := youtubepkg.GetVideoStatus(context.Background(), videoID)
+	if err != nil {
+		return "", err
+	}
+	if status.PrivacyStatus == "public" {
+		return "public", nil
+	}
+	if publishAt != nil {
+		return "updated", youtubepkg.ScheduleExistingVideo(context.Background(), videoID, *publishAt)
+	}
+	return "updated", youtubepkg.ClearExistingVideoSchedule(context.Background(), videoID)
 }
 
 func RecordingsAdminSaveXCopy(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -664,6 +766,11 @@ func RecordingsAdminScheduleX(w http.ResponseWriter, r *http.Request, ctx *confi
 		rec.PublishAt = publishAt
 		row.Recording.PublishAt = publishAt
 	}
+	if _, err := updateRecordingYouTubeSchedule(ctx, rec, publishAt); err != nil {
+		ctx.Err.Printf("schedule x youtube recording=%s: %s", recordingID, err)
+		redirectWithErr(w, r, conf.Tag, recordingID, "couldn't update YouTube schedule: "+err.Error())
+		return
+	}
 
 	status := recordingStatusScheduling
 	clear := ""
@@ -737,6 +844,10 @@ func runYouTubeUpload(ctx *config.AppContext, rec *types.Recording, title, body,
 		setJobStatus(recordingID, "failed", "uploaded to YouTube but failed to update Notion: "+err.Error())
 		return
 	}
+	rec.YTLink = ytURL
+	if err := uploadRecordingYouTubeThumbnail(context.Background(), rec); err != nil {
+		ctx.Err.Printf("youtube upload: thumbnail recording=%s: %s", recordingID, err)
+	}
 	if err := upsertRecordingSocialPost(ctx, row, recordingPlatformYouTube, getters.SocialPostUpdate{
 		URL:      &ytURL,
 		Status:   &status,
@@ -745,6 +856,67 @@ func runYouTubeUpload(ctx *config.AppContext, rec *types.Recording, title, body,
 		ctx.Err.Printf("youtube upload: persist socialpost recording=%s: %s", recordingID, err)
 	}
 	setJobStatus(recordingID, "succeeded", ytURL)
+}
+
+func uploadRecordingYouTubeThumbnail(ctx context.Context, rec *types.Recording) error {
+	if rec == nil || rec.YTLink == "" || rec.ConfTalkID == "" {
+		return nil
+	}
+	videoID := youtubeVideoID(rec.YTLink)
+	if videoID == "" {
+		return fmt.Errorf("could not parse video ID from %q", rec.YTLink)
+	}
+	key := recordingTalkCardKey(rec.ConfTalkID)
+	if key == "" {
+		return nil
+	}
+	data, err := spaces.Get(key)
+	if err != nil {
+		return fmt.Errorf("load talk card %s: %w", key, err)
+	}
+	return youtubepkg.SetThumbnailBytes(ctx, videoID, filepath.Base(key), data)
+}
+
+func recordingTalkCardKey(confTalkID string) string {
+	ct := getters.FetchConfTalkByID(confTalkID)
+	if ct == nil {
+		return ""
+	}
+	if strings.TrimSpace(ct.SocialCard) != "" {
+		return strings.TrimPrefix(strings.TrimSpace(ct.SocialCard), "/")
+	}
+	if ct.Conf == nil || ct.Conf.Tag == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/talks/%s-1080p.png", ct.Conf.Tag, ct.ID)
+}
+
+func youtubeVideoID(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+		return raw
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(u.Hostname())
+	switch {
+	case strings.Contains(host, "youtu.be"):
+		return strings.Trim(strings.TrimPrefix(u.Path, "/"), "/")
+	case strings.Contains(host, "youtube.com"):
+		if id := u.Query().Get("v"); id != "" {
+			return id
+		}
+		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+		if len(parts) >= 2 && (parts[0] == "shorts" || parts[0] == "embed") {
+			return parts[1]
+		}
+	}
+	return ""
 }
 
 // ---- save X link (manual handoff) ------------------------------------
@@ -845,21 +1017,24 @@ func RecordingsYTOAuthStart(w http.ResponseWriter, r *http.Request, ctx *config.
 		http.Error(w, "YouTube OAuth env vars are not set", http.StatusServiceUnavailable)
 		return
 	}
-	state := mintState()
+	state := mintState(conf.Tag)
 	ctx.Session.Put(r.Context(), youtubeOAuthStateKey, state)
-	http.Redirect(w, r, youtubepkg.AuthCodeURLForRedirect(state, recordingsOAuthRedirectURL(ctx, conf.Tag)), http.StatusSeeOther)
+	http.Redirect(w, r, youtubepkg.AuthCodeURLForRedirect(state, recordingsOAuthRedirectURL(ctx)), http.StatusSeeOther)
 }
 
 func RecordingsYTOAuthCallback(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	conf, ok := requireRecordingsConfAdmin(w, r, ctx)
-	if !ok {
-		return
-	}
 	wantState, _ := ctx.Session.Pop(r.Context(), youtubeOAuthStateKey).(string)
 	gotState := r.URL.Query().Get("state")
 	if wantState == "" || gotState == "" || wantState != gotState {
 		http.Error(w, "OAuth state mismatch — try again from the recordings page", http.StatusBadRequest)
 		return
+	}
+	confTag := confTagFromOAuthState(wantState)
+	if confTag == "" {
+		confTag = mux.Vars(r)["conf"]
+	}
+	if confTag == "" {
+		confTag = "vienna"
 	}
 	if errMsg := r.URL.Query().Get("error"); errMsg != "" {
 		http.Error(w, "Google denied the request: "+errMsg, http.StatusBadRequest)
@@ -870,12 +1045,12 @@ func RecordingsYTOAuthCallback(w http.ResponseWriter, r *http.Request, ctx *conf
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
-	if err := youtubepkg.ExchangeForRedirect(r.Context(), code, recordingsOAuthRedirectURL(ctx, conf.Tag)); err != nil {
+	if err := youtubepkg.ExchangeForRedirect(r.Context(), code, recordingsOAuthRedirectURL(ctx)); err != nil {
 		ctx.Err.Printf("youtube oauth exchange: %s", err)
 		http.Error(w, "OAuth exchange failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, recordingsAdminPath(conf.Tag, "?flash=YouTube+connected"), http.StatusSeeOther)
+	http.Redirect(w, r, recordingsAdminPath(confTag, "?flash=YouTube+connected"), http.StatusSeeOther)
 }
 
 func RecordingsYTOAuthDisconnect(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
@@ -894,10 +1069,22 @@ func RecordingsYTOAuthDisconnect(w http.ResponseWriter, r *http.Request, ctx *co
 
 // ---- helpers ---------------------------------------------------------
 
-func mintState() string {
+func mintState(confTag string) string {
 	var b [24]byte
 	_, _ = rand.Read(b[:])
-	return base64.RawURLEncoding.EncodeToString(b[:])
+	return url.PathEscape(confTag) + ":" + base64.RawURLEncoding.EncodeToString(b[:])
+}
+
+func confTagFromOAuthState(state string) string {
+	confTag, _, ok := strings.Cut(state, ":")
+	if !ok {
+		return ""
+	}
+	out, err := url.PathUnescape(confTag)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
 }
 
 func redirectWithErr(w http.ResponseWriter, r *http.Request, confTag, recordingID, msg string) {
@@ -962,8 +1149,8 @@ func recordingDetailPath(confTag, recordingID string) string {
 	return fmt.Sprintf("/%s/admin/recordings/%s", url.PathEscape(confTag), url.PathEscape(recordingID))
 }
 
-func recordingsOAuthRedirectURL(ctx *config.AppContext, confTag string) string {
-	return strings.TrimRight(ctx.Env.GetURI(), "/") + recordingsAdminPath(confTag, "/oauth/youtube/callback")
+func recordingsOAuthRedirectURL(ctx *config.AppContext) string {
+	return strings.TrimRight(ctx.Env.GetURI(), "/") + "/admin/recordings/oauth/youtube/callback"
 }
 
 func recordingPublishAtInput(publishAt *time.Time, conf *types.Conf) string {
