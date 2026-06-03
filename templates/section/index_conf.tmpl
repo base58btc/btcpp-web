@@ -21,11 +21,13 @@
               <a href="/talk/{{ .Tag }}" class="whitespace-nowrap font-semibold text-white {{ .Tag }}-text"><span class="absolute inset-0" aria-hidden="true"></span>Apply to Speak<span aria-hidden="true">&rarr;</span></a>
             </div>
           </div>
+	      {{ if .VolunteerOpen }}
 	      <div class="sm:mb-10 sm:flex">
             <div class="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-500 lg:ring-1 lg:ring-gray-900/10 hover:ring-gray-900/20">
               <a href="/volunteer/{{ .Tag }}" class="whitespace-nowrap font-semibold text-white {{ .Tag }}-text"><span class="absolute inset-0" aria-hidden="true"></span>Apply to Volunteer<span aria-hidden="true">&rarr;</span></a>
             </div>
 	      </div>
+	      {{ end }}
 	    </div>
 	  </div>
 	</div>

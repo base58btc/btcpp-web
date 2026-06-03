@@ -528,7 +528,7 @@
            from the user's Speakers row via the hr+em query params
            the dashboard already mints for other magic-link CTAs.
       */}}
-      {{ if and (not $eb.VolApp) $conf.InFuture }}
+      {{ if and (not $eb.VolApp) $conf.VolunteerOpen }}
       <div class="mt-5">
         <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Volunteer</h3>
         <a href="/volunteer/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
@@ -646,10 +646,12 @@
         Apply to speak
       </span>
       {{ end }}
-      <a href="/volunteer/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
-         class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200">
-        Apply to volunteer
-      </a>
+      {{ if $conf.VolunteerOpen }}
+        <a href="/volunteer/{{ $conf.Tag }}?hr={{ $.HMAC }}&em={{ $.Email }}"
+           class="inline-flex items-center px-3 py-1.5 rounded-md text-xs font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200">
+          Apply to volunteer
+        </a>
+      {{ end }}
     </div>
   </div>
   {{ end }}

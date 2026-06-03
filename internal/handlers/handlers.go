@@ -1326,6 +1326,20 @@ func listConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
 	return confs
 }
 
+func listVolunteerConfs(w http.ResponseWriter, ctx *config.AppContext) []*types.Conf {
+	confs := listConfs(w, ctx)
+	if confs == nil {
+		return nil
+	}
+	var out []*types.Conf
+	for _, conf := range confs {
+		if conf != nil && conf.VolunteerOpen() {
+			out = append(out, conf)
+		}
+	}
+	return out
+}
+
 func listJobs(w http.ResponseWriter, ctx *config.AppContext) []*types.JobType {
 	var jobs types.JobsList
 	var err error
@@ -2075,7 +2089,7 @@ func RenderSpeakerConf(w http.ResponseWriter, r *http.Request, ctx *config.AppCo
 }
 
 func RenderVolunteers(w http.ResponseWriter, r *http.Request, ctx *config.AppContext) {
-	confs := listConfs(w, ctx)
+	confs := listVolunteerConfs(w, ctx)
 	err := ctx.TemplateCache.ExecuteTemplate(w, "embeds/volunteer_select.tmpl", &VolunteerPage{
 		Confs: confs,
 		Year:  helpers.CurrentYear(),
@@ -2099,9 +2113,13 @@ func RenderVolunteerConf(w http.ResponseWriter, r *http.Request, ctx *config.App
 		handle404(w, r, ctx)
 		return
 	}
+	if !conf.VolunteerOpen() {
+		handle404(w, r, ctx)
+		return
+	}
 
 	jobs := listJobs(w, ctx)
-	confs := listConfs(w, ctx)
+	confs := listVolunteerConfs(w, ctx)
 
 	switch r.Method {
 	case http.MethodGet:

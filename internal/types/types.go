@@ -889,6 +889,15 @@ func (c *Conf) TalksOpen() bool {
 	return c.Active && time.Now().Before(c.TalksDueDate())
 }
 
+// VolunteerOpen reports whether public volunteer applications should be
+// available for this conf.
+func (c *Conf) VolunteerOpen() bool {
+	if c.Tag == "nairobi" {
+		return false
+	}
+	return c.Active && c.InFuture()
+}
+
 // EmojiOrDefault returns the conf's emoji, or a sparkles fallback when
 // the field is empty so the dashboard never renders a blank tile.
 func (c *Conf) EmojiOrDefault() string {
