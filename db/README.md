@@ -33,17 +33,32 @@ btcpp_pg_reset
 
 ## Notion Import
 
-The migration command currently imports conferences and conference ticket
-tiers:
+The migration command imports the Notion-backed dataset into Postgres:
 
 ```sh
 go run ./cmd/migrate-notion-postgres -reset -validate
 ```
+
+Current import coverage includes conferences, conference days, ticket tiers,
+discounts, registrations, affiliate usage, hotels, job types, volunteers,
+volunteer info, work shifts, organizations, sponsorships, people, proposals,
+speaker conference rows, scheduled conference talks, recordings, social posts,
+newsletter subscribers, and missives.
+
+`-reset` truncates the imported root tables and cascades through their child
+and join tables before writing. Keep using it while iterating on migration data
+so generated-UUID tables such as sponsorships, people, volunteers, work shifts,
+hotels, and affiliate usages do not accumulate duplicate import rows.
 
 Useful flags:
 
 ```sh
 go run ./cmd/migrate-notion-postgres -dry-run
 go run ./cmd/migrate-notion-postgres -database-url "$DATABASE_URL" -validate
-go run ./cmd/migrate-notion-postgres -skip-tickets -validate
+go run ./cmd/migrate-notion-postgres -skip-speaker-confs -validate
+go run ./cmd/migrate-notion-postgres -skip-conf-talks -skip-recordings -skip-social-posts -validate
 ```
+
+The app can use Postgres locally by setting `dataBackend = "postgres"` in
+`config.toml` or by exporting `DATA_BACKEND=postgres`. The environment variable
+overrides `config.toml` when both are present.

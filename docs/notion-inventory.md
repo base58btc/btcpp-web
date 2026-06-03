@@ -461,10 +461,10 @@ temporary in-memory maps while it runs:
   Notion data.
 - Discounts map by case-insensitive code name.
 - Registrations map by `RefID`, which is already the ticket's public stable ID.
-- Affiliate usage rows are append-only ledger entries. The importer stores the
-  code/email snapshots, resolves `discount_id` and `conference_id` when current
-  rows match, and should be rerun with `-reset` during migration to avoid
-  repeated inserts.
+- Affiliate usage rows are append-mostly ledger entries. The importer stores
+  the code/email snapshots, resolves `discount_id` and `conference_id` when
+  current rows match, and should be rerun with `-reset` during migration to
+  avoid repeated inserts.
 - Social posts map by `Ref`.
 - Job types map by `Tag`.
 - Subscribers map by case-insensitive email. Duplicate Notion subscriber pages
